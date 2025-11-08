@@ -1,0 +1,22 @@
+{
+  "id": "test_grid_constraints",
+  "type": "standard",
+  "size": { "width": 4, "height": 4 },
+  "islands": [
+    { "id": "A", "x": 1, "y": 1 },
+    { "id": "B", "x": 1, "y": 3, "constraints": ["num_bridges=3"] },
+    { "id": "C", "x": 3, "y": 1, "constraints": ["num_bridges=1"] },
+    { "id": "D", "x": 3, "y": 3, "constraints": ["num_bridges=2"] }
+  ],
+  "bridgeTypes": [
+    { "id": "b1", "colour": "black", "length": 3, "count": 1 },
+    { "id": "b2", "colour": "black", "length": 2, "count": 1 },
+    { "id": "b3", "colour": "black", "length": 2, "count": 1 },
+    { "id": "b4", "colour": "black", "length": 1, "count": 1 }
+  ],
+  "constraints": [
+    { "type": "AllBridgesPlacedConstraint" },
+    { "type": "MustTouchAHorizontalBridge", "params": { "x": 1, "y": 2 } },
+    { "type": "MustTouchAVerticalBridge",   "params": { "x": 2, "y": 1 } }
+  ]
+}

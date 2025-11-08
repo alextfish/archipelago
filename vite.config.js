@@ -1,0 +1,13 @@
+import { defineConfig } from 'vite';
+import path from 'path';
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      '@model': path.resolve(__dirname, 'src/model'),
+      '@view': path.resolve(__dirname, 'src/view'),
+      '@controller': path.resolve(__dirname, 'src/controller'),
+      '@core': path.resolve(__dirname, 'src/core'),
+    },
+  },
+});
