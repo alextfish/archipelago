@@ -5,15 +5,13 @@ import type { PuzzleHost } from "./PuzzleHost";
 import { PuzzleValidator } from "@model/puzzle/PuzzleValidator";
 import type { BridgeType } from "@model/puzzle/BridgeType";
 import type { Bridge } from "@model/puzzle/Bridge";
+import { UndoRedoManager } from "@model/UndoRedoManager";
+import { BuildBridgeCommand } from "@model/commands/BuildBridgeCommand";
+import { RemoveBridgeCommand } from "@model/commands/RemoveBridgeCommand";
 
 
 
 
-
-interface PuzzleCommand {
-    execute(): void;
-    undo(): void;
-}
 
 export class PuzzleController {
     private puzzle: BridgePuzzle;
@@ -24,17 +22,19 @@ export class PuzzleController {
     currentBridgeType: BridgeType | null = null;
     currentBridge: Bridge | null = null;
     pendingStart: { x: number; y: number } | null = null;
-    
-    // Undo/redo system
-    private history: PuzzleCommand[] = [];
-    private historyIndex: number = -1;
 
-    constructor(puzzle: BridgePuzzle, renderer: PuzzleRenderer, host: PuzzleHost) {
+    // Undo/redo manager (single source of truth for history)
+    private undoManager: UndoRedoManager;
+    // Track whether puzzle was previously solved to detect transitions
+    private wasSolved: boolean = false;
+
+    constructor(puzzle: BridgePuzzle, renderer: PuzzleRenderer, host: PuzzleHost, undoManager?: UndoRedoManager) {
         this.puzzle = puzzle;
         this.renderer = renderer;
         this.host = host;
         this.validator = new PuzzleValidator(puzzle);
         this.selectDefaultBridge();
+        this.undoManager = undoManager ?? new UndoRedoManager();
     }
 
     /** Called when player begins interacting with this puzzle. */
@@ -72,10 +72,40 @@ export class PuzzleController {
             return;
         }
         const availableBridgeTypes = this.puzzle.getAvailableBridgeTypes();
-        const currentIndex = availableBridgeTypes.findIndex(b => b.id === this.currentBridgeType!.id);
-        const nextIndex = next ? (currentIndex + 1) % availableBridgeTypes.length : (currentIndex - 1 + availableBridgeTypes.length) % availableBridgeTypes.length;
-        this.currentBridgeType = availableBridgeTypes[nextIndex];
-        this.selectBridgeType(this.currentBridgeType!);
+        const counts = this.puzzle.availableCounts();
+        if (!availableBridgeTypes.length) return;
+
+        // If counts is empty (no availability info), fall back to simple cycling
+        const hasCountsInfo = Object.keys(counts ?? {}).length > 0;
+
+        // Find current index in list
+        let currentIndex = availableBridgeTypes.findIndex(b => b.id === this.currentBridgeType!.id);
+        const len = availableBridgeTypes.length;
+
+        if (!hasCountsInfo) {
+            // Simple cycle without considering availability
+            const nextIndex = next ? (currentIndex + 1) % len : (currentIndex - 1 + len) % len;
+            this.currentBridgeType = availableBridgeTypes[nextIndex];
+            this.selectBridgeType(this.currentBridgeType!);
+            return;
+        }
+
+        // Start searching from next/previous index and wrap until we find an available type
+        let i = 0;
+        while (i < len) {
+            currentIndex = next ? (currentIndex + 1) % len : (currentIndex - 1 + len) % len;
+            const candidate = availableBridgeTypes[currentIndex];
+            const avail = counts[candidate.id] ?? 0;
+            if (avail > 0) {
+                this.currentBridgeType = candidate;
+                this.selectBridgeType(candidate);
+                return;
+            }
+            i++;
+        }
+        // No available types found — clear selection
+        this.currentBridgeType = null;
+        this.host.setSelectedBridgeType?.(null);
     }
     nextBridgeType() {
         this.nextOrPreviousBridgeType(true);
@@ -107,63 +137,96 @@ export class PuzzleController {
     /** Player attempts to place first endpoint. */
     tryPlaceFirstEndpoint(x: number, y: number) {
         if (!this.currentBridgeType) return;
-        this.pendingStart = { x, y };
-        this.renderer.highlightPreviewStart(x, y);
-        // Reserve nothing yet: only create/allocate the bridge when the second
-        // endpoint is confirmed. For now remember the start and show preview.
+        // Allocate a bridge immediately so the HUD can update and the renderer
+        // can preview using the concrete bridge. If none is available, notify
+        // host and don't start placement.
+        const bridge = this.puzzle.takeBridgeOfType(this.currentBridgeType.id);
+        if (!bridge) {
+            this.host.onNoBridgeTypeAvailable?.(this.currentBridgeType.id);
+            return;
+        }
+        bridge.start = { x, y };
+        // Keep the allocated bridge until second endpoint
+        this.currentBridge = bridge;
+        this.pendingStart = bridge.start;
+        this.renderer.previewBridge(bridge);
     }
 
     /** Player attempts to place second endpoint. */
     tryPlaceSecondEndpoint(x: number, y: number) {
         if (!this.currentBridgeType || !this.pendingStart) return;
-        // Allocate a real bridge of the selected type from inventory now.
-        const bridge = this.puzzle.takeBridgeOfType(this.currentBridgeType.id);
+        // Use the bridge already allocated on first endpoint
+        const bridge = this.currentBridge!;
         if (!bridge) {
             this.host.onNoBridgeTypeAvailable?.(this.currentBridgeType.id);
             // Keep pendingStart so the user can try another endpoint or cancel
             return;
         }
-        
+
         const endPoint = { x, y };
-        const success = this.puzzle.placeBridge(
-            bridge.id,
-            this.pendingStart,
-            endPoint
-        );
-        
-        if (!success) {
-            // Return the bridge to inventory by clearing its end
-            // (placeBridge didn't place it); there is no explicit returnBridge here
-            // because bridge was not marked placed. Just flash and leave state.
+        // Enforce maximum of two bridges between the same island pair.
+        // If there are already two placed bridges between these coordinates,
+        // reject the placement and give feedback.
+        const existingBetween = this.puzzle.placedBridges.filter(b => {
+            if (!b.start || !b.end) return false;
+            const a1 = b.start;
+            const a2 = b.end;
+            const s = this.pendingStart!;
+            const e = endPoint;
+            const sameOrder = (a1.x === s.x && a1.y === s.y && a2.x === e.x && a2.y === e.y);
+            const reversed = (a1.x === e.x && a1.y === e.y && a2.x === s.x && a2.y === s.y);
+            return sameOrder || reversed;
+        }).length;
+        if (existingBetween >= 2) {
+            // Too many bridges already; show invalid placement and release allocated bridge
             this.renderer.flashInvalidPlacement(this.pendingStart, endPoint);
-            bridge.end = undefined;
+            // Release allocated bridge
+            bridge.end = undefined as any;
+            this.currentBridge = null;
+            this.pendingStart = null;
             return;
         }
-        
+        // Create a BuildBridgeCommand that will place the bridge. Pass the
+        // preallocated bridge id so the command does not re-allocate.
+        const cmd = new BuildBridgeCommand(this.puzzle, this.currentBridgeType.id, this.pendingStart!, endPoint, bridge.id);
+        try {
+            this.undoManager.executeCommand(cmd);
+        } catch (e) {
+            // Placement failed: show invalid placement and release allocated bridge
+            this.renderer.flashInvalidPlacement(this.pendingStart, endPoint);
+            bridge.end = undefined;
+            this.currentBridge = null;
+            this.pendingStart = null;
+            return;
+        }
+
         // Placement succeeded. Clear pending state and update visuals.
         this.pendingStart = null;
+        // Clear any allocated bridge reference — it's now placed.
+        this.currentBridge = null;
         this.renderer.updateFromPuzzle(this.puzzle);
-        this.autoSelectNextBridgeType();
+        this.selectAvailableBridgeType();
         this.validate();
     }
 
-    private autoSelectNextBridgeType() {
+    private selectAvailableBridgeType() {
         // If the selected type is now depleted, auto-select the next available type
         const counts = this.puzzle.availableCounts();
         const remaining = (this.currentBridgeType ? counts[this.currentBridgeType.id] : 0) ?? 0;
         if (remaining === 0) {
-          const availableTypes = this.puzzle.getAvailableBridgeTypes();
-          const next = availableTypes.find(t => (counts[t.id] ?? 0) > 0) ?? null;
-          this.currentBridgeType = next;
-          this.host.setSelectedBridgeType?.(next ? next.id : null);
+            const availableTypes = this.puzzle.getAvailableBridgeTypes();
+            const next = availableTypes.find(t => (counts[t.id] ?? 0) > 0) ?? null;
+            this.currentBridgeType = next;
+            this.host.setSelectedBridgeType?.(next ? next.id : null);
         }
     }
 
     removeBridge(bridgeId: string) {
         this.cancelPlacement();
-        this.puzzle.removeBridge(bridgeId);
+        const cmd = new RemoveBridgeCommand(this.puzzle, bridgeId);
+        this.undoManager.executeCommand(cmd);
         this.renderer.updateFromPuzzle(this.puzzle);
-        this.autoSelectNextBridgeType();
+        this.selectAvailableBridgeType();
         this.validate();
     }
 
@@ -173,33 +236,50 @@ export class PuzzleController {
     }
 
     undo(): void {
-        console.log('Undo requested');
-        if (this.historyIndex >= 0) {
-            const command = this.history[this.historyIndex];
-            command.undo();
-            this.historyIndex--;
+        // Block undo when puzzle is currently solved
+        if (this.wasSolved) return;
+        if (this.undoManager.undo()) {
             this.renderer.updateFromPuzzle(this.puzzle);
             this.validate();
         }
     }
 
     redo(): void {
-        if (this.historyIndex < this.history.length - 1) {
-            this.historyIndex++;
-            const command = this.history[this.historyIndex];
-            command.execute();
+        // Block redo when puzzle is currently solved
+        if (this.wasSolved) return;
+        if (this.undoManager.redo()) {
             this.renderer.updateFromPuzzle(this.puzzle);
             this.validate();
         }
     }
 
+    canUndo(): boolean {
+        return !this.wasSolved && this.undoManager.canUndo();
+    }
+
+    canRedo(): boolean {
+        return !this.wasSolved && this.undoManager.canRedo();
+    }
+
     validate() {
         const results = this.validator.validateAll();
 
-        if (results.allSatisfied) {
-            // puzzle solved — call host callback
+    // Consider puzzle solved only if there is at least one constraint and all are satisfied.
+    const nowSolved = results.allSatisfied && (results.perConstraint?.length ?? 0) > 0;
+        // Transition: unsolved -> solved
+        if (nowSolved && !this.wasSolved) {
+            this.wasSolved = true;
+            // Debug log: notify host that puzzle is solved
+            try {
+                console.log('[PuzzleController] validate: nowSolved=true, calling host.onPuzzleSolved()');
+            } catch (e) {}
             this.host.onPuzzleSolved();
-        } else {
+        } else if (!nowSolved && this.wasSolved) {
+            // Solved -> unsolved transition (clear flag)
+            this.wasSolved = false;
+        }
+
+        if (!nowSolved) {
             // inform view which constraints failed
             const failed = results.perConstraint.filter(p => !p.result.satisfied);
             const affected = failed.flatMap(f => f.result.affectedElements ?? []);

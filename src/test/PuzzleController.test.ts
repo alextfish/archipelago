@@ -47,9 +47,17 @@ class MockPuzzleRenderer implements PuzzleRenderer {
     this.clearHighlightsCalled = true;
   }
 
-  previewBridge?(bridge: Bridge): void {
+  previewBridge(bridge: Bridge): void {
     this.previewBridgeCalled = true;
     this.previewBridgeArg = bridge;
+  }
+
+  setAvailableBridgeTypes(_types: BridgeType[]): void {
+    // no-op for tests
+  }
+
+  setSelectedBridgeType(_type: BridgeType | null): void {
+    // no-op for tests
   }
 
   update(dt: number): void {
@@ -279,6 +287,33 @@ describe("PuzzleController", () => {
       expect(controller.currentBridgeType).not.toBeNull();
       expect(controller.currentBridgeType!.id).toBe("type1");
     });
+
+    it("skips unavailable bridge types when cycling", () => {
+      // Arrange three types where middle type has zero availability
+      const bridgeTypes: BridgeType[] = [
+        { id: "t1", colour: "black" },
+        { id: "t2", colour: "red" },
+        { id: "t3", colour: "blue" }
+      ];
+      mockPuzzle.getAvailableBridgeTypes = vi.fn(() => bridgeTypes);
+      // Only t1 and t3 available
+      mockPuzzle.availableCounts = vi.fn(() => ({ t1: 1, t2: 0, t3: 1 }));
+
+      controller = new PuzzleController(
+        mockPuzzle as unknown as BridgePuzzle,
+        mockRenderer,
+        mockHost
+      );
+
+      // Start at t1
+      expect(controller.currentBridgeType!.id).toBe('t1');
+      // Next should skip t2 (unavailable) and select t3
+      controller.nextBridgeType();
+      expect(controller.currentBridgeType!.id).toBe('t3');
+      // Next should wrap to t1
+      controller.nextBridgeType();
+      expect(controller.currentBridgeType!.id).toBe('t1');
+    });
   });
 
   describe("cancelPlacement", () => {
@@ -326,7 +361,6 @@ describe("PuzzleController", () => {
       controller.tryPlaceAt(1, 2);
 
       expect(mockPuzzle.takeBridgeOfType).toHaveBeenCalledWith("type1");
-      expect(mockRenderer.highlightStartCalled).toBe(true);
       expect(mockRenderer.previewBridgeCalled).toBe(true);
     });
 
@@ -373,6 +407,38 @@ describe("PuzzleController", () => {
       expect(mockHost.noBridgeTypeAvailableCalled).toBe(true);
       expect(mockHost.bridgeTypeId).toBe("type1");
     });
+
+    it('prevents placing a third bridge between the same island pair', () => {
+      // Simulate two already-placed bridges between (1,2) and (3,2)
+      (mockPuzzle.bridges as any[]).push(
+        { id: 'b1', type: { id: 'type1' }, start: { x: 1, y: 2 }, end: { x: 3, y: 2 } },
+        { id: 'b2', type: { id: 'type1' }, start: { x: 1, y: 2 }, end: { x: 3, y: 2 } }
+      );
+
+      // Ensure allocation still returns a bridge if attempted
+      const mockBridge: Bridge = { id: 'b3', type: { id: 'type1' } } as any;
+      mockPuzzle.takeBridgeOfType = vi.fn(() => mockBridge);
+
+      controller = new PuzzleController(
+        mockPuzzle as unknown as BridgePuzzle,
+        mockRenderer,
+        mockHost
+      );
+
+      // Try placing a third bridge between the same pair
+      controller.tryPlaceAt(1, 2); // allocate
+      expect(mockRenderer.previewBridgeCalled).toBe(true);
+      expect(controller.currentBridge).toBe(mockBridge);
+
+      controller.tryPlaceAt(3, 2); // attempt to finish placement
+
+      // Placement should be rejected: renderer should flash invalid and placeBridge not called
+      expect(mockRenderer.flashInvalidCalled).toBe(true);
+      expect(mockPuzzle.placeBridge).not.toHaveBeenCalled();
+      // And controller should have cleared pending state
+      expect(controller.currentBridge).toBeNull();
+      expect(controller.pendingStart).toBeNull();
+    });
   });
 
   describe("bridge removal", () => {
@@ -388,6 +454,9 @@ describe("PuzzleController", () => {
     });
 
     it("removes bridge and updates renderer", () => {
+      // Ensure puzzle has a bridge to remove so RemoveBridgeCommand can find it
+      (mockPuzzle.bridges as any[]).push({ id: "bridge1", type: { id: "type1" }, start: { x:1,y:1 }, end: { x:2,y:2 } });
+
       controller.removeBridge("bridge1");
 
       expect(mockPuzzle.removeBridge).toHaveBeenCalledWith("bridge1");
@@ -397,6 +466,7 @@ describe("PuzzleController", () => {
     it("validates after removal", () => {
       const validateSpy = vi.spyOn(controller as any, "validate");
 
+      (mockPuzzle.bridges as any[]).push({ id: "bridge1", type: { id: "type1" }, start: { x:1,y:1 }, end: { x:2,y:2 } });
       controller.removeBridge("bridge1");
 
       expect(validateSpy).toHaveBeenCalled();
@@ -412,7 +482,7 @@ describe("PuzzleController", () => {
       const mockValidator = {
         validateAll: vi.fn(() => ({
           allSatisfied: true,
-          perConstraint: [],
+          perConstraint: [{ constraintId: 'c1', result: { satisfied: true, affectedElements: [] } }],
           unsatisfiedCount: 0
         } as ValidationResult))
       };
@@ -431,6 +501,56 @@ describe("PuzzleController", () => {
       controller.validate();
 
       expect(mockHost.puzzleSolvedCalled).toBe(true);
+    });
+
+    it('only calls host.onPuzzleSolved once on transition to solved', () => {
+      // Prepare a validator that reports solved
+      const mockValidator = {
+        validateAll: vi.fn(() => ({ allSatisfied: true, perConstraint: [{ constraintId: 'c1', result: { satisfied: true, affectedElements: [] } }], unsatisfiedCount: 0 }))
+      };
+
+      controller = new PuzzleController(
+        mockPuzzle as unknown as BridgePuzzle,
+        mockRenderer,
+        mockHost
+      );
+      // Inject the mock validator
+      (controller as any).validator = mockValidator;
+
+      // First call should invoke host.onPuzzleSolved once
+      controller.validate();
+      expect(mockHost.puzzleSolvedCalled).toBe(true);
+
+      // Reset flag and call validate again with same solved result
+      mockHost.puzzleSolvedCalled = false;
+      controller.validate();
+      // Should not call again because state hasn't changed
+      expect(mockHost.puzzleSolvedCalled).toBe(false);
+    });
+
+    it('blocks undo when puzzle is solved', () => {
+      // Make validator report solved so controller sets wasSolved
+      const mockValidator = {
+        validateAll: vi.fn(() => ({ allSatisfied: true, perConstraint: [{ constraintId: 'c1', result: { satisfied: true, affectedElements: [] } }], unsatisfiedCount: 0 }))
+      };
+
+      controller = new PuzzleController(
+        mockPuzzle as unknown as BridgePuzzle,
+        mockRenderer,
+        mockHost
+      );
+      (controller as any).validator = mockValidator;
+
+      // Trigger solved transition
+      controller.validate();
+      expect((controller as any).wasSolved).toBe(true);
+
+      // Spy on undoManager.undo
+      (controller as any).undoManager.undo = vi.fn(() => false);
+
+      controller.undo();
+      expect((controller as any).undoManager.undo).not.toHaveBeenCalled();
+      expect(controller.canUndo()).toBe(false);
     });
 
     it("highlights violations when not all constraints satisfied", () => {
@@ -523,14 +643,10 @@ describe("PuzzleController", () => {
       );
     });
 
-    it("can undo", () => {
-      const command = {
-        execute: vi.fn(),
-        undo: vi.fn()
-      };
-      
-      (controller as any).history = [command];
-      (controller as any).historyIndex = 0;
+    it("can undo via UndoRedoManager", () => {
+      const command = { execute: vi.fn(), undo: vi.fn() };
+      // execute the command through the controller's undo manager
+      (controller as any).undoManager.executeCommand(command);
 
       controller.undo();
 
@@ -538,14 +654,10 @@ describe("PuzzleController", () => {
       expect(mockRenderer.updateCalled).toBe(true);
     });
 
-    it("can redo", () => {
-      const command = {
-        execute: vi.fn(),
-        undo: vi.fn()
-      };
-      
-      (controller as any).history = [command];
-      (controller as any).historyIndex = -1;
+    it("can redo via UndoRedoManager", () => {
+      const command = { execute: vi.fn(), undo: vi.fn() };
+      (controller as any).undoManager.executeCommand(command);
+      controller.undo();
 
       controller.redo();
 
@@ -554,31 +666,17 @@ describe("PuzzleController", () => {
     });
 
     it("can't undo when at start of history", () => {
-      const command = {
-        execute: vi.fn(),
-        undo: vi.fn()
-      };
-      
-      (controller as any).history = [command];
-      (controller as any).historyIndex = -1;
-
+      // Ensure manager is clear
+      (controller as any).undoManager.clear();
       controller.undo();
-
-      expect(command.undo).not.toHaveBeenCalled();
+      // Nothing to assert on spies; just ensure no throws and renderer not updated
+      expect(mockRenderer.updateCalled).toBe(false);
     });
 
     it("can't redo when at end of history", () => {
-      const command = {
-        execute: vi.fn(),
-        undo: vi.fn()
-      };
-      
-      (controller as any).history = [command];
-      (controller as any).historyIndex = 0;
-
+      (controller as any).undoManager.clear();
       controller.redo();
-
-      expect(command.execute).not.toHaveBeenCalled();
+      expect(mockRenderer.updateCalled).toBe(false);
     });
   });
 });

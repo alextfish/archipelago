@@ -17,6 +17,10 @@ export class PuzzleSidebar {
   private typeButtons: Map<string, Phaser.GameObjects.Container> = new Map();
   private counts: Record<string, number> = {};
 
+  private selectedTypeId: string | null = null;
+  private undoBg: Phaser.GameObjects.Rectangle | null = null;
+  private redoBg: Phaser.GameObjects.Rectangle | null = null;
+
   constructor(
     scene: Phaser.Scene,
     callbacks: PuzzleSidebarCallbacks
@@ -83,10 +87,13 @@ export class PuzzleSidebar {
     
     const undoBtn = this.createButton('Undo', yOffset, () => this.callbacks.onUndo());
     this.panel.add(undoBtn);
+    // store bg rectangle for styling later
+    this.undoBg = undoBtn.getAll().find(c => c instanceof Phaser.GameObjects.Rectangle) as Phaser.GameObjects.Rectangle;
     yOffset += 40;
     
     const redoBtn = this.createButton('Redo', yOffset, () => this.callbacks.onRedo());
     this.panel.add(redoBtn);
+    this.redoBg = redoBtn.getAll().find(c => c instanceof Phaser.GameObjects.Rectangle) as Phaser.GameObjects.Rectangle;
     yOffset += 40;
   }
 
@@ -144,6 +151,30 @@ export class PuzzleSidebar {
     return container;
   }
 
+  setUndoEnabled(enabled: boolean): void {
+    if (!this.undoBg) return;
+    if (enabled) {
+      this.undoBg.setFillStyle(0x0077ff, 1);
+      // Re-enable interactive without removing existing listeners
+      if ((this.undoBg as any).setInteractive) (this.undoBg as any).setInteractive({ useHandCursor: true });
+    } else {
+      this.undoBg.setFillStyle(0x0077ff, 0.35);
+      // Disable interaction but keep listeners attached so re-enable restores behaviour
+      if ((this.undoBg as any).disableInteractive) (this.undoBg as any).disableInteractive();
+    }
+  }
+
+  setRedoEnabled(enabled: boolean): void {
+    if (!this.redoBg) return;
+    if (enabled) {
+      this.redoBg.setFillStyle(0x0077ff, 1);
+      if ((this.redoBg as any).setInteractive) (this.redoBg as any).setInteractive({ useHandCursor: true });
+    } else {
+      this.redoBg.setFillStyle(0x0077ff, 0.35);
+      if ((this.redoBg as any).disableInteractive) (this.redoBg as any).disableInteractive();
+    }
+  }
+
   updateCounts(counts: Record<string, number>): void {
     this.counts = counts;
     
@@ -171,7 +202,11 @@ export class PuzzleSidebar {
           try { bg.removeAllListeners('pointerdown'); } catch(e) {}
           if ((bg as any).disableInteractive) (bg as any).disableInteractive();
         } else {
-          bg.setFillStyle(0x555555, 1);
+          if (this.selectedTypeId === typeId) {
+            bg.setFillStyle(0x9999aa, 1); // Bright cyan when selected
+          } else {
+            bg.setFillStyle(0x555555, 1);
+          }
           // ensure interactive and listener present
           try { bg.removeAllListeners('pointerdown'); } catch(e) {}
           bg.setInteractive({ useHandCursor: true });
@@ -184,6 +219,7 @@ export class PuzzleSidebar {
   }
 
   setSelectedType(typeId: string): void {
+    this.selectedTypeId = typeId;
     // Update button visuals
     for (const [id, button] of this.typeButtons.entries()) {
       const children = button.getAll();

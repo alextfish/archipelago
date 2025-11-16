@@ -51,10 +51,15 @@ export class BridgeInventory {
 
   /** Number of remaining bridges of each type */
   countsByType(): Record<string, number> {
+    // Ensure every declared bridge type appears in the result (even if zero)
     const counts: Record<string, number> = {};
     for (const b of this.allBridges) {
-      if (!b.start && !b.end)
-        counts[b.type.id] = (counts[b.type.id] ?? 0) + 1;
+      if (!(b.type.id in counts)) counts[b.type.id] = 0;
+    }
+    for (const b of this.allBridges) {
+      if (!b.start && !b.end) {
+        counts[b.type.id] = counts[b.type.id] + 1;
+      }
     }
     return counts;
   }

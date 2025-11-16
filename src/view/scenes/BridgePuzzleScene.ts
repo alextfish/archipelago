@@ -174,7 +174,7 @@ export class BridgePuzzleScene extends Phaser.Scene {
         this.input.keyboard?.on('keydown-Q', () => {
             this.controller?.previousBridgeType();
             if (this.controller?.currentBridgeType) {
-                const hud = this.scene.get('PuzzleHUD');
+                const hud = this.scene.get('PuzzleHUDScene');
                 hud.events.emit('setSelectedType', this.controller.currentBridgeType.id);
             }
         });
@@ -182,7 +182,7 @@ export class BridgePuzzleScene extends Phaser.Scene {
         this.input.keyboard?.on('keydown-E', () => {
             this.controller?.nextBridgeType();
             if (this.controller?.currentBridgeType) {
-                const hud = this.scene.get('PuzzleHUD');
+                const hud = this.scene.get('PuzzleHUDScene');
                 hud.events.emit('setSelectedType', this.controller.currentBridgeType.id);
             }
         });
@@ -190,17 +190,13 @@ export class BridgePuzzleScene extends Phaser.Scene {
         this.input.keyboard?.on('keydown-ESC', () => {
             this.controller?.cancelPlacement();
         });
-        
-        this.input.keyboard?.on('keydown-Z', (event: KeyboardEvent) => {
-            if (event.ctrlKey) {
-                this.controller?.undo();
-            }
+
+        this.input.keyboard?.on('keydown-Z', () => {
+            this.controller?.undo();
         });
-        
-        this.input.keyboard?.on('keydown-Y', (event: KeyboardEvent) => {
-            if (event.ctrlKey) {
-                this.controller?.redo();
-            }
+
+        this.input.keyboard?.on('keydown-Y', () => {
+            this.controller?.redo();
         });
     }
 
@@ -229,6 +225,11 @@ export class BridgePuzzleScene extends Phaser.Scene {
             const counts = this.puzzle.availableCounts();
             const hud = this.scene.get('PuzzleHUDScene');
             hud.events.emit('updateCounts', counts);
+            // Update HUD undo/redo button enabled state
+            const canUndo = this.controller!.canUndo();
+            const canRedo = this.controller!.canRedo();
+            hud.events.emit('setUndoEnabled', canUndo);
+            hud.events.emit('setRedoEnabled', canRedo);
         }
     }
 
@@ -237,7 +238,12 @@ export class BridgePuzzleScene extends Phaser.Scene {
             loadPuzzle: (_puzzleID: string) => {
                 // Already loaded in create()
             },
-            onPuzzleSolved: () => this.onPuzzleSolved(),
+            onPuzzleSolved: () => {
+                try { console.log('[PuzzleHost] onPuzzleSolved called (forwarding to HUD)'); } catch(e) {}
+                // Forward solved notification to the HUD scene so the overlay is drawn in UI space
+                const hud = this.scene.get('PuzzleHUDScene');
+                hud.events.emit('puzzleSolved');
+            },
             onPuzzleExited: (success: boolean) => this.onPuzzleExited(success),
             onNoBridgeTypeAvailable: (typeId: string) => this.onNoBridgeTypeAvailable(typeId),
             setSelectedBridgeType: (typeId: string | null) => {
@@ -250,22 +256,8 @@ export class BridgePuzzleScene extends Phaser.Scene {
 
     // PuzzleHost implementation
     onPuzzleSolved(): void {
-        // Show "Puzzle Solved!" message
-        const text = this.add.text(400, 300, 'Puzzle Solved!', {
-            color: '#00ff00',
-            fontSize: '32px',
-            fontStyle: 'bold'
-        }).setOrigin(0.5, 0.5);
-        
-        this.tweens.add({
-            targets: text,
-            alpha: 0,
-            duration: 2000,
-            yoyo: true,
-            onComplete: () => {
-                // Could transition to overworld here
-            }
-        });
+        // Solved notification is handled by the HUD scene (fixed to viewport).
+        try { console.log('[BridgePuzzleScene] onPuzzleSolved() called — HUD will display solved overlay'); } catch(e) {}
     }
 
     onPuzzleExited(success: boolean): void {

@@ -39,6 +39,9 @@ describe("PuzzleValidator", () => {
     const puzzle = makeMockPuzzle([c1, c2]);
     const v = new PuzzleValidator(puzzle);
     const res = v.validateAll();
+    const solved = v.isSolved();
+
+    expect(solved).toBe(true);
 
     expect(res.allSatisfied).toBe(true);
     expect(res.unsatisfiedCount).toBe(0);
@@ -56,7 +59,10 @@ describe("PuzzleValidator", () => {
     const puzzle = makeMockPuzzle([c1 as any, c2 as any]);
     const v = new PuzzleValidator(puzzle);
     const res = v.validateAll();
+    const solved = v.isSolved();
 
+    expect(solved).toBe(false);
+    
     expect(res.allSatisfied).toBe(false);
     expect(res.unsatisfiedCount).toBe(1);
     const failed = res.perConstraint.filter(p => !p.result.satisfied);

@@ -8,31 +8,42 @@ import { Command } from "@model/commands/Command";
  * - On undo: removes the placed bridge (returns it to inventory).
  */
 export class BuildBridgeCommand extends Command {
-  private bridgeId: string | null = null;
+  private bridgeID: string | null = null;
   private executed = false;
 
+  /**
+   * If preallocatedBridgeId is provided, the command will use that bridge id
+   * instead of calling takeBridge() when executed. This allows the controller
+   * to allocate a preview bridge on first endpoint and then create a command
+   * that completes placement without re-allocating.
+   */
   constructor(
     private puzzle: BridgePuzzle,
-    private bridgeTypeId: string,
+    private bridgeTypeID: string,
     private start: Point,
-    private end: Point
+    private end: Point,
+    preallocatedBridgeID?: string
   ) {
     super();
+    if (preallocatedBridgeID) this.bridgeID = preallocatedBridgeID;
   }
 
   execute(): void {
     if (this.executed) return;
-
-    const bridge = this.puzzle.takeBridgeOfType(this.bridgeTypeId);
-    if (!bridge) {
-      throw new Error(`No bridge available of type ${this.bridgeTypeId}`);
+    let bridgeIDToUse = this.bridgeID;
+    if (!bridgeIDToUse) {
+      const bridge = this.puzzle.takeBridgeOfType(this.bridgeTypeID);
+      if (!bridge) {
+        throw new Error(`No bridge available of type ${this.bridgeTypeID}`);
+      }
+      bridgeIDToUse = bridge.id;
+      this.bridgeID = bridgeIDToUse;
     }
 
-    this.bridgeId = bridge.id;
-    const placed = this.puzzle.placeBridge(this.bridgeId, this.start, this.end);
+    const placed = this.puzzle.placeBridge(bridgeIDToUse, this.start, this.end);
     if (!placed) {
       // If placement failed, ensure bridge is not considered allocated here
-      this.bridgeId = null;
+      this.bridgeID = null;
       throw new Error("Bridge placement failed");
     }
 
@@ -40,12 +51,12 @@ export class BuildBridgeCommand extends Command {
   }
 
   undo(): void {
-    if (!this.executed || !this.bridgeId) return;
-    this.puzzle.removeBridge(this.bridgeId);
+    if (!this.executed || !this.bridgeID) return;
+    this.puzzle.removeBridge(this.bridgeID);
     this.executed = false;
   }
 
   getDescription(): string {
-    return `Place bridge ${this.bridgeTypeId} at ${this.start.x},${this.start.y} -> ${this.end.x},${this.end.y}`;
+    return `Place bridge ${this.bridgeTypeID} at ${this.start.x},${this.start.y} -> ${this.end.x},${this.end.y}`;
   }
 }

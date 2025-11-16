@@ -1,14 +1,14 @@
 // view/PuzzleRenderer.ts
 import type { BridgeType } from "@model/puzzle/BridgeType";
 import type { BridgePuzzle } from "../model/puzzle/BridgePuzzle";
+import type { Bridge } from "@model/puzzle/Bridge";
 
 export interface PuzzleRenderer {
   /** Called once when session begins to let renderer create sprites. */
   init(puzzle: BridgePuzzle): void;
   /** Redraw everything from puzzle state; idempotent. */
   updateFromPuzzle(puzzle: BridgePuzzle): void;
-  highlightPreviewStart(x: number, y: number): void;
-  highlightPreviewSegment(start: {x:number,y:number}, end: {x:number,y:number}): void;
+  previewBridge(bridge: Bridge): void;
 
   /** Show which bridge type is selected in sidebar, counts, etc. */
   setAvailableBridgeTypes(types: BridgeType[]): void;
