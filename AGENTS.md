@@ -28,6 +28,8 @@ Use mocks or stubs to isolate layers when testing controllers.
 
 Keep tests small, deterministic, and readable.
 
+There's no such thing as "legacy tests": update the tests to match the product code. If some planned product changes break tests, fix the tests rather than making inelegant edits to the product.
+
 3. Data Flow
 
 Puzzle state changes live in the model.

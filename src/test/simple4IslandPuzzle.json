@@ -2,8 +2,8 @@
   "id": "test_simple_4_island",
   "type": "standard",
   "size": {
-    "width": 4,
-    "height": 4
+    "width": 6,
+    "height": 6
   },
   "islands": [
     {
@@ -14,14 +14,14 @@
     {
       "id": "B",
       "x": 1,
-      "y": 3,
+      "y": 4,
       "constraints": [
         "num_bridges=3"
       ]
     },
     {
       "id": "C",
-      "x": 3,
+      "x": 4,
       "y": 1,
       "constraints": [
         "num_bridges=1"
@@ -29,8 +29,8 @@
     },
     {
       "id": "D",
-      "x": 3,
-      "y": 3,
+      "x": 4,
+      "y": 4,
       "constraints": [
         "num_bridges=2"
       ]

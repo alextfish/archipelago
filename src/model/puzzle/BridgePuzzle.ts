@@ -52,17 +52,22 @@ export class BridgePuzzle {
         count: spec.count ?? 1
       }));
     this.inventory = new BridgeInventory(bridgeTypes);
-      if (spec.maxNumBridges !== undefined) {
+    if (spec.maxNumBridges !== undefined) {
       this.maxNumBridges = spec.maxNumBridges;
     } else {
       this.maxNumBridges = 2;
     }
-      // Build constraints from spec and also add length constraints for any fixed-length bridge types
-      for (const bt of bridgeTypes) {
-        const len = (bt.length === undefined) ? -1 : bt.length ?? -1;
-        if (len !== -1) {
-          // add a constraint enforcing this bridge type's fixed length
-          this.constraints.push(BridgeLengthConstraint.fromSpec({ typeId: bt.id, length: len }));
+      // Build constraints from spec. If the spec does not include any constraints,
+      // automatically add fixed-length constraints for each fixed-length bridge type
+      // so standalone fixed-length tests still get validated.
+      const hasSpecConstraints = Array.isArray(spec.constraints) && spec.constraints.length > 0;
+      if (!hasSpecConstraints) {
+        for (const bt of bridgeTypes) {
+          const len = (bt.length === undefined) ? -1 : bt.length ?? -1;
+          if (len !== -1) {
+            // add a constraint enforcing this bridge type's fixed length
+            this.constraints.push(BridgeLengthConstraint.fromSpec({ typeId: bt.id, length: len }));
+          }
         }
       }
   }
@@ -128,12 +133,37 @@ export class BridgePuzzle {
    * the puzzle's current rules (encapsulated here so criteria can change later).
    */
   couldPlaceBridgeAt(startIslandId: string, endIslandId: string): boolean {
+    return this.couldPlaceBridgeOfType(startIslandId, endIslandId, undefined as any);
+  }
+
+  /**
+   * Returns whether a bridge of the given type can be placed between two islands.
+   * If typeId is undefined, this behaves like the legacy couldPlaceBridgeAt (only max-bridges and existence checks).
+   */
+  couldPlaceBridgeOfType(startIslandId: string, endIslandId: string, typeId?: string): boolean {
     if (startIslandId === endIslandId) return false;
     const startIsland = this.islands.find(i => i.id === startIslandId);
     const endIsland = this.islands.find(i => i.id === endIslandId);
     if (!startIsland || !endIsland) return false;
     const existing = this.getBridgeCountBetween(startIslandId, endIslandId);
-    return existing < this.maxNumBridges;
+    if (existing >= this.maxNumBridges) return false;
+
+    if (!typeId) return true;
+
+    // Find bridge type in inventory; fall back to checking length property directly
+    const bt = this.inventory.bridgeTypes.find(b => b.id === typeId);
+    if (!bt) return true; // unknown type — allow by default
+
+    if (bt.allowsSpan) {
+      return bt.allowsSpan({ x: startIsland.x, y: startIsland.y }, { x: endIsland.x, y: endIsland.y });
+    }
+
+    const len = (bt.length === undefined) ? -1 : bt.length ?? -1;
+    if (len === -1) return true;
+    const dx = endIsland.x - startIsland.x;
+    const dy = endIsland.y - startIsland.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    return Math.abs(dist - len) <= 0.01;
   }
   takeBridgeOfType(typeId: string): Bridge | undefined {
     return this.inventory.takeBridge(typeId);

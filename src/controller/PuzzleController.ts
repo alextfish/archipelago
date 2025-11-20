@@ -67,14 +67,14 @@ export class PuzzleController {
         if (typeLength !== -1) {
             // fixed length: angle from start to cursor or island, endpoint at fixed length
             const startID = this.getIslandIDAt(start.x, start.y);
-            if (candidateIsland && startID && this.puzzle.couldPlaceBridgeAt(startID, candidateIsland.id)) {
+            if (candidateIsland && startID && this.puzzle.couldPlaceBridgeOfType(startID, candidateIsland.id, this.currentBridgeType!.id)) {
                 // snap to island
                 previewEnd = { x: candidateIsland.x, y: candidateIsland.y };
                 const count = this.puzzle.getBridgeCountBetween(startID, candidateIsland.id);
                 isDouble = count === 1;
             } else {
                 // angle from start to cursor, endpoint = start + unit(angle)*length
-                // calculate true angle from world coordinates
+                // calculate true angle to cursor point from world coordinates
                 const worldStart = (this.renderer as any).gridMapper.gridToWorld(start.x, start.y);
                 const angle = Math.atan2(_worldY - worldStart.y, _worldX - worldStart.x);
                 previewEnd = { x: start.x + Math.cos(angle) * typeLength, y: start.y + Math.sin(angle) * typeLength };
@@ -83,7 +83,7 @@ export class PuzzleController {
             // variable length: snap to candidate island if it's a valid placement, else follow cursor
             if (candidateIsland) {
                 const startID = this.getIslandIDAt(start.x, start.y);
-                if (startID && this.puzzle.couldPlaceBridgeAt(startID, candidateIsland.id)) {
+                if (startID && this.puzzle.couldPlaceBridgeOfType(startID, candidateIsland.id, this.currentBridgeType!.id)) {
                     previewEnd = { x: candidateIsland.x, y: candidateIsland.y };
                     const count = this.puzzle.getBridgeCountBetween(startID, candidateIsland.id);
                     isDouble = count === 1;
@@ -291,44 +291,26 @@ export class PuzzleController {
         // Enforce maximum of two bridges between the same island pair.
         // If there are already two placed bridges between these coordinates,
         // reject the placement and give feedback.
-        const existingBetween = this.puzzle.placedBridges.filter(b => {
-            if (!b.start || !b.end) return false;
-            const a1 = b.start;
-            const a2 = b.end;
-            const s = this.pendingStart!;
-            const e = endPoint;
-            const sameOrder = (a1.x === s.x && a1.y === s.y && a2.x === e.x && a2.y === e.y);
-            const reversed = (a1.x === e.x && a1.y === e.y && a2.x === s.x && a2.y === s.y);
-            return sameOrder || reversed;
-        }).length;
-        if (existingBetween >= this.puzzle.maxNumBridges) {
-            // Too many bridges already; show invalid placement and release allocated bridge
+
+        const startID = this.getIslandIDAt(this.pendingStart.x, this.pendingStart.y);
+        if (!startID || !this.currentBridgeType ||
+            !this.puzzle.couldPlaceBridgeOfType(startID, islandAtEnd.id, this.currentBridgeType.id)) {
+            // Invalid according to model rules (length/multiplicity/etc.). Show feedback and return the allocated bridge.
             this.renderer.flashInvalidPlacement(this.pendingStart, endPoint);
             // Release allocated bridge
             bridge.end = undefined as any;
             if (bridge.id) this.puzzle.inventory.returnBridge(bridge.id);
             this.currentBridge = null;
             this.pendingStart = null;
+            this.renderer.clearHighlights();
+            this.renderer.setPlacing(false);
             return;
         }
-        // Enforce fixed-length bridge type if applicable
-        const declaredLen = (this.currentBridgeType.length === undefined) ? -1 : this.currentBridgeType.length ?? -1;
-        if (declaredLen !== -1) {
-            const dx = endPoint.x - this.pendingStart.x;
-            const dy = endPoint.y - this.pendingStart.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (Math.abs(dist - declaredLen) > 0.01) {
-                this.renderer.flashInvalidPlacement(this.pendingStart, endPoint);
-                if (bridge && bridge.id) this.puzzle.inventory.returnBridge(bridge.id);
-                bridge.end = undefined as any;
-                this.currentBridge = null;
-                this.pendingStart = null;
-                return;
-            }
-        }
+
         // Create a BuildBridgeCommand that will place the bridge. Pass the
         // preallocated bridge id so the command does not re-allocate.
         const cmd = new BuildBridgeCommand(this.puzzle, this.currentBridgeType.id, this.pendingStart!, endPoint, bridge.id);
+        console.log('[PuzzleController] executing BuildBridgeCommand', { start: this.pendingStart, end: endPoint, bridgeId: bridge.id });
         try {
             this.undoManager.executeCommand(cmd);
         } catch (e) {

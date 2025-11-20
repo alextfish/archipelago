@@ -40,6 +40,7 @@ export class BuildBridgeCommand extends Command {
       this.bridgeID = bridgeIDToUse;
     }
 
+    console.log(`[BuildBridgeCommand] executing placeBridge id=${bridgeIDToUse} start=${this.start.x},${this.start.y} end=${this.end.x},${this.end.y}`);
     const placed = this.puzzle.placeBridge(bridgeIDToUse, this.start, this.end);
     if (!placed) {
       // If placement failed, ensure bridge is not considered allocated here

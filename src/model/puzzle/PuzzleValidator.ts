@@ -40,18 +40,23 @@ export class PuzzleValidator {
       });
     }
 
-    
-
     const unsatisfiedCount = perConstraint.reduce(
       (acc, item) => acc + (item.result.satisfied ? 0 : 1),
       0
     );
 
-    return {
+    const result = {
       allSatisfied: unsatisfiedCount === 0,
       perConstraint,
       unsatisfiedCount,
     };
+
+    // Debug: emit per-constraint summary to help failing tests diagnostics
+    try {
+      console.log('[PuzzleValidator] validateAll results:', result.perConstraint.map(p => ({ type: p.type, ok: p.result.satisfied, msg: p.result.message })));
+    } catch (e) { }
+
+    return result;
   }
 
   /**

@@ -216,17 +216,21 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
   setPlacing(isPlacing: boolean): void {
     this.isPlacing = !!isPlacing;
     // Toggle interactivity for known hit zones
-    for (const z of this.bridgeHitZones) {
+    for (const thisZone of this.bridgeHitZones) {
       try {
         if (this.isPlacing) {
-          z.disableInteractive();
+          thisZone.disableInteractive();
         } else {
-          const shape = z.getData('shape');
-          if (shape) {
-            z.setInteractive(shape, Phaser.Geom.Rectangle.Contains);
-          } else {
-            z.setInteractive();
-          }
+            const shape = (typeof (thisZone.getData) === 'function') ? thisZone.getData('shape') : undefined;
+            try {
+              if (shape) {
+                thisZone.setInteractive(shape, Phaser.Geom.Rectangle.Contains);
+              } else {
+                thisZone.setInteractive();
+              }
+            } catch (e) {
+              try { (thisZone as any).setInteractive(); } catch (e) { /* ignore */ }
+            }
         }
       } catch (e) {
         // Ignore zones that have been destroyed
@@ -421,11 +425,17 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
     // setInteractive.
     const hitZone = this.scene.add.zone(-halfW, -halfH, worldLength, zoneThickness);
     hitZone.setOrigin(0, 0);
-    const rect = new Phaser.Geom.Rectangle(0, 0, worldLength, zoneThickness);
-    hitZone.setData('shape', rect);
-    if (!this.isPlacing) {
-      hitZone.setInteractive(rect, Phaser.Geom.Rectangle.Contains);
-    }
+      const interactiveRectangle = new Phaser.Geom.Rectangle(0, 0, worldLength, zoneThickness);
+      if (typeof (hitZone as any).setData === 'function') {
+        (hitZone as any).setData('shape', interactiveRectangle);
+      }
+      if (!this.isPlacing) {
+        try {
+          hitZone.setInteractive(interactiveRectangle, Phaser.Geom.Rectangle.Contains);
+        } catch (e) {
+          try { (hitZone as any).setInteractive(); } catch (e) { /* ignore */ }
+        }
+      }
     container.add(hitZone);
 
     // Remember zone so we can toggle interactivity later

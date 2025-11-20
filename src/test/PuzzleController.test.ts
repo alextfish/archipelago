@@ -110,8 +110,8 @@ function createMockPuzzle(): Partial<BridgePuzzle> {
     id: "test-puzzle",
     width: 4,
     height: 4,
-    islands: [] as any[],
-    bridges: [] as Bridge[],
+  islands: [ { id: 'I1', x: 1, y: 2 }, { id: 'I2', x: 3, y: 2 } ] as any[],
+  bridges: [] as Bridge[],
     constraints: [] as any[],
     maxNumBridges: 2,
 
@@ -123,7 +123,20 @@ function createMockPuzzle(): Partial<BridgePuzzle> {
     allBridgesPlaced: vi.fn(() => false),
     bridgesAt: vi.fn(() => [] as Bridge[]),
     availableCounts: vi.fn(() => ({})),
-    inventory: {} as any,
+    inventory: { returnBridge: vi.fn() } as any,
+    couldPlaceBridgeOfType: vi.fn((startId: string, endId: string, _typeId?: string) => {
+      // default behaviour: check existing placed bridges count vs maxNumBridges
+      const startIsland = puzzle.islands.find((i: any) => i.id === startId);
+      const endIsland = puzzle.islands.find((i: any) => i.id === endId);
+      if (!startIsland || !endIsland) return false;
+      const existing = puzzle.bridges.filter((b: any) => {
+        if (!b.start || !b.end) return false;
+        const sMatches = (b.start.x === startIsland.x && b.start.y === startIsland.y && b.end.x === endIsland.x && b.end.y === endIsland.y);
+        const rMatches = (b.start.x === endIsland.x && b.start.y === endIsland.y && b.end.x === startIsland.x && b.end.y === startIsland.y);
+        return sMatches || rMatches;
+      }).length;
+      return existing < puzzle.maxNumBridges;
+    }),
 
     get placedBridges(): Bridge[] {
       return puzzle.bridges.filter(b => b.start && b.end);

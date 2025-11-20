@@ -6,6 +6,8 @@ export interface BridgeType {
   width?: number;
   style?: string;
   hasLength?(): boolean;
+  /** Returns true when this bridge type allows a span between the two grid coordinates. */
+  allowsSpan?(start: { x: number; y: number }, end: { x: number; y: number }): boolean;
 }
 
 /**
@@ -24,6 +26,13 @@ export function createBridgeType(params: Partial<BridgeType>): BridgeType {
     width,
     style,
     hasLength: () => length !== -1,
+    allowsSpan: (start: { x: number; y: number }, end: { x: number; y: number }) => {
+      if (length === -1) return true;
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      return Math.abs(dist - length) <= 0.01;
+    }
   };
 }
 
