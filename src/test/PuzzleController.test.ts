@@ -47,9 +47,13 @@ class MockPuzzleRenderer implements PuzzleRenderer {
     this.clearHighlightsCalled = true;
   }
 
-  previewBridge(bridge: Bridge): void {
+  previewBridge(bridge: Bridge, _opts?: any): void {
     this.previewBridgeCalled = true;
     this.previewBridgeArg = bridge;
+  }
+
+  setPlacing(_isPlacing: boolean): void {
+    // no-op for tests
   }
 
   setAvailableBridgeTypes(_types: BridgeType[]): void {
@@ -109,7 +113,8 @@ function createMockPuzzle(): Partial<BridgePuzzle> {
     islands: [] as any[],
     bridges: [] as Bridge[],
     constraints: [] as any[],
-    
+    maxNumBridges: 2,
+
     getAvailableBridgeTypes: vi.fn(() => [] as BridgeType[]),
     takeBridgeOfType: vi.fn((): Bridge | undefined => undefined),
     placeBridge: vi.fn(() => true),
@@ -119,12 +124,12 @@ function createMockPuzzle(): Partial<BridgePuzzle> {
     bridgesAt: vi.fn(() => [] as Bridge[]),
     availableCounts: vi.fn(() => ({})),
     inventory: {} as any,
-    
+
     get placedBridges(): Bridge[] {
       return puzzle.bridges.filter(b => b.start && b.end);
     }
   };
-  
+
   return puzzle;
 }
 
@@ -243,15 +248,15 @@ describe("PuzzleController", () => {
     it("cycles to next bridge type and wraps around", () => {
       // Controller starts with the first type (type1)
       expect(controller.currentBridgeType?.id).toBe("type1");
-      
+
       // Move to next (type1 -> type2)
       controller.nextBridgeType();
       expect(controller.currentBridgeType?.id).toBe("type2");
-      
+
       // Move to next (type2 -> type3)
       controller.nextBridgeType();
       expect(controller.currentBridgeType?.id).toBe("type3");
-      
+
       // Wrap around (type3 -> type1)
       controller.nextBridgeType();
       expect(controller.currentBridgeType?.id).toBe("type1");
@@ -260,19 +265,19 @@ describe("PuzzleController", () => {
     it("cycles to previous bridge type and wraps around", () => {
       // Controller starts with the first type (type1)
       expect(controller.currentBridgeType?.id).toBe("type1");
-      
+
       // Move to previous (wraps to type3)
       controller.previousBridgeType();
       expect(controller.currentBridgeType?.id).toBe("type3");
-      
+
       // Move to previous (type3 -> type2)
       controller.previousBridgeType();
       expect(controller.currentBridgeType?.id).toBe("type2");
-      
+
       // Move to previous (type2 -> type1)
       controller.previousBridgeType();
       expect(controller.currentBridgeType?.id).toBe("type1");
-      
+
       // Wrap around (type1 -> type3)
       controller.previousBridgeType();
       expect(controller.currentBridgeType?.id).toBe("type3");
@@ -281,7 +286,7 @@ describe("PuzzleController", () => {
     it("handles cycling when no current bridge type", () => {
       // Clear the bridge type
       controller.currentBridgeType = null;
-      
+
       // Calling next should select the default
       controller.nextBridgeType();
       expect(controller.currentBridgeType).not.toBeNull();
@@ -325,7 +330,7 @@ describe("PuzzleController", () => {
         mockRenderer,
         mockHost
       );
-      
+
       controller.tryPlaceFirstEndpoint(1, 2);
     });
 
@@ -343,13 +348,13 @@ describe("PuzzleController", () => {
     beforeEach(() => {
       const bridgeTypes: BridgeType[] = [{ id: "type1", colour: "black" }];
       mockPuzzle.getAvailableBridgeTypes = vi.fn(() => bridgeTypes);
-      
+
       const mockBridge: Bridge = {
         id: "bridge1",
         type: bridgeTypes[0]
       };
       mockPuzzle.takeBridgeOfType = vi.fn(() => mockBridge);
-      
+
       controller = new PuzzleController(
         mockPuzzle as unknown as BridgePuzzle,
         mockRenderer,
@@ -367,7 +372,7 @@ describe("PuzzleController", () => {
     it("places second endpoint successfully", () => {
       // Place first endpoint
       controller.tryPlaceAt(1, 2);
-      
+
       // Place second endpoint
       controller.tryPlaceAt(3, 2);
 
@@ -445,7 +450,7 @@ describe("PuzzleController", () => {
     beforeEach(() => {
       const bridgeTypes: BridgeType[] = [{ id: "type1", colour: "black" }];
       mockPuzzle.getAvailableBridgeTypes = vi.fn(() => bridgeTypes);
-      
+
       controller = new PuzzleController(
         mockPuzzle as unknown as BridgePuzzle,
         mockRenderer,
@@ -455,7 +460,7 @@ describe("PuzzleController", () => {
 
     it("removes bridge and updates renderer", () => {
       // Ensure puzzle has a bridge to remove so RemoveBridgeCommand can find it
-      (mockPuzzle.bridges as any[]).push({ id: "bridge1", type: { id: "type1" }, start: { x:1,y:1 }, end: { x:2,y:2 } });
+      (mockPuzzle.bridges as any[]).push({ id: "bridge1", type: { id: "type1" }, start: { x: 1, y: 1 }, end: { x: 2, y: 2 } });
 
       controller.removeBridge("bridge1");
 
@@ -466,7 +471,7 @@ describe("PuzzleController", () => {
     it("validates after removal", () => {
       const validateSpy = vi.spyOn(controller as any, "validate");
 
-      (mockPuzzle.bridges as any[]).push({ id: "bridge1", type: { id: "type1" }, start: { x:1,y:1 }, end: { x:2,y:2 } });
+      (mockPuzzle.bridges as any[]).push({ id: "bridge1", type: { id: "type1" }, start: { x: 1, y: 1 }, end: { x: 2, y: 2 } });
       controller.removeBridge("bridge1");
 
       expect(validateSpy).toHaveBeenCalled();
@@ -477,7 +482,7 @@ describe("PuzzleController", () => {
     beforeEach(() => {
       const bridgeTypes: BridgeType[] = [{ id: "type1", colour: "black" }];
       mockPuzzle.getAvailableBridgeTypes = vi.fn(() => bridgeTypes);
-      
+
       // Mock the validator's validateAll to return successful validation
       const mockValidator = {
         validateAll: vi.fn(() => ({
@@ -493,7 +498,7 @@ describe("PuzzleController", () => {
         mockRenderer,
         mockHost
       );
-      
+
       (controller as any).validator = mockValidator;
     });
 
@@ -585,7 +590,7 @@ describe("PuzzleController", () => {
     beforeEach(() => {
       const bridgeTypes: BridgeType[] = [{ id: "type1", colour: "black" }];
       mockPuzzle.getAvailableBridgeTypes = vi.fn(() => bridgeTypes);
-      
+
       controller = new PuzzleController(
         mockPuzzle as unknown as BridgePuzzle,
         mockRenderer,
@@ -604,7 +609,7 @@ describe("PuzzleController", () => {
     beforeEach(() => {
       const bridgeTypes: BridgeType[] = [{ id: "type1", colour: "black" }];
       mockPuzzle.getAvailableBridgeTypes = vi.fn(() => bridgeTypes);
-      
+
       controller = new PuzzleController(
         mockPuzzle as unknown as BridgePuzzle,
         mockRenderer,
@@ -635,7 +640,7 @@ describe("PuzzleController", () => {
     beforeEach(() => {
       const bridgeTypes: BridgeType[] = [{ id: "type1", colour: "black" }];
       mockPuzzle.getAvailableBridgeTypes = vi.fn(() => bridgeTypes);
-      
+
       controller = new PuzzleController(
         mockPuzzle as unknown as BridgePuzzle,
         mockRenderer,

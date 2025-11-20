@@ -20,10 +20,10 @@ export class PuzzleValidator {
     this.puzzle = puzzle;
   }
 
-   /**
-   * Run every constraint attached to the puzzle and return the aggregated result.
-   * This does not mutate the puzzle.
-   */
+  /**
+  * Run every constraint attached to the puzzle and return the aggregated result.
+  * This does not mutate the puzzle.
+  */
   validateAll(): ValidationResult {
     const perConstraint: ValidationResult["perConstraint"] = [];
 
@@ -39,6 +39,8 @@ export class PuzzleValidator {
         result,
       });
     }
+
+    
 
     const unsatisfiedCount = perConstraint.reduce(
       (acc, item) => acc + (item.result.satisfied ? 0 : 1),

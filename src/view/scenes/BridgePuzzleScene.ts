@@ -159,7 +159,8 @@ export class BridgePuzzleScene extends Phaser.Scene {
             // Check if clicked on island
             const island = this.findIslandAt(gridPos.x, gridPos.y);
             if (island) {
-                this.controller?.tryPlaceAt(gridPos.x, gridPos.y);
+                // Start a placement (supports click or drag flow)
+                if (this.controller) this.controller.onPointerDown(worldPoint.x, worldPoint.y, gridPos.x, gridPos.y);
                 return;
             }
             // // Check if clicked on bridge
@@ -168,6 +169,20 @@ export class BridgePuzzleScene extends Phaser.Scene {
             //     this.controller?.removeBridge(bridge.id);
             //     return;
             // }
+        });
+
+        // Forward pointer move events to controller for animated preview
+        this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+            const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+            const gridPos = this.gridMapper!.worldToGrid(worldPoint.x, worldPoint.y);
+            if (this.controller) this.controller.onPointerMove(worldPoint.x, worldPoint.y, gridPos.x, gridPos.y);
+        });
+
+        // Forward pointer up events to controller (end drag placement)
+        this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+            const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+            const gridPos = this.gridMapper!.worldToGrid(worldPoint.x, worldPoint.y);
+            if (this.controller) this.controller.onPointerUp(worldPoint.x, worldPoint.y, gridPos.x, gridPos.y);
         });
         
         // Keyboard input

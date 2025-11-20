@@ -70,3 +70,4 @@ Use meaningful variable names like "bridgeStart" rather than short names like "s
 
 * Imports should use the paths defined in tsconfig.json: `@model`, `@view`, `@controller`, `@helpers` rather than `../model`.
 * We use British spellings everywhere possible. "colour", "standardise" etc. Only use American "color" etc when interfacing with other languages like HTML or packages like Phaser with APIs out of our control.
+* Initialisms like "ID" always have all letters the same case. Variables can be named "startID" or "idStart" but never "startId".

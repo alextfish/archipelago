@@ -9,8 +9,6 @@ export function createConstraintsFromSpec(constraints: { type: string; params?: 
   // and is imported somewhere else in the project.
   // Example: { type: "MaxBridges", params: { max: 2 } }
   return constraints.map(spec => {
-    // You may want to use a registry or a switch statement here.
-    // For demonstration, using a simple switch:
     switch (spec.type) {
       case "AllBridgesPlacedConstraint":
         return AllBridgesPlacedConstraint.fromSpec(spec.params);

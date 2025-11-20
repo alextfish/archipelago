@@ -12,6 +12,11 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
   private gridMapper: GridToWorldMapper = new GridToWorldMapper(64);
   private textureKey: string;
   
+  // Track interactive hit zones so they can be disabled while the user is placing
+  // a bridge (previews active). This prevents outlines from capturing clicks
+  // that should go to the preview flow.
+  private bridgeHitZones: Phaser.GameObjects.Zone[] = [];
+  private isPlacing: boolean = false;
   // Graphics objects
   private islandGraphics: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private islandLabels: Map<string, Phaser.GameObjects.Text> = new Map();
@@ -34,6 +39,9 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
   readonly H_BRIDGE_SINGLE = 62;
   readonly V_BRIDGE_SINGLE = 63;
   readonly DOUBLE_BRIDGE_OFFSET = 11; // add to single bridge frames for double bridges
+  // Preview visuals
+  readonly PREVIEW_ALPHA = 0.8;
+  readonly INVALID_TINT = 0xff0000;
 
   constructor(scene: Phaser.Scene, gridMapper: GridToWorldMapper, textureKey = 'sprout-tiles') {
     this.scene = scene;
@@ -68,11 +76,11 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
     if (this.previewGraphics) {
       this.previewGraphics.destroy();
     }
-    
+
     // Group placed bridges by normalized start/end so we render a single
     // container per island-pair. This allows switching to double-bridge
     // frames when two bridges occupy the same pair.
-    const bridgeGroups: Map<string, { start: {x:number;y:number}, end: {x:number;y:number}, ids: string[] }> = new Map();
+    const bridgeGroups: Map<string, { start: { x: number; y: number }, end: { x: number; y: number }, ids: string[] }> = new Map();
     for (const bridge of puzzle.placedBridges) {
       if (!bridge.start || !bridge.end) continue;
       const ordered = normalizeRenderOrder(bridge.start, bridge.end);
@@ -100,9 +108,9 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
 
   highlightViolations(ids: string[]): void {
     this.clearHighlights();
-    
+
     const container = this.scene.add.container();
-    
+
     for (const id of ids) {
       // Try to find island or bridge by ID
       const island = this.islandGraphics.get(id);
@@ -116,7 +124,7 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
           repeat: 2
         });
       }
-      
+
       const bridge = this.bridgeGraphics.get(id);
       if (bridge) {
         // Flash bridge red
@@ -129,7 +137,7 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
         });
       }
     }
-    
+
     this.highlightGraphics = container;
   }
 
@@ -170,13 +178,18 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
     }
   }
 
-  previewBridge(bridge: Bridge): void {
+  previewBridge(bridge: Bridge, opts?: { isDouble?: boolean; isInvalid?: boolean } | null): void {
     // Clear any existing preview
     if (this.previewGraphics) {
       this.previewGraphics.destroy();
     }
-    
+
     if (!bridge.start) return;
+    const isDouble = !!opts?.isDouble;
+    const isInvalid = !!opts?.isInvalid;
+    const tint = isInvalid ? this.INVALID_TINT : undefined;
+    const alpha = this.PREVIEW_ALPHA;
+
     // Delegate to shared renderer: preview uses centre tiles and semi-transparent alpha.
     if (bridge.end) {
       this.renderTiledBridge({
@@ -184,7 +197,9 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
         end: bridge.end,
         target: 'preview',
         useEdges: false,
-        alpha: 0.8
+        alpha,
+        tint,
+        bridgeIds: isDouble ? ['preview-a', 'preview-b'] : undefined
       });
     } else {
       // Unfinished single-tile preview
@@ -192,8 +207,30 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
         start: bridge.start,
         target: 'preview',
         singleUnfinished: true,
-        //alpha: 0.8
+        alpha,
+        tint
       });
+    }
+  }
+
+  setPlacing(isPlacing: boolean): void {
+    this.isPlacing = !!isPlacing;
+    // Toggle interactivity for known hit zones
+    for (const z of this.bridgeHitZones) {
+      try {
+        if (this.isPlacing) {
+          z.disableInteractive();
+        } else {
+          const shape = z.getData('shape');
+          if (shape) {
+            z.setInteractive(shape, Phaser.Geom.Rectangle.Contains);
+          } else {
+            z.setInteractive();
+          }
+        }
+      } catch (e) {
+        // Ignore zones that have been destroyed
+      }
     }
   }
 
@@ -251,32 +288,32 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
 
     if (!end) return; // nothing to draw
 
-  // Normalize and compute geometry once
-  const ordered = normalizeRenderOrder(start, end);
-  const startGrid = ordered.start;
-  const endGrid = ordered.end;
-  const startWorld = this.gridMapper.gridToWorld(startGrid.x, startGrid.y);
-  const endWorld = this.gridMapper.gridToWorld(endGrid.x, endGrid.y);
-  const worldLength = Math.sqrt((endWorld.x - startWorld.x) ** 2 + (endWorld.y - startWorld.y) ** 2);
-  const dxGrid = endGrid.x - startGrid.x;
-  const dyGrid = endGrid.y - startGrid.y;
-  const gridDist = Math.sqrt(dxGrid * dxGrid + dyGrid * dyGrid);
-  const segCount = Math.max(1, Math.ceil(gridDist));
-  const worldStep = { x: (endWorld.x - startWorld.x) / segCount, y: (endWorld.y - startWorld.y) / segCount };
-  const angle = Math.atan2(endWorld.y - startWorld.y, endWorld.x - startWorld.x);
-  const spacing = Math.sqrt(worldStep.x * worldStep.x + worldStep.y * worldStep.y);
-  const scale = this.gridMapper.getCellSize() / 32;
-  const orient = orientationForDelta(startGrid, endGrid);
+    // Normalize and compute geometry once
+    const ordered = normalizeRenderOrder(start, end);
+    const startGrid = ordered.start;
+    const endGrid = ordered.end;
+    const startWorld = this.gridMapper.gridToWorld(startGrid.x, startGrid.y);
+    const endWorld = this.gridMapper.gridToWorld(endGrid.x, endGrid.y);
+    const worldLength = Math.sqrt((endWorld.x - startWorld.x) ** 2 + (endWorld.y - startWorld.y) ** 2);
+    const dxGrid = endGrid.x - startGrid.x;
+    const dyGrid = endGrid.y - startGrid.y;
+    const gridDist = Math.sqrt(dxGrid * dxGrid + dyGrid * dyGrid);
+    const segCount = Math.max(1, Math.ceil(gridDist));
+    const worldStep = { x: (endWorld.x - startWorld.x) / segCount, y: (endWorld.y - startWorld.y) / segCount };
+    const angle = Math.atan2(endWorld.y - startWorld.y, endWorld.x - startWorld.x);
+    const spacing = Math.sqrt(worldStep.x * worldStep.x + worldStep.y * worldStep.y);
+    const scale = this.gridMapper.getCellSize() / 32;
+    const orient = orientationForDelta(startGrid, endGrid);
 
-  // Position the container at the midpoint of the bridge (in cell-centred
-  // coordinates) so local coordinates are centred and the interactive
-  // zone/outline can be drawn symmetrically. GridToWorld returns the
-  // top-left of a cell, so add half a cell to align centres.
-  const cellSize = this.gridMapper.getCellSize();
-  const midX = (startWorld.x + endWorld.x) / 2 + cellSize / 2;
-  const midY = (startWorld.y + endWorld.y) / 2 + cellSize / 2;
-  const container = this.scene.add.container(midX, midY);
-  container.setRotation(angle);
+    // Position the container at the midpoint of the bridge (in cell-centred
+    // coordinates) so local coordinates are centred and the interactive
+    // zone/outline can be drawn symmetrically. GridToWorld returns the
+    // top-left of a cell, so add half a cell to align centres.
+    const cellSize = this.gridMapper.getCellSize();
+    const midX = (startWorld.x + endWorld.x) / 2 + cellSize / 2;
+    const midY = (startWorld.y + endWorld.y) / 2 + cellSize / 2;
+    const container = this.scene.add.container(midX, midY);
+    container.setRotation(angle);
 
     // Choose frames helper. If bridgeIds indicates a double bridge, offset
     // frames by DOUBLE_BRIDGE_OFFSET so double-sprite set is used.
@@ -357,16 +394,17 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
       }
     }
   }
-    
+
   private addClickableBridgeOutline(
-      worldLength: number, 
-      container: Phaser.GameObjects.Container, 
-      opts: { start: { x: number; y: number; }; 
-        end?: { x: number; y: number; }; 
-        bridgeId?: string; 
-        bridgeIds?: string[];
-      }
-    ) {
+    worldLength: number,
+    container: Phaser.GameObjects.Container,
+    opts: {
+      start: { x: number; y: number; };
+      end?: { x: number; y: number; };
+      bridgeId?: string;
+      bridgeIds?: string[];
+    }
+  ) {
     // compute bounding box of the bridge in container-local coordinates
     // tileThickness: choose a reasonable clickable thickness (half a cell, clamped)
     const zoneThickness = Math.max(8, this.gridMapper.getCellSize() * 0.75);
@@ -383,8 +421,15 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
     // setInteractive.
     const hitZone = this.scene.add.zone(-halfW, -halfH, worldLength, zoneThickness);
     hitZone.setOrigin(0, 0);
-    hitZone.setInteractive(new Phaser.Geom.Rectangle(0, 0, worldLength, zoneThickness), Phaser.Geom.Rectangle.Contains);
+    const rect = new Phaser.Geom.Rectangle(0, 0, worldLength, zoneThickness);
+    hitZone.setData('shape', rect);
+    if (!this.isPlacing) {
+      hitZone.setInteractive(rect, Phaser.Geom.Rectangle.Contains);
+    }
     container.add(hitZone);
+
+    // Remember zone so we can toggle interactivity later
+    this.bridgeHitZones.push(hitZone);
 
     // White outline graphic (hidden by default)
     const outline = this.scene.add.graphics();
@@ -395,12 +440,15 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
 
     // Pointer handlers
     hitZone.on('pointerover', () => {
+      if (this.isPlacing) return;
       outline.setVisible(true);
     });
     hitZone.on('pointerout', () => {
+      if (this.isPlacing) return;
       outline.setVisible(false);
     });
     hitZone.on('pointerdown', () => {
+      if (this.isPlacing) return;
       // Emit an event on the scene so the owning scene / controller can handle removal.
       // Do not directly mutate model from view.
       const ids: string[] = (opts as any).bridgeIds ?? (opts.bridgeId ? [opts.bridgeId] : []);
@@ -437,27 +485,27 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
       lbl.destroy();
     }
     this.islandLabels.clear();
-    
+
     for (const bridge of this.bridgeGraphics.values()) {
       bridge.destroy();
     }
     this.bridgeGraphics.clear();
-    
+
     if (this.previewGraphics) {
       this.previewGraphics.destroy();
       this.previewGraphics = null;
     }
-    
+
     if (this.highlightGraphics) {
       this.highlightGraphics.destroy();
       this.highlightGraphics = null;
     }
-    
+
     if (this.flashGraphics) {
       this.flashGraphics.destroy();
       this.flashGraphics = null;
     }
-    
+
     if (this.flashTimer) {
       this.scene.time.removeEvent(this.flashTimer);
       this.flashTimer = null;

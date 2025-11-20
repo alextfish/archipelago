@@ -8,7 +8,11 @@ export interface PuzzleRenderer {
   init(puzzle: BridgePuzzle): void;
   /** Redraw everything from puzzle state; idempotent. */
   updateFromPuzzle(puzzle: BridgePuzzle): void;
-  previewBridge(bridge: Bridge): void;
+  previewBridge(bridge: Bridge, opts?: { isDouble?: boolean; isInvalid?: boolean } | null): void;
+  /** When true, interactive bridge outlines should not respond to pointer events.
+   * Renderer implementations should use this to disable hit areas while placement is pending.
+   */
+  setPlacing(isPlacing: boolean): void;
 
   /** Show which bridge type is selected in sidebar, counts, etc. */
   setAvailableBridgeTypes(types: BridgeType[]): void;
