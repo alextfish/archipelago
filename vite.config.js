@@ -7,6 +7,7 @@ export default defineConfig({
       '@model': path.resolve(__dirname, 'src/model'),
       '@view': path.resolve(__dirname, 'src/view'),
       '@controller': path.resolve(__dirname, 'src/controller'),
+      '@helpers': path.resolve(__dirname, 'src/helpers'),
       '@core': path.resolve(__dirname, 'src/core'),
     },
   },

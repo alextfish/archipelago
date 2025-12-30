@@ -53,13 +53,19 @@ export class PuzzleHUDScene extends Phaser.Scene {
             if (typeId) this.sidebar?.setSelectedType(typeId);
         });
 
-        this.events.on('adjustForCameraZoom', (zoom: number) => {
-            this.sidebar?.adjustForCameraZoom(zoom);
+        // UI stays at fixed scale now, so no camera zoom adjustment needed
+
+        this.events.on('updateCameraInfo', (x: number, y: number, zoom: number, width: number, height: number) => {
+            this.sidebar?.updateCameraInfo(x, y, zoom, width, height);
+        });
+
+        this.events.on('updateIslandInfo', (totalCount: number, visibleCount: number, bounds?: { minX: number; maxX: number; minY: number; maxY: number }) => {
+            this.sidebar?.updateIslandInfo(totalCount, visibleCount, bounds);
         });
 
         // Listen for solved notification and show a persistent HUD overlay
         this.events.on('puzzleSolved', () => {
-            try { console.log('[PuzzleHUDScene] puzzleSolved event received - showing HUD overlay'); } catch(e) {}
+            try { console.log('[PuzzleHUDScene] puzzleSolved event received - showing HUD overlay'); } catch (e) { }
             if (this.solvedOverlay) return; // already shown
             const centerX = (this.scale?.width ?? 800) / 2;
             const centerY = (this.scale?.height ?? 600) / 2;

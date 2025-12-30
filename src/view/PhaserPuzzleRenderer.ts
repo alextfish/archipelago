@@ -11,7 +11,7 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
   private scene: Phaser.Scene;
   private gridMapper: GridToWorldMapper = new GridToWorldMapper(64);
   private textureKey: string;
-  
+
   // Track interactive hit zones so they can be disabled while the user is placing
   // a bridge (previews active). This prevents outlines from capturing clicks
   // that should go to the preview flow.
@@ -57,6 +57,23 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
       const sprite = this.scene.add.sprite(worldPos.x, worldPos.y, this.textureKey, this.FRAME_ISLAND)
         .setInteractive({ useHandCursor: true })
         .setOrigin(0, 0);
+
+      // Add click handler for island
+      sprite.on('pointerdown', () => {
+        console.log(`PhaserPuzzleRenderer: Island clicked at grid (${island.x}, ${island.y}), world (${worldPos.x.toFixed(2)}, ${worldPos.y.toFixed(2)})`);
+        this.scene.events.emit('island-clicked', worldPos.x, worldPos.y, island.x, island.y);
+      });
+
+      // Add move handler for island (for smooth bridge preview over islands)
+      sprite.on('pointermove', () => {
+        this.scene.events.emit('island-pointermove', worldPos.x, worldPos.y, island.x, island.y);
+      });
+
+      // Add pointer up handler for island (for bridge completion over islands)
+      sprite.on('pointerup', () => {
+        this.scene.events.emit('island-pointerup', worldPos.x, worldPos.y, island.x, island.y);
+      });
+
       // Scale sprite to match cell size (sprites are 32px)
       const scale = this.gridMapper.getCellSize() / 32;
       sprite.setScale(scale, scale);
@@ -196,7 +213,7 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
         start: bridge.start,
         end: bridge.end,
         target: 'preview',
-        useEdges: false,
+        useEdges: true,
         alpha,
         tint,
         bridgeIds: isDouble ? ['preview-a', 'preview-b'] : undefined
@@ -221,16 +238,16 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
         if (this.isPlacing) {
           thisZone.disableInteractive();
         } else {
-            const shape = (typeof (thisZone.getData) === 'function') ? thisZone.getData('shape') : undefined;
-            try {
-              if (shape) {
-                thisZone.setInteractive(shape, Phaser.Geom.Rectangle.Contains);
-              } else {
-                thisZone.setInteractive();
-              }
-            } catch (e) {
-              try { (thisZone as any).setInteractive(); } catch (e) { /* ignore */ }
+          const shape = (typeof (thisZone.getData) === 'function') ? thisZone.getData('shape') : undefined;
+          try {
+            if (shape) {
+              thisZone.setInteractive(shape, Phaser.Geom.Rectangle.Contains);
+            } else {
+              thisZone.setInteractive();
             }
+          } catch (e) {
+            try { (thisZone as any).setInteractive(); } catch (e) { /* ignore */ }
+          }
         }
       } catch (e) {
         // Ignore zones that have been destroyed
@@ -425,17 +442,17 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
     // setInteractive.
     const hitZone = this.scene.add.zone(-halfW, -halfH, worldLength, zoneThickness);
     hitZone.setOrigin(0, 0);
-      const interactiveRectangle = new Phaser.Geom.Rectangle(0, 0, worldLength, zoneThickness);
-      if (typeof (hitZone as any).setData === 'function') {
-        (hitZone as any).setData('shape', interactiveRectangle);
+    const interactiveRectangle = new Phaser.Geom.Rectangle(0, 0, worldLength, zoneThickness);
+    if (typeof (hitZone as any).setData === 'function') {
+      (hitZone as any).setData('shape', interactiveRectangle);
+    }
+    if (!this.isPlacing) {
+      try {
+        hitZone.setInteractive(interactiveRectangle, Phaser.Geom.Rectangle.Contains);
+      } catch (e) {
+        try { (hitZone as any).setInteractive(); } catch (e) { /* ignore */ }
       }
-      if (!this.isPlacing) {
-        try {
-          hitZone.setInteractive(interactiveRectangle, Phaser.Geom.Rectangle.Contains);
-        } catch (e) {
-          try { (hitZone as any).setInteractive(); } catch (e) { /* ignore */ }
-        }
-      }
+    }
     container.add(hitZone);
 
     // Remember zone so we can toggle interactivity later

@@ -29,7 +29,8 @@
       "@model/*": ["src/model/*"],
       "@view/*": ["src/view/*"],
       "@controller/*": ["src/controller/*"],
-      "@helpers/*": ["test/helpers/*"],
+      "@helpers/*": ["src/helpers/*"],
+      "@test-helpers/*": ["test/helpers/*"],
       "@data/*": ["data/*"],
       "@core/*": ["core/*"]
     }
