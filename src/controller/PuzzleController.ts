@@ -77,10 +77,18 @@ export class PuzzleController {
                 // calculate true angle to cursor point from world coordinates
                 const worldStart = (this.renderer as any).gridMapper.gridToWorld(start.x, start.y);
                 const angle = Math.atan2(_worldY - worldStart.y, _worldX - worldStart.x);
-                previewEnd = { x: start.x + Math.cos(angle) * typeLength, y: start.y + Math.sin(angle) * typeLength };
+                const rawEndX = start.x + Math.cos(angle) * typeLength;
+                const rawEndY = start.y + Math.sin(angle) * typeLength;
+
+                // Round to avoid floating-point precision issues that cause length jumping
+                // This ensures the rendered bridge stays at exactly the intended fixed length
+                previewEnd = {
+                    x: Math.round(rawEndX * 1000) / 1000,
+                    y: Math.round(rawEndY * 1000) / 1000
+                };
             }
         } else {
-            // variable length: snap to candidate island if it's a valid placement, else follow cursor
+            // variable length: snap to candidate island if it's a valid placement, else follow cursor smoothly
             if (candidateIsland) {
                 const startID = this.getIslandIDAt(start.x, start.y);
                 if (startID && this.puzzle.couldPlaceBridgeOfType(startID, candidateIsland.id, this.currentBridgeType!.id)) {
@@ -88,12 +96,21 @@ export class PuzzleController {
                     const count = this.puzzle.getBridgeCountBetween(startID, candidateIsland.id);
                     isDouble = count === 1;
                 } else {
-                    // invalid to place here
-                    previewEnd = { x: gridX, y: gridY };
+                    // invalid to place here, but still show smooth pixel preview
+                    const worldStart = (this.renderer as any).gridMapper.gridToWorld(start.x, start.y);
+                    const angle = Math.atan2(_worldY - worldStart.y, _worldX - worldStart.x);
+                    const distance = Math.sqrt((_worldX - worldStart.x) ** 2 + (_worldY - worldStart.y) ** 2);
+                    const gridDistance = distance / (this.renderer as any).gridMapper.getCellSize();
+                    previewEnd = { x: start.x + Math.cos(angle) * gridDistance, y: start.y + Math.sin(angle) * gridDistance };
                     isInvalid = true;
                 }
             } else {
-                previewEnd = { x: gridX, y: gridY };
+                // over empty sea: use smooth pixel coordinates like fixed-length bridges
+                const worldStart = (this.renderer as any).gridMapper.gridToWorld(start.x, start.y);
+                const angle = Math.atan2(_worldY - worldStart.y, _worldX - worldStart.x);
+                const distance = Math.sqrt((_worldX - worldStart.x) ** 2 + (_worldY - worldStart.y) ** 2);
+                const gridDistance = distance / (this.renderer as any).gridMapper.getCellSize();
+                previewEnd = { x: start.x + Math.cos(angle) * gridDistance, y: start.y + Math.sin(angle) * gridDistance };
             }
         }
 

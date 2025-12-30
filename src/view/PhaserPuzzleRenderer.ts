@@ -205,16 +205,14 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
     const isDouble = !!opts?.isDouble;
     const isInvalid = !!opts?.isInvalid;
     const tint = isInvalid ? this.INVALID_TINT : undefined;
-    const alpha = this.PREVIEW_ALPHA;
 
-    // Delegate to shared renderer: preview uses centre tiles and semi-transparent alpha.
+    // Delegate to shared renderer: preview uses centre tiles but no individual alpha (we'll set container alpha instead)
     if (bridge.end) {
       this.renderTiledBridge({
         start: bridge.start,
         end: bridge.end,
         target: 'preview',
         useEdges: true,
-        alpha,
         tint,
         bridgeIds: isDouble ? ['preview-a', 'preview-b'] : undefined
       });
@@ -224,9 +222,13 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
         start: bridge.start,
         target: 'preview',
         singleUnfinished: true,
-        alpha,
         tint
       });
+    }
+
+    // Set alpha on the entire container to avoid overlapping transparency issues
+    if (this.previewGraphics) {
+      this.previewGraphics.setAlpha(this.PREVIEW_ALPHA);
     }
   }
 
@@ -319,7 +321,7 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
     const dxGrid = endGrid.x - startGrid.x;
     const dyGrid = endGrid.y - startGrid.y;
     const gridDist = Math.sqrt(dxGrid * dxGrid + dyGrid * dyGrid);
-    const segCount = Math.max(1, Math.ceil(gridDist));
+    const segCount = Math.max(1, Math.ceil(gridDist - 0.01)); // avoid floating-point issues
     const worldStep = { x: (endWorld.x - startWorld.x) / segCount, y: (endWorld.y - startWorld.y) / segCount };
     const angle = Math.atan2(endWorld.y - startWorld.y, endWorld.x - startWorld.x);
     const spacing = Math.sqrt(worldStep.x * worldStep.x + worldStep.y * worldStep.y);
