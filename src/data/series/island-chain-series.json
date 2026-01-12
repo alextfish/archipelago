@@ -1,0 +1,33 @@
+{
+  "id": "island-chain-series",
+  "title": "The Island Chain Challenge",
+  "description": "Connect a series of islands using strategic bridge placement and resource management",
+  "puzzleRefs": [
+    {
+      "puzzleFile": "data/puzzles/simple4IslandPuzzle.json",
+      "title": "Four Island Foundation", 
+      "description": "Master the basics with this classic four-island layout",
+      "unlocked": true,
+      "requiredPuzzles": []
+    },
+    {
+      "puzzleFile": "data/puzzles/gridConstraintsPuzzle.json",
+      "title": "Grid Navigation",
+      "description": "Navigate complex grid constraints to connect all islands",
+      "unlocked": false, 
+      "requiredPuzzles": ["simple4IslandPuzzle"]
+    },
+    {
+      "puzzleFile": "data/series/custom-puzzles/advanced-chain.json",
+      "title": "Advanced Chain",
+      "description": "The ultimate test of your bridge-building skills",
+      "unlocked": false,
+      "requiredPuzzles": ["gridConstraintsPuzzle"]
+    }
+  ],
+  "metadata": {
+    "difficulty": "Intermediate",
+    "estimatedTime": "45 minutes", 
+    "tags": ["strategy", "resource-management", "progression"]
+  }
+}

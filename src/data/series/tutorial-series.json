@@ -1,0 +1,103 @@
+{
+  "id": "tutorial-series",
+  "title": "Bridge Building Tutorial",
+  "description": "Learn the basics of bridge building with this introductory series",
+  "puzzles": [
+    {
+      "id": "tutorial-1",
+      "title": "First Bridge",
+      "description": "Build your very first bridge between two islands",
+      "puzzleData": {
+        "id": "tutorial-1",
+        "type": "tutorial",
+        "size": { "width": 5, "height": 3 },
+        "islands": [
+          { "id": "start", "x": 1, "y": 1 },
+          { "id": "end", "x": 3, "y": 1 }
+        ],
+        "bridgeTypes": [
+          {
+            "id": "basic",
+            "colour": "#8B4513", 
+            "count": 1,
+            "width": 1
+          }
+        ],
+        "constraints": [
+          { "type": "AllBridgesPlacedConstraint" }
+        ],
+        "maxNumBridges": 1
+      },
+      "requiredPuzzles": []
+    },
+    {
+      "id": "tutorial-2", 
+      "title": "Multiple Bridges",
+      "description": "Learn to manage multiple bridges and different types",
+      "puzzleData": {
+        "id": "tutorial-2",
+        "type": "tutorial", 
+        "size": { "width": 7, "height": 3 },
+        "islands": [
+          { "id": "west", "x": 1, "y": 1 },
+          { "id": "central", "x": 3, "y": 1 },
+          { "id": "east", "x": 5, "y": 1 }
+        ],
+        "bridgeTypes": [
+          {
+            "id": "basic",
+            "colour": "#8B4513",
+            "count": 2,
+            "width": 1
+          }
+        ],
+        "constraints": [
+          { "type": "AllBridgesPlacedConstraint" }
+        ],
+        "maxNumBridges": 2
+      },
+      "requiredPuzzles": ["tutorial-1"]
+    },
+    {
+      "id": "tutorial-3",
+      "title": "Bridge Length Limits", 
+      "description": "Work with bridges that have fixed lengths",
+      "puzzleData": {
+        "id": "tutorial-3",
+        "type": "tutorial",
+        "size": { "width": 8, "height": 5 },
+        "islands": [
+          { "id": "a", "x": 1, "y": 2 },
+          { "id": "b", "x": 4, "y": 2 },
+          { "id": "c", "x": 6, "y": 2 }
+        ],
+        "bridgeTypes": [
+          {
+            "id": "short",
+            "colour": "#8B4513",
+            "length": 3,
+            "count": 1,
+            "width": 1
+          },
+          {
+            "id": "long",
+            "colour": "#654321", 
+            "length": 2,
+            "count": 1,
+            "width": 1
+          }
+        ],
+        "constraints": [
+          { "type": "AllBridgesPlacedConstraint" }
+        ],
+        "maxNumBridges": 2
+      },
+      "requiredPuzzles": ["tutorial-2"]
+    }
+  ],
+  "metadata": {
+    "difficulty": "Beginner",
+    "estimatedTime": "15 minutes",
+    "tags": ["tutorial", "basics", "introduction"]
+  }
+}
