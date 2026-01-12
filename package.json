@@ -16,6 +16,8 @@
     "vitest": "^2.1.9"
   },
   "dependencies": {
-    "phaser": "^3.90.0"
+    "@types/xml2js": "^0.4.14",
+    "phaser": "^3.90.0",
+    "xml2js": "^0.6.2"
   }
 }

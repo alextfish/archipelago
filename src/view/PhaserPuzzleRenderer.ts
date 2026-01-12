@@ -21,7 +21,7 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
   private islandGraphics: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private islandLabels: Map<string, Phaser.GameObjects.Text> = new Map();
   private bridgeGraphics: Map<string, Phaser.GameObjects.Container> = new Map();
-  private previewGraphics: Phaser.GameObjects.Container | null = null;
+  private previewGraphics: Phaser.GameObjects.Container | Phaser.GameObjects.RenderTexture | null = null;
   private highlightGraphics: Phaser.GameObjects.Container | null = null;
   private flashGraphics: Phaser.GameObjects.Container | null = null;
   private flashTimer: Phaser.Time.TimerEvent | null = null;
@@ -228,6 +228,31 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
 
     // Set alpha on the entire container to avoid overlapping transparency issues
     if (this.previewGraphics) {
+      // // Get the temporary container that was created (should be a Container from renderTiledBridge)
+      // const tempContainer = this.previewGraphics as Phaser.GameObjects.Container;
+
+      // // Get the bounds of the container to size the RenderTexture appropriately
+      // const bounds = tempContainer.getBounds();
+      // const width = Math.max(32, Math.ceil(bounds.width + 20)); // Add padding
+      // const height = Math.max(32, Math.ceil(bounds.height + 20)); // Add padding
+
+      // // Create a RenderTexture at (0,0) - we'll position it correctly after drawing
+      // const renderTexture = this.scene.add.renderTexture(0, 0, width, height);
+
+      // // Temporarily move the container to origin for drawing, accounting for its bounds offset
+      // tempContainer.setPosition(10 - bounds.x, 10 - bounds.y);
+
+      // // Draw the container to the RenderTexture (centered)
+      // renderTexture.draw(tempContainer, width / 2 - bounds.x, height / 2 - bounds.y);
+
+      // // Position the RenderTexture where the original container was
+      // renderTexture.setPosition(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+      // renderTexture.setOrigin(0.5, 0.5);
+      // // Destroy the temporary container
+      // tempContainer.destroy();
+
+      // // Replace previewGraphics with the RenderTexture directly and set its alpha
+      // this.previewGraphics = renderTexture;
       this.previewGraphics.setAlpha(this.PREVIEW_ALPHA);
     }
   }
