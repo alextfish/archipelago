@@ -24,8 +24,8 @@ describe('@helpers path mapping validation', () => {
 
     it('should detect test environment correctly', () => {
         const info = Environment.getInfo();
-        // In Node.js test environment, should detect as 'node'
-        expect(info.environment).toBe('node');
-        expect(info.hostname).toBe('node');
+        // In test environment with happy-dom, should detect as 'browser'
+        expect(info.environment).toBe('browser');
+        expect(info.hostname).toBe('localhost');
     });
 });

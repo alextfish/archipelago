@@ -7,11 +7,7 @@ import type { TileLayerConfig } from './MapPuzzleExtractor';
 export const defaultTileConfig: TileLayerConfig = {
     // Island tiles - specific tile IDs that represent islands in puzzles
     islandTileIDs: [
-        45,  // Small island
-        46,  // Medium island
-        47,  // Large island
-        48,  // Rocky island
-        49   // Tree island
+        6
     ],
 
     // Obstacle tiles - tiles that block bridge placement
@@ -33,10 +29,8 @@ export const defaultTileConfig: TileLayerConfig = {
 
     // Entry point tiles - tiles that trigger puzzle interface when player walks on them
     entryPointTileIDs: [
-        90,  // Dock tile
-        91,  // Pier tile
-        92,  // Bridge approach
-        93   // Lighthouse base
+        7,  // Planks
+        17  // Pier tile
     ]
 };
 

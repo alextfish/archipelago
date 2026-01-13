@@ -65,7 +65,7 @@ Use meaningful variable names like "bridgeStart" rather than short names like "s
 ** Don’t introduce framework-specific logic into model/.
 ** Don’t add hidden global state or event buses.
 ** Prefer dependency injection and callbacks over implicit coupling.
-* Include or update tests for any new logic in model/.
+* All new code should be immediately followed by new tests for it. Prefer unit tests wherever possible.
 * When in doubt, prioritise clarity, testability, and architectural consistency.
 
 ### Coding Style
@@ -73,16 +73,3 @@ Use meaningful variable names like "bridgeStart" rather than short names like "s
 * Imports should use the paths defined in tsconfig.json: `@model`, `@view`, `@controller`, `@helpers` rather than `../model`.
 * We use British spellings everywhere possible. "colour", "standardise" etc. Only use American "color" etc when interfacing with other languages like HTML or packages like Phaser with APIs out of our control.
 * Initialisms like "ID" always have all letters the same case. Variables can be named "startID" or "idStart" but never "startId".
-
-### Details on Specific Code Areas
-
-**Puzzle Series System**: A progression system for organizing related puzzles with unlock requirements, progress tracking, and structured navigation. This enables the game to present puzzles in thematic series where completing certain puzzles unlocks others. The system includes:
-
-- `PuzzleSeries` class for managing puzzle collections with progression logic
-- `SeriesFactory` for loading series from JSON configuration files  
-- Progress persistence with `LocalStorageProgressStore` and `MemoryProgressStore`
-- `SeriesManager` for high-level coordination and caching
-- Comprehensive unit tests ensuring reliability
-- Integration examples showing how to connect with existing game flow
-
-Key benefits: Player engagement through clear progression, content organization, progress persistence, extensibility, and full testability. See `PUZZLE_SERIES_ARCHITECTURE.md` for detailed documentation.

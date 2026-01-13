@@ -1,5 +1,14 @@
 import Phaser from 'phaser';
 import { MapUtils } from '@model/overworld/MapConfig';
+import { OverworldPuzzleManager } from '@model/overworld/OverworldPuzzleManager';
+import { OverworldGameState } from '@model/overworld/OverworldGameState';
+import { CollisionManager } from '@model/overworld/CollisionManager';
+import { CameraManager } from '@view/CameraManager';
+import { EmbeddedPuzzleRenderer } from '@view/EmbeddedPuzzleRenderer';
+import { PuzzleController } from '@controller/PuzzleController';
+import { PuzzleInputHandler } from '@controller/PuzzleInputHandler';
+import type { PuzzleHost } from '@controller/PuzzleHost';
+import { defaultTileConfig } from '@model/overworld/MapConfig';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -11,14 +20,36 @@ export class OverworldScene extends Phaser.Scene {
   private collisionLayer!: Phaser.Tilemaps.TilemapLayer;
   private collisionArray: boolean[][] = [];
 
+  // Overworld puzzle system
+  private puzzleManager: OverworldPuzzleManager;
+  private gameState: OverworldGameState;
+  private collisionManager: CollisionManager;
+  private cameraManager: CameraManager;
+  private activePuzzleController?: PuzzleController;
+  private puzzleRenderer?: EmbeddedPuzzleRenderer;
+  private puzzleInputHandler?: PuzzleInputHandler;
+  private tiledMapData?: any;
+
   constructor() {
     super({ key: 'OverworldScene' });
+
+    // Initialize overworld puzzle systems
+    this.puzzleManager = new OverworldPuzzleManager(defaultTileConfig);
+    this.gameState = new OverworldGameState();
+    this.collisionManager = new CollisionManager(this);
+    this.cameraManager = new CameraManager(this);
   }
 
   preload() {
     // Load tilesets
     this.load.image('beachTileset', 'resources/tilesets/beach.png');
     this.load.image('grassTileset', 'resources/tilesets/SproutLandsGrassIslands.png');
+
+    // Load spritesheet for puzzle elements (same as BridgePuzzleScene)
+    this.load.spritesheet('sprout-tiles', 'resources/tilesets/SproutLandsGrassIslands.png', {
+      frameWidth: 32,
+      frameHeight: 32
+    });
 
     // Load player sprite
     this.load.spritesheet('builder', 'resources/builder.png', {
@@ -147,6 +178,28 @@ export class OverworldScene extends Phaser.Scene {
     console.log('Overworld scene created successfully');
     console.log(`Map size: ${mapWidth}x${mapHeight}`);
     console.log(`Player start: (${playerStart.x}, ${playerStart.y})`);
+
+    // Initialize overworld puzzle system
+    this.initializeOverworldPuzzles();
+  }
+
+  private async initializeOverworldPuzzles(): Promise<void> {
+    try {
+      console.log('Initializing overworld puzzle system...');
+
+      // Load the tilemap data for puzzle extraction
+      this.tiledMapData = await MapUtils.loadTiledMap('resources/overworld.json');
+
+      // Load all puzzles from the map
+      const puzzles = this.puzzleManager.loadPuzzlesFromMap(this.tiledMapData);
+      console.log(`Loaded ${puzzles.size} overworld puzzles`);
+
+      // Set up puzzle interaction checking
+      this.setupPuzzleInteraction();
+
+    } catch (error) {
+      console.error('Failed to initialize overworld puzzles:', error);
+    }
   }
 
   private setupCollisionLayer(beachTileset: Phaser.Tilemaps.Tileset | null, grassTileset: Phaser.Tilemaps.Tileset | null) {
@@ -349,5 +402,210 @@ export class OverworldScene extends Phaser.Scene {
         tile.setCollision(hasCollision);
       }
     }
+  }
+
+  // === OVERWORLD PUZZLE METHODS ===
+
+  /**
+   * Set up puzzle interaction checking
+   */
+  private setupPuzzleInteraction(): void {
+    // Add E key for entering puzzles
+    this.input.keyboard?.on('keydown-E', () => {
+      this.checkForPuzzleEntry();
+    });
+
+    console.log('Puzzle interaction set up - press E near puzzles to enter');
+  }
+
+  /**
+   * Check if player is near a puzzle and can enter it
+   */
+  private checkForPuzzleEntry(): void {
+    if (!this.tiledMapData || !this.player) {
+      return;
+    }
+
+    const playerX = this.player.x;
+    const playerY = this.player.y;
+
+    console.log(`Checking for puzzle at player position (${playerX}, ${playerY})`);
+
+    // Check if there's a puzzle at the player's position
+    const puzzle = this.puzzleManager.getPuzzleAtPosition(playerX, playerY, this.tiledMapData);
+
+    if (puzzle) {
+      console.log(`Found puzzle: ${puzzle.id}`);
+      this.enterOverworldPuzzle(puzzle.id);
+    } else {
+      console.log('No puzzle found at player position');
+    }
+  }
+
+  /**
+   * Enter overworld puzzle mode
+   */
+  public async enterOverworldPuzzle(puzzleId: string): Promise<void> {
+    console.log(`Entering overworld puzzle: ${puzzleId}`);
+
+    if (!this.tiledMapData) {
+      console.error('No tilemap data available for puzzle entry');
+      return;
+    }
+
+    // Get the puzzle
+    const puzzle = this.puzzleManager.getPuzzleById(puzzleId);
+    if (!puzzle) {
+      console.error(`Puzzle not found: ${puzzleId}`);
+      return;
+    }
+
+    // Get puzzle bounds
+    const puzzleBounds = this.puzzleManager.getPuzzleBounds(puzzleId);
+    if (!puzzleBounds) {
+      console.error(`No bounds found for puzzle: ${puzzleId}`);
+      return;
+    }
+
+    try {
+      // Set active puzzle in game state
+      this.gameState.setActivePuzzle(puzzleId, puzzle);
+
+      // Create puzzle bounds rectangle
+      const boundsRect = new Phaser.Geom.Rectangle(
+        puzzleBounds.x,
+        puzzleBounds.y,
+        puzzleBounds.width,
+        puzzleBounds.height
+      );
+
+      // Transition camera to puzzle
+      await this.cameraManager.transitionToPuzzle(boundsRect);
+
+      // Create embedded puzzle renderer
+      this.puzzleRenderer = new EmbeddedPuzzleRenderer(
+        this,
+        boundsRect,
+        'sprout-tiles'
+      );
+
+      // Create puzzle controller
+      this.activePuzzleController = new PuzzleController(
+        puzzle,
+        this.puzzleRenderer,
+        this.createOverworldPuzzleHost(puzzleId)
+      );
+
+      // Set up input handling for puzzle
+      this.puzzleInputHandler = new PuzzleInputHandler(
+        this,
+        this.activePuzzleController,
+        this.puzzleRenderer
+      );
+
+      // Initialize puzzle systems
+      this.puzzleRenderer.init(puzzle);
+      this.puzzleInputHandler.setupInputHandlers();
+      this.activePuzzleController.enterPuzzle();
+
+      // Update collision for bridges
+      this.collisionManager.updateCollisionFromBridges(puzzle, boundsRect);
+
+      console.log(`Successfully entered overworld puzzle: ${puzzleId}`);
+
+    } catch (error) {
+      console.error(`Failed to enter overworld puzzle: ${puzzleId}`, error);
+      this.exitOverworldPuzzle(false);
+    }
+  }
+
+  /**
+   * Exit overworld puzzle mode
+   */
+  public async exitOverworldPuzzle(success: boolean): Promise<void> {
+    const activeData = this.gameState.getActivePuzzle();
+    if (!activeData) {
+      console.warn('No active puzzle to exit');
+      return;
+    }
+
+    console.log(`Exiting overworld puzzle: ${activeData.id} (success: ${success})`);
+
+    try {
+      // Save puzzle state before exiting
+      if (this.activePuzzleController) {
+        this.gameState.saveOverworldPuzzleProgress(activeData.id, activeData.puzzle);
+        this.activePuzzleController.exitPuzzle(success);
+      }
+
+      // Mark as completed if successful
+      if (success) {
+        this.gameState.markPuzzleCompleted(activeData.id);
+      }
+
+      // Clean up puzzle input handler
+      if (this.puzzleInputHandler) {
+        this.puzzleInputHandler.destroy();
+        this.puzzleInputHandler = undefined;
+      }
+
+      // Clean up puzzle renderer
+      if (this.puzzleRenderer) {
+        this.puzzleRenderer.destroy();
+        this.puzzleRenderer = undefined;
+      }
+
+      // Restore collision
+      this.collisionManager.restoreOriginalCollision();
+
+      // Return camera to overworld
+      await this.cameraManager.transitionToOverworld();
+
+      // Clear active puzzle
+      this.gameState.clearActivePuzzle();
+      this.activePuzzleController = undefined;
+
+      console.log('Successfully exited overworld puzzle');
+
+    } catch (error) {
+      console.error('Error exiting overworld puzzle:', error);
+    }
+  }
+
+  /**
+   * Create puzzle host for overworld puzzles
+   */
+  private createOverworldPuzzleHost(puzzleId: string): PuzzleHost {
+    return {
+      loadPuzzle: (_puzzleID: string) => {
+        // Already loaded
+      },
+      onPuzzleSolved: () => {
+        console.log(`Overworld puzzle ${puzzleId} solved!`);
+        this.exitOverworldPuzzle(true);
+      },
+      onPuzzleExited: (success: boolean) => {
+        this.exitOverworldPuzzle(success);
+      }
+    };
+  }
+
+  /**
+   * Check if currently in overworld puzzle mode
+   */
+  public isInPuzzleMode(): boolean {
+    return this.gameState.getActivePuzzle() !== null;
+  }
+
+  /**
+   * Get debug info about overworld puzzle system
+   */
+  public getOverworldPuzzleDebugInfo(): any {
+    return {
+      gameState: this.gameState.getDebugInfo(),
+      puzzleStats: this.puzzleManager.getStats(),
+      cameraInPuzzleView: this.cameraManager.isInPuzzleView(),
+      activePuzzle: this.gameState.getActivePuzzle()?.id
+    };
   }
 }

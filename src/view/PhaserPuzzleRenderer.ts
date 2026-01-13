@@ -1,13 +1,16 @@
 // phaser/view/PhaserPuzzleRenderer.ts
 import Phaser from "phaser";
 import type { PuzzleRenderer } from "./PuzzleRenderer";
+import type { IPuzzleView } from "./IPuzzleView";
 import type { BridgePuzzle } from "@model/puzzle/BridgePuzzle";
 import { GridToWorldMapper } from "./GridToWorldMapper";
 import type { Bridge } from "@model/puzzle/Bridge";
+import type { BridgeType } from "@model/puzzle/BridgeType";
+import type { Point } from "@model/puzzle/Point";
 import { orientationForDelta, normalizeRenderOrder } from "./PuzzleRenderer";
 import { parseNumBridgesConstraint } from "@model/puzzle/Island";
 
-export class PhaserPuzzleRenderer implements PuzzleRenderer {
+export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
   private scene: Phaser.Scene;
   private gridMapper: GridToWorldMapper = new GridToWorldMapper(64);
   private textureKey: string;
@@ -564,5 +567,54 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer {
       this.scene.time.removeEvent(this.flashTimer);
       this.flashTimer = null;
     }
+  }
+
+  // IPuzzleView interface methods
+
+  /**
+   * Show a preview of a bridge being placed
+   */
+  showPreview(start: Point, end: Point, bridgeType: BridgeType): void {
+    // Create a temporary bridge object for preview
+    const tempBridge: Bridge = {
+      id: 'preview',
+      start,
+      end,
+      type: bridgeType
+    };
+
+    // Use existing previewBridge method
+    this.previewBridge(tempBridge);
+  }
+
+  /**
+   * Hide any active bridge preview
+   */
+  hidePreview(): void {
+    if (this.previewGraphics) {
+      this.previewGraphics.destroy();
+      this.previewGraphics = null;
+    }
+  }
+
+  /**
+   * Convert screen coordinates to grid coordinates
+   */
+  screenToGrid(screenX: number, screenY: number): Point {
+    // For dedicated puzzle scenes, we need to account for camera position
+    const camera = this.scene.cameras.main;
+    const worldX = (screenX - camera.x) / camera.zoom;
+    const worldY = (screenY - camera.y) / camera.zoom;
+
+    const gridPos = this.gridMapper.worldToGrid(worldX, worldY);
+    return { x: gridPos.x, y: gridPos.y };
+  }
+
+  /**
+   * Convert grid coordinates to world coordinates
+   */
+  gridToWorld(gridX: number, gridY: number): Point {
+    const worldPos = this.gridMapper.gridToWorld(gridX, gridY);
+    return { x: worldPos.x, y: worldPos.y };
   }
 }
