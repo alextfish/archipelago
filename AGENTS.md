@@ -4,19 +4,6 @@ This project implements a bridge-building puzzle game with a clean, layered arch
 All game logic must remain decoupled from rendering and input frameworks (e.g. Phaser or React).
 The codebase should be easy to test, extend, and maintain.
 
-## Recent Architecture Additions
-
-**Puzzle Series System**: A new progression system for organizing related puzzles with unlock requirements, progress tracking, and structured navigation. This enables the game to present puzzles in thematic series where completing certain puzzles unlocks others. The system includes:
-
-- `PuzzleSeries` class for managing puzzle collections with progression logic
-- `SeriesFactory` for loading series from JSON configuration files  
-- Progress persistence with `LocalStorageProgressStore` and `MemoryProgressStore`
-- `SeriesManager` for high-level coordination and caching
-- Comprehensive unit tests ensuring reliability
-- Integration examples showing how to connect with existing game flow
-
-Key benefits: Player engagement through clear progression, content organization, progress persistence, extensibility, and full testability. See `PUZZLE_SERIES_ARCHITECTURE.md` for detailed documentation.
-
 ## Architectural Principles
 
 1. Layer Separation
@@ -86,3 +73,16 @@ Use meaningful variable names like "bridgeStart" rather than short names like "s
 * Imports should use the paths defined in tsconfig.json: `@model`, `@view`, `@controller`, `@helpers` rather than `../model`.
 * We use British spellings everywhere possible. "colour", "standardise" etc. Only use American "color" etc when interfacing with other languages like HTML or packages like Phaser with APIs out of our control.
 * Initialisms like "ID" always have all letters the same case. Variables can be named "startID" or "idStart" but never "startId".
+
+### Details on Specific Code Areas
+
+**Puzzle Series System**: A progression system for organizing related puzzles with unlock requirements, progress tracking, and structured navigation. This enables the game to present puzzles in thematic series where completing certain puzzles unlocks others. The system includes:
+
+- `PuzzleSeries` class for managing puzzle collections with progression logic
+- `SeriesFactory` for loading series from JSON configuration files  
+- Progress persistence with `LocalStorageProgressStore` and `MemoryProgressStore`
+- `SeriesManager` for high-level coordination and caching
+- Comprehensive unit tests ensuring reliability
+- Integration examples showing how to connect with existing game flow
+
+Key benefits: Player engagement through clear progression, content organization, progress persistence, extensibility, and full testability. See `PUZZLE_SERIES_ARCHITECTURE.md` for detailed documentation.

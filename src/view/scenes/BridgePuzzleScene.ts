@@ -1,17 +1,12 @@
 import Phaser from 'phaser';
 import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
-import { GridToWorldMapper } from '../GridToWorldMapper';
-import { PhaserPuzzleRenderer } from '../PhaserPuzzleRenderer';
 import { PuzzleController } from '@controller/PuzzleController';
 import type { PuzzleHost } from '@controller/PuzzleHost';
 import { Environment } from '@helpers/Environment';
-import { getAvailableViewport } from '../ui/viewport';
 import puzzleData from '../../data/puzzles/simple4IslandPuzzle.json';
 
 export class BridgePuzzleScene extends Phaser.Scene {
     private puzzle: BridgePuzzle | null = null;
-    private gridMapper: GridToWorldMapper | null = null;
-    private puzzleRenderer: PhaserPuzzleRenderer | null = null;
     private controller: PuzzleController | null = null;
 
     constructor() {
@@ -117,16 +112,6 @@ export class BridgePuzzleScene extends Phaser.Scene {
     private findIslandAt(gridX: number, gridY: number) {
         if (!this.puzzle) return null;
         return this.puzzle.islands.find(isl => isl.x === gridX && isl.y === gridY);
-    }
-
-    private findBridgeAt(worldX: number, worldY: number) {
-        if (!this.puzzle || !this.gridMapper) return null;
-
-        const gridPos = this.gridMapper.worldToGrid(worldX, worldY);
-        const bridges = this.puzzle.bridgesAt(gridPos.x, gridPos.y);
-
-        // Return the first bridge found (or null if none)
-        return bridges.length > 0 ? bridges[0] : null;
     }
 
     update(_time: number, dt: number) {
