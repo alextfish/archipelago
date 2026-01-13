@@ -33,7 +33,11 @@ export class OverworldScene extends Phaser.Scene {
   private async loadTmxFile() {
     try {
       console.log('Loading TMX file...');
-      const tiledMapData = await MapUtils.loadTiledMap('resources/overworld.tmx');
+      const tiledMapData = await MapUtils.loadTiledMap('resources/overworld.json');
+
+      console.log('TMX data loaded:', tiledMapData);
+      console.log('Layers:', tiledMapData.layers);
+      console.log('Tilesets:', tiledMapData.tilesets);
 
       // Add the converted map data to Phaser's cache
       this.cache.tilemap.add('overworldMap', { format: 1, data: tiledMapData });
@@ -42,9 +46,7 @@ export class OverworldScene extends Phaser.Scene {
       console.error('Failed to load TMX file, using fallback:', error);
       this.createFallbackMap();
     }
-  }
-
-  private createFallbackMap() {
+  } private createFallbackMap() {
     // Simple fallback map if TMX loading fails
     const mapData = {
       width: 20,
@@ -99,10 +101,17 @@ export class OverworldScene extends Phaser.Scene {
       return;
     }
 
+    // Debug: Check what's actually in the cache
+    const cachedData = this.cache.tilemap.get('overworldMap');
+    console.log('Cached tilemap data:', cachedData);
+
     // Create the tilemap
     this.map = this.make.tilemap({ key: 'overworldMap' });
 
-    // Add tilesets
+    // Debug: Check the created map
+    console.log('Created map:', this.map);
+    console.log('Map layers:', this.map.layers);
+    console.log('Map tilesets:', this.map.tilesets);    // Add tilesets
     const beachTileset = this.map.addTilesetImage('beach', 'beachTileset');
     const grassTileset = this.map.addTilesetImage('SproutLandsGrassIslands', 'grassTileset');
 

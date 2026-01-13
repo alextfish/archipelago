@@ -86,8 +86,18 @@ export class MapUtils {
                 }
 
                 if (mapPath.endsWith('.tmx')) {
-                    // For browser, you'd need to include xml2js or use DOMParser
-                    throw new Error('TMX files not yet supported in browser environment');
+                    // Parse TMX in browser using DOMParser
+                    const xmlText = await response.text();
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+
+                    // Check for parsing errors
+                    const parserError = xmlDoc.querySelector('parsererror');
+                    if (parserError) {
+                        throw new Error(`XML parsing error: ${parserError.textContent}`);
+                    }
+
+                    mapData = this.convertTmxToJsonBrowser(xmlDoc);
                 } else {
                     mapData = await response.json();
                 }
@@ -195,6 +205,162 @@ export class MapUtils {
 
                 mapData.layers.push(objectLayer);
             }
+        }
+
+        return mapData;
+    }
+
+    /**
+     * Convert TMX DOM Document to JSON-like format for browser environment
+     */
+    private static convertTmxToJsonBrowser(xmlDoc: Document): any {
+        const mapElement = xmlDoc.querySelector('map');
+        if (!mapElement) {
+            throw new Error('Invalid TMX file: no map element found');
+        }
+
+        // Extract basic map properties
+        const mapData: any = {
+            width: parseInt(mapElement.getAttribute('width') || '0'),
+            height: parseInt(mapElement.getAttribute('height') || '0'),
+            tilewidth: parseInt(mapElement.getAttribute('tilewidth') || '32'),
+            tileheight: parseInt(mapElement.getAttribute('tileheight') || '32'),
+            orientation: mapElement.getAttribute('orientation') || 'orthogonal',
+            renderorder: mapElement.getAttribute('renderorder') || 'right-down',
+            infinite: mapElement.getAttribute('infinite') === '1',
+            version: mapElement.getAttribute('version') || '1.0',
+            type: 'map',
+            tilesets: [],
+            layers: []
+        };
+
+        // Process tilesets
+        const tilesets = xmlDoc.querySelectorAll('tileset');
+        for (const tileset of tilesets) {
+            // Check if this is an external tileset reference
+            const sourceAttr = tileset.getAttribute('source');
+            if (sourceAttr) {
+                // External tileset - we don't support loading TSX files yet
+                console.warn(`External tileset detected: ${sourceAttr}. Consider exporting as JSON instead.`);
+                throw new Error(`External tilesets not yet supported. Found: ${sourceAttr}`);
+            }
+
+            const imageElement = tileset.querySelector('image');
+            const tilesetData: any = {
+                firstgid: parseInt(tileset.getAttribute('firstgid') || '1'),
+                name: tileset.getAttribute('name') || 'unknown',
+                tilewidth: parseInt(tileset.getAttribute('tilewidth') || '32'),
+                tileheight: parseInt(tileset.getAttribute('tileheight') || '32'),
+                tilecount: parseInt(tileset.getAttribute('tilecount') || '1'),
+                columns: parseInt(tileset.getAttribute('columns') || '1')
+            };
+
+            if (imageElement) {
+                tilesetData.image = imageElement.getAttribute('source');
+                tilesetData.imagewidth = parseInt(imageElement.getAttribute('width') || '32');
+                tilesetData.imageheight = parseInt(imageElement.getAttribute('height') || '32');
+            }
+
+            mapData.tilesets.push(tilesetData);
+        }
+
+        // Process tile layers
+        const tileLayers = xmlDoc.querySelectorAll('layer');
+        for (const layer of tileLayers) {
+            const layerData: any = {
+                id: parseInt(layer.getAttribute('id') || '0'),
+                name: layer.getAttribute('name') || 'unknown',
+                type: 'tilelayer',
+                width: parseInt(layer.getAttribute('width') || '0'),
+                height: parseInt(layer.getAttribute('height') || '0'),
+                visible: layer.getAttribute('visible') !== '0',
+                opacity: parseFloat(layer.getAttribute('opacity') || '1'),
+                x: parseInt(layer.getAttribute('offsetx') || '0'),
+                y: parseInt(layer.getAttribute('offsety') || '0')
+            };
+
+            // Parse tile data
+            const dataElement = layer.querySelector('data');
+            if (dataElement) {
+                const encoding = dataElement.getAttribute('encoding');
+
+                if (encoding === 'csv') {
+                    // Parse CSV data
+                    const csvData = dataElement.textContent?.trim() || '';
+                    layerData.data = csvData
+                        .split(/[\n,]/)
+                        .map((s: string) => parseInt(s.trim()))
+                        .filter((n: number) => !isNaN(n));
+                } else {
+                    // Default to CSV-like parsing for uncompressed data
+                    const csvData = dataElement.textContent?.trim() || '';
+                    layerData.data = csvData
+                        .split(/[\s,]+/)
+                        .map((s: string) => parseInt(s.trim()))
+                        .filter((n: number) => !isNaN(n));
+                }
+            }
+
+            mapData.layers.push(layerData);
+        }
+
+        // Process object layers
+        const objectLayers = xmlDoc.querySelectorAll('objectgroup');
+        for (const objectgroup of objectLayers) {
+            const objectLayer: any = {
+                id: parseInt(objectgroup.getAttribute('id') || '0'),
+                name: objectgroup.getAttribute('name') || 'unknown',
+                type: 'objectgroup',
+                visible: objectgroup.getAttribute('visible') !== '0',
+                objects: []
+            };
+
+            // Process objects in this layer
+            const objects = objectgroup.querySelectorAll('object');
+            for (const obj of objects) {
+                const objData: any = {
+                    id: parseInt(obj.getAttribute('id') || '0'),
+                    name: obj.getAttribute('name') || '',
+                    type: obj.getAttribute('type') || '',
+                    x: parseFloat(obj.getAttribute('x') || '0'),
+                    y: parseFloat(obj.getAttribute('y') || '0'),
+                    width: parseFloat(obj.getAttribute('width') || '0'),
+                    height: parseFloat(obj.getAttribute('height') || '0'),
+                    rotation: parseFloat(obj.getAttribute('rotation') || '0'),
+                    visible: obj.getAttribute('visible') !== '0'
+                };
+
+                // Parse properties if present
+                const properties = obj.querySelector('properties');
+                if (properties) {
+                    objData.properties = {};
+                    const propElements = properties.querySelectorAll('property');
+                    for (const prop of propElements) {
+                        const name = prop.getAttribute('name');
+                        const value = prop.getAttribute('value') || prop.textContent;
+                        const type = prop.getAttribute('type') || 'string';
+
+                        if (name) {
+                            // Convert value based on type
+                            switch (type) {
+                                case 'bool':
+                                    objData.properties[name] = value === 'true';
+                                    break;
+                                case 'int':
+                                case 'float':
+                                    objData.properties[name] = parseFloat(value || '0');
+                                    break;
+                                default:
+                                    objData.properties[name] = value || '';
+                            }
+                        }
+                    }
+                }
+
+                objectLayer.objects.push(objData);
+            }
+
+            mapData.layers.push(objectLayer);
         }
 
         return mapData;
