@@ -32,18 +32,14 @@ export class OverworldScene extends Phaser.Scene {
 
   private async loadTmxFile() {
     try {
-      console.log('Loading TMX file...');
+      console.log('Loading map file...');
       const tiledMapData = await MapUtils.loadTiledMap('resources/overworld.json');
-
-      console.log('TMX data loaded:', tiledMapData);
-      console.log('Layers:', tiledMapData.layers);
-      console.log('Tilesets:', tiledMapData.tilesets);
 
       // Add the converted map data to Phaser's cache
       this.cache.tilemap.add('overworldMap', { format: 1, data: tiledMapData });
-      console.log('TMX file loaded and converted successfully');
+      console.log('Map file loaded and converted successfully');
     } catch (error) {
-      console.error('Failed to load TMX file, using fallback:', error);
+      console.error('Failed to load map file, using fallback:', error);
       this.createFallbackMap();
     }
   } private createFallbackMap() {
@@ -94,24 +90,17 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   create() {
-    // Wait for TMX loading if needed
+    // Wait for map loading if needed
     if (!this.cache.tilemap.exists('overworldMap')) {
       console.log('Waiting for map to load...');
       this.time.delayedCall(100, () => this.create(), [], this);
       return;
     }
 
-    // Debug: Check what's actually in the cache
-    const cachedData = this.cache.tilemap.get('overworldMap');
-    console.log('Cached tilemap data:', cachedData);
-
     // Create the tilemap
     this.map = this.make.tilemap({ key: 'overworldMap' });
 
-    // Debug: Check the created map
-    console.log('Created map:', this.map);
-    console.log('Map layers:', this.map.layers);
-    console.log('Map tilesets:', this.map.tilesets);    // Add tilesets
+    // Add tilesets
     const beachTileset = this.map.addTilesetImage('beach', 'beachTileset');
     const grassTileset = this.map.addTilesetImage('SproutLandsGrassIslands', 'grassTileset');
 
@@ -181,7 +170,7 @@ export class OverworldScene extends Phaser.Scene {
   private findPlayerStartPosition(): { x: number; y: number } {
     try {
       // Look for player start in scene transitions layer
-      const sceneTransitionsLayer = this.map.getObjectLayer('scene transitions');
+      const sceneTransitionsLayer = this.map.getObjectLayer('sceneTransitions');
 
       if (sceneTransitionsLayer) {
         const playerStartObj = sceneTransitionsLayer.objects.find(obj =>
