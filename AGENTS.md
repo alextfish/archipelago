@@ -73,3 +73,7 @@ Use meaningful variable names like "bridgeStart" rather than short names like "s
 * Imports should use the paths defined in tsconfig.json: `@model`, `@view`, `@controller`, `@helpers` rather than `../model`.
 * We use British spellings everywhere possible. "colour", "standardise" etc. Only use American "color" etc when interfacing with other languages like HTML or packages like Phaser with APIs out of our control.
 * Initialisms like "ID" always have all letters the same case. Variables can be named "startID" or "idStart" but never "startId".
+
+### Player Puzzle State Transitions
+
+The player's state can be: exploring the overworld; solving an overworld puzzle on a puzzle version of the overworld view; talking to an NPC; or solving a BridgePuzzle on a separate screen. When the player solves an overworld puzzle, the bridges are added to the OverworldScene's collisionArray to make them walkable. The map read from Tiled contains a "collision" layer which we NEVER CHANGE.

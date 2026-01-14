@@ -89,6 +89,14 @@ export class OverworldGameState {
     }
 
     /**
+     * Clear completion status for a puzzle (when re-entering and cancelling)
+     */
+    clearPuzzleCompletion(puzzleId: string): void {
+        console.log(`OverworldGameState: Clearing completion status for puzzle ${puzzleId}`);
+        this.completedPuzzles.delete(puzzleId);
+    }
+
+    /**
      * Check if a puzzle has saved progress
      */
     hasSavedProgress(puzzleId: string): boolean {

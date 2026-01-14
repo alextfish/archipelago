@@ -3,6 +3,7 @@ import { MapUtils } from '@model/overworld/MapConfig';
 import { OverworldPuzzleManager } from '@model/overworld/OverworldPuzzleManager';
 import { OverworldGameState } from '@model/overworld/OverworldGameState';
 import { CollisionManager } from '@model/overworld/CollisionManager';
+import { OverworldBridgeManager } from '@model/overworld/OverworldBridgeManager';
 import { CameraManager } from '@view/CameraManager';
 import { EmbeddedPuzzleRenderer } from '@view/EmbeddedPuzzleRenderer';
 import { PuzzleController } from '@controller/PuzzleController';
@@ -19,6 +20,7 @@ export class OverworldScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private map!: Phaser.Tilemaps.Tilemap;
   private collisionLayer!: Phaser.Tilemaps.TilemapLayer;
+  private bridgesLayer!: Phaser.Tilemaps.TilemapLayer;
   private collisionArray: boolean[][] = [];
   private gameMode: 'exploration' | 'puzzle' = 'exploration';
   private isExitingPuzzle: boolean = false; // Guard to prevent re-entrant exit calls
@@ -27,6 +29,7 @@ export class OverworldScene extends Phaser.Scene {
   private puzzleManager: OverworldPuzzleManager;
   private gameState: OverworldGameState;
   private collisionManager: CollisionManager;
+  private bridgeManager?: OverworldBridgeManager;
   private cameraManager: CameraManager;
   private activePuzzleController?: PuzzleController;
   private puzzleRenderer?: EmbeddedPuzzleRenderer;
@@ -196,6 +199,27 @@ export class OverworldScene extends Phaser.Scene {
       // Load the tilemap data for puzzle extraction
       this.tiledMapData = await MapUtils.loadTiledMap('resources/overworld.json');
 
+      // Now that tiledMapData is loaded, create the bridge manager if we have a bridges layer
+      if (this.bridgesLayer && !this.bridgeManager) {
+        console.log('Creating bridge manager now that tiledMapData is loaded');
+        this.bridgeManager = new OverworldBridgeManager(
+          this.map,
+          this.bridgesLayer,
+          this.collisionArray,
+          this.tiledMapData
+        );
+        console.log('Bridge manager created');
+
+        // Restore completed puzzle bridges
+        this.bridgeManager.restoreCompletedPuzzles(
+          this.gameState,
+          (puzzleId: string) => {
+            const bounds = this.puzzleManager.getPuzzleBounds(puzzleId);
+            return bounds ? new Phaser.Geom.Rectangle(bounds.x, bounds.y, bounds.width, bounds.height) : null;
+          }
+        );
+      }
+
       // Load all puzzles from the map
       const puzzles = this.puzzleManager.loadPuzzlesFromMap(this.tiledMapData);
       console.log(`Loaded ${puzzles.size} overworld puzzles`);
@@ -224,9 +248,27 @@ export class OverworldScene extends Phaser.Scene {
     } else {
       console.warn('No collision layer found in map');
     }
-  }
 
-  private findPlayerStartPosition(): { x: number; y: number } {
+    // Setup bridges layer for completed puzzles
+    const bridgesLayerData = this.map.getLayer(OverworldBridgeManager.getBridgesLayerName());
+    console.log(`Looking for bridges layer '${OverworldBridgeManager.getBridgesLayerName()}': ${bridgesLayerData ? 'FOUND' : 'NOT FOUND'}`);
+
+    if (bridgesLayerData) {
+      const tilesets = [grassTileset].filter(Boolean) as Phaser.Tilemaps.Tileset[];
+      console.log(`Creating bridges layer with ${tilesets.length} tilesets`);
+      const bridgesLayer = this.map.createLayer(OverworldBridgeManager.getBridgesLayerName(), tilesets);
+
+      if (bridgesLayer) {
+        this.bridgesLayer = bridgesLayer;
+        console.log(`Bridges layer created successfully: depth=${bridgesLayer.depth}, visible=${bridgesLayer.visible}, alpha=${bridgesLayer.alpha}`);
+        console.log('Bridge manager will be created after tiledMapData loads in initializeOverworldPuzzles()');
+      } else {
+        console.error('Failed to create bridges layer!');
+      }
+    } else {
+      console.warn('No bridges layer found in map');
+    }
+  } private findPlayerStartPosition(): { x: number; y: number } {
     try {
       // Look for player start in scene transitions layer
       const sceneTransitionsLayer = this.map.getObjectLayer('sceneTransitions');
@@ -523,6 +565,12 @@ export class OverworldScene extends Phaser.Scene {
         puzzleBounds.height
       );
 
+      // Blank this puzzle's region from bridges layer (whether completed or not)
+      // This allows editing and restores proper collision
+      if (this.bridgeManager) {
+        this.bridgeManager.blankPuzzleRegion(puzzleId, boundsRect);
+      }
+
       // Enter puzzle mode
       this.gameMode = 'puzzle';
 
@@ -616,11 +664,6 @@ export class OverworldScene extends Phaser.Scene {
         // which would call this method again, creating an infinite loop
       }
 
-      // Mark as completed if successful
-      if (success) {
-        this.gameState.markPuzzleCompleted(activeData.id);
-      }
-
       // Clean up puzzle input handler
       if (this.puzzleInputHandler) {
         this.puzzleInputHandler.destroy();
@@ -633,14 +676,48 @@ export class OverworldScene extends Phaser.Scene {
         this.puzzleRenderer = undefined;
       }
 
-      // Handle collision based on whether puzzle was solved
+      // Handle collision and bridge rendering based on whether puzzle was solved
+      const puzzleBounds = this.puzzleManager.getPuzzleBounds(activeData.id);
+      const boundsRect = puzzleBounds ? new Phaser.Geom.Rectangle(
+        puzzleBounds.x,
+        puzzleBounds.y,
+        puzzleBounds.width,
+        puzzleBounds.height
+      ) : null;
+
       if (success) {
-        // If solved, keep the bridge collision so player can walk on bridges
-        // The collision was already applied when entering the puzzle
-        console.log('Puzzle solved - keeping bridge collision in place');
+        // If solved: bake bridges to bridges layer and mark as completed
+        console.log('Puzzle solved - baking bridges to overworld');
+        console.log(`  Bridge manager exists: ${!!this.bridgeManager}`);
+        console.log(`  Bounds rect exists: ${!!boundsRect}`);
+        console.log(`  Number of bridges: ${activeData.puzzle.bridges.length}`);
+
+        if (this.bridgeManager && boundsRect) {
+          const bridges = activeData.puzzle.bridges;
+          console.log('  Calling bakePuzzleBridges...');
+          this.bridgeManager.bakePuzzleBridges(activeData.id, boundsRect, bridges);
+          console.log('  bakePuzzleBridges completed');
+        } else {
+          console.error('  CANNOT BAKE: missing bridge manager or bounds');
+        }
+        this.gameState.markPuzzleCompleted(activeData.id);
       } else {
-        // If cancelled/failed, restore original collision (remove bridges)
-        this.collisionManager.restoreOriginalCollision();
+        // If cancelled: check if it was previously completed
+        const wasCompleted = this.gameState.isPuzzleCompleted(activeData.id);
+
+        if (wasCompleted) {
+          // Was completed, now being re-entered and cancelled
+          // Clear completion status and blank the region again (already blanked on entry, but be explicit)
+          console.log('Previously completed puzzle cancelled - clearing completion status');
+          this.gameState.clearPuzzleCompletion(activeData.id);
+          if (this.bridgeManager && boundsRect) {
+            this.bridgeManager.blankPuzzleRegion(activeData.id, boundsRect);
+          }
+        } else {
+          // Was never completed, just restore collision
+          console.log('Incomplete puzzle cancelled - restoring collision');
+          this.collisionManager.restoreOriginalCollision();
+        }
       }
 
       // Return camera to overworld
