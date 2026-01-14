@@ -11,7 +11,14 @@ describe('EmbeddedPuzzleRenderer - Coordinate Conversion', () => {
         mockCamera = {
             scrollX: 100,
             scrollY: 200,
-            zoom: 2.0
+            zoom: 2.0,
+            getWorldPoint: vi.fn((screenX: number, screenY: number) => {
+                // Phaser's getWorldPoint implementation
+                return {
+                    x: mockCamera.scrollX + (screenX / mockCamera.zoom),
+                    y: mockCamera.scrollY + (screenY / mockCamera.zoom)
+                };
+            })
         };
 
         // Mock scene
@@ -36,8 +43,8 @@ describe('EmbeddedPuzzleRenderer - Coordinate Conversion', () => {
         it('should correctly convert screen coordinates with camera zoom', () => {
             // Test case: screen position (400, 300) with camera zoom 2.0
             // Expected calculation:
-            // worldX = (400 / 2.0) + 100 = 200 + 100 = 300
-            // worldY = (300 / 2.0) + 200 = 150 + 200 = 350
+            // worldX = scrollX + (screenX / zoom) = 100 + (400 / 2.0) = 100 + 200 = 300
+            // worldY = scrollY + (screenY / zoom) = 200 + (300 / 2.0) = 200 + 150 = 350
             // gridX = Math.floor((300 - 500) / 32) = Math.floor(-200 / 32) = -7
             // gridY = Math.floor((350 - 600) / 32) = Math.floor(-250 / 32) = -8
 
@@ -49,8 +56,8 @@ describe('EmbeddedPuzzleRenderer - Coordinate Conversion', () => {
         it('should handle zoom factor of 1.0 correctly', () => {
             mockCamera.zoom = 1.0;
 
-            // worldX = (400 / 1.0) + 100 = 500
-            // worldY = (300 / 1.0) + 200 = 500  
+            // worldX = 100 + (400 / 1.0) = 500
+            // worldY = 200 + (300 / 1.0) = 500  
             // gridX = Math.floor((500 - 500) / 32) = 0
             // gridY = Math.floor((500 - 600) / 32) = Math.floor(-100 / 32) = -4
 
@@ -62,8 +69,8 @@ describe('EmbeddedPuzzleRenderer - Coordinate Conversion', () => {
         it('should handle different zoom levels consistently', () => {
             mockCamera.zoom = 0.5; // Zoomed out
 
-            // worldX = (400 / 0.5) + 100 = 800 + 100 = 900
-            // worldY = (300 / 0.5) + 200 = 600 + 200 = 800
+            // worldX = 100 + (400 / 0.5) = 100 + 800 = 900
+            // worldY = 200 + (300 / 0.5) = 200 + 600 = 800
             // gridX = Math.floor((900 - 500) / 32) = Math.floor(400 / 32) = 12
             // gridY = Math.floor((800 - 600) / 32) = Math.floor(200 / 32) = 6
 

@@ -9,6 +9,7 @@ import { PuzzleController } from '@controller/PuzzleController';
 import { PuzzleInputHandler } from '@controller/PuzzleInputHandler';
 import type { PuzzleHost } from '@controller/PuzzleHost';
 import { defaultTileConfig } from '@model/overworld/MapConfig';
+import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -19,6 +20,7 @@ export class OverworldScene extends Phaser.Scene {
   private map!: Phaser.Tilemaps.Tilemap;
   private collisionLayer!: Phaser.Tilemaps.TilemapLayer;
   private collisionArray: boolean[][] = [];
+  private gameMode: 'exploration' | 'puzzle' = 'exploration';
 
   // Overworld puzzle system
   private puzzleManager: OverworldPuzzleManager;
@@ -179,6 +181,9 @@ export class OverworldScene extends Phaser.Scene {
     console.log(`Map size: ${mapWidth}x${mapHeight}`);
     console.log(`Player start: (${playerStart.x}, ${playerStart.y})`);
 
+    // Initialize shared puzzle HUD
+    PuzzleHUDManager.getInstance().initializeHUD(this);
+
     // Initialize overworld puzzle system
     this.initializeOverworldPuzzles();
   }
@@ -282,7 +287,10 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   update() {
-    this.handlePlayerMovement();
+    // Only handle player movement in exploration mode
+    if (this.gameMode === 'exploration') {
+      this.handlePlayerMovement();
+    }
   }
 
   private createPlayerAnimations() {
@@ -429,7 +437,18 @@ export class OverworldScene extends Phaser.Scene {
     const playerX = this.player.x;
     const playerY = this.player.y;
 
-    console.log(`Checking for puzzle at player position (${playerX}, ${playerY})`);
+    // Convert player position to tile coordinates
+    const tileX = Math.floor(playerX / this.tiledMapData.tilewidth);
+    const tileY = Math.floor(playerY / this.tiledMapData.tileheight);
+
+    console.log(`Checking for puzzle at player position (${playerX}, ${playerY}) - tile (${tileX}, ${tileY})`);
+
+    // Check if player is standing on a valid entry tile
+    const isOnEntryTile = this.isPlayerOnEntryTile(tileX, tileY);
+    if (!isOnEntryTile) {
+      console.log('Player not on a valid puzzle entry tile');
+      return;
+    }
 
     // Check if there's a puzzle at the player's position
     const puzzle = this.puzzleManager.getPuzzleAtPosition(playerX, playerY, this.tiledMapData);
@@ -440,6 +459,30 @@ export class OverworldScene extends Phaser.Scene {
     } else {
       console.log('No puzzle found at player position');
     }
+  }
+
+  /**
+   * Check if player is standing on a valid puzzle entry tile
+   */
+  private isPlayerOnEntryTile(tileX: number, tileY: number): boolean {
+    if (!this.map) {
+      return false;
+    }
+
+    // Get all layers and check for entry tiles
+    const entryTileIDs = defaultTileConfig.entryPointTileIDs;
+
+    for (const layer of this.map.layers) {
+      if (layer.tilemapLayer) {
+        const tile = layer.tilemapLayer.getTileAt(tileX, tileY);
+        if (tile && entryTileIDs.includes(tile.index)) {
+          console.log(`Player on entry tile ${tile.index} at (${tileX}, ${tileY})`);
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -479,7 +522,13 @@ export class OverworldScene extends Phaser.Scene {
         puzzleBounds.height
       );
 
-      // Transition camera to puzzle
+      // Enter puzzle mode
+      this.gameMode = 'puzzle';
+
+      // Disable player movement
+      this.setPlayerMovementEnabled(false);
+
+      // Transition camera to puzzle (uses 2-cell margin defined in CameraManager)
       await this.cameraManager.transitionToPuzzle(boundsRect);
 
       // Create embedded puzzle renderer
@@ -511,6 +560,22 @@ export class OverworldScene extends Phaser.Scene {
       // Update collision for bridges
       this.collisionManager.updateCollisionFromBridges(puzzle, boundsRect);
 
+      // Show HUD using PuzzleHUDManager
+      PuzzleHUDManager.getInstance().enterPuzzle(
+        this,
+        this.activePuzzleController,
+        'overworld'
+      );
+
+      // Emit puzzle setup events for HUD
+      const bridgeTypes = puzzle.getAvailableBridgeTypes();
+      console.log('OverworldScene: Emitting setTypes with', bridgeTypes);
+      this.events.emit('setTypes', bridgeTypes);
+
+      const counts = puzzle.availableCounts();
+      console.log('OverworldScene: Emitting updateCounts with', counts);
+      this.events.emit('updateCounts', counts);
+
       console.log(`Successfully entered overworld puzzle: ${puzzleId}`);
 
     } catch (error) {
@@ -532,6 +597,9 @@ export class OverworldScene extends Phaser.Scene {
     console.log(`Exiting overworld puzzle: ${activeData.id} (success: ${success})`);
 
     try {
+      // Hide HUD using PuzzleHUDManager
+      PuzzleHUDManager.getInstance().exitPuzzle();
+
       // Save puzzle state before exiting
       if (this.activePuzzleController) {
         this.gameState.saveOverworldPuzzleProgress(activeData.id, activeData.puzzle);
@@ -561,6 +629,10 @@ export class OverworldScene extends Phaser.Scene {
       // Return camera to overworld
       await this.cameraManager.transitionToOverworld();
 
+      // Exit puzzle mode and re-enable player movement
+      this.gameMode = 'exploration';
+      this.setPlayerMovementEnabled(true);
+
       // Clear active puzzle
       this.gameState.clearActivePuzzle();
       this.activePuzzleController = undefined;
@@ -569,6 +641,25 @@ export class OverworldScene extends Phaser.Scene {
 
     } catch (error) {
       console.error('Error exiting overworld puzzle:', error);
+    }
+  }
+
+  /**
+   * Enable or disable player movement
+   */
+  private setPlayerMovementEnabled(enabled: boolean): void {
+    if (enabled) {
+      // Re-enable cursor keys
+      if (!this.cursors) {
+        this.cursors = this.input.keyboard!.createCursorKeys();
+      }
+      this.player.setVisible(true);
+      console.log('Player movement enabled');
+    } else {
+      // Disable player movement by clearing velocity
+      this.player.setVelocity(0);
+      // Don't hide player - keep visible during puzzle solving
+      console.log('Player movement disabled');
     }
   }
 

@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
 
+// Margin around puzzle in grid cells when zooming to fit
+const PUZZLE_VIEW_MARGIN_CELLS = 2;
+
 /**
  * Manages camera transitions for overworld puzzle integration
  * Handles smooth transitions between overworld view and puzzle-focused view
@@ -10,20 +13,26 @@ export class CameraManager {
     private originalZoom: number = 1;
     private originalX: number = 0;
     private originalY: number = 0;
+    private readonly tileSize: number;
 
-    constructor(scene: Phaser.Scene) {
+    constructor(scene: Phaser.Scene, tileSize: number = 32) {
         this.scene = scene;
+        this.tileSize = tileSize;
     }
 
     /**
      * Transition camera to focus on a puzzle area
+     * @param puzzleBounds The puzzle bounds in pixels
+     * @param duration Animation duration in milliseconds
      */
     async transitionToPuzzle(
         puzzleBounds: Phaser.Geom.Rectangle,
-        padding: number = 64,
         duration: number = 1000
     ): Promise<void> {
         const camera = this.scene.cameras.main;
+
+        // Calculate padding in pixels (PUZZLE_VIEW_MARGIN_CELLS * tileSize)
+        const padding = PUZZLE_VIEW_MARGIN_CELLS * this.tileSize;
 
         // Store original camera state
         this.originalBounds = new Phaser.Geom.Rectangle(
@@ -45,15 +54,19 @@ export class CameraManager {
         );
 
         // Calculate zoom to fit puzzle with padding
-        const scaleX = camera.displayWidth / puzzleWithPadding.width;
-        const scaleY = camera.displayHeight / puzzleWithPadding.height;
-        const targetZoom = Math.min(scaleX, scaleY, 2.0); // Cap at 2x zoom
+        // Use width/height (viewport size) not displayWidth/displayHeight (which are affected by zoom)
+        const scaleX = camera.width / puzzleWithPadding.width;
+        const scaleY = camera.height / puzzleWithPadding.height;
+        const targetZoom = Math.min(scaleX, scaleY); // No max cap - zoom as needed to fit
 
         // Calculate center point
         const centerX = puzzleWithPadding.x + puzzleWithPadding.width / 2;
         const centerY = puzzleWithPadding.y + puzzleWithPadding.height / 2;
 
-        console.log(`CameraManager: Transitioning to puzzle at (${centerX}, ${centerY}) with zoom ${targetZoom}`);
+        console.log(`CameraManager: Transitioning to puzzle at (${centerX}, ${centerY}) with zoom ${targetZoom} (padding: ${padding}px = ${PUZZLE_VIEW_MARGIN_CELLS} cells)`);
+        console.log(`  Puzzle bounds: ${puzzleBounds.width}x${puzzleBounds.height}, with padding: ${puzzleWithPadding.width}x${puzzleWithPadding.height}`);
+        console.log(`  Camera viewport: ${camera.width}x${camera.height}, current zoom: ${camera.zoom}`);
+
 
         // Create transition promise
         return new Promise<void>((resolve) => {
@@ -105,8 +118,11 @@ export class CameraManager {
     /**
      * Immediately set camera to puzzle view (no animation)
      */
-    setPuzzleView(puzzleBounds: Phaser.Geom.Rectangle, padding: number = 64): void {
+    setPuzzleView(puzzleBounds: Phaser.Geom.Rectangle): void {
         const camera = this.scene.cameras.main;
+
+        // Calculate padding in pixels
+        const padding = PUZZLE_VIEW_MARGIN_CELLS * this.tileSize;
 
         // Store original state
         this.originalBounds = new Phaser.Geom.Rectangle(
@@ -127,9 +143,9 @@ export class CameraManager {
             puzzleBounds.height + padding * 2
         );
 
-        const scaleX = camera.displayWidth / puzzleWithPadding.width;
-        const scaleY = camera.displayHeight / puzzleWithPadding.height;
-        const targetZoom = Math.min(scaleX, scaleY, 2.0);
+        const scaleX = camera.width / puzzleWithPadding.width;
+        const scaleY = camera.height / puzzleWithPadding.height;
+        const targetZoom = Math.min(scaleX, scaleY); // No max cap
 
         const centerX = puzzleWithPadding.x + puzzleWithPadding.width / 2;
         const centerY = puzzleWithPadding.y + puzzleWithPadding.height / 2;

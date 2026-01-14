@@ -71,6 +71,8 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     }
 
     updateFromPuzzle(puzzle: BridgePuzzle): void {
+        console.log(`EmbeddedPuzzleRenderer.updateFromPuzzle: ${puzzle.placedBridges.length} placed bridges`);
+
         // Clear existing bridge graphics
         this.destroyBridges();
 
@@ -78,6 +80,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
         const placedBridges = puzzle.placedBridges;
         if (placedBridges.length > 0) {
             for (const bridge of placedBridges) {
+                console.log(`EmbeddedPuzzleRenderer: Creating bridge ${bridge.id} from (${bridge.start?.x},${bridge.start?.y}) to (${bridge.end?.x},${bridge.end?.y})`);
                 this.createBridge(bridge);
             }
         }
@@ -106,13 +109,13 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     }
 
     screenToGrid(screenX: number, screenY: number): Point {
-        // Convert screen coordinates to world coordinates accounting for camera zoom
+        // Convert screen coordinates to world coordinates using Phaser's built-in method
         const camera = this.scene.cameras.main;
-        const worldX = (screenX / camera.zoom) + camera.scrollX;
-        const worldY = (screenY / camera.zoom) + camera.scrollY;
+        const worldPoint = camera.getWorldPoint(screenX, screenY);
 
         // Convert to puzzle grid coordinates
-        const gridPos = this.gridMapper.worldToGrid(worldX, worldY);
+        const gridPos = this.gridMapper.worldToGrid(worldPoint.x, worldPoint.y);
+        //console.log(`EmbeddedPuzzleRenderer.screenToGrid: screen(${screenX}, ${screenY}) camera(scrollX=${camera.scrollX}, scrollY=${camera.scrollY}, zoom=${camera.zoom}) -> world(${worldPoint.x}, ${worldPoint.y}) -> grid(${gridPos.x}, ${gridPos.y})`);
         return { x: gridPos.x, y: gridPos.y };
     }
 

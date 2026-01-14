@@ -22,6 +22,8 @@ describe('CameraManager', () => {
             scrollY: 200,
             displayWidth: 800,
             displayHeight: 600,
+            width: 800,
+            height: 600,
             zoom: 1,
             pan: vi.fn(),
             zoomTo: vi.fn(),
@@ -36,7 +38,7 @@ describe('CameraManager', () => {
             }
         };
 
-        cameraManager = new CameraManager(mockScene);
+        cameraManager = new CameraManager(mockScene, 32);
     });
 
     describe('transitionToPuzzle', () => {
@@ -55,13 +57,13 @@ describe('CameraManager', () => {
 
         it('should calculate correct target zoom and position', async () => {
             const puzzleBounds = new MockRectangle(400, 300, 200, 150);
-            const padding = 64;
+            const padding = 2 * 32; // 2 cells * 32px tile size
 
             mockCamera.pan.mockImplementation((_x: number, _y: number, _duration: number, _ease: string, _force: boolean, callback: Function) => {
                 callback(mockCamera, 1);
             });
 
-            await cameraManager.transitionToPuzzle(puzzleBounds as any, padding);
+            await cameraManager.transitionToPuzzle(puzzleBounds as any);
 
             // Should pan to center of puzzle with padding
             const expectedCenterX = puzzleBounds.x + puzzleBounds.width / 2;
@@ -76,14 +78,15 @@ describe('CameraManager', () => {
                 expect.any(Function)
             );
 
-            // Should zoom to fit puzzle with padding
+            // Should zoom to fit puzzle with padding (no max cap)
+            // Use camera.width/height not displayWidth/displayHeight
             const puzzleWithPadding = {
                 width: puzzleBounds.width + padding * 2,
                 height: puzzleBounds.height + padding * 2
             };
-            const scaleX = mockCamera.displayWidth / puzzleWithPadding.width;
-            const scaleY = mockCamera.displayHeight / puzzleWithPadding.height;
-            const expectedZoom = Math.min(scaleX, scaleY, 2.0);
+            const scaleX = mockCamera.width / puzzleWithPadding.width;
+            const scaleY = mockCamera.height / puzzleWithPadding.height;
+            const expectedZoom = Math.min(scaleX, scaleY);
 
             expect(mockCamera.zoomTo).toHaveBeenCalledWith(expectedZoom, 1000, 'Power2');
         });
