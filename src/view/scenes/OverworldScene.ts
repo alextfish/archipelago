@@ -200,11 +200,12 @@ export class OverworldScene extends Phaser.Scene {
       this.tiledMapData = await MapUtils.loadTiledMap('resources/overworld.json');
 
       // Now that tiledMapData is loaded, create the bridge manager if we have a bridges layer
-      if (this.bridgesLayer && !this.bridgeManager) {
+      if (this.bridgesLayer && this.collisionLayer && !this.bridgeManager) {
         console.log('Creating bridge manager now that tiledMapData is loaded');
         this.bridgeManager = new OverworldBridgeManager(
           this.map,
           this.bridgesLayer,
+          this.collisionLayer,
           this.collisionArray,
           this.tiledMapData
         );
