@@ -87,6 +87,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     }
 
     showPreview(start: Point, end: Point, bridgeType: BridgeType): void {
+        console.log(`EmbeddedPuzzleRenderer.showPreview: start(${start.x},${start.y}) end(${end.x},${end.y}) type=${bridgeType.id}`);
         this.hidePreview();
 
         const tempBridge: Bridge = {
@@ -99,6 +100,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
         this.previewGraphics = this.createBridgeContainer(tempBridge);
         this.previewGraphics.setAlpha(this.PREVIEW_ALPHA);
         this.puzzleContainer.add(this.previewGraphics);
+        console.log(`EmbeddedPuzzleRenderer.showPreview: Preview container created with ${this.previewGraphics.list.length} sprites, depth=${this.previewGraphics.depth}`);
     }
 
     hidePreview(): void {
@@ -137,9 +139,12 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
         // Destroy preview
         this.hidePreview();
 
-        // Destroy container
+        // Destroy container and recreate it
         if (this.puzzleContainer) {
             this.puzzleContainer.destroy();
+            this.puzzleContainer = this.scene.add.container(0, 0);
+            this.puzzleContainer.setDepth(100);
+            this.puzzleContainer.setVisible(true);
         }
     }
 
@@ -155,9 +160,13 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     }
 
     private createBridge(bridge: Bridge): void {
+        console.log(`EmbeddedPuzzleRenderer.createBridge: Creating bridge ${bridge.id}`);
         const container = this.createBridgeContainer(bridge);
+        console.log(`EmbeddedPuzzleRenderer.createBridge: Container created with ${container.list.length} sprites`);
         this.puzzleContainer.add(container);
         this.bridgeGraphics.set(bridge.id, container);
+        console.log(`EmbeddedPuzzleRenderer.createBridge: Bridge added to puzzle container, total bridges: ${this.bridgeGraphics.size}`);
+        console.log(`  puzzleContainer visible=${this.puzzleContainer.visible} alpha=${this.puzzleContainer.alpha} depth=${this.puzzleContainer.depth} childCount=${this.puzzleContainer.list.length}`);
     }
 
     private createBridgeContainer(bridge: Bridge): Phaser.GameObjects.Container {
@@ -167,8 +176,19 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
         if (!bridge.start || !bridge.end) {
             console.warn(`EmbeddedPuzzleRenderer: Bridge ${bridge.id} missing start or end coordinates`);
             return container;
-        } const startWorld = this.gridMapper.gridToWorld(bridge.start.x, bridge.start.y);
+        }
+
+        const startWorld = this.gridMapper.gridToWorld(bridge.start.x, bridge.start.y);
         const endWorld = this.gridMapper.gridToWorld(bridge.end.x, bridge.end.y);
+
+        const cam = this.scene.cameras.main;
+        const viewportTL = { x: cam.scrollX, y: cam.scrollY };
+        const viewportBR = { x: cam.scrollX + cam.width / cam.zoom, y: cam.scrollY + cam.height / cam.zoom };
+
+        console.log(`EmbeddedPuzzleRenderer: Bridge ${bridge.id} grid(${bridge.start.x},${bridge.start.y})->(${bridge.end.x},${bridge.end.y}) mapped to world(${startWorld.x},${startWorld.y})->(${endWorld.x},${endWorld.y})`);
+        console.log(`  Puzzle bounds offset: (${this.puzzleBounds.x}, ${this.puzzleBounds.y})`);
+        console.log(`  Viewport: TL(${viewportTL.x.toFixed(0)},${viewportTL.y.toFixed(0)}) BR(${viewportBR.x.toFixed(0)},${viewportBR.y.toFixed(0)}) zoom=${cam.zoom.toFixed(2)}`);
+        console.log(`  Container position: (${container.x}, ${container.y})`);
 
         // Determine bridge orientation
         const orientation = orientationForDelta(bridge.start, bridge.end);
@@ -177,6 +197,14 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
             this.createHorizontalBridge(container, bridge, startWorld, endWorld);
         } else {
             this.createVerticalBridge(container, bridge, startWorld, endWorld);
+        }
+
+        // Log sprite details after creation
+        console.log(`  Container has ${container.list.length} sprites after creation`);
+        if (container.list.length > 0) {
+            const firstSprite = container.list[0] as Phaser.GameObjects.Sprite;
+            console.log(`  First sprite: pos(${firstSprite.x},${firstSprite.y}) origin(${firstSprite.originX},${firstSprite.originY}) visible=${firstSprite.visible} alpha=${firstSprite.alpha} depth=${firstSprite.depth}`);
+            console.log(`  First sprite texture: ${firstSprite.texture.key} frame=${firstSprite.frame.name}`);
         }
 
         return container;

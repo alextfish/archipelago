@@ -77,15 +77,7 @@ export class PuzzleController {
                 // calculate true angle to cursor point from world coordinates
                 const worldStart = (this.renderer as any).gridMapper.gridToWorld(start.x, start.y);
                 const angle = Math.atan2(_worldY - worldStart.y, _worldX - worldStart.x);
-                const rawEndX = start.x + Math.cos(angle) * typeLength;
-                const rawEndY = start.y + Math.sin(angle) * typeLength;
-
-                // Round to avoid floating-point precision issues that cause length jumping
-                // This ensures the rendered bridge stays at exactly the intended fixed length
-                previewEnd = {
-                    x: Math.round(rawEndX * 1000) / 1000,
-                    y: Math.round(rawEndY * 1000) / 1000
-                };
+                previewEnd = { x: start.x + Math.cos(angle) * typeLength, y: start.y + Math.sin(angle) * typeLength };
             }
         } else {
             // variable length: snap to candidate island if it's a valid placement, else follow cursor smoothly
@@ -348,6 +340,7 @@ export class PuzzleController {
         this.renderer.setPlacing(false);
         this.renderer.updateFromPuzzle(this.puzzle);
         this.selectAvailableBridgeType();
+        this.notifyCountsChanged();
         this.validate();
     }
 
@@ -382,6 +375,7 @@ export class PuzzleController {
         if (this.wasSolved) return;
         if (this.undoManager.undo()) {
             this.renderer.updateFromPuzzle(this.puzzle);
+            this.notifyCountsChanged();
             this.validate();
         }
     }
@@ -391,6 +385,7 @@ export class PuzzleController {
         if (this.wasSolved) return;
         if (this.undoManager.redo()) {
             this.renderer.updateFromPuzzle(this.puzzle);
+            this.notifyCountsChanged();
             this.validate();
         }
     }
@@ -435,5 +430,10 @@ export class PuzzleController {
     update(dt: number): void {
         // Optional per-frame logic (animations, timers, etc.)
         this.renderer.update(dt);
+    }
+
+    private notifyCountsChanged(): void {
+        const counts = this.puzzle.availableCounts();
+        this.host.onBridgeCountsChanged?.(counts);
     }
 }

@@ -20,6 +20,11 @@ export interface PuzzleHost {
      * Controller can call this when it changes the selection so HUD stays in sync.
      */
     setSelectedBridgeType?(typeId: string | null): void;
+    /**
+     * Optional: called when bridge counts change (after placement/removal/undo/redo).
+     * Allows host to update the HUD with current available counts.
+     */
+    onBridgeCountsChanged?(counts: Record<string, number>): void;
 }
 
 // PhaserPuzzleHost: Implements PuzzleHost using Phaser for rendering and input handling.
@@ -28,7 +33,7 @@ export class PhaserPuzzleHost implements PuzzleHost {
     private puzzleController: PuzzleController | null = null
     private renderer: PuzzleRenderer;
 
-    
+
     /**
      * Constructs a PuzzleHost with a PuzzleController and PuzzleRenderer.
      * @param controller The PuzzleController instance to orchestrate puzzle logic.

@@ -21,6 +21,7 @@ export class OverworldScene extends Phaser.Scene {
   private collisionLayer!: Phaser.Tilemaps.TilemapLayer;
   private collisionArray: boolean[][] = [];
   private gameMode: 'exploration' | 'puzzle' = 'exploration';
+  private isExitingPuzzle: boolean = false; // Guard to prevent re-entrant exit calls
 
   // Overworld puzzle system
   private puzzleManager: OverworldPuzzleManager;
@@ -588,6 +589,12 @@ export class OverworldScene extends Phaser.Scene {
    * Exit overworld puzzle mode
    */
   public async exitOverworldPuzzle(success: boolean): Promise<void> {
+    // Guard against re-entrant calls (prevents infinite loop when puzzle is solved)
+    if (this.isExitingPuzzle) {
+      console.log('Already exiting puzzle, ignoring duplicate call');
+      return;
+    }
+
     const activeData = this.gameState.getActivePuzzle();
     if (!activeData) {
       console.warn('No active puzzle to exit');
@@ -596,6 +603,8 @@ export class OverworldScene extends Phaser.Scene {
 
     console.log(`Exiting overworld puzzle: ${activeData.id} (success: ${success})`);
 
+    this.isExitingPuzzle = true;
+
     try {
       // Hide HUD using PuzzleHUDManager
       PuzzleHUDManager.getInstance().exitPuzzle();
@@ -603,7 +612,8 @@ export class OverworldScene extends Phaser.Scene {
       // Save puzzle state before exiting
       if (this.activePuzzleController) {
         this.gameState.saveOverworldPuzzleProgress(activeData.id, activeData.puzzle);
-        this.activePuzzleController.exitPuzzle(success);
+        // Don't call controller.exitPuzzle() as it would trigger onPuzzleExited callback
+        // which would call this method again, creating an infinite loop
       }
 
       // Mark as completed if successful
@@ -623,8 +633,15 @@ export class OverworldScene extends Phaser.Scene {
         this.puzzleRenderer = undefined;
       }
 
-      // Restore collision
-      this.collisionManager.restoreOriginalCollision();
+      // Handle collision based on whether puzzle was solved
+      if (success) {
+        // If solved, keep the bridge collision so player can walk on bridges
+        // The collision was already applied when entering the puzzle
+        console.log('Puzzle solved - keeping bridge collision in place');
+      } else {
+        // If cancelled/failed, restore original collision (remove bridges)
+        this.collisionManager.restoreOriginalCollision();
+      }
 
       // Return camera to overworld
       await this.cameraManager.transitionToOverworld();
@@ -641,6 +658,9 @@ export class OverworldScene extends Phaser.Scene {
 
     } catch (error) {
       console.error('Error exiting overworld puzzle:', error);
+    } finally {
+      // Always reset the guard flag
+      this.isExitingPuzzle = false;
     }
   }
 
@@ -677,6 +697,10 @@ export class OverworldScene extends Phaser.Scene {
       },
       onPuzzleExited: (success: boolean) => {
         this.exitOverworldPuzzle(success);
+      },
+      onBridgeCountsChanged: (counts: Record<string, number>) => {
+        console.log('OverworldScene: Bridge counts changed, emitting updateCounts with', counts);
+        this.events.emit('updateCounts', counts);
       }
     };
   }
