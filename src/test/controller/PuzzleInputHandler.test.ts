@@ -27,11 +27,18 @@ describe('PuzzleInputHandler', () => {
             off: vi.fn()
         };
 
+        const mockCamera = {
+            getWorldPoint: vi.fn().mockImplementation((x: number, y: number) => ({ x, y }))
+        };
+
         mockScene = {
             input: {
                 on: vi.fn(),
                 off: vi.fn(),
                 keyboard: mockKeyboard
+            },
+            cameras: {
+                main: mockCamera
             },
             events: {
                 emit: vi.fn()
@@ -98,8 +105,10 @@ describe('PuzzleInputHandler', () => {
             pointerMoveHandler(mockPointer);
 
             expect(mockView.screenToGrid).toHaveBeenCalledWith(250, 200);
-            expect(mockView.gridToWorld).toHaveBeenCalledWith(5, 3);
-            expect(mockController.onPointerMove).toHaveBeenCalledWith(160, 96, 5, 3);
+            // Should use camera.getWorldPoint for pixel-accurate position, not gridToWorld
+            expect(mockScene.cameras.main.getWorldPoint).toHaveBeenCalledWith(250, 200);
+            // World coordinates come from camera, grid coordinates from screenToGrid
+            expect(mockController.onPointerMove).toHaveBeenCalledWith(250, 200, 5, 3);
         });
 
         it('should handle pointer up events', () => {
