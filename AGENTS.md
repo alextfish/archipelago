@@ -1,83 +1,89 @@
-## Project Intent
+# AI Agent Guidelines for Archipelago
 
-This project implements a bridge-building puzzle game with a clean, layered architecture and full unit testability.
-All game logic must remain decoupled from rendering and input frameworks (e.g. Phaser or React).
-The codebase should be easy to test, extend, and maintain.
+This document contains specific instructions and guidelines for AI coding agents (such as GitHub Copilot) working on the Archipelago project.
 
-## Architectural Principles
+> **For comprehensive architecture documentation**, see [ARCHITECTURE.md](ARCHITECTURE.md).  
+> This file focuses on agent-specific workflows and considerations.
 
-1. Layer Separation
+## Quick Reference
 
-* model/ — pure logic and data. Contains BridgePuzzle, Constraints, PuzzleValidator, etc.
-** No UI, rendering, or input handling code.
-** Should be fully unit-testable with no mocks beyond simple data objects.
-* view/ — rendering and display code. For example, Phaser scenes and sprites.
-** Knows how to draw puzzles, not how to solve them.
-** May depend on the model only through well-defined read-only interfaces.
-* controller/ — orchestration and glue. For example, PuzzleController, OverworldController, and PuzzleHost.
-** Responds to user input, updates models, and triggers view changes.
-** Never contains puzzle logic itself.
+**Project Type**: Bridge-building puzzle game with clean MVC architecture
 
-2. Testing
+**Key Architectural Rule**: Keep model/ pure and framework-independent. All game logic in model/, rendering in view/, orchestration in controller/.
 
-Every class in model/ should have unit tests in tests/model/.
+**Documentation**:
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Comprehensive architecture guide
+- [PUZZLE_SERIES_ARCHITECTURE.md](PUZZLE_SERIES_ARCHITECTURE.md) - Puzzle series system details
 
-No test outside of test/view should depend on Phaser or any graphical library.
+## Essential Architectural Constraints
 
-Use mocks or stubs to isolate layers when testing controllers.
+When writing code, you **must** adhere to these layer separation rules:
 
-Keep tests small, deterministic, and readable.
+### Model Layer (`src/model/`)
+* ✅ Pure TypeScript logic and data structures
+* ✅ Fully unit-testable without mocks
+* ❌ NO Phaser, React, or any UI framework imports
+* ❌ NO rendering or input handling code
+* ❌ NO dependencies on view/ or controller/
 
-There's no such thing as "legacy tests": update the tests to match the product code. If some planned product changes break tests, fix the tests rather than making inelegant edits to the product.
+### View Layer (`src/view/`)
+* ✅ Phaser scenes, sprites, and visual components
+* ✅ Read from model through well-defined interfaces
+* ❌ NO game logic or puzzle solving code
+* ❌ NO direct model state mutation (must go through controller)
 
-3. Data Flow
+### Controller Layer (`src/controller/`)
+* ✅ Orchestration between model and view
+* ✅ Input handling and state coordination
+* ❌ NO puzzle logic (belongs in model)
+* ❌ NO rendering code (belongs in view)
 
-Puzzle state changes live in the model.
+## Code Generation Guidelines
 
-controller updates the model and tells the view what changed.
+When generating or modifying code:
 
-The view sends input events back to the controller, never directly to the model.
+### Respect Layer Separation
+* Place game logic in model/, never in view/ or controller/
+* Keep model/ free of any UI framework dependencies
+* Don't introduce framework-specific logic into model/
+* Don't add hidden global state or event buses
+* Prefer dependency injection and callbacks over implicit coupling
 
-4. Extensibility
+### Testing Requirements
+* Write unit tests for all new model/ classes in test/model/
+* Tests should use real objects, not mocks (for model layer)
+* Update existing tests when behaviour changes - no "legacy tests"
+* Ensure tests are deterministic and readable
+* All new code should be immediately followed by tests
 
-Adding new constraint types or puzzle mechanics should not require changes in the rendering code.
+### Code Quality Standards
+* Prioritise clarity over cleverness
+* Use meaningful names: `bridgeStart` not `s`
+* Keep classes small and focused (< 200 lines ideally)
+* Extract shared logic to avoid duplication
+* Prefer explicit code over implicit magic
 
-Adding new renderers (e.g. alternate visual styles) should not require changing puzzle logic.
+### When In Doubt
+Prioritise: **Clarity → Testability → Architectural Consistency**
 
-Use small, composable classes over large monoliths.
+## Coding Style
 
-5. Maintainability
+* **Imports**: Use path aliases defined in tsconfig.json: `@model`, `@view`, `@controller`, `@helpers` rather than `../model`
+* **Spelling**: Use British spellings everywhere possible: "colour", "standardise", etc. Only use American spellings when interfacing with external APIs (HTML, Phaser) that require them
+* **Initialisms**: Keep all letters the same case. Use `startID` or `idStart`, never `startId`
 
-Prefer explicit, readable code over clever one-liners.
-
-Avoid circular dependencies and tight coupling between modules.
-
-Keep interfaces stable and clearly documented.
-
-Follow consistent naming and file structure. 
-Use meaningful variable names like "bridgeStart" rather than short names like "s".
-
-
-## Copilot / AI Coding Guidelines:
-
-* Respect the separation between model, view, and controller.
-** When suggesting code:
-** Don’t introduce framework-specific logic into model/.
-** Don’t add hidden global state or event buses.
-** Prefer dependency injection and callbacks over implicit coupling.
-* All new code should be immediately followed by new tests for it. Prefer unit tests wherever possible.
-* When in doubt, prioritise clarity, testability, and architectural consistency.
-
-### Coding Style
-
-* Imports should use the paths defined in tsconfig.json: `@model`, `@view`, `@controller`, `@helpers` rather than `../model`.
-* We use British spellings everywhere possible. "colour", "standardise" etc. Only use American "color" etc when interfacing with other languages like HTML or packages like Phaser with APIs out of our control.
-* Initialisms like "ID" always have all letters the same case. Variables can be named "startID" or "idStart" but never "startId".
+## Project-Specific Context
 
 ### Player Puzzle State Transitions
 
-The player's state can be: exploring the overworld; solving an overworld puzzle on a puzzle version of the overworld view; talking to an NPC; or solving a BridgePuzzle on a separate screen. When the player solves an overworld puzzle, the bridges are added to the OverworldScene's collisionArray to make them walkable. The map read from Tiled contains a "collision" layer which we NEVER CHANGE.
+The player's state can be:
+- Exploring the overworld
+- Solving an overworld puzzle on a puzzle version of the overworld view
+- Talking to an NPC
+- Solving a BridgePuzzle on a separate screen
+
+When the player solves an overworld puzzle, the bridges are added to the OverworldScene's collisionArray to make them walkable. The map read from Tiled contains a "collision" layer which we **NEVER CHANGE**.
 
 ### Source Control
 
-We use git. But AI agents NEVER COMMIT TO GIT. I will make git commits and pushes. You can use git to revert or stash changes if you want.
+We use git. **AI agents NEVER COMMIT TO GIT directly.** The human developer makes git commits and pushes. You can use git to revert or stash changes if needed, but never commit.
