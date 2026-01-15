@@ -64,7 +64,7 @@ export class PuzzleInputHandler {
         // Handle pointer move for bridge preview during drag
         this.scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
             const gridPos = this.view.screenToGrid(pointer.x, pointer.y);
-            
+
             // Get actual world position without grid snapping for smooth previews
             const camera = this.scene.cameras.main;
             const worldPoint = camera.getWorldPoint(pointer.x, pointer.y);
