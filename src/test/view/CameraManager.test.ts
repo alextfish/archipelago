@@ -50,6 +50,8 @@ describe('CameraManager', () => {
                 callback(mockCamera, 1);
             });
 
+            // Store camera state before transition
+            cameraManager.storeCameraState();
             await cameraManager.transitionToPuzzle(puzzleBounds as any);
 
             expect(cameraManager.isInPuzzleView()).toBe(true);
@@ -63,6 +65,8 @@ describe('CameraManager', () => {
                 callback(mockCamera, 1);
             });
 
+            // Store camera state before transition
+            cameraManager.storeCameraState();
             await cameraManager.transitionToPuzzle(puzzleBounds as any);
 
             // Should pan to center of puzzle with padding
@@ -99,21 +103,19 @@ describe('CameraManager', () => {
             mockCamera.pan.mockImplementation((_x: number, _y: number, _duration: number, _ease: string, _force: boolean, callback: Function) => {
                 callback(mockCamera, 1);
             });
+            mockCamera.zoomTo.mockImplementation((_zoom: number, _duration: number, _ease: string, _force: boolean, callback: Function) => {
+                if (callback) callback(mockCamera, 1);
+            });
 
+            // Store camera state then transition to puzzle
+            cameraManager.storeCameraState();
             await cameraManager.transitionToPuzzle(puzzleBounds as any);
 
             // Now return to overworld
             await cameraManager.transitionToOverworld();
 
-            expect(mockCamera.pan).toHaveBeenCalledWith(
-                mockCamera.scrollX + mockCamera.displayWidth / 2,
-                mockCamera.scrollY + mockCamera.displayHeight / 2,
-                1000,
-                'Power2',
-                false,
-                expect.any(Function)
-            );
-            expect(mockCamera.zoomTo).toHaveBeenCalledWith(1, 1000, 'Power2');
+            // Should zoom back to original zoom (panning is handled by camera follow, not by CameraManager)
+            expect(mockCamera.zoomTo).toHaveBeenCalledWith(1, 1000, 'Power2', false, expect.any(Function));
         });
     });
 
@@ -121,6 +123,7 @@ describe('CameraManager', () => {
         it('should immediately set camera to puzzle view', () => {
             const puzzleBounds = new MockRectangle(400, 300, 200, 150);
 
+            cameraManager.storeCameraState();
             cameraManager.setPuzzleView(puzzleBounds as any);
 
             expect(mockCamera.setZoom).toHaveBeenCalled();
@@ -132,6 +135,7 @@ describe('CameraManager', () => {
         it('should immediately return to overworld view', () => {
             // First enter puzzle mode
             const puzzleBounds = new MockRectangle(400, 300, 200, 150);
+            cameraManager.storeCameraState();
             cameraManager.setPuzzleView(puzzleBounds as any);
 
             // Now return
@@ -149,6 +153,7 @@ describe('CameraManager', () => {
 
         it('should return true after entering puzzle view', () => {
             const puzzleBounds = new MockRectangle(400, 300, 200, 150);
+            cameraManager.storeCameraState();
             cameraManager.setPuzzleView(puzzleBounds as any);
 
             expect(cameraManager.isInPuzzleView()).toBe(true);
@@ -158,6 +163,7 @@ describe('CameraManager', () => {
     describe('reset', () => {
         it('should clear all stored state', () => {
             const puzzleBounds = new MockRectangle(400, 300, 200, 150);
+            cameraManager.storeCameraState();
             cameraManager.setPuzzleView(puzzleBounds as any);
 
             expect(cameraManager.isInPuzzleView()).toBe(true);

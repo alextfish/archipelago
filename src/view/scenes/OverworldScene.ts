@@ -578,6 +578,11 @@ export class OverworldScene extends Phaser.Scene {
       // Disable player movement
       this.setPlayerMovementEnabled(false);
 
+      // Store camera state BEFORE stopping follow, so we capture where the camera is while following
+      // Then stop following and transition
+      this.cameraManager.storeCameraState();
+      this.cameras.main.stopFollow();
+
       // Transition camera to puzzle (uses 2-cell margin defined in CameraManager)
       await this.cameraManager.transitionToPuzzle(boundsRect);
 
@@ -721,7 +726,10 @@ export class OverworldScene extends Phaser.Scene {
         }
       }
 
-      // Return camera to overworld
+      // Resume camera following player BEFORE transition so it pans to player while zooming
+      this.cameras.main.startFollow(this.player);
+
+      // Return camera to overworld (just zooms, camera follow handles panning to player)
       await this.cameraManager.transitionToOverworld();
 
       // Exit puzzle mode and re-enable player movement

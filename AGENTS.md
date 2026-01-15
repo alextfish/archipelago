@@ -77,3 +77,7 @@ Use meaningful variable names like "bridgeStart" rather than short names like "s
 ### Player Puzzle State Transitions
 
 The player's state can be: exploring the overworld; solving an overworld puzzle on a puzzle version of the overworld view; talking to an NPC; or solving a BridgePuzzle on a separate screen. When the player solves an overworld puzzle, the bridges are added to the OverworldScene's collisionArray to make them walkable. The map read from Tiled contains a "collision" layer which we NEVER CHANGE.
+
+### Source Control
+
+We use git. But AI agents NEVER COMMIT TO GIT. I will make git commits and pushes. You can use git to revert or stash changes if you want.
