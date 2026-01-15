@@ -11,6 +11,7 @@ import { PuzzleInputHandler } from '@controller/PuzzleInputHandler';
 import type { PuzzleHost } from '@controller/PuzzleHost';
 import { defaultTileConfig } from '@model/overworld/MapConfig';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
+import { PlayerController } from '@view/PlayerController';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -18,6 +19,7 @@ import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 export class OverworldScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private playerController?: PlayerController;
   private map!: Phaser.Tilemaps.Tilemap;
   private collisionLayer!: Phaser.Tilemaps.TilemapLayer;
   private bridgesLayer!: Phaser.Tilemaps.TilemapLayer;
@@ -170,11 +172,9 @@ export class OverworldScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
     this.cameras.main.setZoom(2);
 
-    // Create player animations
-    this.createPlayerAnimations();
-
-    // Set up input
+    // Set up input and player controller
     this.cursors = this.input.keyboard!.createCursorKeys();
+    this.playerController = new PlayerController(this, this.player, this.cursors);
 
     // Enable collision between player and collision layer
     if (this.collisionLayer) {
@@ -332,101 +332,8 @@ export class OverworldScene extends Phaser.Scene {
 
   update() {
     // Only handle player movement in exploration mode
-    if (this.gameMode === 'exploration') {
-      this.handlePlayerMovement();
-    }
-  }
-
-  private createPlayerAnimations() {
-    // Walking down animations (frames 1-3, but Phaser is 0-indexed so 0-2)
-    this.anims.create({
-      key: 'walk-down',
-      frames: this.anims.generateFrameNumbers('builder', { start: 0, end: 2 }),
-      frameRate: 8,
-      repeat: -1
-    });
-
-    // Walking right animations (frames 4-6, so 3-5 in 0-indexed)
-    this.anims.create({
-      key: 'walk-right',
-      frames: this.anims.generateFrameNumbers('builder', { start: 3, end: 5 }),
-      frameRate: 8,
-      repeat: -1
-    });
-
-    // Walking up animations (frames 7-9, so 6-8 in 0-indexed)  
-    this.anims.create({
-      key: 'walk-up',
-      frames: this.anims.generateFrameNumbers('builder', { start: 6, end: 8 }),
-      frameRate: 8,
-      repeat: -1
-    });
-
-    // Idle frames (first frame of each direction)
-    this.anims.create({
-      key: 'idle-down',
-      frames: [{ key: 'builder', frame: 0 }],
-      frameRate: 1
-    });
-
-    this.anims.create({
-      key: 'idle-right',
-      frames: [{ key: 'builder', frame: 3 }],
-      frameRate: 1
-    });
-
-    this.anims.create({
-      key: 'idle-up',
-      frames: [{ key: 'builder', frame: 6 }],
-      frameRate: 1
-    });
-  }
-
-  private handlePlayerMovement() {
-    const speed = 100;
-
-    // Reset velocity
-    this.player.setVelocity(0);
-
-    // Horizontal movement
-    if (this.cursors.left!.isDown) {
-      this.player.setVelocityX(-speed);
-      this.player.setFlipX(true);
-      this.player.anims.play('walk-right', true);
-    } else if (this.cursors.right!.isDown) {
-      this.player.setVelocityX(speed);
-      this.player.setFlipX(false);
-      this.player.anims.play('walk-right', true);
-    }
-
-    // Vertical movement
-    if (this.cursors.up!.isDown) {
-      this.player.setVelocityY(-speed);
-      if (this.player.body!.velocity.x === 0) {
-        this.player.anims.play('walk-up', true);
-      }
-    } else if (this.cursors.down!.isDown) {
-      this.player.setVelocityY(speed);
-      if (this.player.body!.velocity.x === 0) {
-        this.player.anims.play('walk-down', true);
-      }
-    }
-
-    // Play idle animation if not moving
-    if (this.player.body!.velocity.x === 0 && this.player.body!.velocity.y === 0) {
-      // Determine which idle animation based on last direction
-      if (this.player.anims.currentAnim) {
-        const currentAnim = this.player.anims.currentAnim.key;
-        if (currentAnim.includes('up')) {
-          this.player.anims.play('idle-up', true);
-        } else if (currentAnim.includes('right')) {
-          this.player.anims.play('idle-right', true);
-        } else {
-          this.player.anims.play('idle-down', true);
-        }
-      } else {
-        this.player.anims.play('idle-down', true);
-      }
+    if (this.gameMode === 'exploration' && this.playerController) {
+      this.playerController.update();
     }
   }
 
@@ -576,7 +483,9 @@ export class OverworldScene extends Phaser.Scene {
       this.gameMode = 'puzzle';
 
       // Disable player movement
-      this.setPlayerMovementEnabled(false);
+      if (this.playerController) {
+        this.playerController.setEnabled(false);
+      }
 
       // Store camera state BEFORE stopping follow, so we capture where the camera is while following
       // Then stop following and transition
@@ -757,7 +666,9 @@ export class OverworldScene extends Phaser.Scene {
 
       // Exit puzzle mode and re-enable player movement
       this.gameMode = 'exploration';
-      this.setPlayerMovementEnabled(true);
+      if (this.playerController) {
+        this.playerController.setEnabled(true);
+      }
 
       // Clear active puzzle
       this.gameState.clearActivePuzzle();
@@ -770,25 +681,6 @@ export class OverworldScene extends Phaser.Scene {
     } finally {
       // Always reset the guard flag
       this.isExitingPuzzle = false;
-    }
-  }
-
-  /**
-   * Enable or disable player movement
-   */
-  private setPlayerMovementEnabled(enabled: boolean): void {
-    if (enabled) {
-      // Re-enable cursor keys
-      if (!this.cursors) {
-        this.cursors = this.input.keyboard!.createCursorKeys();
-      }
-      this.player.setVisible(true);
-      console.log('Player movement enabled');
-    } else {
-      // Disable player movement by clearing velocity
-      this.player.setVelocity(0);
-      // Don't hide player - keep visible during puzzle solving
-      console.log('Player movement disabled');
     }
   }
 
