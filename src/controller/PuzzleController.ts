@@ -338,6 +338,7 @@ export class PuzzleController {
         // Clear any allocated bridge reference — it's now placed.
         this.currentBridge = null;
         this.renderer.setPlacing(false);
+        this.renderer.hidePreview();
         this.renderer.updateFromPuzzle(this.puzzle);
         this.selectAvailableBridgeType();
         this.notifyCountsChanged();
@@ -362,6 +363,7 @@ export class PuzzleController {
         this.undoManager.executeCommand(cmd);
         this.renderer.updateFromPuzzle(this.puzzle);
         this.selectAvailableBridgeType();
+        this.notifyCountsChanged();
         this.validate();
     }
 

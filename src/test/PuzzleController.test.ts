@@ -52,6 +52,10 @@ class MockPuzzleRenderer implements PuzzleRenderer {
     this.previewBridgeArg = bridge;
   }
 
+  hidePreview(): void {
+    // no-op for tests
+  }
+
   setPlacing(_isPlacing: boolean): void {
     // no-op for tests
   }
@@ -110,8 +114,8 @@ function createMockPuzzle(): Partial<BridgePuzzle> {
     id: "test-puzzle",
     width: 4,
     height: 4,
-  islands: [ { id: 'I1', x: 1, y: 2 }, { id: 'I2', x: 3, y: 2 } ] as any[],
-  bridges: [] as Bridge[],
+    islands: [ { id: 'I1', x: 1, y: 2 }, { id: 'I2', x: 3, y: 2 } ] as any[],
+    bridges: [] as Bridge[],
     constraints: [] as any[],
     maxNumBridges: 2,
 
