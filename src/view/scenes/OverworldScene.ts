@@ -631,6 +631,9 @@ export class OverworldScene extends Phaser.Scene {
         hudScene.events.on('redo', this.handleHUDRedo, this);
       }
 
+      // Setup bridge click listener for removal
+      this.events.on('bridge-clicked', this.handleBridgeClicked, this);
+
       // Setup Escape key to exit puzzle
       this.input.keyboard?.on('keydown-ESC', this.handleEscapeKey, this);
 
@@ -679,6 +682,9 @@ export class OverworldScene extends Phaser.Scene {
         hudScene.events.off('undo', this.handleHUDUndo, this);
         hudScene.events.off('redo', this.handleHUDRedo, this);
       }
+
+      // Clean up bridge click listener
+      this.events.off('bridge-clicked', this.handleBridgeClicked, this);
 
       // Clean up Escape key listener
       this.input.keyboard?.off('keydown-ESC', this.handleEscapeKey, this);
@@ -859,6 +865,16 @@ export class OverworldScene extends Phaser.Scene {
     // Only handle if in puzzle mode
     if (this.isInPuzzleMode()) {
       this.exitOverworldPuzzle(false);
+    }
+  }
+
+  /**
+   * Handle bridge click for removal
+   */
+  private handleBridgeClicked(bridgeId: string): void {
+    console.log('OverworldScene: Bridge clicked', bridgeId);
+    if (this.activePuzzleController) {
+      this.activePuzzleController.removeBridge(bridgeId);
     }
   }
 

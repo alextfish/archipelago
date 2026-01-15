@@ -21,8 +21,10 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     // Graphics objects for embedded rendering
     private islandGraphics: Map<string, Phaser.GameObjects.Sprite> = new Map();
     private bridgeGraphics: Map<string, Phaser.GameObjects.Container> = new Map();
+    private bridgeHitZones: Phaser.GameObjects.Zone[] = [];
     private previewGraphics: Phaser.GameObjects.Container | null = null;
     private puzzleContainer: Phaser.GameObjects.Container;
+    private isPlacing: boolean = false;
 
     // Sprite frame indices (matching PhaserPuzzleRenderer)
     readonly FRAME_ISLAND = 36;
@@ -161,7 +163,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
 
     private createBridge(bridge: Bridge): void {
         console.log(`EmbeddedPuzzleRenderer.createBridge: Creating bridge ${bridge.id}`);
-        const container = this.createBridgeContainer(bridge);
+        const container = this.createBridgeContainer(bridge, true);
         console.log(`EmbeddedPuzzleRenderer.createBridge: Container created with ${container.list.length} sprites`);
         this.puzzleContainer.add(container);
         this.bridgeGraphics.set(bridge.id, container);
@@ -169,15 +171,15 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
         console.log(`  puzzleContainer visible=${this.puzzleContainer.visible} alpha=${this.puzzleContainer.alpha} depth=${this.puzzleContainer.depth} childCount=${this.puzzleContainer.list.length}`);
     }
 
-    private createBridgeContainer(bridge: Bridge): Phaser.GameObjects.Container {
-        const container = this.scene.add.container();
-        container.setDepth(102); // Above islands
-
+    private createBridgeContainer(bridge: Bridge, addClickableOutline: boolean = false): Phaser.GameObjects.Container {
         if (!bridge.start || !bridge.end) {
             console.warn(`EmbeddedPuzzleRenderer: Bridge ${bridge.id} missing start or end coordinates`);
-            return container;
+            const emptyContainer = this.scene.add.container();
+            emptyContainer.setDepth(102);
+            return emptyContainer;
         }
 
+        // Convert grid coordinates to world coordinates
         const startWorld = this.gridMapper.gridToWorld(bridge.start.x, bridge.start.y);
         const endWorld = this.gridMapper.gridToWorld(bridge.end.x, bridge.end.y);
 
@@ -188,18 +190,89 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
         console.log(`EmbeddedPuzzleRenderer: Bridge ${bridge.id} grid(${bridge.start.x},${bridge.start.y})->(${bridge.end.x},${bridge.end.y}) mapped to world(${startWorld.x},${startWorld.y})->(${endWorld.x},${endWorld.y})`);
         console.log(`  Puzzle bounds offset: (${this.puzzleBounds.x}, ${this.puzzleBounds.y})`);
         console.log(`  Viewport: TL(${viewportTL.x.toFixed(0)},${viewportTL.y.toFixed(0)}) BR(${viewportBR.x.toFixed(0)},${viewportBR.y.toFixed(0)}) zoom=${cam.zoom.toFixed(2)}`);
-        console.log(`  Container position: (${container.x}, ${container.y})`);
 
-        // Determine bridge orientation
+        // Calculate world length and angle
+        const dx = endWorld.x - startWorld.x;
+        const dy = endWorld.y - startWorld.y;
+        const worldLength = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx);
+
+        // Calculate grid distance to determine number of segments
+        const dxGrid = bridge.end.x - bridge.start.x;
+        const dyGrid = bridge.end.y - bridge.start.y;
+        const gridDist = Math.sqrt(dxGrid * dxGrid + dyGrid * dyGrid);
+        const segCount = Math.max(1, Math.ceil(gridDist - 0.01));
+
+        // Calculate spacing between tiles
+        const spacing = worldLength / segCount;
+
+        // Get cell size for positioning and scaling
+        const cellSize = this.gridMapper.getCellSize();
+        const scale = cellSize / 32; // Our tiles are 32x32
+
+        // Position container at midpoint (cell-centered coordinates)
+        const midX = (startWorld.x + endWorld.x) / 2 + cellSize / 2;
+        const midY = (startWorld.y + endWorld.y) / 2 + cellSize / 2;
+        const container = this.scene.add.container(midX, midY);
+        container.setRotation(angle);
+        container.setDepth(102); // Above islands
+
+        // Determine orientation for frame selection
         const orientation = orientationForDelta(bridge.start, bridge.end);
 
-        if (orientation === 'horizontal') {
-            this.createHorizontalBridge(container, bridge, startWorld, endWorld);
-        } else {
-            this.createVerticalBridge(container, bridge, startWorld, endWorld);
+        // Check if this is a double bridge
+        const isDouble = bridge.type.id === 'double';
+
+        // Create tiles along the rotated container's X axis
+        const centreIndexOffset = (segCount - 1) / 2;
+        for (let i = 0; i < segCount; i++) {
+            let frameIndex: number;
+
+            // Choose frame based on position and orientation
+            if (orientation === 'horizontal') {
+                if (segCount === 1) {
+                    frameIndex = this.H_BRIDGE_SINGLE;
+                } else if (i === 0) {
+                    frameIndex = this.H_BRIDGE_LEFT;
+                } else if (i === segCount - 1) {
+                    frameIndex = this.H_BRIDGE_RIGHT;
+                } else {
+                    frameIndex = this.H_BRIDGE_CENTRE;
+                }
+            } else {
+                if (segCount === 1) {
+                    frameIndex = this.V_BRIDGE_SINGLE;
+                } else if (i === 0) {
+                    frameIndex = this.V_BRIDGE_BOTTOM;
+                } else if (i === segCount - 1) {
+                    frameIndex = this.V_BRIDGE_TOP;
+                } else {
+                    frameIndex = this.V_BRIDGE_MIDDLE;
+                }
+            }
+
+            // Add double bridge offset if needed
+            if (isDouble) {
+                frameIndex += this.DOUBLE_BRIDGE_OFFSET;
+            }
+
+            // Create sprite centered at origin
+            const sprite = this.scene.add.sprite(0, 0, this.textureKey, frameIndex);
+            sprite.setOrigin(0.5, 0.5);
+            sprite.setScale(scale, scale);
+
+            // Position along the container's local X axis
+            sprite.x = (i - centreIndexOffset) * spacing;
+            sprite.y = 0;
+
+            // Rotate vertical tiles
+            if (orientation !== 'horizontal') {
+                sprite.setRotation(Math.PI / 2);
+            }
+
+            container.add(sprite);
         }
 
-        // Log sprite details after creation
         console.log(`  Container has ${container.list.length} sprites after creation`);
         if (container.list.length > 0) {
             const firstSprite = container.list[0] as Phaser.GameObjects.Sprite;
@@ -207,85 +280,12 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
             console.log(`  First sprite texture: ${firstSprite.texture.key} frame=${firstSprite.frame.name}`);
         }
 
+        // Add clickable outline for placed bridges
+        if (addClickableOutline) {
+            this.addClickableBridgeOutline(worldLength, container, bridge);
+        }
+
         return container;
-    }
-
-    private createHorizontalBridge(
-        container: Phaser.GameObjects.Container,
-        bridge: Bridge,
-        startWorld: { x: number; y: number },
-        endWorld: { x: number; y: number }
-    ): void {
-        if (!bridge.start || !bridge.end) {
-            return;
-        }
-
-        const length = Math.abs(bridge.end.x - bridge.start.x) + 1;
-        const leftmost = Math.min(startWorld.x, endWorld.x);
-
-        for (let i = 0; i < length; i++) {
-            const x = leftmost + i * 32;
-            const y = startWorld.y;
-
-            let frameIndex: number;
-            if (length === 1) {
-                frameIndex = this.H_BRIDGE_SINGLE;
-            } else if (i === 0) {
-                frameIndex = this.H_BRIDGE_LEFT;
-            } else if (i === length - 1) {
-                frameIndex = this.H_BRIDGE_RIGHT;
-            } else {
-                frameIndex = this.H_BRIDGE_CENTRE;
-            }
-
-            // Add double bridge offset if needed
-            if (bridge.type.id === 'double') {
-                frameIndex += this.DOUBLE_BRIDGE_OFFSET;
-            }
-
-            const sprite = this.scene.add.sprite(x, y, this.textureKey, frameIndex);
-            sprite.setOrigin(0, 0);
-            container.add(sprite);
-        }
-    }
-
-    private createVerticalBridge(
-        container: Phaser.GameObjects.Container,
-        bridge: Bridge,
-        startWorld: { x: number; y: number },
-        endWorld: { x: number; y: number }
-    ): void {
-        if (!bridge.start || !bridge.end) {
-            return;
-        }
-
-        const length = Math.abs(bridge.end.y - bridge.start.y) + 1;
-        const topmost = Math.min(startWorld.y, endWorld.y);
-
-        for (let i = 0; i < length; i++) {
-            const x = startWorld.x;
-            const y = topmost + i * 32;
-
-            let frameIndex: number;
-            if (length === 1) {
-                frameIndex = this.V_BRIDGE_SINGLE;
-            } else if (i === 0) {
-                frameIndex = this.V_BRIDGE_TOP;
-            } else if (i === length - 1) {
-                frameIndex = this.V_BRIDGE_BOTTOM;
-            } else {
-                frameIndex = this.V_BRIDGE_MIDDLE;
-            }
-
-            // Add double bridge offset if needed
-            if (bridge.type.id === 'double') {
-                frameIndex += this.DOUBLE_BRIDGE_OFFSET;
-            }
-
-            const sprite = this.scene.add.sprite(x, y, this.textureKey, frameIndex);
-            sprite.setOrigin(0, 0);
-            container.add(sprite);
-        }
     }
 
     private destroyBridges(): void {
@@ -293,6 +293,76 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
             container.destroy();
         }
         this.bridgeGraphics.clear();
+        this.bridgeHitZones = []; // Clear hit zones too
+    }
+
+    /**
+     * Add an interactive hit area and hover outline to a placed bridge container.
+     * Adapted from PhaserPuzzleRenderer.addClickableBridgeOutline
+     */
+    private addClickableBridgeOutline(
+        worldLength: number,
+        container: Phaser.GameObjects.Container,
+        bridge: Bridge
+    ): void {
+        // Compute bounding box of the bridge in container-local coordinates
+        const zoneThickness = Math.max(8, this.gridMapper.getCellSize() * 0.75);
+
+        // Shrink length slightly because bridge sprites start/end partway into the island
+        worldLength = worldLength - (this.gridMapper.getCellSize() / 2);
+        const halfW = worldLength / 2;
+        const halfH = zoneThickness / 2;
+
+        // Create invisible interactive zone centered on the bridge
+        const hitZone = this.scene.add.zone(-halfW, -halfH, worldLength, zoneThickness);
+        hitZone.setOrigin(0, 0);
+        const interactiveRectangle = new Phaser.Geom.Rectangle(0, 0, worldLength, zoneThickness);
+
+        // Store the shape for later re-enabling
+        if (typeof (hitZone as any).setData === 'function') {
+            (hitZone as any).setData('shape', interactiveRectangle);
+        }
+
+        // Make it interactive unless we're currently placing
+        if (!this.isPlacing) {
+            try {
+                hitZone.setInteractive(interactiveRectangle, Phaser.Geom.Rectangle.Contains);
+            } catch (e) {
+                try {
+                    (hitZone as any).setInteractive();
+                } catch (e) {
+                    /* ignore */
+                }
+            }
+        }
+        container.add(hitZone);
+
+        // Remember zone so we can toggle interactivity later
+        this.bridgeHitZones.push(hitZone);
+
+        // White outline graphic (hidden by default)
+        const outline = this.scene.add.graphics();
+        outline.lineStyle(2, 0xffffff, 1);
+        outline.strokeRect(-halfW, -halfH, worldLength, zoneThickness);
+        outline.setVisible(false);
+        container.add(outline);
+
+        // Pointer handlers
+        hitZone.on('pointerover', () => {
+            if (this.isPlacing) return;
+            outline.setVisible(true);
+        });
+
+        hitZone.on('pointerout', () => {
+            if (this.isPlacing) return;
+            outline.setVisible(false);
+        });
+
+        hitZone.on('pointerdown', () => {
+            if (this.isPlacing) return;
+            // Emit event on the scene so the controller can handle removal
+            this.scene.events.emit('bridge-clicked', bridge.id);
+        });
     }
 
     // === PuzzleRenderer interface methods ===
@@ -324,9 +394,23 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
      * Set placing mode (disable hit areas during placement)
      */
     setPlacing(isPlacing: boolean): void {
-        // For embedded renderer, we don't have interactive hit areas
-        // This is handled by the PuzzleInputHandler
+        this.isPlacing = isPlacing;
         console.log(`EmbeddedPuzzleRenderer: Setting placing mode: ${isPlacing}`);
+
+        // Enable/disable all bridge hit zones based on placing state
+        for (const zone of this.bridgeHitZones) {
+            if (isPlacing) {
+                zone.disableInteractive();
+            } else {
+                if (!zone.input) {
+                    // Re-enable interactive if it was disabled
+                    const shape = (zone as any).getData('shape');
+                    if (shape) {
+                        zone.setInteractive(shape, Phaser.Geom.Rectangle.Contains);
+                    }
+                }
+            }
+        }
     }
 
     /**
