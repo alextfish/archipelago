@@ -7,6 +7,7 @@ import type { Point } from '@model/puzzle/Point';
 import type { Bridge } from '@model/puzzle/Bridge';
 import { GridToWorldMapper } from './GridToWorldMapper';
 import { orientationForDelta } from './PuzzleRenderer';
+import { BridgeSpriteFrames, BridgeVisualConstants } from './BridgeSpriteFrameRegistry';
 
 /**
  * Puzzle renderer that works embedded within the overworld scene
@@ -23,20 +24,6 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     private bridgeGraphics: Map<string, Phaser.GameObjects.Container> = new Map();
     private previewGraphics: Phaser.GameObjects.Container | null = null;
     private puzzleContainer: Phaser.GameObjects.Container;
-
-    // Sprite frame indices (matching PhaserPuzzleRenderer)
-    readonly FRAME_ISLAND = 36;
-    readonly H_BRIDGE_LEFT = 55;
-    readonly H_BRIDGE_CENTRE = 56;
-    readonly H_BRIDGE_RIGHT = 57;
-    readonly V_BRIDGE_BOTTOM = 58;
-    readonly V_BRIDGE_MIDDLE = 59;
-    readonly V_BRIDGE_TOP = 60;
-    readonly H_BRIDGE_SINGLE = 62;
-    readonly V_BRIDGE_SINGLE = 63;
-    readonly DOUBLE_BRIDGE_OFFSET = 11;
-    readonly PREVIEW_ALPHA = 0.8;
-    readonly INVALID_TINT = 0xff0000;
 
     constructor(
         scene: Phaser.Scene,
@@ -98,7 +85,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
         };
 
         this.previewGraphics = this.createBridgeContainer(tempBridge);
-        this.previewGraphics.setAlpha(this.PREVIEW_ALPHA);
+        this.previewGraphics.setAlpha(BridgeVisualConstants.PREVIEW_ALPHA);
         this.puzzleContainer.add(this.previewGraphics);
         console.log(`EmbeddedPuzzleRenderer.showPreview: Preview container created with ${this.previewGraphics.list.length} sprites, depth=${this.previewGraphics.depth}`);
     }
@@ -151,7 +138,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     private createIsland(island: any): void {
         const worldPos = this.gridMapper.gridToWorld(island.x, island.y);
 
-        const sprite = this.scene.add.sprite(worldPos.x, worldPos.y, this.textureKey, this.FRAME_ISLAND);
+        const sprite = this.scene.add.sprite(worldPos.x, worldPos.y, this.textureKey, BridgeSpriteFrames.FRAME_ISLAND);
         sprite.setOrigin(0, 0);
         sprite.setDepth(101); // Above overworld, below bridges
 
@@ -229,18 +216,18 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
 
             let frameIndex: number;
             if (length === 1) {
-                frameIndex = this.H_BRIDGE_SINGLE;
+                frameIndex = BridgeSpriteFrames.H_BRIDGE_SINGLE;
             } else if (i === 0) {
-                frameIndex = this.H_BRIDGE_LEFT;
+                frameIndex = BridgeSpriteFrames.H_BRIDGE_LEFT;
             } else if (i === length - 1) {
-                frameIndex = this.H_BRIDGE_RIGHT;
+                frameIndex = BridgeSpriteFrames.H_BRIDGE_RIGHT;
             } else {
-                frameIndex = this.H_BRIDGE_CENTRE;
+                frameIndex = BridgeSpriteFrames.H_BRIDGE_CENTRE;
             }
 
             // Add double bridge offset if needed
             if (bridge.type.id === 'double') {
-                frameIndex += this.DOUBLE_BRIDGE_OFFSET;
+                frameIndex += BridgeSpriteFrames.DOUBLE_BRIDGE_OFFSET;
             }
 
             const sprite = this.scene.add.sprite(x, y, this.textureKey, frameIndex);
@@ -268,18 +255,18 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
 
             let frameIndex: number;
             if (length === 1) {
-                frameIndex = this.V_BRIDGE_SINGLE;
+                frameIndex = BridgeSpriteFrames.V_BRIDGE_SINGLE;
             } else if (i === 0) {
-                frameIndex = this.V_BRIDGE_TOP;
+                frameIndex = BridgeSpriteFrames.V_BRIDGE_TOP;
             } else if (i === length - 1) {
-                frameIndex = this.V_BRIDGE_BOTTOM;
+                frameIndex = BridgeSpriteFrames.V_BRIDGE_BOTTOM;
             } else {
-                frameIndex = this.V_BRIDGE_MIDDLE;
+                frameIndex = BridgeSpriteFrames.V_BRIDGE_MIDDLE;
             }
 
             // Add double bridge offset if needed
             if (bridge.type.id === 'double') {
-                frameIndex += this.DOUBLE_BRIDGE_OFFSET;
+                frameIndex += BridgeSpriteFrames.DOUBLE_BRIDGE_OFFSET;
             }
 
             const sprite = this.scene.add.sprite(x, y, this.textureKey, frameIndex);
@@ -313,7 +300,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
                 // Tint all children in the container
                 this.previewGraphics.list.forEach((child: any) => {
                     if (child.setTint) {
-                        child.setTint(this.INVALID_TINT);
+                        child.setTint(BridgeVisualConstants.INVALID_TINT);
                     }
                 });
             }
