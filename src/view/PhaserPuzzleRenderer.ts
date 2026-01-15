@@ -9,6 +9,7 @@ import type { BridgeType } from "@model/puzzle/BridgeType";
 import type { Point } from "@model/puzzle/Point";
 import { orientationForDelta, normalizeRenderOrder } from "./PuzzleRenderer";
 import { parseNumBridgesConstraint } from "@model/puzzle/Island";
+import { BridgeSpriteFrames, BridgeVisualConstants } from "./BridgeSpriteFrameRegistry";
 
 export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
   private scene: Phaser.Scene;
@@ -29,23 +30,6 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
   private flashGraphics: Phaser.GameObjects.Container | null = null;
   private flashTimer: Phaser.Time.TimerEvent | null = null;
 
-  // Sprite frame indices (from SproutLandsGrassIslands.png)
-  readonly FRAME_ISLAND = 36;
-  // readonly FRAME_WATER = 10; // not currently used
-  readonly H_BRIDGE_LEFT = 55;
-  readonly H_BRIDGE_CENTRE = 56;
-  readonly H_BRIDGE_RIGHT = 57;
-  readonly V_BRIDGE_BOTTOM = 58;
-  readonly V_BRIDGE_MIDDLE = 59;
-  readonly V_BRIDGE_TOP = 60;
-  readonly UNFINISHED_BRIDGE = 61;
-  readonly H_BRIDGE_SINGLE = 62;
-  readonly V_BRIDGE_SINGLE = 63;
-  readonly DOUBLE_BRIDGE_OFFSET = 11; // add to single bridge frames for double bridges
-  // Preview visuals
-  readonly PREVIEW_ALPHA = 0.8;
-  readonly INVALID_TINT = 0xff0000;
-
   constructor(scene: Phaser.Scene, gridMapper: GridToWorldMapper, textureKey = 'sprout-tiles') {
     this.scene = scene;
     this.gridMapper = gridMapper;
@@ -57,7 +41,7 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
     // Create island sprites (frame 36)
     for (const island of puzzle.islands) {
       const worldPos = this.gridMapper.gridToWorld(island.x, island.y);
-      const sprite = this.scene.add.sprite(worldPos.x, worldPos.y, this.textureKey, this.FRAME_ISLAND)
+      const sprite = this.scene.add.sprite(worldPos.x, worldPos.y, this.textureKey, BridgeSpriteFrames.FRAME_ISLAND)
         .setInteractive({ useHandCursor: true })
         .setOrigin(0, 0);
 
@@ -207,7 +191,7 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
     if (!bridge.start) return;
     const isDouble = !!opts?.isDouble;
     const isInvalid = !!opts?.isInvalid;
-    const tint = isInvalid ? this.INVALID_TINT : undefined;
+    const tint = isInvalid ? BridgeVisualConstants.INVALID_TINT : undefined;
 
     // Delegate to shared renderer: preview uses centre tiles but no individual alpha (we'll set container alpha instead)
     if (bridge.end) {
@@ -256,7 +240,7 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
 
       // // Replace previewGraphics with the RenderTexture directly and set its alpha
       // this.previewGraphics = renderTexture;
-      this.previewGraphics.setAlpha(this.PREVIEW_ALPHA);
+      this.previewGraphics.setAlpha(BridgeVisualConstants.PREVIEW_ALPHA);
     }
   }
 
@@ -327,7 +311,7 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
       // centre of the cell
       const cellSize = this.gridMapper.getCellSize();
       const container = this.scene.add.container(startWorld.x + cellSize / 2, startWorld.y + cellSize / 2);
-      const spr = this.scene.add.sprite(0, 0, this.textureKey, this.UNFINISHED_BRIDGE).setOrigin(0.5, 0.5);
+      const spr = this.scene.add.sprite(0, 0, this.textureKey, BridgeSpriteFrames.UNFINISHED_BRIDGE).setOrigin(0.5, 0.5);
       if (alpha !== undefined) spr.setAlpha(alpha);
       if (tint !== undefined) spr.setTintFill(tint);
       const scale = this.gridMapper.getCellSize() / 32;
@@ -371,20 +355,20 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
     const isDouble = (bridgeIds && bridgeIds.length >= 2) || false;
     const chooseFrame = (i: number) => {
       const base = (() => {
-        if (!useEdges) return orient === 'horizontal' ? this.H_BRIDGE_CENTRE : this.V_BRIDGE_MIDDLE;
+        if (!useEdges) return orient === 'horizontal' ? BridgeSpriteFrames.H_BRIDGE_CENTRE : BridgeSpriteFrames.V_BRIDGE_MIDDLE;
         if (orient === 'horizontal') {
-          if (i === 0 && segCount === 1) return this.H_BRIDGE_SINGLE;
-          if (i === 0) return this.H_BRIDGE_LEFT;
-          if (i === segCount - 1) return this.H_BRIDGE_RIGHT;
-          return this.H_BRIDGE_CENTRE;
+          if (i === 0 && segCount === 1) return BridgeSpriteFrames.H_BRIDGE_SINGLE;
+          if (i === 0) return BridgeSpriteFrames.H_BRIDGE_LEFT;
+          if (i === segCount - 1) return BridgeSpriteFrames.H_BRIDGE_RIGHT;
+          return BridgeSpriteFrames.H_BRIDGE_CENTRE;
         } else {
-          if (i === 0 && segCount === 1) return this.V_BRIDGE_SINGLE;
-          if (i === 0) return this.V_BRIDGE_BOTTOM;
-          if (i === segCount - 1) return this.V_BRIDGE_TOP;
-          return this.V_BRIDGE_MIDDLE;
+          if (i === 0 && segCount === 1) return BridgeSpriteFrames.V_BRIDGE_SINGLE;
+          if (i === 0) return BridgeSpriteFrames.V_BRIDGE_BOTTOM;
+          if (i === segCount - 1) return BridgeSpriteFrames.V_BRIDGE_TOP;
+          return BridgeSpriteFrames.V_BRIDGE_MIDDLE;
         }
       })();
-      return isDouble ? base + this.DOUBLE_BRIDGE_OFFSET : base;
+      return isDouble ? base + BridgeSpriteFrames.DOUBLE_BRIDGE_OFFSET : base;
     };
 
     // Place tiles centred about the container origin. This keeps layout
