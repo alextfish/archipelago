@@ -44,7 +44,7 @@ export class PlayerController {
             repeat: -1
         });
 
-        // Walking up animations (frames 7-9, so 6-8 in 0-indexed)  
+        // Walking up animations (frames 7-9, so 6-8 in 0-indexed)
         this.scene.anims.create({
             key: 'walk-up',
             frames: this.scene.anims.generateFrameNumbers('builder', { start: 6, end: 8 }),
