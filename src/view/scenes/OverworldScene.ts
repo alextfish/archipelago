@@ -622,6 +622,18 @@ export class OverworldScene extends Phaser.Scene {
         'overworld'
       );
 
+      // Setup HUD event listeners
+      const hudScene = this.scene.get('PuzzleHUDScene');
+      if (hudScene) {
+        // Listen for HUD button clicks
+        hudScene.events.on('exit', this.handleHUDExit, this);
+        hudScene.events.on('undo', this.handleHUDUndo, this);
+        hudScene.events.on('redo', this.handleHUDRedo, this);
+      }
+
+      // Setup Escape key to exit puzzle
+      this.input.keyboard?.on('keydown-ESC', this.handleEscapeKey, this);
+
       // Emit puzzle setup events for HUD
       const bridgeTypes = puzzle.getAvailableBridgeTypes();
       console.log('OverworldScene: Emitting setTypes with', bridgeTypes);
@@ -660,6 +672,17 @@ export class OverworldScene extends Phaser.Scene {
     this.isExitingPuzzle = true;
 
     try {
+      // Clean up HUD event listeners
+      const hudScene = this.scene.get('PuzzleHUDScene');
+      if (hudScene) {
+        hudScene.events.off('exit', this.handleHUDExit, this);
+        hudScene.events.off('undo', this.handleHUDUndo, this);
+        hudScene.events.off('redo', this.handleHUDRedo, this);
+      }
+
+      // Clean up Escape key listener
+      this.input.keyboard?.off('keydown-ESC', this.handleEscapeKey, this);
+
       // Hide HUD using PuzzleHUDManager
       PuzzleHUDManager.getInstance().exitPuzzle();
 
@@ -796,6 +819,47 @@ export class OverworldScene extends Phaser.Scene {
    */
   public isInPuzzleMode(): boolean {
     return this.gameState.getActivePuzzle() !== null;
+  }
+
+  /**
+   * Handle HUD exit button click
+   */
+  private handleHUDExit(): void {
+    console.log('OverworldScene: HUD Exit button clicked');
+    if (this.activePuzzleController) {
+      this.exitOverworldPuzzle(false);
+    }
+  }
+
+  /**
+   * Handle HUD undo button click
+   */
+  private handleHUDUndo(): void {
+    console.log('OverworldScene: HUD Undo button clicked');
+    if (this.activePuzzleController) {
+      this.activePuzzleController.undo();
+    }
+  }
+
+  /**
+   * Handle HUD redo button click
+   */
+  private handleHUDRedo(): void {
+    console.log('OverworldScene: HUD Redo button clicked');
+    if (this.activePuzzleController) {
+      this.activePuzzleController.redo();
+    }
+  }
+
+  /**
+   * Handle Escape key press
+   */
+  private handleEscapeKey(): void {
+    console.log('OverworldScene: Escape key pressed');
+    // Only handle if in puzzle mode
+    if (this.isInPuzzleMode()) {
+      this.exitOverworldPuzzle(false);
+    }
   }
 
   /**
