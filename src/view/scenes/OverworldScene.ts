@@ -621,7 +621,19 @@ export class OverworldScene extends Phaser.Scene {
       return;
     }
 
-    console.log(`Exiting overworld puzzle: ${activeData.id} (success: ${success})`);
+    console.log(`Exiting overworld puzzle: ${activeData.id} (success parameter: ${success})`);
+
+    // Check if the puzzle is currently in a solved state, even if exiting via cancel/escape
+    // This allows players to re-enter solved puzzles and exit without losing completion status
+    if (!success && this.activePuzzleController) {
+      const isSolved = this.activePuzzleController.isSolved();
+      if (isSolved) {
+        console.log('Puzzle is currently solved despite exit request - treating as success');
+        success = true;
+      }
+    }
+
+    console.log(`Final exit mode: ${success ? 'SOLVED' : 'CANCELLED'}`);
 
     this.isExitingPuzzle = true;
 

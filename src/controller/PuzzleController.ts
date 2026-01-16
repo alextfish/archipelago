@@ -163,6 +163,13 @@ export class PuzzleController {
 
     /** Called when player leaves or cancels. */
     exitPuzzle(success: boolean) { // true = solved, false = cancelled 
+        // Check if the puzzle is currently in a solved state, even if exiting via cancel/escape
+        // This allows players to re-enter solved puzzles and exit without losing completion status
+        if (!success && this.isSolved()) {
+            console.log('[PuzzleController] Puzzle is currently solved despite exit request - treating as success');
+            success = true;
+        }
+
         this.host.onPuzzleExited(success);
         this.renderer.destroy();
     }
@@ -427,6 +434,16 @@ export class PuzzleController {
             //const messages = failed.map(f => f.result.message).filter(Boolean);
             //this.renderer.showValidationMessages(messages);
         }
+    }
+
+    /**
+     * Check if the puzzle is currently in a solved state
+     * This checks the actual validation state, not just the wasSolved flag
+     */
+    isSolved(): boolean {
+        const results = this.validator.validateAll();
+        const nowSolved = results.allSatisfied && (results.perConstraint?.length ?? 0) > 0;
+        return nowSolved;
     }
 
     update(dt: number): void {
