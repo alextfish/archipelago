@@ -12,6 +12,7 @@ import type { PuzzleHost } from '@controller/PuzzleHost';
 import { defaultTileConfig } from '@model/overworld/MapConfig';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 import { PlayerController } from '@view/PlayerController';
+import { InteractionCursor, type Interactable } from '@view/InteractionCursor';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -38,6 +39,10 @@ export class OverworldScene extends Phaser.Scene {
   private puzzleInputHandler?: PuzzleInputHandler;
   private tiledMapData?: any;
   private puzzleEntryPointerHandler?: (pointer: Phaser.Input.Pointer) => void;
+  
+  // Interaction cursor system
+  private interactionCursor?: InteractionCursor;
+  private interactables: Interactable[] = [];
 
   constructor() {
     super({ key: 'OverworldScene' });
@@ -229,9 +234,83 @@ export class OverworldScene extends Phaser.Scene {
       // Set up puzzle interaction checking
       this.setupPuzzleInteraction();
 
+      // Initialize interaction cursor
+      this.initializeInteractionCursor();
+
     } catch (error) {
       console.error('Failed to initialize overworld puzzles:', error);
     }
+  }
+
+  /**
+   * Initialize the interaction cursor and build list of interactables
+   */
+  private initializeInteractionCursor(): void {
+    if (!this.tiledMapData) {
+      return;
+    }
+
+    // Create the cursor
+    this.interactionCursor = new InteractionCursor(
+      this,
+      this.tiledMapData.tilewidth,
+      this.tiledMapData.tileheight
+    );
+
+    // Build list of all puzzle entry tiles as interactables
+    this.buildInteractablesList();
+
+    console.log(`Interaction cursor initialized with ${this.interactables.length} interactables`);
+  }
+
+  /**
+   * Build list of all interactable objects (puzzle entries, NPCs, etc.)
+   */
+  private buildInteractablesList(): void {
+    this.interactables = [];
+
+    if (!this.tiledMapData || !this.map) {
+      return;
+    }
+
+    // Get all puzzle definitions
+    const puzzles = this.puzzleManager.getAllPuzzles();
+
+    // For each puzzle, add its entry tiles as interactables
+    for (const [puzzleId] of puzzles) {
+      const definition = this.puzzleManager.getPuzzleDefinitionById(puzzleId);
+      if (!definition) continue;
+
+      // Get the puzzle bounds in tile coordinates
+      const bounds = this.puzzleManager.getPuzzleBounds(puzzleId);
+      if (!bounds) continue;
+
+      const tileX = Math.floor(bounds.x / this.tiledMapData.tilewidth);
+      const tileY = Math.floor(bounds.y / this.tiledMapData.tileheight);
+      const width = Math.ceil(bounds.width / this.tiledMapData.tilewidth);
+      const height = Math.ceil(bounds.height / this.tiledMapData.tileheight);
+
+      // Add all tiles in the puzzle area as potential entry points
+      // (We'll validate actual entry tiles when attempting to enter)
+      for (let dy = 0; dy < height; dy++) {
+        for (let dx = 0; dx < width; dx++) {
+          const entryTileX = tileX + dx;
+          const entryTileY = tileY + dy;
+
+          // Check if this is actually a valid entry tile
+          if (this.isPlayerOnEntryTile(entryTileX, entryTileY)) {
+            this.interactables.push({
+              type: 'puzzle',
+              tileX: entryTileX,
+              tileY: entryTileY,
+              data: { puzzleId }
+            });
+          }
+        }
+      }
+    }
+
+    console.log(`Built interactables list with ${this.interactables.length} entries`);
   }
 
   private setupCollisionLayer(beachTileset: Phaser.Tilemaps.Tileset | null, grassTileset: Phaser.Tilemaps.Tileset | null) {
@@ -335,6 +414,18 @@ export class OverworldScene extends Phaser.Scene {
     // Only handle player movement in exploration mode
     if (this.gameMode === 'exploration' && this.playerController) {
       this.playerController.update();
+
+      // Update interaction cursor based on player position
+      if (this.interactionCursor && this.tiledMapData && this.player) {
+        const playerTileX = Math.floor(this.player.x / this.tiledMapData.tilewidth);
+        const playerTileY = Math.floor(this.player.y / this.tiledMapData.tileheight);
+
+        // Update cursor's facing direction
+        this.interactionCursor.setFacing(this.playerController.getFacingDirection());
+
+        // Update cursor to show nearest interactable
+        this.interactionCursor.update(playerTileX, playerTileY, this.interactables);
+      }
     }
   }
 
@@ -388,13 +479,12 @@ export class OverworldScene extends Phaser.Scene {
       const worldY = pointer.worldY;
 
       // Check if player exists and is within a reasonable distance from click
-      if (!this.player || !this.tiledMapData || !this.playerController) {
+      if (!this.player || !this.tiledMapData || !this.playerController || !this.interactionCursor) {
         return;
       }
 
       const playerX = this.player.x;
       const playerY = this.player.y;
-      const distance = Phaser.Math.Distance.Between(worldX, worldY, playerX, playerY);
 
       // Convert both positions to tile coordinates
       const clickTileX = Math.floor(worldX / this.tiledMapData.tilewidth);
@@ -402,26 +492,68 @@ export class OverworldScene extends Phaser.Scene {
       const playerTileX = Math.floor(playerX / this.tiledMapData.tilewidth);
       const playerTileY = Math.floor(playerY / this.tiledMapData.tileheight);
 
-      // Check if clicking on the same tile as the player (or very close - within 1.5 tiles)
-      const tileDistance = Phaser.Math.Distance.Between(
-        clickTileX, clickTileY,
-        playerTileX, playerTileY
-      );
+      // Check if there's a focused target
+      const focusedTarget = this.interactionCursor.getCurrentTarget();
 
-      if (tileDistance <= 1.5 && distance < this.tiledMapData.tilewidth * 1.5) {
-        // Tapping on/near player: try to enter puzzle
+      // If clicking on the focused target, interact with it
+      if (focusedTarget && this.interactionCursor.isTargeting(clickTileX, clickTileY)) {
+        console.log(`Interacting with focused target at (${clickTileX}, ${clickTileY})`);
+        this.interactWithTarget(focusedTarget);
+        return;
+      }
+
+      // Check if clicking within interaction range (1 tile)
+      const tileDx = Math.abs(clickTileX - playerTileX);
+      const tileDy = Math.abs(clickTileY - playerTileY);
+      const withinRange = tileDx <= 1 && tileDy <= 1;
+
+      if (withinRange) {
+        // Check if clicking on an interactable
+        const clickedInteractable = this.interactables.find(
+          i => i.tileX === clickTileX && i.tileY === clickTileY
+        );
+
+        if (clickedInteractable) {
+          // If it's not focused, focus it (player may need to turn)
+          // If it becomes focused, it will be interactable next tap
+          console.log(`Focusing interactable at (${clickTileX}, ${clickTileY})`);
+          return;
+        }
+
+        // Clicking near player but not on interactable - try to enter puzzle at player position
         console.log(`Tap detected near player at tile (${clickTileX}, ${clickTileY})`);
         this.checkForPuzzleEntry();
       } else {
         // Tapping away from player: move towards that location
-        console.log(`Tap-to-move: player at (${playerX.toFixed(0)}, ${playerY.toFixed(0)}), target (${worldX.toFixed(0)}, ${worldY.toFixed(0)}), distance: ${distance.toFixed(0)}px`);
+        console.log(`Tap-to-move: player at (${playerX.toFixed(0)}, ${playerY.toFixed(0)}), target (${worldX.toFixed(0)}, ${worldY.toFixed(0)})`);
         this.playerController.setTargetPosition(worldX, worldY);
       }
     };
 
     this.input.on('pointerdown', this.puzzleEntryPointerHandler);
 
-    console.log('Puzzle interaction set up - press E or tap player tile to enter puzzles, tap elsewhere to move');
+    console.log('Puzzle interaction set up - press E or tap focused interactable to interact, tap elsewhere to move');
+  }
+
+  /**
+   * Interact with a target (puzzle, NPC, lever, etc.)
+   */
+  private interactWithTarget(target: Interactable): void {
+    switch (target.type) {
+      case 'puzzle':
+        if (target.data?.puzzleId) {
+          this.enterOverworldPuzzle(target.data.puzzleId);
+        }
+        break;
+      case 'npc':
+        // Future: handle NPC interaction
+        console.log('NPC interaction not yet implemented');
+        break;
+      case 'lever':
+        // Future: handle lever interaction
+        console.log('Lever interaction not yet implemented');
+        break;
+    }
   }
 
   /**
@@ -528,6 +660,11 @@ export class OverworldScene extends Phaser.Scene {
 
       // Enter puzzle mode
       this.gameMode = 'puzzle';
+
+      // Hide interaction cursor while in puzzle mode
+      if (this.interactionCursor) {
+        this.interactionCursor.hide();
+      }
 
       // Disable player movement
       if (this.playerController) {

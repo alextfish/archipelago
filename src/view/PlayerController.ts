@@ -27,6 +27,9 @@ export class PlayerController {
     private stuckFrames: number = 0;
     private readonly MAX_STUCK_FRAMES = 10; // If stuck for this many frames, give up
 
+    // Track facing direction for interaction cursor
+    private facingDirection: 'up' | 'down' | 'left' | 'right' = 'down';
+
     constructor(
         scene: Phaser.Scene,
         player: Phaser.Physics.Arcade.Sprite,
@@ -368,16 +371,20 @@ export class PlayerController {
         if (velX < 0) {
             this.player.setFlipX(true);
             this.player.anims.play('walk-right', true);
+            this.facingDirection = 'left';
         } else if (velX > 0) {
             this.player.setFlipX(false);
             this.player.anims.play('walk-right', true);
+            this.facingDirection = 'right';
         }
 
         // Vertical movement animations (only if not moving horizontally)
         if (velY < 0 && velX === 0) {
             this.player.anims.play('walk-up', true);
+            this.facingDirection = 'up';
         } else if (velY > 0 && velX === 0) {
             this.player.anims.play('walk-down', true);
+            this.facingDirection = 'down';
         }
 
         // Play idle animation if not moving
@@ -435,5 +442,12 @@ export class PlayerController {
      */
     setPosition(x: number, y: number): void {
         this.player.setPosition(x, y);
+    }
+
+    /**
+     * Get the direction the player is facing
+     */
+    getFacingDirection(): 'up' | 'down' | 'left' | 'right' {
+        return this.facingDirection;
     }
 }
