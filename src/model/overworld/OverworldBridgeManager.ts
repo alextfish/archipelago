@@ -203,8 +203,9 @@ export class OverworldBridgeManager {
 
         // Single connection (endpoint)
         if (count === 1) {
-            if (north) return BridgeSpriteFrames.V_BRIDGE_TOP;
-            if (south) return BridgeSpriteFrames.V_BRIDGE_BOTTOM;
+            // For vertical bridges: if north connection, this is the bottom end; if south connection, this is the top end
+            if (north) return BridgeSpriteFrames.V_BRIDGE_BOTTOM;
+            if (south) return BridgeSpriteFrames.V_BRIDGE_TOP;
             if (east) return BridgeSpriteFrames.H_BRIDGE_LEFT;
             if (west) return BridgeSpriteFrames.H_BRIDGE_RIGHT;
         }
