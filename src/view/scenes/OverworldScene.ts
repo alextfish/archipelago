@@ -37,6 +37,7 @@ export class OverworldScene extends Phaser.Scene {
   private puzzleRenderer?: EmbeddedPuzzleRenderer;
   private puzzleInputHandler?: PuzzleInputHandler;
   private tiledMapData?: any;
+  private puzzleEntryPointerHandler?: (pointer: Phaser.Input.Pointer) => void;
 
   constructor() {
     super({ key: 'OverworldScene' });
@@ -374,7 +375,48 @@ export class OverworldScene extends Phaser.Scene {
       this.checkForPuzzleEntry();
     });
 
-    console.log('Puzzle interaction set up - press E near puzzles to enter');
+    // Add pointer/touch input for mobile devices
+    // Store the handler so we can remove it later if needed
+    this.puzzleEntryPointerHandler = (pointer: Phaser.Input.Pointer) => {
+      // Only handle clicks in exploration mode
+      if (this.gameMode !== 'exploration') {
+        return;
+      }
+
+      // Get world coordinates of the click (accounting for camera position)
+      const worldX = pointer.worldX;
+      const worldY = pointer.worldY;
+
+      // Check if player exists and is within a reasonable distance from click
+      if (!this.player || !this.tiledMapData) {
+        return;
+      }
+
+      const playerX = this.player.x;
+      const playerY = this.player.y;
+      const distance = Phaser.Math.Distance.Between(worldX, worldY, playerX, playerY);
+
+      // Convert both positions to tile coordinates
+      const clickTileX = Math.floor(worldX / this.tiledMapData.tilewidth);
+      const clickTileY = Math.floor(worldY / this.tiledMapData.tileheight);
+      const playerTileX = Math.floor(playerX / this.tiledMapData.tilewidth);
+      const playerTileY = Math.floor(playerY / this.tiledMapData.tileheight);
+
+      // Check if clicking on the same tile as the player (or very close - within 1.5 tiles)
+      const tileDistance = Phaser.Math.Distance.Between(
+        clickTileX, clickTileY,
+        playerTileX, playerTileY
+      );
+
+      if (tileDistance <= 1.5 && distance < this.tiledMapData.tilewidth * 1.5) {
+        console.log(`Tap detected near player at tile (${clickTileX}, ${clickTileY})`);
+        this.checkForPuzzleEntry();
+      }
+    };
+
+    this.input.on('pointerdown', this.puzzleEntryPointerHandler);
+
+    console.log('Puzzle interaction set up - press E or tap player tile to enter puzzles');
   }
 
   /**
@@ -679,6 +721,12 @@ export class OverworldScene extends Phaser.Scene {
       this.gameMode = 'exploration';
       if (this.playerController) {
         this.playerController.setEnabled(true);
+      }
+
+      // Restore pointer handler for puzzle entry (it was removed by PuzzleInputHandler)
+      if (this.puzzleEntryPointerHandler) {
+        this.input.off('pointerdown', this.puzzleEntryPointerHandler); // Remove first to avoid duplicates
+        this.input.on('pointerdown', this.puzzleEntryPointerHandler);
       }
 
       // Clear active puzzle
