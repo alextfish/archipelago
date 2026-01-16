@@ -609,14 +609,17 @@ export class OverworldScene extends Phaser.Scene {
           return;
         }
 
-        // Clicking near player but not on interactable - try to enter puzzle at player position
-        console.log(`Tap detected near player at tile (${clickTileX}, ${clickTileY})`);
-        this.checkForPuzzleEntry();
-      } else {
-        // Tapping away from player: move towards that location
-        console.log(`Tap-to-move: player at (${playerX.toFixed(0)}, ${playerY.toFixed(0)}), target (${worldX.toFixed(0)}, ${worldY.toFixed(0)})`);
-        this.playerController.setTargetPosition(worldX, worldY);
+        // Clicking on player's own tile - try to enter puzzle at player position
+        if (clickTileX === playerTileX && clickTileY === playerTileY) {
+          console.log(`Tap detected on player tile (${clickTileX}, ${clickTileY})`);
+          this.checkForPuzzleEntry();
+          return;
+        }
       }
+
+      // Tapping anywhere else: move towards that location
+      console.log(`Tap-to-move: player at (${playerX.toFixed(0)}, ${playerY.toFixed(0)}), target (${worldX.toFixed(0)}, ${worldY.toFixed(0)})`);
+      this.playerController.setTargetPosition(worldX, worldY);
     };
 
     this.input.on('pointerdown', this.puzzleEntryPointerHandler);
