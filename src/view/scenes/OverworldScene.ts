@@ -388,7 +388,7 @@ export class OverworldScene extends Phaser.Scene {
       const worldY = pointer.worldY;
 
       // Check if player exists and is within a reasonable distance from click
-      if (!this.player || !this.tiledMapData) {
+      if (!this.player || !this.tiledMapData || !this.playerController) {
         return;
       }
 
@@ -409,14 +409,19 @@ export class OverworldScene extends Phaser.Scene {
       );
 
       if (tileDistance <= 1.5 && distance < this.tiledMapData.tilewidth * 1.5) {
+        // Tapping on/near player: try to enter puzzle
         console.log(`Tap detected near player at tile (${clickTileX}, ${clickTileY})`);
         this.checkForPuzzleEntry();
+      } else {
+        // Tapping away from player: move towards that location
+        console.log(`Tap-to-move: player at (${playerX.toFixed(0)}, ${playerY.toFixed(0)}), target (${worldX.toFixed(0)}, ${worldY.toFixed(0)}), distance: ${distance.toFixed(0)}px`);
+        this.playerController.setTargetPosition(worldX, worldY);
       }
     };
 
     this.input.on('pointerdown', this.puzzleEntryPointerHandler);
 
-    console.log('Puzzle interaction set up - press E or tap player tile to enter puzzles');
+    console.log('Puzzle interaction set up - press E or tap player tile to enter puzzles, tap elsewhere to move');
   }
 
   /**

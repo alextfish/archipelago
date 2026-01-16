@@ -5,6 +5,7 @@ import Phaser from 'phaser';
  */
 const PLAYER_SPEED = 200; // Doubled from 100
 const CORNER_NUDGE = 4; // Pixels to nudge in perpendicular direction when hitting a corner
+const TARGET_REACHED_THRESHOLD = 5; // Pixels - how close is "close enough" to target
 
 /**
  * PlayerController manages the player character in the overworld.
@@ -19,6 +20,12 @@ export class PlayerController {
     private scene: Phaser.Scene;
     private enabled: boolean = true;
     private collisionLayer?: Phaser.Tilemaps.TilemapLayer;
+
+    // Tap-to-move state
+    private targetPosition?: { x: number; y: number };
+    private lastPlayerPosition?: { x: number; y: number };
+    private stuckFrames: number = 0;
+    private readonly MAX_STUCK_FRAMES = 10; // If stuck for this many frames, give up
 
     constructor(
         scene: Phaser.Scene,
@@ -98,7 +105,7 @@ export class PlayerController {
     }
 
     /**
-     * Update player movement based on cursor input
+     * Update player movement based on cursor input or tap target
      * Should be called from scene's update() method
      */
     update(): void {
@@ -106,6 +113,32 @@ export class PlayerController {
             return;
         }
 
+        // Check if any keyboard input is being used
+        const hasKeyboardInput =
+            this.cursors.left!.isDown ||
+            this.cursors.right!.isDown ||
+            this.cursors.up!.isDown ||
+            this.cursors.down!.isDown;
+
+        // Keyboard input takes priority and cancels tap movement
+        if (hasKeyboardInput) {
+            this.clearTargetPosition();
+            this.handleKeyboardMovement();
+        } else if (this.targetPosition) {
+            this.handleTapMovement();
+        } else {
+            // No input at all
+            this.player.setVelocity(0);
+        }
+
+        // Handle animations based on final velocity
+        this.updateAnimations();
+    }
+
+    /**
+     * Handle keyboard-based movement (existing behavior)
+     */
+    private handleKeyboardMovement(): void {
         // Reset velocity
         this.player.setVelocity(0);
 
@@ -127,9 +160,103 @@ export class PlayerController {
 
         // Apply movement with corner forgiveness
         this.applyMovementWithCornerForgiveness(moveX, moveY);
+    }
 
-        // Handle animations based on final velocity
-        this.updateAnimations();
+    /**
+     * Handle tap-to-move movement
+     * Moves player towards target position, stopping when close or blocked
+     */
+    private handleTapMovement(): void {
+        if (!this.targetPosition) {
+            return;
+        }
+
+        const playerX = this.player.x;
+        const playerY = this.player.y;
+        const targetX = this.targetPosition.x;
+        const targetY = this.targetPosition.y;
+
+        // Calculate distance to target
+        const distance = Phaser.Math.Distance.Between(playerX, playerY, targetX, targetY);
+
+        // Check if we've reached the target
+        if (distance < TARGET_REACHED_THRESHOLD) {
+            this.player.setVelocity(0);
+            this.clearTargetPosition();
+            return;
+        }
+
+        // Calculate direction vector (normalized)
+        const dirX = (targetX - playerX) / distance;
+        const dirY = (targetY - playerY) / distance;
+
+        // Set velocity towards target
+        this.player.setVelocity(dirX * PLAYER_SPEED, dirY * PLAYER_SPEED);
+
+        // Check if player is stuck (not moving despite velocity)
+        this.checkIfStuck(playerX, playerY);
+    }
+
+    /**
+     * Check if player has gotten stuck and can't reach target
+     * This happens when running into walls or obstacles
+     */
+    private checkIfStuck(currentX: number, currentY: number): void {
+        if (!this.lastPlayerPosition) {
+            this.lastPlayerPosition = { x: currentX, y: currentY };
+            return;
+        }
+
+        // Check if player has moved since last frame
+        const movedDistance = Phaser.Math.Distance.Between(
+            currentX, currentY,
+            this.lastPlayerPosition.x, this.lastPlayerPosition.y
+        );
+
+        if (movedDistance < 0.5) {
+            // Player hasn't moved much - increment stuck counter
+            this.stuckFrames++;
+            if (this.stuckFrames >= this.MAX_STUCK_FRAMES) {
+                // Give up - player is blocked
+                console.log('PlayerController: Player stuck, clearing target');
+                this.player.setVelocity(0);
+                this.clearTargetPosition();
+            }
+        } else {
+            // Player is moving - reset stuck counter
+            this.stuckFrames = 0;
+        }
+
+        this.lastPlayerPosition = { x: currentX, y: currentY };
+    }
+
+    /**
+     * Set a target position for the player to move towards
+     * Called when player taps/clicks a location
+     */
+    setTargetPosition(worldX: number, worldY: number): void {
+        this.targetPosition = { x: worldX, y: worldY };
+        this.stuckFrames = 0;
+        this.lastPlayerPosition = undefined;
+        console.log(`PlayerController: Moving to target (${worldX.toFixed(0)}, ${worldY.toFixed(0)})`);
+    }
+
+    /**
+     * Clear the current target position
+     */
+    clearTargetPosition(): void {
+        if (this.targetPosition) {
+            this.targetPosition = undefined;
+            this.lastPlayerPosition = undefined;
+            this.stuckFrames = 0;
+        }
+    }
+
+    /**
+     * Check if player is currently moving towards a tap target
+     */
+    hasTarget(): boolean {
+        return this.targetPosition !== undefined;
     }
 
     /**
