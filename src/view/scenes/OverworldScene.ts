@@ -39,7 +39,7 @@ export class OverworldScene extends Phaser.Scene {
   private puzzleInputHandler?: PuzzleInputHandler;
   private tiledMapData?: any;
   private puzzleEntryPointerHandler?: (pointer: Phaser.Input.Pointer) => void;
-  
+
   // Interaction cursor system
   private interactionCursor?: InteractionCursor;
   private interactables: Interactable[] = [];
