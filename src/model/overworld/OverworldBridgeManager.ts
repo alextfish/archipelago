@@ -1,6 +1,17 @@
 import Phaser from 'phaser';
 import type { Bridge } from '@model/puzzle/Bridge';
 import type { OverworldGameState } from './OverworldGameState';
+import { BridgeSpriteFrames } from '@view/BridgeSpriteFrameRegistry';
+
+/**
+ * Tracks which directions have bridges at a tile
+ */
+interface TileConnections {
+    north: boolean;
+    east: boolean;
+    south: boolean;
+    west: boolean;
+}
 
 /**
  * Manages rendering of completed puzzle bridges to the overworld tilemap.
@@ -8,17 +19,6 @@ import type { OverworldGameState } from './OverworldGameState';
  */
 export class OverworldBridgeManager {
     private static readonly BRIDGES_LAYER_NAME = 'bridges';
-
-    // Tile indices matching EmbeddedPuzzleRenderer (these are TEXTURE frame indices)
-    private readonly H_BRIDGE_LEFT = 55;
-    private readonly H_BRIDGE_CENTRE = 56;
-    private readonly H_BRIDGE_RIGHT = 57;
-    private readonly V_BRIDGE_BOTTOM = 58;
-    private readonly V_BRIDGE_MIDDLE = 59;
-    private readonly V_BRIDGE_TOP = 60;
-    private readonly H_BRIDGE_SINGLE = 62;
-    private readonly V_BRIDGE_SINGLE = 63;
-    private readonly DOUBLE_BRIDGE_OFFSET = 11;
 
     private tilesetFirstGid: number = 0;
 
@@ -41,7 +41,9 @@ export class OverworldBridgeManager {
 
     /**
      * Render completed puzzle bridges to the bridges layer
-     * and update collision array to make them walkable
+     * and update collision array to make them walkable.
+     * 
+     * Uses junction tiles when multiple bridges meet at the same tile.
      */
     bakePuzzleBridges(puzzleId: string, puzzleBounds: Phaser.Geom.Rectangle, bridges: Bridge[]): void {
         console.log(`OverworldBridgeManager: Baking ${bridges.length} bridges for puzzle ${puzzleId}`);
@@ -53,45 +55,174 @@ export class OverworldBridgeManager {
             return;
         }
 
-        let tilesPlaced = 0;
+        // Phase 1: Collect all bridge segments and their connections at each tile
+        const tileConnectionsMap = new Map<string, TileConnections>();
+        
         for (const bridge of bridges) {
             if (!bridge.start || !bridge.end) {
                 console.warn(`OverworldBridgeManager: Bridge ${bridge.id} missing start or end`);
                 continue;
             }
 
-            const tiles = this.getBridgeTileData(bridge, puzzleBounds);
-            console.log(`  Bridge ${bridge.id}: ${tiles.length} tiles to place`);
+            // Add connections for this bridge
+            this.collectBridgeConnections(bridge, puzzleBounds, tileConnectionsMap);
+        }
 
-            for (const { tileX, tileY, tileIndex } of tiles) {
-                // Convert texture frame index to tilemap GID
-                // Tilemap uses GIDs which are: firstgid + frame_index
-                const gid = this.tilesetFirstGid + tileIndex;
+        console.log(`  Collected connections for ${tileConnectionsMap.size} unique tiles`);
 
-                // Add bridge visual to bridges layer
-                const tile = this.bridgesLayer.putTileAt(gid, tileX, tileY);
-                console.log(`    Placed tile frame=${tileIndex} -> GID=${gid} at (${tileX}, ${tileY}), result: ${tile ? 'success' : 'FAILED'}`);
-                if (tile) {
-                    tilesPlaced++;
-                }
+        // Phase 2: Place appropriate tiles based on collected connections
+        let tilesPlaced = 0;
+        for (const [tileKey, connections] of tileConnectionsMap.entries()) {
+            const [tileX, tileY] = tileKey.split(',').map(Number);
+            
+            // Determine which sprite frame to use based on connections
+            const tileIndex = this.getTileIndexForConnections(connections);
+            
+            // Convert texture frame index to tilemap GID
+            const gid = this.tilesetFirstGid + tileIndex;
 
-                // Remove collision from the collision layer at this position
-                // This makes the bridge walkable in the physics system
-                const collisionTile = this.collisionLayer.getTileAt(tileX, tileY);
-                if (collisionTile) {
-                    collisionTile.setCollision(false, false, false, false);
-                    console.log(`    Removed collision from collision layer at (${tileX}, ${tileY})`);
-                }
+            // Add bridge visual to bridges layer
+            const tile = this.bridgesLayer.putTileAt(gid, tileX, tileY);
+            if (tile) {
+                tilesPlaced++;
+                console.log(`    Placed junction tile frame=${tileIndex} -> GID=${gid} at (${tileX}, ${tileY}) with connections: ${this.connectionsToString(connections)}`);
+            }
 
-                // Make walkable by updating collision array
-                if (tileY >= 0 && tileY < this.collisionArray.length &&
-                    tileX >= 0 && tileX < this.collisionArray[tileY].length) {
-                    this.collisionArray[tileY][tileX] = false;
-                }
+            // Remove collision from the collision layer at this position
+            const collisionTile = this.collisionLayer.getTileAt(tileX, tileY);
+            if (collisionTile) {
+                collisionTile.setCollision(false, false, false, false);
+            }
+
+            // Make walkable by updating collision array
+            if (tileY >= 0 && tileY < this.collisionArray.length &&
+                tileX >= 0 && tileX < this.collisionArray[tileY].length) {
+                this.collisionArray[tileY][tileX] = false;
             }
         }
 
         console.log(`OverworldBridgeManager: Baked ${bridges.length} bridges (${tilesPlaced} tiles placed) for puzzle ${puzzleId}`);
+    }
+
+    /**
+     * Collect bridge connections at each tile position
+     */
+    private collectBridgeConnections(
+        bridge: Bridge,
+        puzzleBounds: Phaser.Geom.Rectangle,
+        tileConnectionsMap: Map<string, TileConnections>
+    ): void {
+        if (!bridge.start || !bridge.end) return;
+
+        const tileWidth = this.tiledMapData.tilewidth;
+        const tileHeight = this.tiledMapData.tileheight;
+
+        // Determine if horizontal or vertical
+        const isHorizontal = bridge.start.y === bridge.end.y;
+
+        if (isHorizontal) {
+            // Horizontal bridge
+            const y = bridge.start.y;
+            const startX = Math.min(bridge.start.x, bridge.end.x);
+            const endX = Math.max(bridge.start.x, bridge.end.x);
+
+            for (let gridX = startX; gridX <= endX; gridX++) {
+                const worldX = puzzleBounds.x + gridX * 32;
+                const worldY = puzzleBounds.y + y * 32;
+                const tileX = Math.floor(worldX / tileWidth);
+                const tileY = Math.floor(worldY / tileHeight);
+                const tileKey = `${tileX},${tileY}`;
+
+                if (!tileConnectionsMap.has(tileKey)) {
+                    tileConnectionsMap.set(tileKey, { north: false, east: false, south: false, west: false });
+                }
+
+                const connections = tileConnectionsMap.get(tileKey)!;
+                
+                // Mark connections based on position in bridge
+                if (gridX > startX) connections.west = true;  // Has segment to the west
+                if (gridX < endX) connections.east = true;    // Has segment to the east
+            }
+        } else {
+            // Vertical bridge
+            const x = bridge.start.x;
+            const startY = Math.min(bridge.start.y, bridge.end.y);
+            const endY = Math.max(bridge.start.y, bridge.end.y);
+
+            for (let gridY = startY; gridY <= endY; gridY++) {
+                const worldX = puzzleBounds.x + x * 32;
+                const worldY = puzzleBounds.y + gridY * 32;
+                const tileX = Math.floor(worldX / tileWidth);
+                const tileY = Math.floor(worldY / tileHeight);
+                const tileKey = `${tileX},${tileY}`;
+
+                if (!tileConnectionsMap.has(tileKey)) {
+                    tileConnectionsMap.set(tileKey, { north: false, east: false, south: false, west: false });
+                }
+
+                const connections = tileConnectionsMap.get(tileKey)!;
+                
+                // Mark connections based on position in bridge
+                if (gridY > startY) connections.north = true;  // Has segment to the north
+                if (gridY < endY) connections.south = true;    // Has segment to the south
+            }
+        }
+    }
+
+    /**
+     * Determine the appropriate tile index based on which directions have connections
+     */
+    private getTileIndexForConnections(connections: TileConnections): number {
+        const { north, east, south, west } = connections;
+        const count = [north, east, south, west].filter(Boolean).length;
+
+        // Four-way junction
+        if (count === 4) {
+            return BridgeSpriteFrames.BRIDGE_JUNCTION_N_E_W_S;
+        }
+
+        // Three-way junctions
+        if (count === 3) {
+            if (!north) return BridgeSpriteFrames.BRIDGE_JUNCTION_E_W_S;
+            if (!east) return BridgeSpriteFrames.BRIDGE_JUNCTION_N_W_S;
+            if (!south) return BridgeSpriteFrames.BRIDGE_JUNCTION_E_W_N;
+            if (!west) return BridgeSpriteFrames.BRIDGE_JUNCTION_N_E_S;
+        }
+
+        // Corner (two perpendicular connections)
+        if (count === 2) {
+            if (north && east) return BridgeSpriteFrames.BRIDGE_CORNER_N_E;
+            if (north && west) return BridgeSpriteFrames.BRIDGE_CORNER_N_W;
+            if (south && east) return BridgeSpriteFrames.BRIDGE_CORNER_E_S;
+            if (south && west) return BridgeSpriteFrames.BRIDGE_CORNER_W_S;
+            
+            // Straight bridge segment (two opposite connections)
+            if (north && south) return BridgeSpriteFrames.V_BRIDGE_MIDDLE;
+            if (east && west) return BridgeSpriteFrames.H_BRIDGE_CENTRE;
+        }
+
+        // Single connection (endpoint)
+        if (count === 1) {
+            if (north) return BridgeSpriteFrames.V_BRIDGE_TOP;
+            if (south) return BridgeSpriteFrames.V_BRIDGE_BOTTOM;
+            if (east) return BridgeSpriteFrames.H_BRIDGE_LEFT;
+            if (west) return BridgeSpriteFrames.H_BRIDGE_RIGHT;
+        }
+
+        // No connections (shouldn't happen, but default to single tile)
+        return BridgeSpriteFrames.H_BRIDGE_SINGLE;
+    }
+
+    /**
+     * Convert connections to a readable string for debugging
+     */
+    private connectionsToString(connections: TileConnections): string {
+        const dirs: string[] = [];
+        if (connections.north) dirs.push('N');
+        if (connections.east) dirs.push('E');
+        if (connections.south) dirs.push('S');
+        if (connections.west) dirs.push('W');
+        return dirs.join('');
     }
 
     /**
@@ -174,94 +305,6 @@ export class OverworldBridgeManager {
         }
 
         console.log(`OverworldBridgeManager: Restored all completed puzzle bridges`);
-    }
-
-    /**
-     * Calculate which tilemap tiles a bridge occupies and what tile index to use for each
-     */
-    private getBridgeTileData(
-        bridge: Bridge,
-        puzzleBounds: Phaser.Geom.Rectangle
-    ): Array<{ tileX: number; tileY: number; tileIndex: number }> {
-        const result: Array<{ tileX: number; tileY: number; tileIndex: number }> = [];
-
-        if (!bridge.start || !bridge.end) {
-            return result;
-        }
-
-        const tileWidth = this.tiledMapData.tilewidth;
-        const tileHeight = this.tiledMapData.tileheight;
-
-        // Determine if horizontal or vertical
-        const isHorizontal = bridge.start.y === bridge.end.y;
-        const isDouble = bridge.type.id === 'double';
-        const doubleOffset = isDouble ? this.DOUBLE_BRIDGE_OFFSET : 0;
-
-        if (isHorizontal) {
-            // Horizontal bridge
-            const y = bridge.start.y;
-            const startX = Math.min(bridge.start.x, bridge.end.x);
-            const endX = Math.max(bridge.start.x, bridge.end.x);
-            const length = endX - startX + 1;
-
-            for (let i = 0; i < length; i++) {
-                const gridX = startX + i;
-
-                // Convert puzzle grid coords to world coords to tilemap coords
-                const worldX = puzzleBounds.x + gridX * 32;
-                const worldY = puzzleBounds.y + y * 32;
-                const tileX = Math.floor(worldX / tileWidth);
-                const tileY = Math.floor(worldY / tileHeight);
-
-                // Determine which tile index to use
-                let tileIndex: number;
-                if (length === 1) {
-                    tileIndex = this.H_BRIDGE_SINGLE;
-                } else if (i === 0) {
-                    tileIndex = this.H_BRIDGE_LEFT;
-                } else if (i === length - 1) {
-                    tileIndex = this.H_BRIDGE_RIGHT;
-                } else {
-                    tileIndex = this.H_BRIDGE_CENTRE;
-                }
-                tileIndex += doubleOffset;
-
-                result.push({ tileX, tileY, tileIndex });
-            }
-        } else {
-            // Vertical bridge
-            const x = bridge.start.x;
-            const startY = Math.min(bridge.start.y, bridge.end.y);
-            const endY = Math.max(bridge.start.y, bridge.end.y);
-            const length = endY - startY + 1;
-
-            for (let i = 0; i < length; i++) {
-                const gridY = startY + i;
-
-                // Convert puzzle grid coords to world coords to tilemap coords
-                const worldX = puzzleBounds.x + x * 32;
-                const worldY = puzzleBounds.y + gridY * 32;
-                const tileX = Math.floor(worldX / tileWidth);
-                const tileY = Math.floor(worldY / tileHeight);
-
-                // Determine which tile index to use
-                let tileIndex: number;
-                if (length === 1) {
-                    tileIndex = this.V_BRIDGE_SINGLE;
-                } else if (i === 0) {
-                    tileIndex = this.V_BRIDGE_TOP;
-                } else if (i === length - 1) {
-                    tileIndex = this.V_BRIDGE_BOTTOM;
-                } else {
-                    tileIndex = this.V_BRIDGE_MIDDLE;
-                }
-                tileIndex += doubleOffset;
-
-                result.push({ tileX, tileY, tileIndex });
-            }
-        }
-
-        return result;
     }
 
     /**

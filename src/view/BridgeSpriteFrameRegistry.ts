@@ -12,22 +12,37 @@
 export const BridgeSpriteFrames = {
   /** Island tile frame */
   FRAME_ISLAND: 36,
-  
+
   /** Horizontal bridge component frames */
   H_BRIDGE_LEFT: 55,
   H_BRIDGE_CENTRE: 56,
   H_BRIDGE_RIGHT: 57,
-  
+
   /** Vertical bridge component frames */
   V_BRIDGE_BOTTOM: 58,
   V_BRIDGE_MIDDLE: 59,
   V_BRIDGE_TOP: 60,
-  
+
   /** Single-tile bridge frames */
   UNFINISHED_BRIDGE: 61,
   H_BRIDGE_SINGLE: 62,
   V_BRIDGE_SINGLE: 63,
-  
+
+  /** Corner bridge frames */
+  BRIDGE_CORNER_E_S: 77,
+  BRIDGE_CORNER_W_S: 78,
+  BRIDGE_CORNER_N_E: 79,
+  BRIDGE_CORNER_N_W: 80,
+
+  /** Three-way bridge frames */
+  BRIDGE_JUNCTION_N_E_S: 81,
+  BRIDGE_JUNCTION_N_W_S: 82,
+  BRIDGE_JUNCTION_E_W_N: 83,
+  BRIDGE_JUNCTION_E_W_S: 84,
+
+  /** Four-way bridge frame */
+  BRIDGE_JUNCTION_N_E_W_S: 85,
+
   /** Offset to apply to single bridge frames for double bridges */
   DOUBLE_BRIDGE_OFFSET: 11,
 } as const;
@@ -38,7 +53,7 @@ export const BridgeSpriteFrames = {
 export const BridgeVisualConstants = {
   /** Alpha transparency for bridge placement preview */
   PREVIEW_ALPHA: 0.8,
-  
+
   /** Tint colour for invalid placement preview */
   INVALID_TINT: 0xff0000,
 } as const;
@@ -68,10 +83,10 @@ export function getBridgeSegmentFrame(
   isDouble: boolean = false
 ): number {
   let baseFrame: number;
-  
+
   if (position === 'single') {
     // Single-tile bridge
-    baseFrame = orientation === 'horizontal' 
+    baseFrame = orientation === 'horizontal'
       ? BridgeSpriteFrames.H_BRIDGE_SINGLE
       : BridgeSpriteFrames.V_BRIDGE_SINGLE;
   } else if (orientation === 'horizontal') {
@@ -85,7 +100,7 @@ export function getBridgeSegmentFrame(
     else if (position === 'middle') baseFrame = BridgeSpriteFrames.V_BRIDGE_MIDDLE;
     else baseFrame = BridgeSpriteFrames.V_BRIDGE_BOTTOM;
   }
-  
+
   // Add offset for double bridges
   return isDouble ? baseFrame + BridgeSpriteFrames.DOUBLE_BRIDGE_OFFSET : baseFrame;
 }
