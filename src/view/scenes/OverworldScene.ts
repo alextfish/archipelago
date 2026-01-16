@@ -160,9 +160,8 @@ export class OverworldScene extends Phaser.Scene {
       return;
     }
 
-    // Create the beach layer
-    const beachLayer = this.map.createLayer('beach', beachTileset);
-    console.log('Beach layer created:', beachLayer ? 'success' : 'failed');
+    // Auto-create all visual layers (layers with autoRender property or in the default list)
+    this.setupVisualLayers(beachTileset, grassTileset);
 
     // Create collision layer if it exists
     this.setupCollisionLayer(beachTileset, grassTileset);
@@ -325,6 +324,51 @@ export class OverworldScene extends Phaser.Scene {
     }
 
     console.log(`Built interactables list with ${this.interactables.length} entries`);
+  }
+
+  /**
+   * Setup visual tile layers that should be automatically rendered
+   * Looks for layers with the custom property "autoRender: true" or layers in the default list
+   */
+  private setupVisualLayers(beachTileset: Phaser.Tilemaps.Tileset | null, grassTileset: Phaser.Tilemaps.Tileset | null) {
+    // Default layers to render (fallback if Tiled properties aren't set)
+    const defaultVisualLayers = ['beach', 'water', 'grass', 'ground'];
+    const tilesets = [beachTileset, grassTileset].filter(Boolean) as Phaser.Tilemaps.Tileset[];
+
+    console.log('Setting up visual layers...');
+
+    // Check all layers in the map
+    for (const layerData of this.map.layers) {
+      const layerName = layerData.name;
+
+      // Skip special layers that are handled elsewhere
+      if (layerName === 'collision' ||
+        layerName === 'roofs' ||
+        layerName === OverworldBridgeManager.getBridgesLayerName()) {
+        continue;
+      }
+
+      // Check if this layer should be auto-rendered
+      let shouldRender = defaultVisualLayers.includes(layerName);
+
+      // Also check for autoRender property in Tiled (if layer has properties)
+      if (layerData.properties && Array.isArray(layerData.properties)) {
+        const autoRenderProp = layerData.properties.find((prop: any) => prop.name === 'autoRender');
+        if (autoRenderProp && 'value' in autoRenderProp) {
+          shouldRender = (autoRenderProp as any).value === true;
+        }
+      }
+
+      if (shouldRender) {
+        // Try to create this layer
+        const layer = this.map.createLayer(layerName, tilesets);
+        if (layer) {
+          console.log(`Visual layer "${layerName}" created successfully`);
+        } else {
+          console.warn(`Failed to create visual layer "${layerName}"`);
+        }
+      }
+    }
   }
 
   private setupCollisionLayer(beachTileset: Phaser.Tilemaps.Tileset | null, grassTileset: Phaser.Tilemaps.Tileset | null) {
@@ -767,6 +811,7 @@ export class OverworldScene extends Phaser.Scene {
         hudScene.events.on('exit', this.handleHUDExit, this);
         hudScene.events.on('undo', this.handleHUDUndo, this);
         hudScene.events.on('redo', this.handleHUDRedo, this);
+        hudScene.events.on('typeSelected', this.handleTypeSelected, this);
       }
 
       // Setup bridge click listener for removal
@@ -831,6 +876,7 @@ export class OverworldScene extends Phaser.Scene {
         hudScene.events.off('exit', this.handleHUDExit, this);
         hudScene.events.off('undo', this.handleHUDUndo, this);
         hudScene.events.off('redo', this.handleHUDRedo, this);
+        hudScene.events.off('typeSelected', this.handleTypeSelected, this);
       }
 
       // Clean up bridge click listener
@@ -998,6 +1044,27 @@ export class OverworldScene extends Phaser.Scene {
     console.log('OverworldScene: HUD Redo button clicked');
     if (this.activePuzzleController) {
       this.activePuzzleController.redo();
+    }
+  }
+
+  /**
+   * Handle bridge type selection from HUD
+   */
+  private handleTypeSelected(typeId: string): void {
+    console.log('OverworldScene: Bridge type selected:', typeId);
+    if (!this.activePuzzleController) return;
+
+    // Find the bridge type by ID
+    const puzzle = this.activePuzzleController['puzzle']; // Access private field
+    const bridgeTypes = puzzle.getAvailableBridgeTypes();
+    const selectedType = bridgeTypes.find(bt => bt.id === typeId);
+
+    if (selectedType) {
+      // Update controller's selected type
+      this.activePuzzleController.selectBridgeType(selectedType);
+
+      // Notify HUD to update visual selection
+      this.events.emit('setSelectedType', typeId);
     }
   }
 

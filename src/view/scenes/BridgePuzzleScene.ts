@@ -65,7 +65,11 @@ export class BridgePuzzleScene extends Phaser.Scene {
         // Listen for HUD events (user actions)
         hud.events.on('typeSelected', (typeId: string) => {
             const type = this.puzzle?.inventory.bridges.find(b => b.type.id === typeId)?.type;
-            if (type) this.controller?.selectBridgeType(type);
+            if (type) {
+                this.controller?.selectBridgeType(type);
+                // Notify HUD to update visual selection
+                hud.events.emit('setSelectedType', typeId);
+            }
         });
         hud.events.on('exit', () => this.controller?.exitPuzzle(false));
         hud.events.on('undo', () => this.controller?.undo());

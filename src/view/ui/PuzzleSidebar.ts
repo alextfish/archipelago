@@ -34,8 +34,11 @@ export class PuzzleSidebar {
   ) {
     this.scene = scene;
     this.callbacks = callbacks;
-    // Create the panel in screen coordinates and make it fixed (ignore camera scroll)
-    this.panel = scene.add.container(650, 0);
+    // Position the panel at the top-right of the screen
+    // Panel width is 150px, so position at (screenWidth - 150/2) to anchor right edge
+    const panelWidth = 150;
+    const xPosition = scene.scale.width - panelWidth / 2;
+    this.panel = scene.add.container(xPosition, 0);
     // Prevent the panel from moving when the main camera scrolls
     // This makes the panel act like UI (fixed to the viewport). Zoom is handled separately.
     this.panel.setScrollFactor(0);
@@ -314,7 +317,7 @@ export class PuzzleSidebar {
       `Screen: ${cam.width}x${cam.height}`,
       `View: (${worldLeft.toFixed(0)},${worldTop.toFixed(0)}) to (${worldRight.toFixed(0)},${worldBottom.toFixed(0)})`,
       `Islands: ${this.islandInfo.visible}/${this.islandInfo.count}`,
-      this.islandInfo.bounds ? `bounds:(${this.islandInfo.bounds.minX},${this.islandInfo.bounds.minY})-(${this.islandInfo.bounds.maxX},${this.islandInfo.bounds.maxY})` : '',
+      this.islandInfo.bounds ? `bounds: (${this.islandInfo.bounds.minX},${this.islandInfo.bounds.minY})-(${this.islandInfo.bounds.maxX},${this.islandInfo.bounds.maxY})` : '',
       `Env: ${Environment.isDevelopment() ? 'DEV' : 'PROD'}`
     ];
 

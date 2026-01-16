@@ -97,6 +97,12 @@
          "id":6,
          "name":"water",
          "opacity":1,
+         "properties":[
+                {
+                 "name":"autoRender",
+                 "type":"bool",
+                 "value":true
+                }],
          "type":"tilelayer",
          "visible":true,
          "width":90,
@@ -198,6 +204,12 @@
          "id":1,
          "name":"beach",
          "opacity":1,
+         "properties":[
+                {
+                 "name":"autoRender",
+                 "type":"bool",
+                 "value":true
+                }],
          "type":"tilelayer",
          "visible":true,
          "width":90,
@@ -299,6 +311,12 @@
          "id":7,
          "name":"buildings",
          "opacity":1,
+         "properties":[
+                {
+                 "name":"autoRender",
+                 "type":"bool",
+                 "value":true
+                }],
          "type":"tilelayer",
          "visible":true,
          "width":90,
