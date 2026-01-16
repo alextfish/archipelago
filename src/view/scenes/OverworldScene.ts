@@ -172,9 +172,9 @@ export class OverworldScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
     this.cameras.main.setZoom(2);
 
-    // Set up input and player controller
+    // Set up input and player controller (pass collision layer for corner forgiveness)
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.playerController = new PlayerController(this, this.player, this.cursors);
+    this.playerController = new PlayerController(this, this.player, this.cursors, this.collisionLayer);
 
     // Enable collision between player and collision layer
     if (this.collisionLayer) {
@@ -622,6 +622,7 @@ export class OverworldScene extends Phaser.Scene {
 
       // Handle collision and bridge rendering based on whether puzzle was solved
       const puzzleBounds = this.puzzleManager.getPuzzleBounds(activeData.id);
+      console.log(`DEBUG getPuzzleBounds for "${activeData.id}":`, puzzleBounds);
       const boundsRect = puzzleBounds ? new Phaser.Geom.Rectangle(
         puzzleBounds.x,
         puzzleBounds.y,
@@ -632,7 +633,9 @@ export class OverworldScene extends Phaser.Scene {
       if (success) {
         // If solved: bake bridges to bridges layer and mark as completed
         console.log('Puzzle solved - baking bridges to overworld');
+        console.log(`  Active puzzle ID: "${activeData.id}"`);
         console.log(`  Bridge manager exists: ${!!this.bridgeManager}`);
+        console.log(`  Puzzle bounds: ${puzzleBounds ? JSON.stringify(puzzleBounds) : 'NULL'}`);
         console.log(`  Bounds rect exists: ${!!boundsRect}`);
         console.log(`  Number of bridges: ${activeData.puzzle.bridges.length}`);
 
@@ -643,6 +646,8 @@ export class OverworldScene extends Phaser.Scene {
           console.log('  bakePuzzleBridges completed');
         } else {
           console.error('  CANNOT BAKE: missing bridge manager or bounds');
+          console.error(`    bridgeManager: ${this.bridgeManager ? 'EXISTS' : 'NULL'}`);
+          console.error(`    boundsRect: ${boundsRect ? 'EXISTS' : 'NULL'}`);
         }
         this.gameState.markPuzzleCompleted(activeData.id);
       } else {

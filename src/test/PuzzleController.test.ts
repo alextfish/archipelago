@@ -114,7 +114,7 @@ function createMockPuzzle(): Partial<BridgePuzzle> {
     id: "test-puzzle",
     width: 4,
     height: 4,
-    islands: [ { id: 'I1', x: 1, y: 2 }, { id: 'I2', x: 3, y: 2 } ] as any[],
+    islands: [{ id: 'I1', x: 1, y: 2 }, { id: 'I2', x: 3, y: 2 }] as any[],
     bridges: [] as Bridge[],
     constraints: [] as any[],
     maxNumBridges: 2,
