@@ -13,6 +13,7 @@ import { defaultTileConfig } from '@model/overworld/MapConfig';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 import { PlayerController } from '@view/PlayerController';
 import { InteractionCursor, type Interactable } from '@view/InteractionCursor';
+import { RoofManager } from '@view/RoofManager';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -44,6 +45,10 @@ export class OverworldScene extends Phaser.Scene {
   private interactionCursor?: InteractionCursor;
   private interactables: Interactable[] = [];
 
+  // Roof hiding system
+  private roofManager?: RoofManager;
+  private roofsLayer?: Phaser.Tilemaps.TilemapLayer;
+
   constructor() {
     super({ key: 'OverworldScene' });
 
@@ -52,6 +57,7 @@ export class OverworldScene extends Phaser.Scene {
     this.gameState = new OverworldGameState();
     this.collisionManager = new CollisionManager(this);
     this.cameraManager = new CameraManager(this);
+    this.roofManager = new RoofManager(this);
   }
 
   preload() {
@@ -161,6 +167,9 @@ export class OverworldScene extends Phaser.Scene {
     // Create collision layer if it exists
     this.setupCollisionLayer(beachTileset, grassTileset);
 
+    // Create roofs layer if it exists (should be above player)
+    this.setupRoofsLayer(beachTileset, grassTileset);
+
     // Set world bounds to match map size
     const mapWidth = this.map.widthInPixels;
     const mapHeight = this.map.heightInPixels;
@@ -236,6 +245,11 @@ export class OverworldScene extends Phaser.Scene {
 
       // Initialize interaction cursor
       this.initializeInteractionCursor();
+
+      // Initialize roof manager if we have a roofs layer
+      if (this.roofsLayer && this.roofManager) {
+        this.roofManager.initialize(this.map, this.roofsLayer, this.tiledMapData);
+      }
 
     } catch (error) {
       console.error('Failed to initialize overworld puzzles:', error);
@@ -349,7 +363,33 @@ export class OverworldScene extends Phaser.Scene {
     } else {
       console.warn('No bridges layer found in map');
     }
-  } private findPlayerStartPosition(): { x: number; y: number } {
+  }
+
+  private setupRoofsLayer(beachTileset: Phaser.Tilemaps.Tileset | null, grassTileset: Phaser.Tilemaps.Tileset | null) {
+    // Check if roofs layer exists in the tilemap data
+    const roofsLayerData = this.map.getLayer('roofs');
+    console.log('Looking for roofs layer:', roofsLayerData ? 'FOUND' : 'NOT FOUND');
+
+    if (roofsLayerData) {
+      // Use both tilesets - roofs might use either
+      const tilesets = [beachTileset, grassTileset].filter(Boolean) as Phaser.Tilemaps.Tileset[];
+      console.log(`Creating roofs layer with ${tilesets.length} tilesets`);
+
+      const roofsLayer = this.map.createLayer('roofs', tilesets);
+
+      if (roofsLayer) {
+        this.roofsLayer = roofsLayer;
+        // Set roof layer depth to appear above player (player is at default depth 0)
+        roofsLayer.setDepth(10);
+        console.log(`Roofs layer created successfully: depth=${roofsLayer.depth}, visible=${roofsLayer.visible}, alpha=${roofsLayer.alpha}`);
+      } else {
+        console.error('Failed to create roofs layer - createLayer returned null');
+      }
+    } else {
+      console.log('No roofs layer found in map (optional)');
+    }
+  }
+  private findPlayerStartPosition(): { x: number; y: number } {
     try {
       // Look for player start in scene transitions layer
       const sceneTransitionsLayer = this.map.getObjectLayer('sceneTransitions');
@@ -425,6 +465,11 @@ export class OverworldScene extends Phaser.Scene {
 
         // Update cursor to show nearest interactable
         this.interactionCursor.update(playerTileX, playerTileY, this.interactables);
+      }
+
+      // Update roof manager to hide/show roofs based on player position
+      if (this.roofManager && this.player) {
+        this.roofManager.update(this.player.x, this.player.y);
       }
     }
   }
