@@ -57,7 +57,7 @@ export class OverworldBridgeManager {
 
         // Phase 1: Collect all bridge segments and their connections at each tile
         const tileConnectionsMap = new Map<string, TileConnections>();
-        
+
         for (const bridge of bridges) {
             if (!bridge.start || !bridge.end) {
                 console.warn(`OverworldBridgeManager: Bridge ${bridge.id} missing start or end`);
@@ -74,10 +74,10 @@ export class OverworldBridgeManager {
         let tilesPlaced = 0;
         for (const [tileKey, connections] of tileConnectionsMap.entries()) {
             const [tileX, tileY] = tileKey.split(',').map(Number);
-            
+
             // Determine which sprite frame to use based on connections
             const tileIndex = this.getTileIndexForConnections(connections);
-            
+
             // Convert texture frame index to tilemap GID
             const gid = this.tilesetFirstGid + tileIndex;
 
@@ -138,7 +138,7 @@ export class OverworldBridgeManager {
                 }
 
                 const connections = tileConnectionsMap.get(tileKey)!;
-                
+
                 // Mark connections based on position in bridge
                 if (gridX > startX) connections.west = true;  // Has segment to the west
                 if (gridX < endX) connections.east = true;    // Has segment to the east
@@ -161,7 +161,7 @@ export class OverworldBridgeManager {
                 }
 
                 const connections = tileConnectionsMap.get(tileKey)!;
-                
+
                 // Mark connections based on position in bridge
                 if (gridY > startY) connections.north = true;  // Has segment to the north
                 if (gridY < endY) connections.south = true;    // Has segment to the south
@@ -195,7 +195,7 @@ export class OverworldBridgeManager {
             if (north && west) return BridgeSpriteFrames.BRIDGE_CORNER_N_W;
             if (south && east) return BridgeSpriteFrames.BRIDGE_CORNER_E_S;
             if (south && west) return BridgeSpriteFrames.BRIDGE_CORNER_W_S;
-            
+
             // Straight bridge segment (two opposite connections)
             if (north && south) return BridgeSpriteFrames.V_BRIDGE_MIDDLE;
             if (east && west) return BridgeSpriteFrames.H_BRIDGE_CENTRE;
