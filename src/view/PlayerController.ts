@@ -194,7 +194,8 @@ export class PlayerController {
         const dirY = (targetY - playerY) / distance;
 
         // Set velocity towards target
-        this.player.setVelocity(dirX * PLAYER_SPEED, dirY * PLAYER_SPEED);
+        // Use integer velocities to avoid subpixel issues
+        this.player.setVelocity(Math.round(dirX * PLAYER_SPEED), Math.round(dirY * PLAYER_SPEED));
 
         // Check if player is stuck (not moving despite velocity)
         this.checkIfStuck(playerX, playerY);

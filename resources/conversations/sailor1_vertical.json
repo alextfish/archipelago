@@ -1,0 +1,38 @@
+{
+  "id": "sailor1 vertical bridge",
+  "npcId": "sailor1",
+  "start": "intro",
+  "nodes": {
+    "intro": {
+      "npc": {
+        "expression": "neutral",
+        "glyphs": "me want adjacent vertical bridge"
+      },
+      "choices": [
+        {
+          "text": "OK",
+          "next": "sailor_request"
+        },
+        {
+          "text": "I don't understand",
+          "effects": [
+            {
+              "type": "setExpression",
+              "expression": "frown",
+              "durationMs": 20000
+            }
+          ],
+          "end": true
+        }
+      ]
+    },
+
+    "sailor_request": {
+      "npc": {
+        "expression": "neutral",
+        "glyphs": "you build bridge question"
+      },
+      "end": true
+    }
+  }
+}

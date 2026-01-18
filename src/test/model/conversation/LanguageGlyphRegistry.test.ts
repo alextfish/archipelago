@@ -1,0 +1,176 @@
+/**
+ * Unit tests for LanguageGlyphRegistry
+ */
+
+import { describe, it, expect } from 'vitest';
+import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
+
+describe('LanguageGlyphRegistry', () => {
+    describe('initialization', () => {
+        it('should initialize with grass and fire languages', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(registry.hasLanguage('grass')).toBe(true);
+            expect(registry.hasLanguage('fire')).toBe(true);
+        });
+
+        it('should return correct tileset path', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(registry.getTilesetPath()).toBe('resources/tilesets/language.png');
+        });
+    });
+
+    describe('getSpeechBubbleFrames', () => {
+        it('should return correct frames for grass language', () => {
+            const registry = new LanguageGlyphRegistry();
+            const frames = registry.getSpeechBubbleFrames('grass');
+
+            expect(frames.topLeft).toBe(1);
+            expect(frames.topEdge).toBe(2);
+            expect(frames.topRight).toBe(3);
+            expect(frames.leftEdge).toBe(11);
+            expect(frames.centre).toBe(12);
+            expect(frames.rightEdge).toBe(13);
+            expect(frames.bottomLeft).toBe(21);
+            expect(frames.bottomEdge).toBe(22);
+            expect(frames.bottomRight).toBe(23);
+        });
+
+        it('should return correct frames for fire language', () => {
+            const registry = new LanguageGlyphRegistry();
+            const frames = registry.getSpeechBubbleFrames('fire');
+
+            expect(frames.topLeft).toBe(4);
+            expect(frames.topEdge).toBe(5);
+            expect(frames.topRight).toBe(6);
+            expect(frames.leftEdge).toBe(14);
+            expect(frames.centre).toBe(15);
+            expect(frames.rightEdge).toBe(16);
+            expect(frames.bottomLeft).toBe(24);
+            expect(frames.bottomEdge).toBe(25);
+            expect(frames.bottomRight).toBe(26);
+        });
+
+        it('should throw error for unknown language', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(() => registry.getSpeechBubbleFrames('unknown')).toThrow('Unknown language: unknown');
+        });
+    });
+
+    describe('getGlyphFrame', () => {
+        it('should return correct frame for known grass words', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(registry.getGlyphFrame('grass', 'you')).toBe(31);
+            expect(registry.getGlyphFrame('grass', 'me')).toBe(32);
+            expect(registry.getGlyphFrame('grass', 'bridge')).toBe(33);
+            expect(registry.getGlyphFrame('grass', 'want')).toBe(34);
+            expect(registry.getGlyphFrame('grass', 'build')).toBe(35);
+            expect(registry.getGlyphFrame('grass', 'adjacent')).toBe(36);
+            expect(registry.getGlyphFrame('grass', 'not')).toBe(37);
+            expect(registry.getGlyphFrame('grass', 'vertical')).toBe(38);
+            expect(registry.getGlyphFrame('grass', 'horizontal')).toBe(39);
+        });
+
+        it('should be case-insensitive', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(registry.getGlyphFrame('grass', 'BRIDGE')).toBe(33);
+            expect(registry.getGlyphFrame('grass', 'BrIdGe')).toBe(33);
+        });
+
+        it('should return missing glyph frame for unknown grass words', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(registry.getGlyphFrame('grass', 'unknown')).toBe(7);
+            expect(registry.getGlyphFrame('grass', 'invalid')).toBe(7);
+        });
+
+        it('should return missing glyph frame for unknown fire words', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(registry.getGlyphFrame('fire', 'unknown')).toBe(8);
+        });
+
+        it('should throw error for unknown language', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(() => registry.getGlyphFrame('unknown', 'word')).toThrow('Unknown language: unknown');
+        });
+    });
+
+    describe('parseGlyphs', () => {
+        it('should parse space-separated glyphs into frame indices', () => {
+            const registry = new LanguageGlyphRegistry();
+            const frames = registry.parseGlyphs('grass', 'me want adjacent vertical bridge');
+
+            expect(frames).toEqual([32, 34, 36, 38, 33]);
+        });
+
+        it('should handle extra whitespace', () => {
+            const registry = new LanguageGlyphRegistry();
+            const frames = registry.parseGlyphs('grass', '  me   want  bridge  ');
+
+            expect(frames).toEqual([32, 34, 33]);
+        });
+
+        it('should use missing glyph frame for unknown words', () => {
+            const registry = new LanguageGlyphRegistry();
+            const frames = registry.parseGlyphs('grass', 'me unknown bridge');
+
+            expect(frames).toEqual([32, 7, 33]);
+        });
+    });
+
+    describe('calculateBubbleSize', () => {
+        it('should calculate width based on word count', () => {
+            const registry = new LanguageGlyphRegistry();
+            const size = registry.calculateBubbleSize('me want adjacent vertical bridge');
+
+            expect(size.width).toBe(5);
+            expect(size.rows).toBe(1);
+        });
+
+        it('should handle single word', () => {
+            const registry = new LanguageGlyphRegistry();
+            const size = registry.calculateBubbleSize('bridge');
+
+            expect(size.width).toBe(1);
+            expect(size.rows).toBe(1);
+        });
+
+        it('should handle extra whitespace', () => {
+            const registry = new LanguageGlyphRegistry();
+            const size = registry.calculateBubbleSize('  me   want  ');
+
+            expect(size.width).toBe(2);
+            expect(size.rows).toBe(1);
+        });
+    });
+
+    describe('addGlyph', () => {
+        it('should allow adding new glyphs to a language', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            registry.addGlyph('grass', 'question', 40);
+
+            expect(registry.getGlyphFrame('grass', 'question')).toBe(40);
+        });
+
+        it('should allow overwriting existing glyphs', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            registry.addGlyph('grass', 'bridge', 99);
+
+            expect(registry.getGlyphFrame('grass', 'bridge')).toBe(99);
+        });
+
+        it('should throw error for unknown language', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(() => registry.addGlyph('unknown', 'word', 50)).toThrow('Unknown language: unknown');
+        });
+    });
+});

@@ -14,6 +14,8 @@ import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 import { PlayerController } from '@view/PlayerController';
 import { InteractionCursor, type Interactable } from '@view/InteractionCursor';
 import { RoofManager } from '@view/RoofManager';
+import { NPC } from '@model/conversation/NPC';
+import type { ConversationSpec } from '@model/conversation/ConversationData';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -26,7 +28,7 @@ export class OverworldScene extends Phaser.Scene {
   private collisionLayer!: Phaser.Tilemaps.TilemapLayer;
   private bridgesLayer!: Phaser.Tilemaps.TilemapLayer;
   private collisionArray: boolean[][] = [];
-  private gameMode: 'exploration' | 'puzzle' = 'exploration';
+  private gameMode: 'exploration' | 'conversation' | 'puzzle' = 'exploration';
   private isExitingPuzzle: boolean = false; // Guard to prevent re-entrant exit calls
 
   // Overworld puzzle system
@@ -44,6 +46,10 @@ export class OverworldScene extends Phaser.Scene {
   // Interaction cursor system
   private interactionCursor?: InteractionCursor;
   private interactables: Interactable[] = [];
+
+  // NPC and conversation system
+  private npcs: NPC[] = [];
+  private npcSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
 
   // Roof hiding system
   private roofManager?: RoofManager;
@@ -76,6 +82,10 @@ export class OverworldScene extends Phaser.Scene {
       frameWidth: 32,
       frameHeight: 32
     });
+
+    // Load NPC sprites
+    this.load.image('sailorNS', 'resources/sprites/sailorNS.png');
+    this.load.image('sailorEW', 'resources/sprites/sailorEW.png');
 
     // Load TMX file asynchronously
     this.loadTmxFile();
@@ -185,6 +195,7 @@ export class OverworldScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player);
     this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
     this.cameras.main.setZoom(2);
+    this.cameras.main.roundPixels = true; // avoid subpixel gaps
 
     // Set up input and player controller (pass collision layer for corner forgiveness)
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -323,7 +334,72 @@ export class OverworldScene extends Phaser.Scene {
       }
     }
 
-    console.log(`Built interactables list with ${this.interactables.length} entries`);
+    // Load NPCs from the "npcs" object layer
+    this.loadNPCs();
+
+    console.log(`Built interactables list with ${this.interactables.length} entries (${this.npcs.length} NPCs)`);
+  }
+
+  /**
+   * Load NPCs from the Tiled map "npcs" object layer
+   */
+  private loadNPCs(): void {
+    if (!this.map) return;
+
+    const npcsLayer = this.map.getObjectLayer('npcs');
+    if (!npcsLayer) {
+      console.log('No NPCs layer found in map');
+      return;
+    }
+
+    for (const obj of npcsLayer.objects) {
+      if (!obj.name || typeof obj.x !== 'number' || typeof obj.y !== 'number') {
+        console.warn('Invalid NPC object:', obj);
+        continue;
+      }
+
+      // Convert pixel coordinates to tile coordinates
+      const tileX = Math.floor(obj.x / this.tiledMapData.tilewidth);
+      const tileY = Math.floor(obj.y / this.tiledMapData.tileheight);
+
+      // Get properties from Tiled object
+      const properties = obj.properties as any[] | undefined;
+      const conversationFile = properties?.find((p: any) => p.name === 'conversation')?.value;
+      const language = properties?.find((p: any) => p.name === 'language')?.value || 'grass';
+      const appearanceId = properties?.find((p: any) => p.name === 'appearance')?.value || 'sailorNS';
+
+      // Create NPC instance
+      const npc = new NPC(
+        obj.name,
+        obj.name,
+        tileX,
+        tileY,
+        language,
+        appearanceId,
+        conversationFile
+      );
+
+      this.npcs.push(npc);
+
+      // Add NPC to interactables list
+      this.interactables.push({
+        type: 'npc',
+        tileX,
+        tileY,
+        data: { npc }
+      });
+
+      // Create NPC sprite at world coordinates
+      // Tiled uses top-left for objects, so we need to add tileheight to get bottom position
+      const worldX = tileX * this.tiledMapData.tilewidth;
+      const worldY = (tileY + 1) * this.tiledMapData.tileheight; // Add 1 tile to match Tiled's top-left origin
+      const sprite = this.add.sprite(worldX, worldY, appearanceId);
+      sprite.setOrigin(0, 1); // Bottom-left origin to align with tile coordinates
+      sprite.setDepth(worldY); // Use Y-sorting for depth
+      this.npcSprites.set(npc.id, sprite);
+
+      console.log(`Loaded NPC: ${npc.name} at (${tileX}, ${tileY}), language: ${language}, conversation: ${conversationFile || 'none'}`);
+    }
   }
 
   /**
@@ -550,9 +626,18 @@ export class OverworldScene extends Phaser.Scene {
    * Set up puzzle interaction checking
    */
   private setupPuzzleInteraction(): void {
-    // Add E key for entering puzzles
+    // Add E key for interacting with focused target or entering puzzles
     this.input.keyboard?.on('keydown-E', () => {
-      this.checkForPuzzleEntry();
+      // If there's a focused target, interact with it
+      const focusedTarget = this.interactionCursor?.getCurrentTarget();
+      if (focusedTarget) {
+        console.log('E key: interacting with focused target');
+        this.interactWithTarget(focusedTarget);
+      } else {
+        // Otherwise, check for puzzle entry at player's position
+        console.log('E key: checking for puzzle entry');
+        this.checkForPuzzleEntry();
+      }
     });
 
     // Add pointer/touch input for mobile devices
@@ -638,13 +723,113 @@ export class OverworldScene extends Phaser.Scene {
         }
         break;
       case 'npc':
-        // Future: handle NPC interaction
-        console.log('NPC interaction not yet implemented');
+        if (target.data?.npc) {
+          this.startConversationWithNPC(target.data.npc);
+        }
         break;
       case 'lever':
         // Future: handle lever interaction
         console.log('Lever interaction not yet implemented');
         break;
+    }
+  }
+
+  /**
+   * Start a conversation with an NPC
+   */
+  private async startConversationWithNPC(npc: NPC): Promise<void> {
+    if (!npc.hasConversation()) {
+      console.log(`NPC ${npc.name} has no conversation`);
+      return;
+    }
+
+    try {
+      // Load conversation JSON
+      const conversationPath = npc.getConversationPath();
+      const response = await fetch(conversationPath);
+      if (!response.ok) {
+        throw new Error(`Failed to load conversation: ${response.statusText}`);
+      }
+
+      const conversationSpec: ConversationSpec = await response.json();
+
+      // Switch to conversation mode
+      this.gameMode = 'conversation';
+      console.log(`Switching to conversation mode with NPC: ${npc.name}`);
+
+      // Get conversation scene
+      const conversationScene = this.scene.get('ConversationScene') as any;
+      if (!conversationScene) {
+        console.error('ConversationScene not found');
+        return;
+      }
+
+      // Listen for conversation end
+      conversationScene.events.once('conversationEnded', () => {
+        this.onConversationEnded();
+      });
+
+      // Listen for conversation effects
+      conversationScene.events.on('conversationEffects', (effects: any[]) => {
+        this.handleConversationEffects(effects);
+      });
+
+      // Launch the conversation scene if not already running
+      if (!this.scene.isActive('ConversationScene')) {
+        // Wait for the scene to be created before starting conversation
+        conversationScene.events.once('create', () => {
+          conversationScene.startConversation(conversationSpec, npc);
+        });
+        this.scene.launch('ConversationScene');
+      } else {
+        // Scene already running, start conversation immediately
+        conversationScene.startConversation(conversationSpec, npc);
+      }
+
+    } catch (error) {
+      console.error('Error starting conversation:', error);
+      this.gameMode = 'exploration';
+    }
+  }
+
+  /**
+   * Handle conversation ending
+   */
+  private onConversationEnded(): void {
+    console.log('Conversation ended, returning to exploration');
+    this.gameMode = 'exploration';
+
+    // Clean up event listeners
+    const conversationScene = this.scene.get('ConversationScene');
+    if (conversationScene) {
+      conversationScene.events.off('conversationEffects');
+    }
+
+    // Stop the conversation scene
+    this.scene.stop('ConversationScene');
+  }
+
+  /**
+   * Handle effects from conversation choices
+   */
+  private handleConversationEffects(effects: any[]): void {
+    console.log('Handling conversation effects:', effects);
+
+    for (const effect of effects) {
+      switch (effect.type) {
+        case 'giveItem':
+          console.log(`TODO: Give item ${effect.itemId} to player`);
+          break;
+        case 'setFlag':
+          console.log(`TODO: Set flag ${effect.flagId} = ${effect.flagValue}`);
+          break;
+        case 'startPuzzle':
+          console.log(`TODO: Start puzzle ${effect.puzzleId}`);
+          break;
+        case 'setExpression':
+          // Expression changes are handled by the conversation system
+          break;
+      }
     }
   }
 
