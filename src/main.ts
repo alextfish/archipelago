@@ -3,6 +3,7 @@ import { BridgePuzzleScene } from "@view/scenes/BridgePuzzleScene";
 import { PuzzleHUDScene } from "@view/scenes/PuzzleHUDScene";
 import { IslandMapScene } from "@view/scenes/IslandMapScene";
 import { OverworldScene } from "@view/scenes/OverworldScene";
+import { ConversationScene } from "@view/scenes/ConversationScene";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -10,6 +11,10 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 800,  // Increased for better overworld view
   backgroundColor: "#87CEEB", // Sky blue for sea
   parent: "game-container",
+  pixelArt: true,
+  render: {
+    antialias: false
+  },
   physics: {
     default: 'arcade',
     arcade: {
@@ -17,7 +22,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false
     }
   },
-  scene: [OverworldScene, BridgePuzzleScene, PuzzleHUDScene, IslandMapScene],
+  scene: [OverworldScene, ConversationScene, BridgePuzzleScene, PuzzleHUDScene, IslandMapScene],
 };
 
 new Phaser.Game(config);
