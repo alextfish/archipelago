@@ -144,6 +144,12 @@ export class EnclosedAreaSizeConstraint extends Constraint {
 
         if (visited.has(key)) continue;
 
+        // Stop expanding if we go outside the puzzle bounds
+        if (nx <= 0 || nx >= puzzle.width || ny <= 0 || ny >= puzzle.height) {
+          isEnclosed = false;
+          continue;
+        }
+
         // Check if there's a bridge blocking this direction
         const isBlocked = this.isBridgeBlocking(puzzle, x, y, nx, ny);
         
