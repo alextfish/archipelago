@@ -30,6 +30,7 @@ export class OverworldScene extends Phaser.Scene {
   private collisionArray: boolean[][] = [];
   private gameMode: 'exploration' | 'conversation' | 'puzzle' = 'exploration';
   private isExitingPuzzle: boolean = false; // Guard to prevent re-entrant exit calls
+  private isPointerHeld: boolean = false; // Track if pointer is held down for continuous movement
 
   // Overworld puzzle system
   private puzzleManager: OverworldPuzzleManager;
@@ -648,6 +649,9 @@ export class OverworldScene extends Phaser.Scene {
         return;
       }
 
+      // Mark pointer as held
+      this.isPointerHeld = true;
+
       // Get world coordinates of the click (accounting for camera position)
       const worldX = pointer.worldX;
       const worldY = pointer.worldY;
@@ -673,6 +677,7 @@ export class OverworldScene extends Phaser.Scene {
       if (focusedTarget && this.interactionCursor.isTargeting(clickTileX, clickTileY)) {
         console.log(`Interacting with focused target at (${clickTileX}, ${clickTileY})`);
         this.interactWithTarget(focusedTarget);
+        this.isPointerHeld = false; // Don't continue moving after interaction
         return;
       }
 
@@ -691,6 +696,7 @@ export class OverworldScene extends Phaser.Scene {
           // If it's not focused, focus it (player may need to turn)
           // If it becomes focused, it will be interactable next tap
           console.log(`Focusing interactable at (${clickTileX}, ${clickTileY})`);
+          this.isPointerHeld = false; // Don't continue moving when focusing
           return;
         }
 
@@ -698,6 +704,7 @@ export class OverworldScene extends Phaser.Scene {
         if (clickTileX === playerTileX && clickTileY === playerTileY) {
           console.log(`Tap detected on player tile (${clickTileX}, ${clickTileY})`);
           this.checkForPuzzleEntry();
+          this.isPointerHeld = false; // Don't continue moving after puzzle check
           return;
         }
       }
@@ -708,6 +715,28 @@ export class OverworldScene extends Phaser.Scene {
     };
 
     this.input.on('pointerdown', this.puzzleEntryPointerHandler);
+
+    // Add pointer move handler for continuous movement while held
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      // Only update destination if pointer is held and in exploration mode
+      if (!this.isPointerHeld || this.gameMode !== 'exploration') {
+        return;
+      }
+
+      if (!this.player || !this.playerController || !pointer.isDown) {
+        return;
+      }
+
+      // Update destination to current pointer position
+      const worldX = pointer.worldX;
+      const worldY = pointer.worldY;
+      this.playerController.setTargetPosition(worldX, worldY);
+    });
+
+    // Add pointer up handler to stop tracking
+    this.input.on('pointerup', () => {
+      this.isPointerHeld = false;
+    });
 
     console.log('Puzzle interaction set up - press E or tap focused interactable to interact, tap elsewhere to move');
   }
