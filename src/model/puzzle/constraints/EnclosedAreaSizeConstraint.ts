@@ -107,6 +107,10 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     });
   }
 
+  private isOutOfBounds(x: number, y: number, puzzle: BridgePuzzle): boolean {
+    return x <= 0 || x >= puzzle.width || y <= 0 || y >= puzzle.height;
+  }
+
   private getEnclosedAreaSize(
     puzzle: BridgePuzzle, 
     startX: number, 
@@ -125,7 +129,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
       cells.push(cellKey(x, y));
 
       // Check if we've reached the boundary of the puzzle
-      if (x <= 0 || x >= puzzle.width || y <= 0 || y >= puzzle.height) {
+      if (this.isOutOfBounds(x, y, puzzle)) {
         isEnclosed = false;
       }
 
@@ -145,7 +149,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
         if (visited.has(key)) continue;
 
         // Stop expanding if we go outside the puzzle bounds
-        if (nx <= 0 || nx >= puzzle.width || ny <= 0 || ny >= puzzle.height) {
+        if (this.isOutOfBounds(nx, ny, puzzle)) {
           isEnclosed = false;
           continue;
         }

@@ -96,8 +96,8 @@ export class IslandPassingBridgeCountConstraint extends Constraint {
       const minX = Math.min(start.x, end.x);
       const maxX = Math.max(start.x, end.x);
 
-      // Check if island is within x-range
-      if (island.x <= minX || island.x >= maxX) return false;
+      // Check if island is within x-range (strictly between endpoints)
+      if (island.x < minX || island.x > maxX) return false;
 
       // Check direction
       switch (this.direction) {
@@ -118,8 +118,8 @@ export class IslandPassingBridgeCountConstraint extends Constraint {
       const minY = Math.min(start.y, end.y);
       const maxY = Math.max(start.y, end.y);
 
-      // Check if island is within y-range
-      if (island.y <= minY || island.y >= maxY) return false;
+      // Check if island is within y-range (strictly between endpoints)
+      if (island.y < minY || island.y > maxY) return false;
 
       // Check direction
       switch (this.direction) {

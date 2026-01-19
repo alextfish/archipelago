@@ -88,8 +88,10 @@ export class IslandVisibilityConstraint extends Constraint {
     let currentIsland = sourceIsland;
 
     while (true) {
-      // Look for next island in this direction
-      const nextIsland = puzzle.islands.find(i => {
+      // Find the closest island in this direction
+      const candidateIslands = puzzle.islands.filter(i => {
+        if (i.id === currentIsland.id) return false;
+        
         if (dx !== 0) {
           // Horizontal direction: same y, appropriate x
           return i.y === currentIsland.y && 
@@ -101,7 +103,14 @@ export class IslandVisibilityConstraint extends Constraint {
         }
       });
 
-      if (!nextIsland) break;
+      if (candidateIslands.length === 0) break;
+
+      // Find the closest one
+      const nextIsland = candidateIslands.reduce((closest, candidate) => {
+        const closestDist = Math.abs(closest.x - currentIsland.x) + Math.abs(closest.y - currentIsland.y);
+        const candidateDist = Math.abs(candidate.x - currentIsland.x) + Math.abs(candidate.y - currentIsland.y);
+        return candidateDist < closestDist ? candidate : closest;
+      });
 
       // Check if there's a bridge connecting current to next
       const bridgeExists = this.hasBridgeBetween(puzzle, currentIsland, nextIsland);
