@@ -173,4 +173,48 @@ describe('LanguageGlyphRegistry', () => {
             expect(() => registry.addGlyph('unknown', 'word', 50)).toThrow('Unknown language: unknown');
         });
     });
+
+    describe('constraint validation glyphs', () => {
+        it('should have constraint validation glyphs registered', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(registry.getGlyphFrame('grass', 'not-enough')).toBe(40);
+            expect(registry.getGlyphFrame('grass', 'too-many')).toBe(41);
+            expect(registry.getGlyphFrame('grass', 'must-not')).toBe(42);
+            expect(registry.getGlyphFrame('grass', 'area')).toBe(43);
+            expect(registry.getGlyphFrame('grass', 'enclosed')).toBe(44);
+            expect(registry.getGlyphFrame('grass', 'island')).toBe(45);
+            expect(registry.getGlyphFrame('grass', 'connected')).toBe(46);
+            expect(registry.getGlyphFrame('grass', 'over')).toBe(47);
+            expect(registry.getGlyphFrame('grass', 'under')).toBe(48);
+        });
+
+        it('should have directional glyphs registered', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(registry.getGlyphFrame('grass', 'left-of')).toBe(49);
+            expect(registry.getGlyphFrame('grass', 'right-of')).toBe(50);
+            expect(registry.getGlyphFrame('grass', 'above')).toBe(51);
+            expect(registry.getGlyphFrame('grass', 'below')).toBe(52);
+        });
+
+        it('should have color glyphs registered', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(registry.getGlyphFrame('grass', 'red')).toBe(60);
+            expect(registry.getGlyphFrame('grass', 'blue')).toBe(61);
+            expect(registry.getGlyphFrame('grass', 'green')).toBe(62);
+            expect(registry.getGlyphFrame('grass', 'yellow')).toBe(63);
+        });
+
+        it('should parse constraint validation glyph messages', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            const frames1 = registry.parseGlyphs('grass', 'not-enough bridge');
+            expect(frames1).toEqual([40, 32]);
+
+            const frames2 = registry.parseGlyphs('grass', 'red island must-not connected blue island');
+            expect(frames2).toEqual([60, 45, 42, 46, 61, 45]);
+        });
+    });
 });

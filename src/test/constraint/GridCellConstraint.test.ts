@@ -31,6 +31,7 @@ describe("GridCellConstraints", () => {
 
       expect(result.satisfied).toBe(false);
       expect(result.message).toContain("No horizontal bridge");
+      expect(result.glyphMessage).toBe("not adjacent bridge");
     });
   });
 
@@ -58,6 +59,7 @@ describe("GridCellConstraints", () => {
 
       expect(result.satisfied).toBe(false);
       expect(result.message).toContain("No vertical bridge");
+      expect(result.glyphMessage).toBe("not adjacent bridge");
     });
   });
 });

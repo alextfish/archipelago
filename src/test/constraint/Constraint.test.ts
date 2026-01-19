@@ -78,6 +78,27 @@ describe("IslandBridgeCountConstraint", () => {
     expect(result.satisfied).toBe(false);
     expect(result.affectedElements).toEqual(["A"]);
     expect(result.message).toContain("A");
+    expect(result.glyphMessage).toBe("not-enough bridge");
+  });
+
+  it("returns 'too-many bridge' glyph message when island has too many bridges", () => {
+    const islands = [
+      { id: "A", x: 1, y: 1, constraints: ["num_bridges=1"] },
+      { id: "B", x: 2, y: 2, constraints: [] }
+    ];
+
+    const bridges = [
+      { id: "b1", start: { x: 1, y: 1 }, end: { x: 2, y: 2 }, type: { id: "t1" } },
+      { id: "b2", start: { x: 1, y: 1 }, end: { x: 3, y: 3 }, type: { id: "t2" } }
+    ];
+    
+    const bridgesFromIsland = (island: any) => bridges.filter(b => (b.start.x === island.x && b.start.y === island.y) || (b.end.x === island.x && b.end.y === island.y));
+    const puzzle = makeMockPuzzle({ islands, bridges, bridgesFromIsland });
+    const constraint = new IslandBridgeCountConstraint();
+    const result = constraint.check(puzzle as any);
+
+    expect(result.satisfied).toBe(false);
+    expect(result.glyphMessage).toBe("too-many bridge");
   });
 });
 

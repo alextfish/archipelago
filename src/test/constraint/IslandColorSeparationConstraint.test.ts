@@ -43,6 +43,7 @@ describe("IslandColorSeparationConstraint", () => {
     expect(result.affectedElements).toContain("A");
     expect(result.affectedElements).toContain("B");
     expect(result.message).toContain("must not connect");
+    expect(result.glyphMessage).toBe("red island must-not connected blue island");
   });
 
   it("passes when all islands are of the same colour", () => {
