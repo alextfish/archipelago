@@ -46,11 +46,21 @@ export class IslandVisibilityConstraint extends Constraint {
 
     this.violations = ok ? [] : [this.islandId];
 
+    let glyphMessage: string | undefined;
+    if (!ok) {
+      if (actualCount < this.expectedCount) {
+        glyphMessage = "not-enough island connected";
+      } else {
+        glyphMessage = "too-many island connected";
+      }
+    }
+
     return {
       satisfied: ok,
       affectedElements: ok ? Array.from(visibleIslands) : [this.islandId, ...Array.from(visibleIslands)],
       message: ok ? undefined : 
-        `Island ${this.islandId} requires ${this.expectedCount} visible islands, but has ${actualCount}`
+        `Island ${this.islandId} requires ${this.expectedCount} visible islands, but has ${actualCount}`,
+      glyphMessage
     };
   }
 

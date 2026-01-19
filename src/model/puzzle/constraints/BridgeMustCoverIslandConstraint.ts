@@ -36,7 +36,8 @@ export class BridgeMustCoverIslandConstraint extends Constraint {
       satisfied: ok,
       affectedElements: violations,
       message: ok ? undefined : 
-        `Bridge${violations.length === 1 ? '' : 's'} must cover island${violations.length === 1 ? '' : 's'}: ${violations.join(", ")}`
+        `Bridge${violations.length === 1 ? '' : 's'} must cover island${violations.length === 1 ? '' : 's'}: ${violations.join(", ")}`,
+      glyphMessage: ok ? undefined : "no island under bridge"
     };
   }
 

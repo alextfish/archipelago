@@ -51,11 +51,22 @@ export class IslandPassingBridgeCountConstraint extends Constraint {
 
     this.violations = ok ? [] : [this.islandId];
 
+    let glyphMessage: string | undefined;
+    if (!ok) {
+      const directionStr = this.direction === 'adjacent' ? '' : ` ${this.direction}`;
+      if (actualCount < this.expectedCount) {
+        glyphMessage = `not-enough bridge${directionStr} island`;
+      } else {
+        glyphMessage = `too-many bridge${directionStr} island`;
+      }
+    }
+
     return {
       satisfied: ok,
       affectedElements: ok ? passingBridges.map(b => b.id) : [this.islandId, ...passingBridges.map(b => b.id)],
       message: ok ? undefined : 
-        `Island ${this.islandId} requires ${this.expectedCount} bridges passing ${this.direction}, but has ${actualCount}`
+        `Island ${this.islandId} requires ${this.expectedCount} bridges passing ${this.direction}, but has ${actualCount}`,
+      glyphMessage
     };
   }
 
