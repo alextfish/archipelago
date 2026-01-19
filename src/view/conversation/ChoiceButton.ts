@@ -46,9 +46,11 @@ export class ChoiceButton extends Phaser.GameObjects.Container {
         this.textLabel.setOrigin(0.5, 0.5);
         this.add(this.textLabel);
 
-        // Make interactive
-        this.setSize(width, height);
-        this.setInteractive({ useHandCursor: true });
+        // Make interactive with explicit hit area
+        // Note: Container hit area is relative to container position
+        const hitArea = new Phaser.Geom.Rectangle(0, 0, width, height);
+        this.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+        this.input!.cursor = 'pointer';
 
         // Set up event handlers
         this.on('pointerover', this.onHoverStart, this);

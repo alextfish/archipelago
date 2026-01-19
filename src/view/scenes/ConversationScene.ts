@@ -154,7 +154,27 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         // Clear existing choice buttons
         this.clearChoices();
 
-        // Create new choice buttons
+        // If no choices, show a "[Leave]" button to dismiss the conversation
+        if (choices.length === 0) {
+            console.log('ConversationScene: No choices, showing [Leave] button');
+            const centerX = this.scale.width / 2;
+            const button = new ChoiceButton(
+                this,
+                centerX - this.CHOICE_WIDTH / 2,
+                this.CHOICES_START_Y,
+                this.CHOICE_WIDTH,
+                this.CHOICE_HEIGHT,
+                '[Leave]',
+                -1, // Special index for continue
+                () => this.onContinueClicked()
+            );
+            button.setDepth(10);
+            this.choiceButtons.push(button);
+            console.log('ConversationScene: [Leave] button created');
+            return;
+        }
+
+        // Create choice buttons for actual choices
         const centerX = this.scale.width / 2;
         let currentY = this.CHOICES_START_Y;
 
@@ -190,6 +210,15 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         }
 
         this.controller.selectChoice(index);
+    }
+
+    /**
+     * Handle continue button click (when conversation has ended with final message)
+     */
+    private onContinueClicked(): void {
+        console.log('ConversationScene: Continue button clicked, ending conversation');
+        this.hideConversation();
+        this.onConversationEnd();
     }
 
     /**

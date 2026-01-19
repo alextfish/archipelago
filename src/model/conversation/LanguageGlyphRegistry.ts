@@ -43,32 +43,32 @@ export class LanguageGlyphRegistry {
     private initializeLanguages(): void {
         // Grass language
         const grassGlyphs = new Map<string, number>([
-            ['you', 31],
-            ['me', 32],
-            ['bridge', 33],
-            ['want', 34],
-            ['build', 35],
-            ['adjacent', 36],
-            ['not', 37],
-            ['vertical', 38],
-            ['horizontal', 39],
+            ['you', 30],
+            ['me', 31],
+            ['bridge', 32],
+            ['want', 33],
+            ['build', 34],
+            ['adjacent', 35],
+            ['not', 36],
+            ['vertical', 37],
+            ['horizontal', 38],
         ]);
 
         this.languages.set('grass', {
             name: 'grass',
             speechBubbleFrames: {
-                topLeft: 1,
-                topEdge: 2,
-                topRight: 3,
-                leftEdge: 11,
-                centre: 12,
-                rightEdge: 13,
-                bottomLeft: 21,
-                bottomEdge: 22,
-                bottomRight: 23,
+                topLeft: 0,
+                topEdge: 1,
+                topRight: 2,
+                leftEdge: 10,
+                centre: 11,
+                rightEdge: 12,
+                bottomLeft: 20,
+                bottomEdge: 21,
+                bottomRight: 22,
             },
             glyphs: grassGlyphs,
-            missingGlyphFrame: 7,
+            missingGlyphFrame: 6,
         });
 
         // Fire language
@@ -79,18 +79,18 @@ export class LanguageGlyphRegistry {
         this.languages.set('fire', {
             name: 'fire',
             speechBubbleFrames: {
-                topLeft: 4,
-                topEdge: 5,
-                topRight: 6,
-                leftEdge: 14,
-                centre: 15,
-                rightEdge: 16,
-                bottomLeft: 24,
-                bottomEdge: 25,
-                bottomRight: 26,
+                topLeft: 3,
+                topEdge: 4,
+                topRight: 5,
+                leftEdge: 13,
+                centre: 14,
+                rightEdge: 15,
+                bottomLeft: 23,
+                bottomEdge: 24,
+                bottomRight: 25,
             },
             glyphs: fireGlyphs,
-            missingGlyphFrame: 8,
+            missingGlyphFrame: 7,
         });
     }
 

@@ -86,6 +86,9 @@ export class ConversationController {
             throw new Error('Conversation has already ended');
         }
 
+        // Remember the current node before selecting choice
+        const previousNodeId = this.state.getCurrentNodeId();
+
         // Apply choice and get effects
         const effects = this.state.selectChoice(choiceIndex);
 
@@ -96,16 +99,23 @@ export class ConversationController {
 
         // Check if conversation ended after selecting choice
         if (this.state.isEnded()) {
-            // Display final node content if it has any
-            const node = this.state.getCurrentNode();
-            if (node.npc) {
-                this.displayCurrentNode();
-            } else {
-                // No final NPC line, hide conversation immediately
-                this.host.hideConversation();
+            const currentNodeId = this.state.getCurrentNodeId();
+            const transitionedToNewNode = currentNodeId !== previousNodeId;
+
+            // Only display final node if we actually transitioned to a new node
+            if (transitionedToNewNode) {
+                const node = this.state.getCurrentNode();
+                if (node.npc) {
+                    console.log('ConversationController: Displaying final node, will wait for dismissal');
+                    this.displayCurrentNode();
+                    // Don't call onConversationEnd yet - wait for player to dismiss
+                    return;
+                }
             }
 
-            // Notify host that conversation has ended
+            // No transition to new node, or no final NPC line - end immediately
+            console.log('ConversationController: Ending conversation immediately');
+            this.host.hideConversation();
             this.host.onConversationEnd();
         } else {
             // Display next node
@@ -137,18 +147,14 @@ export class ConversationController {
             this.host.displayNPCLine(expression, glyphFrames, this.currentNPC.language);
         }
 
-        // Display choices
-        if (node.choices) {
-            const choiceData = node.choices.map((choice, index) => ({
-                text: choice.text,
-                index,
-            }));
+        // Always display choices (even if empty) to clear old buttons
+        const choiceData = node.choices ? node.choices.map((choice, index) => ({
+            text: choice.text,
+            index,
+        })) : [];
 
-            console.log(`ConversationController: Displaying ${choiceData.length} choices`);
-            this.host.displayChoices(choiceData);
-        } else {
-            console.log(`ConversationController: No choices to display`);
-        }
+        console.log(`ConversationController: Displaying ${choiceData.length} choices`);
+        this.host.displayChoices(choiceData);
     }
 
     /**
