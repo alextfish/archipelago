@@ -24,8 +24,9 @@ export class SpeechBubble {
      * @param glyphFrames Array of frame indices for glyphs
      * @param language Language ID (for getting speech bubble frames)
      * @param registry Glyph registry
+     * @param scale Scale factor for the bubble (default 1)
      */
-    create(glyphFrames: number[], language: string, registry: LanguageGlyphRegistry): void {
+    create(glyphFrames: number[], language: string, registry: LanguageGlyphRegistry, scale: number = 1): void {
         // Clear existing content
         this.clear();
 
@@ -47,6 +48,9 @@ export class SpeechBubble {
         // Add glyphs
         this.addGlyphs(glyphFrames, tileSize);
 
+        // Apply scale to the entire container
+        this.container.setScale(scale);
+
         // Center the container's pivot
         this.container.setSize(bubbleWidth * tileSize, bubbleHeight * tileSize);
     }
@@ -60,26 +64,33 @@ export class SpeechBubble {
         height: number,
         tileSize: number
     ): void {
-        // Top row
+        // Top row - use arrow for leftmost tile to point at speaker
         this.addBackgroundTile(frames.topLeft, 0, 0, tileSize);
         for (let x = 1; x < width - 1; x++) {
             this.addBackgroundTile(frames.topEdge, x, 0, tileSize);
         }
         this.addBackgroundTile(frames.topRight, width - 1, 0, tileSize);
 
-        // Middle row (where glyphs go)
-        this.addBackgroundTile(frames.leftEdge, 0, 1, tileSize);
-        for (let x = 1; x < width - 1; x++) {
-            this.addBackgroundTile(frames.centre, x, 1, tileSize);
+        // Middle rows (where glyphs go)
+        for (let y = 1; y < height - 1; y++) {
+            // Middle row with glyphs
+            if (y === 1) {
+                this.addBackgroundTile(frames.arrow, 0, y, tileSize);
+            } else {
+                this.addBackgroundTile(frames.leftEdge, 0, y, tileSize);
+            }
+            for (let x = 1; x < width - 1; x++) {
+                this.addBackgroundTile(frames.centre, x, y, tileSize);
+            }
+            this.addBackgroundTile(frames.rightEdge, width - 1, y, tileSize);
         }
-        this.addBackgroundTile(frames.rightEdge, width - 1, 1, tileSize);
 
         // Bottom row
-        this.addBackgroundTile(frames.bottomLeft, 0, 2, tileSize);
+        this.addBackgroundTile(frames.bottomLeft, 0, height - 1, tileSize);
         for (let x = 1; x < width - 1; x++) {
-            this.addBackgroundTile(frames.bottomEdge, x, 2, tileSize);
+            this.addBackgroundTile(frames.bottomEdge, x, height - 1, tileSize);
         }
-        this.addBackgroundTile(frames.bottomRight, width - 1, 2, tileSize);
+        this.addBackgroundTile(frames.bottomRight, width - 1, height - 1, tileSize);
     }
 
     /**

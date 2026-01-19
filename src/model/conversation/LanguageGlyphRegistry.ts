@@ -18,6 +18,7 @@ export interface SpeechBubbleFrames {
     bottomLeft: number;
     bottomEdge: number;
     bottomRight: number;
+    arrow: number;
 }
 
 export interface LanguageDefinition {
@@ -52,6 +53,7 @@ export class LanguageGlyphRegistry {
             ['not', 36],
             ['vertical', 37],
             ['horizontal', 38],
+            ['question', 39],
         ]);
 
         this.languages.set('grass', {
@@ -66,6 +68,7 @@ export class LanguageGlyphRegistry {
                 bottomLeft: 20,
                 bottomEdge: 21,
                 bottomRight: 22,
+                arrow: 16,
             },
             glyphs: grassGlyphs,
             missingGlyphFrame: 6,
@@ -88,6 +91,7 @@ export class LanguageGlyphRegistry {
                 bottomLeft: 23,
                 bottomEdge: 24,
                 bottomRight: 25,
+                arrow: 17,
             },
             glyphs: fireGlyphs,
             missingGlyphFrame: 7,

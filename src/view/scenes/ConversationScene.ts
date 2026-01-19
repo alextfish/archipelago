@@ -22,15 +22,20 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     private overlay: Phaser.GameObjects.Rectangle | null = null;
     private speechBubble: SpeechBubble | null = null;
     private choiceButtons: ChoiceButton[] = [];
-    private npcSprite: Phaser.GameObjects.Sprite | null = null;
+    private npcPortrait: Phaser.GameObjects.Container | null = null;
+    private playerPortrait: Phaser.GameObjects.Container | null = null;
+    private currentNPC: NPC | null = null;
 
     // Constants
     private readonly TILESET_KEY = 'language';
     private readonly SPEECH_BUBBLE_Y = 150;
-    private readonly CHOICES_START_Y = 350;
+    private readonly SPEECH_BUBBLE_SCALE = 2;
+    private readonly CHOICES_START_Y = 400;
     private readonly CHOICE_HEIGHT = 60;
     private readonly CHOICE_SPACING = 20;
-    private readonly CHOICE_WIDTH = 600;
+    private readonly CHOICE_WIDTH = 280; // Narrower for horizontal layout
+    private readonly PORTRAIT_SCALE = 4;
+    private readonly PORTRAIT_PADDING = 20;
 
     constructor() {
         super({ key: 'ConversationScene' });
@@ -97,6 +102,8 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     startConversation(spec: ConversationSpec, npc: NPC): void {
         console.log('ConversationScene: startConversation called', { spec, npc });
 
+        this.currentNPC = npc;
+
         // Create controller if not exists
         if (!this.controller) {
             console.log('ConversationScene: Creating new controller');
@@ -106,6 +113,9 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
                 this.appearanceRegistry
             );
         }
+
+        // Create portraits
+        this.createPortraits(npc);
 
         // Make sure the scene itself is visible
         console.log('ConversationScene: Making scene visible');
@@ -120,9 +130,7 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         this.controller.startConversation(spec, npc);
 
         console.log('ConversationScene: startConversation complete');
-    }
-
-    /**
+    }    /**
      * ConversationHost interface: Display NPC line
      */
     displayNPCLine(expression: string, glyphFrames: number[], language: string): void {
@@ -130,11 +138,11 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
 
         if (!this.speechBubble) return;
 
-        // Create/update speech bubble
-        this.speechBubble.create(glyphFrames, language, this.glyphRegistry);
+        // Create/update speech bubble with 2x scale
+        this.speechBubble.create(glyphFrames, language, this.glyphRegistry, this.SPEECH_BUBBLE_SCALE);
 
-        // Center the speech bubble horizontally
-        const bubbleWidth = (glyphFrames.length + 2) * 32;
+        // Center the speech bubble horizontally (accounting for scale)
+        const bubbleWidth = (glyphFrames.length + 2) * 32 * this.SPEECH_BUBBLE_SCALE;
         const bubbleX = (this.scale.width - bubbleWidth) / 2;
         this.speechBubble.setPosition(bubbleX, this.SPEECH_BUBBLE_Y);
         this.speechBubble.setVisible(true);
@@ -174,15 +182,16 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
             return;
         }
 
-        // Create choice buttons for actual choices
+        // Create choice buttons horizontally for multiple choices
         const centerX = this.scale.width / 2;
-        let currentY = this.CHOICES_START_Y;
+        const totalWidth = choices.length * this.CHOICE_WIDTH + (choices.length - 1) * this.CHOICE_SPACING;
+        let currentX = centerX - totalWidth / 2;
 
         for (const choice of choices) {
             const button = new ChoiceButton(
                 this,
-                centerX - this.CHOICE_WIDTH / 2,
-                currentY,
+                currentX,
+                this.CHOICES_START_Y,
                 this.CHOICE_WIDTH,
                 this.CHOICE_HEIGHT,
                 choice.text,
@@ -192,7 +201,7 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
             button.setDepth(10);
             this.choiceButtons.push(button);
 
-            currentY += this.CHOICE_HEIGHT + this.CHOICE_SPACING;
+            currentX += this.CHOICE_WIDTH + this.CHOICE_SPACING;
         }
 
         console.log('ConversationScene: Choice buttons created');
@@ -234,8 +243,12 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
             this.speechBubble.setVisible(false);
         }
 
-        if (this.npcSprite) {
-            this.npcSprite.setVisible(false);
+        // Hide portraits
+        if (this.npcPortrait) {
+            this.npcPortrait.setVisible(false);
+        }
+        if (this.playerPortrait) {
+            this.playerPortrait.setVisible(false);
         }
     }
 
@@ -278,7 +291,8 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
             button.setVisible(visible);
         }
 
-        if (this.npcSprite) this.npcSprite.setVisible(visible);
+        if (this.npcPortrait) this.npcPortrait.setVisible(visible);
+        if (this.playerPortrait) this.playerPortrait.setVisible(visible);
     }
 
     /**
@@ -295,5 +309,75 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
      */
     isConversationActive(): boolean {
         return this.controller !== null && this.controller.isActive();
+    }
+
+    /**
+     * Create NPC and player portraits
+     */
+    private createPortraits(npc: NPC): void {
+        // Clear existing portraits
+        if (this.npcPortrait) {
+            this.npcPortrait.destroy();
+        }
+        if (this.playerPortrait) {
+            this.playerPortrait.destroy();
+        }
+
+        // Get NPC appearance info
+        const appearance = this.appearanceRegistry.getAppearance(npc.appearanceId);
+        if (!appearance) {
+            console.warn(`No appearance found for NPC ${npc.appearanceId}`);
+            return;
+        }
+
+        // Create NPC portrait (top left)
+        this.npcPortrait = this.createPortrait(
+            appearance.spriteKey,
+            0, // neutral expression
+            this.PORTRAIT_PADDING,
+            this.PORTRAIT_PADDING
+        );
+
+        // Create player portrait (top right)
+        // TODO: Get player sprite key from game state
+        this.playerPortrait = this.createPortrait(
+            'builder', // Player sprite key
+            0, // neutral frame
+            this.scale.width - this.PORTRAIT_PADDING - (32 * this.PORTRAIT_SCALE),
+            this.PORTRAIT_PADDING
+        );
+    }
+
+    /**
+     * Create a single portrait sprite with border
+     */
+    private createPortrait(spriteKey: string, frame: number, x: number, y: number): Phaser.GameObjects.Container {
+        const container = this.add.container(x, y);
+
+        // Create border background (slightly larger than sprite)
+        const spriteSize = 32 * this.PORTRAIT_SCALE;
+        const borderPadding = 4;
+        const borderSize = spriteSize + (borderPadding * 2);
+
+        const border = this.add.rectangle(
+            -borderPadding,
+            -borderPadding,
+            borderSize,
+            borderSize,
+            0x333333
+        );
+        border.setStrokeStyle(4, 0xffffff);
+        border.setOrigin(0, 0);
+        container.add(border);
+
+        // Create sprite at 4x scale
+        const sprite = this.add.sprite(0, 0, spriteKey, frame);
+        sprite.setOrigin(0, 0);
+        sprite.setScale(this.PORTRAIT_SCALE);
+        container.add(sprite);
+
+        container.setDepth(15); // Above other UI elements
+
+        return container;
     }
 }
