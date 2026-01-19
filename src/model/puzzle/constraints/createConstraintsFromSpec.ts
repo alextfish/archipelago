@@ -8,6 +8,7 @@ import { IslandDirectionalBridgeConstraint } from './IslandDirectionalBridgeCons
 import { IslandPassingBridgeCountConstraint } from './IslandPassingBridgeCountConstraint';
 import { IslandVisibilityConstraint } from './IslandVisibilityConstraint';
 import { EnclosedAreaSizeConstraint } from './EnclosedAreaSizeConstraint';
+import { BridgeMustCoverIslandConstraint } from './BridgeMustCoverIslandConstraint';
 
 
 export function createConstraintsFromSpec(constraints: { type: string; params?: any; }[]): Constraint[] {
@@ -36,6 +37,8 @@ export function createConstraintsFromSpec(constraints: { type: string; params?: 
         return IslandVisibilityConstraint.fromSpec(spec.params);
       case "EnclosedAreaSizeConstraint":
         return EnclosedAreaSizeConstraint.fromSpec(spec.params);
+      case "BridgeMustCoverIslandConstraint":
+        return BridgeMustCoverIslandConstraint.fromSpec(spec.params);
 
       // Add more cases as needed for other constraint types.
       default:

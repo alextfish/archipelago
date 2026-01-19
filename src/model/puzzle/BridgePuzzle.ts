@@ -154,6 +154,13 @@ export class BridgePuzzle {
     const bt = this.inventory.bridgeTypes.find(b => b.id === typeId);
     if (!bt) return true; // unknown type — allow by default
 
+    // Check if bridge would cross any islands (unless it can cover islands)
+    if (!bt.canCoverIsland && !bt.mustCoverIsland) {
+      if (this.bridgeWouldCrossIslands(startIsland, endIsland)) {
+        return false;
+      }
+    }
+
     if (bt.allowsSpan) {
       return bt.allowsSpan({ x: startIsland.x, y: startIsland.y }, { x: endIsland.x, y: endIsland.y });
     }
@@ -165,6 +172,41 @@ export class BridgePuzzle {
     const dist = Math.sqrt(dx * dx + dy * dy);
     return Math.abs(dist - len) <= 0.01;
   }
+
+  /**
+   * Check if a bridge between two islands would cross over any other islands.
+   * Returns true if any island lies strictly between the start and end islands.
+   */
+  private bridgeWouldCrossIslands(
+    startIsland: Island,
+    endIsland: Island
+  ): boolean {
+    for (const island of this.islands) {
+      // Skip the start and end islands themselves
+      if (island.id === startIsland.id || island.id === endIsland.id) continue;
+
+      // Check if bridge is horizontal and would pass over this island
+      if (startIsland.y === endIsland.y && startIsland.y === island.y) {
+        const minX = Math.min(startIsland.x, endIsland.x);
+        const maxX = Math.max(startIsland.x, endIsland.x);
+        if (island.x > minX && island.x < maxX) {
+          return true;
+        }
+      }
+
+      // Check if bridge is vertical and would pass over this island
+      if (startIsland.x === endIsland.x && startIsland.x === island.x) {
+        const minY = Math.min(startIsland.y, endIsland.y);
+        const maxY = Math.max(startIsland.y, endIsland.y);
+        if (island.y > minY && island.y < maxY) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   takeBridgeOfType(typeId: string): Bridge | undefined {
     return this.inventory.takeBridge(typeId);
   }

@@ -173,13 +173,14 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     let isEnclosed = true;
     const cells: string[] = [];
 
-    while (queue.length > 0) {
+    while (queue.length > 0 && isEnclosed) {
       const { x, y } = queue.shift()!;
       cells.push(cellKey(x, y));
 
       // Check if we've reached the boundary of the puzzle
       if (this.isOutOfBounds(x, y, puzzle)) {
         isEnclosed = false;
+        break; // Exit early once we find an out-of-bounds cell
       }
 
       // Try to expand in all four directions
@@ -200,7 +201,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
         // Stop expanding if we go outside the puzzle bounds
         if (this.isOutOfBounds(nx, ny, puzzle)) {
           isEnclosed = false;
-          continue;
+          break; // Exit early once we find an out-of-bounds cell
         }
 
         // Check if the next cell is occupied (bridge or island) using the matrix
