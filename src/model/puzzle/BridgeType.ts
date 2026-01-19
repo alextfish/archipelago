@@ -5,6 +5,8 @@ export interface BridgeType {
   colour?: string; // default black
   width?: number;
   style?: string;
+  canCoverIsland?: boolean; // Ruins: allows bridge to go over islands
+  mustCoverIsland?: boolean; // Ruins: requires bridge to go over at least one island
   hasLength?(): boolean;
   /** Returns true when this bridge type allows a span between the two grid coordinates. */
   allowsSpan?(start: { x: number; y: number }, end: { x: number; y: number }): boolean;
@@ -19,12 +21,16 @@ export function createBridgeType(params: Partial<BridgeType>): BridgeType {
   const colour = params.colour ?? "black";
   const width = params.width ?? 1.0;
   const style = params.style ?? "normal";
+  const canCoverIsland = params.canCoverIsland ?? false;
+  const mustCoverIsland = params.mustCoverIsland ?? false;
   return {
     id,
     length,
     colour,
     width,
     style,
+    canCoverIsland,
+    mustCoverIsland,
     hasLength: () => length !== -1,
     allowsSpan: (start: { x: number; y: number }, end: { x: number; y: number }) => {
       if (length === -1) return true;
