@@ -87,7 +87,7 @@ export class MustTouchAHorizontalBridge extends GridCellConstraint {
             message: ok
                 ? undefined
                 : `No horizontal bridge adjacent to space (${this.x}, ${this.y})`,
-            glyphMessage: ok ? undefined : "not adjacent bridge",
+            glyphMessage: ok ? undefined : "no adjacent bridge",
         };
     }
 }
@@ -112,7 +112,7 @@ export class MustTouchAVerticalBridge extends GridCellConstraint {
             message: ok
                 ? undefined
                 : `No vertical bridge adjacent to space (${this.x}, ${this.y})`,
-            glyphMessage: ok ? undefined : "not adjacent bridge",
+            glyphMessage: ok ? undefined : "no adjacent bridge",
         };
     }
 }

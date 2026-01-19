@@ -62,7 +62,7 @@ export class IslandMustBeCoveredConstraint extends Constraint {
       satisfied: ok,
       affectedElements: ok ? coveringBridges.map(b => b.id) : [this.islandId],
       message: ok ? undefined : `Island ${this.islandId} at (${island.x}, ${island.y}) must be covered by a bridge`,
-      glyphMessage: ok ? undefined : "not bridge over island"
+      glyphMessage: ok ? undefined : "no bridge over island"
     };
   }
 }
