@@ -49,7 +49,7 @@ describe("BridgeMustCoverIslandConstraint", () => {
 
     expect(result.satisfied).toBe(false);
     expect(result.affectedElements).toContain("b1");
-    expect(result.message).toContain("must cover islands");
+    expect(result.message).toContain("must cover island");
   });
 
   it("passes when bridge without mustCoverIsland does not cover an island", () => {

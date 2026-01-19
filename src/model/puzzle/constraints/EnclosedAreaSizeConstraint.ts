@@ -180,7 +180,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
       // Check if we've reached the boundary of the puzzle
       if (this.isOutOfBounds(x, y, puzzle)) {
         isEnclosed = false;
-        break; // Exit early once we find an out-of-bounds cell
+        break; // Exit the while loop immediately
       }
 
       // Try to expand in all four directions
@@ -201,7 +201,8 @@ export class EnclosedAreaSizeConstraint extends Constraint {
         // Stop expanding if we go outside the puzzle bounds
         if (this.isOutOfBounds(nx, ny, puzzle)) {
           isEnclosed = false;
-          break; // Exit early once we find an out-of-bounds cell
+          // Continue to process other directions but will exit while loop on next iteration
+          continue;
         }
 
         // Check if the next cell is occupied (bridge or island) using the matrix
