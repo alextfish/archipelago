@@ -107,6 +107,52 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     });
   }
 
+  /**
+   * Create a matrix marking occupied cells (1 = bridge or island, 0 = empty)
+   */
+  private createOccupancyMatrix(puzzle: BridgePuzzle): number[][] {
+    const matrix: number[][] = [];
+    
+    // Initialize matrix with 0s
+    for (let y = 0; y <= puzzle.height; y++) {
+      matrix[y] = new Array(puzzle.width + 1).fill(0);
+    }
+
+    // Mark islands as occupied
+    for (const island of puzzle.islands) {
+      matrix[island.y][island.x] = 1;
+    }
+
+    // Mark bridge positions as occupied
+    for (const bridge of puzzle.placedBridges) {
+      if (!bridge.start || !bridge.end) continue;
+
+      const startX = bridge.start.x;
+      const startY = bridge.start.y;
+      const endX = bridge.end.x;
+      const endY = bridge.end.y;
+
+      // Mark all cells covered by the bridge
+      if (startY === endY) {
+        // Horizontal bridge
+        const minX = Math.min(startX, endX);
+        const maxX = Math.max(startX, endX);
+        for (let x = minX; x <= maxX; x++) {
+          matrix[startY][x] = 1;
+        }
+      } else if (startX === endX) {
+        // Vertical bridge
+        const minY = Math.min(startY, endY);
+        const maxY = Math.max(startY, endY);
+        for (let y = minY; y <= maxY; y++) {
+          matrix[y][startX] = 1;
+        }
+      }
+    }
+
+    return matrix;
+  }
+
   private isOutOfBounds(x: number, y: number, puzzle: BridgePuzzle): boolean {
     return x <= 0 || x >= puzzle.width || y <= 0 || y >= puzzle.height;
   }
@@ -116,6 +162,9 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     startX: number, 
     startY: number
   ): { size: number; isEnclosed: boolean; cells: string[] } {
+    // Create occupancy matrix once
+    const matrix = this.createOccupancyMatrix(puzzle);
+    
     const visited = new Set<string>();
     const queue: Array<{ x: number; y: number }> = [{ x: startX, y: startY }];
     const cellKey = (x: number, y: number) => `${x},${y}`;
@@ -154,20 +203,10 @@ export class EnclosedAreaSizeConstraint extends Constraint {
           continue;
         }
 
-        // Check if there's a bridge blocking this direction
-        const isBlocked = this.isBridgeBlocking(puzzle, x, y, nx, ny);
-        
-        if (isBlocked) continue;
-
-        // Check if the next cell is an island
-        const isIsland = puzzle.islands.some(i => i.x === nx && i.y === ny);
-        
-        if (isIsland) continue;
-
-        // Check if the next cell is covered by a bridge
-        const isCovered = this.isCellCoveredByBridge(puzzle, nx, ny);
-        
-        if (isCovered) continue;
+        // Check if the next cell is occupied (bridge or island) using the matrix
+        if (matrix[ny][nx] === 1) {
+          continue;
+        }
 
         // Add to queue
         visited.add(key);
@@ -176,45 +215,5 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     }
 
     return { size: cells.length, isEnclosed, cells };
-  }
-
-  private isBridgeBlocking(
-    puzzle: BridgePuzzle,
-    fromX: number,
-    fromY: number,
-    toX: number,
-    toY: number
-  ): boolean {
-    // Check if there's a bridge between these two cells
-    const dx = toX - fromX;
-    const dy = toY - fromY;
-
-    return puzzle.placedBridges.some(bridge => {
-      if (!bridge.start || !bridge.end) return false;
-
-      if (dx !== 0) {
-        // Moving horizontally, check for vertical bridges
-        if (bridge.start.x !== bridge.end.x) return false; // Not vertical
-        
-        const bridgeX = bridge.start.x;
-        const minY = Math.min(bridge.start.y, bridge.end.y);
-        const maxY = Math.max(bridge.start.y, bridge.end.y);
-
-        // Bridge is between the cells if it's on the boundary
-        const boundary = dx > 0 ? toX : fromX;
-        return bridgeX === boundary && fromY >= minY && fromY <= maxY;
-      } else {
-        // Moving vertically, check for horizontal bridges
-        if (bridge.start.y !== bridge.end.y) return false; // Not horizontal
-        
-        const bridgeY = bridge.start.y;
-        const minX = Math.min(bridge.start.x, bridge.end.x);
-        const maxX = Math.max(bridge.start.x, bridge.end.x);
-
-        // Bridge is between the cells if it's on the boundary
-        const boundary = dy > 0 ? toY : fromY;
-        return bridgeY === boundary && fromX >= minX && fromX <= maxX;
-      }
-    });
   }
 }

@@ -8,15 +8,15 @@ import type { Island } from '../Island';
  * that pass directly above, below, left, or right of them (not connected to them).
  * 
  * Direction variants:
- * - "above": count bridges passing horizontally above the island
- * - "below": count bridges passing horizontally below the island
- * - "left": count bridges passing vertically to the left of the island
- * - "right": count bridges passing vertically to the right of the island
- * - "all": total count of bridges passing directly adjacent in any direction
+ * - "above": count bridges passing horizontally at any distance above the island
+ * - "below": count bridges passing horizontally at any distance below the island
+ * - "left": count bridges passing vertically at any distance to the left of the island
+ * - "right": count bridges passing vertically at any distance to the right of the island
+ * - "adjacent": total count of bridges passing directly adjacent (one cell away) in any direction
  */
 export class IslandPassingBridgeCountConstraint extends Constraint {
   private islandId: string;
-  private direction: 'above' | 'below' | 'left' | 'right' | 'all';
+  private direction: 'above' | 'below' | 'left' | 'right' | 'adjacent';
   private expectedCount: number;
 
   constructor(islandId: string, direction: string, expectedCount: number) {
@@ -102,11 +102,11 @@ export class IslandPassingBridgeCountConstraint extends Constraint {
       // Check direction
       switch (this.direction) {
         case 'above':
-          return bridgeY === island.y - 1;
+          return bridgeY < island.y; // Any bridge above the island
         case 'below':
-          return bridgeY === island.y + 1;
-        case 'all':
-          return bridgeY === island.y - 1 || bridgeY === island.y + 1;
+          return bridgeY > island.y; // Any bridge below the island
+        case 'adjacent':
+          return bridgeY === island.y - 1 || bridgeY === island.y + 1; // One cell away
         default:
           return false;
       }
@@ -124,11 +124,11 @@ export class IslandPassingBridgeCountConstraint extends Constraint {
       // Check direction
       switch (this.direction) {
         case 'left':
-          return bridgeX === island.x - 1;
+          return bridgeX < island.x; // Any bridge to the left of the island
         case 'right':
-          return bridgeX === island.x + 1;
-        case 'all':
-          return bridgeX === island.x - 1 || bridgeX === island.x + 1;
+          return bridgeX > island.x; // Any bridge to the right of the island
+        case 'adjacent':
+          return bridgeX === island.x - 1 || bridgeX === island.x + 1; // One cell away
         default:
           return false;
       }

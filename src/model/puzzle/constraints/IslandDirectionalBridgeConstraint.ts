@@ -9,8 +9,8 @@ import type { Bridge } from '../Bridge';
  * two bridges in the same direction (double bridges).
  * 
  * Positive constraint variants:
- * - "double_horizontal": requires exactly 2 bridges left OR exactly 2 bridges right
- * - "double_vertical": requires exactly 2 bridges up OR exactly 2 bridges down
+ * - "double_horizontal": requires exactly 2 bridges in same direction (left OR right) OR one left AND one right
+ * - "double_vertical": requires exactly 2 bridges in same direction (up OR down) OR one up AND one down
  * - "double_any_direction": requires 2 bridges in any single direction
  * 
  * Negative constraint variants:
@@ -53,16 +53,16 @@ export class IslandDirectionalBridgeConstraint extends Constraint {
 
     switch (this.constraintType) {
       case 'double_horizontal':
-        ok = counts.left === 2 || counts.right === 2;
+        ok = counts.left === 2 || counts.right === 2 || (counts.left === 1 && counts.right === 1);
         if (!ok) {
-          message = `Island ${this.islandId} requires 2 bridges in same horizontal direction (left: ${counts.left}, right: ${counts.right})`;
+          message = `Island ${this.islandId} requires 2 bridges in same horizontal direction OR one left and one right (left: ${counts.left}, right: ${counts.right})`;
         }
         break;
 
       case 'double_vertical':
-        ok = counts.up === 2 || counts.down === 2;
+        ok = counts.up === 2 || counts.down === 2 || (counts.up === 1 && counts.down === 1);
         if (!ok) {
-          message = `Island ${this.islandId} requires 2 bridges in same vertical direction (up: ${counts.up}, down: ${counts.down})`;
+          message = `Island ${this.islandId} requires 2 bridges in same vertical direction OR one up and one down (up: ${counts.up}, down: ${counts.down})`;
         }
         break;
 

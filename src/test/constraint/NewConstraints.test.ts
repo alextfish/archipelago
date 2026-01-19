@@ -184,7 +184,7 @@ describe("IslandDirectionalBridgeConstraint", () => {
       expect(result.satisfied).toBe(true);
     });
 
-    it("fails when island has only 1 bridge in each horizontal direction", () => {
+    it("passes when island has 1 bridge in each horizontal direction", () => {
       const islands = [
         createIsland("A", 2, 2),
         createIsland("B", 1, 2),
@@ -206,8 +206,7 @@ describe("IslandDirectionalBridgeConstraint", () => {
       const constraint = new IslandDirectionalBridgeConstraint("A", "double_horizontal");
       const result = constraint.check(puzzle as any);
 
-      expect(result.satisfied).toBe(false);
-      expect(result.message).toContain("horizontal direction");
+      expect(result.satisfied).toBe(true); // Now passes because one left + one right is allowed
     });
   });
 
@@ -340,6 +339,50 @@ describe("IslandPassingBridgeCountConstraint", () => {
 
     expect(result.satisfied).toBe(true);
   });
+
+  it("counts bridges at any distance above the island", () => {
+    const islands = [
+      { id: "A", x: 2, y: 5 },
+      { id: "B", x: 1, y: 2 },
+      { id: "C", x: 3, y: 2 },
+      { id: "D", x: 1, y: 1 },
+      { id: "E", x: 3, y: 1 }
+    ];
+
+    const bridges = [
+      { id: "b1", start: { x: 1, y: 2 }, end: { x: 3, y: 2 }, type: { id: "t1" } }, // 3 cells above
+      { id: "b2", start: { x: 1, y: 1 }, end: { x: 3, y: 1 }, type: { id: "t2" } }  // 4 cells above
+    ];
+
+    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges, width: 5, height: 7 });
+
+    const constraint = new IslandPassingBridgeCountConstraint("A", "above", 2);
+    const result = constraint.check(puzzle as any);
+
+    expect(result.satisfied).toBe(true);
+  });
+
+  it("uses 'adjacent' to count only directly adjacent bridges", () => {
+    const islands = [
+      { id: "A", x: 2, y: 3 },
+      { id: "B", x: 1, y: 2 },
+      { id: "C", x: 3, y: 2 },
+      { id: "D", x: 1, y: 1 },
+      { id: "E", x: 3, y: 1 }
+    ];
+
+    const bridges = [
+      { id: "b1", start: { x: 1, y: 2 }, end: { x: 3, y: 2 }, type: { id: "t1" } }, // Adjacent (1 cell above)
+      { id: "b2", start: { x: 1, y: 1 }, end: { x: 3, y: 1 }, type: { id: "t2" } }  // Not adjacent (2 cells above)
+    ];
+
+    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges, width: 5, height: 5 });
+
+    const constraint = new IslandPassingBridgeCountConstraint("A", "adjacent", 1);
+    const result = constraint.check(puzzle as any);
+
+    expect(result.satisfied).toBe(true);
+  });
 });
 
 describe("IslandVisibilityConstraint", () => {
@@ -355,7 +398,7 @@ describe("IslandVisibilityConstraint", () => {
       { id: "b2", start: { x: 2, y: 1 }, end: { x: 3, y: 1 }, type: { id: "t2" } }
     ];
 
-    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges });
+    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges, width: 5, height: 3 });
 
     const constraint = new IslandVisibilityConstraint("A", 2);
     const result = constraint.check(puzzle as any);
@@ -373,7 +416,7 @@ describe("IslandVisibilityConstraint", () => {
       { id: "b1", start: { x: 1, y: 1 }, end: { x: 2, y: 1 }, type: { id: "t1" } }
     ];
 
-    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges });
+    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges, width: 4, height: 3 });
 
     const constraint = new IslandVisibilityConstraint("A", 2);
     const result = constraint.check(puzzle as any);
@@ -397,7 +440,7 @@ describe("IslandVisibilityConstraint", () => {
       { id: "b2", start: { x: 3, y: 1 }, end: { x: 4, y: 1 }, type: { id: "t2" } }
     ];
 
-    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges });
+    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges, width: 6, height: 3 });
 
     const constraint = new IslandVisibilityConstraint("A", 1);
     const result = constraint.check(puzzle as any);
@@ -421,7 +464,7 @@ describe("IslandVisibilityConstraint", () => {
       { id: "b4", start: { x: 2, y: 2 }, end: { x: 2, y: 3 }, type: { id: "t4" } }
     ];
 
-    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges });
+    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges, width: 5, height: 5 });
 
     const constraint = new IslandVisibilityConstraint("A", 4);
     const result = constraint.check(puzzle as any);

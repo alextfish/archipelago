@@ -85,44 +85,44 @@ export class IslandVisibilityConstraint extends Constraint {
     dy: number
   ): Set<string> {
     const visible = new Set<string>();
-    let currentIsland = sourceIsland;
+    let currentX = sourceIsland.x;
+    let currentY = sourceIsland.y;
+    let previousIsland = sourceIsland;
 
+    // Keep stepping in the direction until we hit the bounds
     while (true) {
-      // Find the closest island in this direction
-      const candidateIslands = puzzle.islands.filter(i => {
-        if (i.id === currentIsland.id) return false;
-        
-        if (dx !== 0) {
-          // Horizontal direction: same y, appropriate x
-          return i.y === currentIsland.y && 
-                 ((dx > 0 && i.x > currentIsland.x) || (dx < 0 && i.x < currentIsland.x));
-        } else {
-          // Vertical direction: same x, appropriate y
-          return i.x === currentIsland.x && 
-                 ((dy > 0 && i.y > currentIsland.y) || (dy < 0 && i.y < currentIsland.y));
-        }
-      });
+      // Step in the direction
+      currentX += dx;
+      currentY += dy;
 
-      if (candidateIslands.length === 0) break;
-
-      // Find the closest one
-      const nextIsland = candidateIslands.reduce((closest, candidate) => {
-        const closestDist = Math.abs(closest.x - currentIsland.x) + Math.abs(closest.y - currentIsland.y);
-        const candidateDist = Math.abs(candidate.x - currentIsland.x) + Math.abs(candidate.y - currentIsland.y);
-        return candidateDist < closestDist ? candidate : closest;
-      });
-
-      // Check if there's a bridge connecting current to next
-      const bridgeExists = this.hasBridgeBetween(puzzle, currentIsland, nextIsland);
-      
-      if (!bridgeExists) break;
-
-      // This island is visible
-      if (nextIsland.id !== sourceIsland.id) {
-        visible.add(nextIsland.id);
+      // Check bounds
+      if (currentX <= 0 || currentX >= puzzle.width || currentY <= 0 || currentY >= puzzle.height) {
+        break;
       }
 
-      currentIsland = nextIsland;
+      // Find island at current position
+      const islandAtPosition = puzzle.islands.find(i => i.x === currentX && i.y === currentY);
+      
+      if (!islandAtPosition) {
+        // No island at this position, continue stepping
+        continue;
+      }
+
+      // Found an island - check if there's a bridge connecting to previous island
+      const bridgeExists = this.hasBridgeBetween(puzzle, previousIsland, islandAtPosition);
+      
+      if (!bridgeExists) {
+        // No bridge connection, stop searching in this direction
+        break;
+      }
+
+      // This island is visible
+      if (islandAtPosition.id !== sourceIsland.id) {
+        visible.add(islandAtPosition.id);
+      }
+
+      // Move to this island and continue
+      previousIsland = islandAtPosition;
     }
 
     return visible;
