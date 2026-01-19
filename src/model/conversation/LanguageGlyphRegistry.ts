@@ -54,6 +54,25 @@ export class LanguageGlyphRegistry {
             ['vertical', 37],
             ['horizontal', 38],
             ['question', 39],
+            // Constraint validation glyphs
+            ['not-enough', 40],
+            ['too-many', 41],
+            ['must-not', 42],
+            ['area', 43],
+            ['enclosed', 44],
+            ['island', 45],
+            ['connected', 46],
+            ['over', 47],
+            ['under', 48],
+            ['left-of', 49],
+            ['right-of', 50],
+            ['above', 51],
+            ['below', 52],
+            // Color glyphs
+            ['red', 60],
+            ['blue', 61],
+            ['green', 62],
+            ['yellow', 63],
         ]);
 
         this.languages.set('grass', {

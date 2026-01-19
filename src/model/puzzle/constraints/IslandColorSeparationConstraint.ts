@@ -84,10 +84,17 @@ export class IslandColorSeparationConstraint extends Constraint {
     this.violations = violations;
     const ok = violations.length === 0;
 
+    let glyphMessage: string | undefined;
+    if (!ok) {
+      // Generate glyph message like "red island must-not connected blue island"
+      glyphMessage = `${this.color1} island must-not connected ${this.color2} island`;
+    }
+
     return {
       satisfied: ok,
       affectedElements: violations,
-      message: ok ? undefined : `Islands of colour ${this.color1} must not connect to islands of colour ${this.color2}`
+      message: ok ? undefined : `Islands of colour ${this.color1} must not connect to islands of colour ${this.color2}`,
+      glyphMessage
     };
   }
 

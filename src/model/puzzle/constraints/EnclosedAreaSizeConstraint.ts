@@ -55,7 +55,8 @@ export class EnclosedAreaSizeConstraint extends Constraint {
         satisfied: ok,
         affectedElements: ok ? [] : [`${this.x},${this.y}`],
         message: ok ? undefined : 
-          `Cell (${this.x}, ${this.y}) with size=0 must be covered by a bridge or open to outside, but is in an enclosed area`
+          `Cell (${this.x}, ${this.y}) with size=0 must be covered by a bridge or open to outside, but is in an enclosed area`,
+        glyphMessage: ok ? undefined : "area must-not enclosed"
       };
     }
 
@@ -66,7 +67,8 @@ export class EnclosedAreaSizeConstraint extends Constraint {
       return {
         satisfied: false,
         affectedElements: [`${this.x},${this.y}`],
-        message: `Cell (${this.x}, ${this.y}) is covered by a bridge but should be in an enclosed area of size ${this.expectedSize}`
+        message: `Cell (${this.x}, ${this.y}) is covered by a bridge but should be in an enclosed area of size ${this.expectedSize}`,
+        glyphMessage: "must-not bridge over me"
       };
     }
 
@@ -75,13 +77,25 @@ export class EnclosedAreaSizeConstraint extends Constraint {
 
     this.violations = ok ? [] : [`${this.x},${this.y}`];
 
+    let glyphMessage: string | undefined;
+    if (!ok) {
+      if (!areaInfo.isEnclosed) {
+        glyphMessage = "area not enclosed";
+      } else if (areaInfo.size > this.expectedSize) {
+        glyphMessage = "too-many enclosed area";
+      } else {
+        glyphMessage = "not-enough enclosed area";
+      }
+    }
+
     return {
       satisfied: ok,
       affectedElements: ok ? areaInfo.cells : [`${this.x},${this.y}`, ...areaInfo.cells],
       message: ok ? undefined : 
         areaInfo.isEnclosed 
           ? `Cell (${this.x}, ${this.y}) is in an enclosed area of size ${areaInfo.size}, but requires size ${this.expectedSize}`
-          : `Cell (${this.x}, ${this.y}) is not in a fully enclosed area (requires size ${this.expectedSize})`
+          : `Cell (${this.x}, ${this.y}) is not in a fully enclosed area (requires size ${this.expectedSize})`,
+      glyphMessage
     };
   }
 

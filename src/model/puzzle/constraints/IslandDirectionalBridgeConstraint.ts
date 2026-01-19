@@ -50,12 +50,14 @@ export class IslandDirectionalBridgeConstraint extends Constraint {
 
     let ok = false;
     let message: string | undefined;
+    let glyphMessage: string | undefined;
 
     switch (this.constraintType) {
       case 'double_horizontal':
         ok = counts.left === 2 || counts.right === 2 || (counts.left === 1 && counts.right === 1);
         if (!ok) {
           message = `Island ${this.islandId} requires 2 bridges in same horizontal direction OR one left and one right (left: ${counts.left}, right: ${counts.right})`;
+          glyphMessage = "not-enough horizontal bridge";
         }
         break;
 
@@ -63,6 +65,7 @@ export class IslandDirectionalBridgeConstraint extends Constraint {
         ok = counts.up === 2 || counts.down === 2 || (counts.up === 1 && counts.down === 1);
         if (!ok) {
           message = `Island ${this.islandId} requires 2 bridges in same vertical direction OR one up and one down (up: ${counts.up}, down: ${counts.down})`;
+          glyphMessage = "not-enough vertical bridge";
         }
         break;
 
@@ -70,6 +73,7 @@ export class IslandDirectionalBridgeConstraint extends Constraint {
         ok = counts.left === 2 || counts.right === 2 || counts.up === 2 || counts.down === 2;
         if (!ok) {
           message = `Island ${this.islandId} requires 2 bridges in any single direction (left: ${counts.left}, right: ${counts.right}, up: ${counts.up}, down: ${counts.down})`;
+          glyphMessage = "not-enough bridge";
         }
         break;
 
@@ -77,6 +81,7 @@ export class IslandDirectionalBridgeConstraint extends Constraint {
         ok = counts.left !== 2 && counts.right !== 2 && counts.up !== 2 && counts.down !== 2;
         if (!ok) {
           message = `Island ${this.islandId} must NOT have 2 bridges in any single direction (left: ${counts.left}, right: ${counts.right}, up: ${counts.up}, down: ${counts.down})`;
+          glyphMessage = "too-many bridge";
         }
         break;
 
@@ -93,7 +98,8 @@ export class IslandDirectionalBridgeConstraint extends Constraint {
     return {
       satisfied: ok,
       affectedElements: ok ? [] : [this.islandId, ...bridges.map(b => b.id)],
-      message
+      message,
+      glyphMessage
     };
   }
 
