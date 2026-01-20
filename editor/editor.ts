@@ -84,10 +84,10 @@ const CONSTRAINT_TYPES = [
     {
         type: 'IslandColorSeparationConstraint',
         name: 'Island Colour Separation',
-        description: 'Islands must be separated by bridge colours',
+        description: 'Islands of different colours must be separated',
         needsParams: true,
         needsCell: false,
-        params: [{ name: 'island1Id', type: 'string' }, { name: 'island2Id', type: 'string' }]
+        params: [{ name: 'colour1', type: 'string' }, { name: 'colour2', type: 'string' }]
     },
     {
         type: 'IslandDirectionalBridgeConstraint',
@@ -103,23 +103,27 @@ const CONSTRAINT_TYPES = [
         description: 'Number of bridges passing by an island',
         needsParams: true,
         needsCell: false,
-        params: [{ name: 'islandId', type: 'string' }, { name: 'count', type: 'number' }]
+        params: [
+            { name: 'islandId', type: 'string' }, 
+            { name: 'direction', type: 'string' },
+            { name: 'expectedCount', type: 'number' }
+        ]
     },
     {
         type: 'IslandVisibilityConstraint',
         name: 'Island Visibility',
-        description: 'Islands must be visible from each other',
+        description: 'Islands must be visible from a specific island',
         needsParams: true,
         needsCell: false,
-        params: [{ name: 'island1Id', type: 'string' }, { name: 'island2Id', type: 'string' }]
+        params: [{ name: 'islandId', type: 'string' }, { name: 'visibleCount', type: 'number' }]
     },
     {
         type: 'EnclosedAreaSizeConstraint',
         name: 'Enclosed Area Size',
         description: 'Size of enclosed areas created by bridges',
         needsParams: true,
-        needsCell: false,
-        params: [{ name: 'minSize', type: 'number' }, { name: 'maxSize', type: 'number' }]
+        needsCell: true,
+        params: [{ name: 'size', type: 'number' }]
     },
     {
         type: 'BridgeMustCoverIslandConstraint',
