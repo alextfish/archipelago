@@ -300,6 +300,24 @@ h3 {
     border-radius: 4px;
     position: relative;
     font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.bridge-type-item:hover {
+    background: #e9ecef;
+    border-color: #3498db;
+}
+
+.bridge-type-item.selected {
+    background: #3498db;
+    color: white;
+    border-color: #2980b9;
+}
+
+.bridge-type-item.selected input {
+    background: white;
+    color: #333;
 }
 
 .bridge-type-item .remove-btn, .island-item .remove-btn {
