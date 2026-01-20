@@ -3,7 +3,7 @@ import type { Constraint } from './Constraint';
 import { MustTouchAHorizontalBridge, MustTouchAVerticalBridge } from './GridCellConstraints';
 import { NoCrossingConstraint } from './NoCrossingConstraint';
 import { IslandMustBeCoveredConstraint } from './IslandMustBeCoveredConstraint';
-import { IslandColorSeparationConstraint } from './IslandColorSeparationConstraint';
+import { IslandColourSeparationConstraint } from './IslandColourSeparationConstraint';
 import { IslandDirectionalBridgeConstraint } from './IslandDirectionalBridgeConstraint';
 import { IslandPassingBridgeCountConstraint } from './IslandPassingBridgeCountConstraint';
 import { IslandVisibilityConstraint } from './IslandVisibilityConstraint';
@@ -27,8 +27,8 @@ export function createConstraintsFromSpec(constraints: { type: string; params?: 
         return MustTouchAVerticalBridge.fromSpec(spec.params);
       case "IslandMustBeCoveredConstraint":
         return IslandMustBeCoveredConstraint.fromSpec(spec.params);
-      case "IslandColorSeparationConstraint":
-        return IslandColorSeparationConstraint.fromSpec(spec.params);
+      case "IslandColourSeparationConstraint":
+        return IslandColourSeparationConstraint.fromSpec(spec.params);
       case "IslandDirectionalBridgeConstraint":
         return IslandDirectionalBridgeConstraint.fromSpec(spec.params);
       case "IslandPassingBridgeCountConstraint":

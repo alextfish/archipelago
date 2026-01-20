@@ -11,18 +11,18 @@ import type { Island } from '../Island';
  * and ensures that islands of different colours never appear in the same
  * connected component.
  */
-export class IslandColorSeparationConstraint extends Constraint {
-  private color1: string;
-  private color2: string;
+export class IslandColourSeparationConstraint extends Constraint {
+  private colour1: string;
+  private colour2: string;
 
-  constructor(color1: string, color2: string) {
+  constructor(colour1: string, colour2: string) {
     super();
-    this.color1 = color1;
-    this.color2 = color2;
+    this.colour1 = colour1;
+    this.colour2 = colour2;
   }
 
-  static fromSpec(params: { color1: string; color2: string; [key: string]: any }): IslandColorSeparationConstraint {
-    return new IslandColorSeparationConstraint(params.color1, params.color2);
+  static fromSpec(params: { colour1: string; colour2: string; [key: string]: any }): IslandColourSeparationConstraint {
+    return new IslandColourSeparationConstraint(params.colour1, params.colour2);
   }
 
   check(puzzle: BridgePuzzle): ConstraintResult {
@@ -72,10 +72,10 @@ export class IslandColorSeparationConstraint extends Constraint {
       }
 
       // Check if this component contains islands of both colours
-      const hasColor1 = component.some(i => this.getIslandColor(i) === this.color1);
-      const hasColor2 = component.some(i => this.getIslandColor(i) === this.color2);
+      const hasColour1 = component.some(i => this.getIslandColour(i) === this.colour1);
+      const hasColour2 = component.some(i => this.getIslandColour(i) === this.colour2);
 
-      if (hasColor1 && hasColor2) {
+      if (hasColour1 && hasColour2) {
         // Violation: this component mixes both colours
         violations.push(...component.map(i => i.id));
       }
@@ -87,28 +87,28 @@ export class IslandColorSeparationConstraint extends Constraint {
     let glyphMessage: string | undefined;
     if (!ok) {
       // Generate glyph message like "red island must-not connected blue island"
-      glyphMessage = `${this.color1} island must-not connected ${this.color2} island`;
+      glyphMessage = `${this.colour1} island must-not connected ${this.colour2} island`;
     }
 
     return {
       satisfied: ok,
       affectedElements: violations,
-      message: ok ? undefined : `Islands of colour ${this.color1} must not connect to islands of colour ${this.color2}`,
+      message: ok ? undefined : `Islands of colour ${this.colour1} must not connect to islands of colour ${this.colour2}`,
       glyphMessage
     };
   }
 
   /**
    * Extract colour from island constraints.
-   * Expects a constraint like "color=red" or "colour=blue"
+   * Expects a constraint like "colour=red" or "colour=blue"
    */
-  private getIslandColor(island: Island): string | undefined {
-    const colorConstraint = island.constraints?.find(c => 
-      c.startsWith('color=') || c.startsWith('colour=')
+  private getIslandColour(island: Island): string | undefined {
+    const colourConstraint = island.constraints?.find(c => 
+      c.startsWith('colour=')
     );
     
-    if (!colorConstraint) return undefined;
+    if (!colourConstraint) return undefined;
     
-    return colorConstraint.split('=')[1];
+    return colourConstraint.split('=')[1];
   }
 }

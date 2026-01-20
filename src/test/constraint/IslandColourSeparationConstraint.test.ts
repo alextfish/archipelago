@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { IslandColorSeparationConstraint } from '@model/puzzle/constraints/IslandColorSeparationConstraint';
+import { IslandColourSeparationConstraint } from '@model/puzzle/constraints/IslandColourSeparationConstraint';
 import { makeMockPuzzle } from "../helpers/MockFactories";
 
-describe("IslandColorSeparationConstraint", () => {
+describe("IslandColourSeparationConstraint", () => {
   it("passes when islands of different colours are not connected", () => {
     const islands = [
-      { id: "A", x: 1, y: 1, constraints: ["color=red"] },
-      { id: "B", x: 2, y: 1, constraints: ["color=red"] },
-      { id: "C", x: 3, y: 1, constraints: ["color=blue"] },
-      { id: "D", x: 4, y: 1, constraints: ["color=blue"] }
+      { id: "A", x: 1, y: 1, constraints: ["colour=red"] },
+      { id: "B", x: 2, y: 1, constraints: ["colour=red"] },
+      { id: "C", x: 3, y: 1, constraints: ["colour=blue"] },
+      { id: "D", x: 4, y: 1, constraints: ["colour=blue"] }
     ];
 
     const bridges = [
@@ -18,7 +18,7 @@ describe("IslandColorSeparationConstraint", () => {
 
     const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges });
 
-    const constraint = new IslandColorSeparationConstraint("red", "blue");
+    const constraint = new IslandColourSeparationConstraint("red", "blue");
     const result = constraint.check(puzzle as any);
 
     expect(result.satisfied).toBe(true);
@@ -26,8 +26,8 @@ describe("IslandColorSeparationConstraint", () => {
 
   it("fails when islands of different colours are connected", () => {
     const islands = [
-      { id: "A", x: 1, y: 1, constraints: ["color=red"] },
-      { id: "B", x: 2, y: 1, constraints: ["color=blue"] }
+      { id: "A", x: 1, y: 1, constraints: ["colour=red"] },
+      { id: "B", x: 2, y: 1, constraints: ["colour=blue"] }
     ];
 
     const bridges = [
@@ -36,7 +36,7 @@ describe("IslandColorSeparationConstraint", () => {
 
     const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges });
 
-    const constraint = new IslandColorSeparationConstraint("red", "blue");
+    const constraint = new IslandColourSeparationConstraint("red", "blue");
     const result = constraint.check(puzzle as any);
 
     expect(result.satisfied).toBe(false);
@@ -48,8 +48,8 @@ describe("IslandColorSeparationConstraint", () => {
 
   it("passes when all islands are of the same colour", () => {
     const islands = [
-      { id: "A", x: 1, y: 1, constraints: ["color=red"] },
-      { id: "B", x: 2, y: 1, constraints: ["color=red"] }
+      { id: "A", x: 1, y: 1, constraints: ["colour=red"] },
+      { id: "B", x: 2, y: 1, constraints: ["colour=red"] }
     ];
 
     const bridges = [
@@ -58,7 +58,7 @@ describe("IslandColorSeparationConstraint", () => {
 
     const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges });
 
-    const constraint = new IslandColorSeparationConstraint("red", "blue");
+    const constraint = new IslandColourSeparationConstraint("red", "blue");
     const result = constraint.check(puzzle as any);
 
     expect(result.satisfied).toBe(true);
