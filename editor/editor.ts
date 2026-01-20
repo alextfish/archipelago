@@ -95,7 +95,7 @@ const CONSTRAINT_TYPES = [
         description: 'Island must have a bridge in a specific direction',
         needsParams: true,
         needsCell: false,
-        params: [{ name: 'islandId', type: 'string' }, { name: 'direction', type: 'string' }]
+        params: [{ name: 'islandId', type: 'string' }, { name: 'constraintType', type: 'string' }]
     },
     {
         type: 'IslandPassingBridgeCountConstraint',
@@ -106,7 +106,7 @@ const CONSTRAINT_TYPES = [
         params: [
             { name: 'islandId', type: 'string' }, 
             { name: 'direction', type: 'string' },
-            { name: 'expectedCount', type: 'number' }
+            { name: 'count', type: 'number' }
         ]
     },
     {
@@ -115,7 +115,7 @@ const CONSTRAINT_TYPES = [
         description: 'Islands must be visible from a specific island',
         needsParams: true,
         needsCell: false,
-        params: [{ name: 'islandId', type: 'string' }, { name: 'visibleCount', type: 'number' }]
+        params: [{ name: 'islandId', type: 'string' }, { name: 'count', type: 'number' }]
     },
     {
         type: 'EnclosedAreaSizeConstraint',
@@ -646,18 +646,47 @@ class PuzzleEditor {
         });
 
         // Draw test bridges
+        // Group bridges by their span to detect duplicates and offset them
+        const bridgesBySpan = new Map<string, typeof this.testBridges>();
         this.testBridges.forEach(bridge => {
-            const startX = (bridge.start.x - 0.5) * this.cellSize;
-            const startY = (bridge.start.y - 0.5) * this.cellSize;
-            const endX = (bridge.end.x - 0.5) * this.cellSize;
-            const endY = (bridge.end.y - 0.5) * this.cellSize;
+            // Create a normalized span key (smaller coords first)
+            const key = bridge.start.x === bridge.end.x
+                ? `v_${bridge.start.x}_${Math.min(bridge.start.y, bridge.end.y)}_${Math.max(bridge.start.y, bridge.end.y)}`
+                : `h_${Math.min(bridge.start.x, bridge.end.x)}_${Math.max(bridge.start.x, bridge.end.x)}_${bridge.start.y}`;
+            
+            if (!bridgesBySpan.has(key)) {
+                bridgesBySpan.set(key, []);
+            }
+            bridgesBySpan.get(key)!.push(bridge);
+        });
 
-            ctx.strokeStyle = '#3498db';
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.lineTo(endX, endY);
-            ctx.stroke();
+        // Draw bridges with offset for duplicates
+        bridgesBySpan.forEach(bridges => {
+            bridges.forEach((bridge, index) => {
+                const startX = (bridge.start.x - 0.5) * this.cellSize;
+                const startY = (bridge.start.y - 0.5) * this.cellSize;
+                const endX = (bridge.end.x - 0.5) * this.cellSize;
+                const endY = (bridge.end.y - 0.5) * this.cellSize;
+
+                // Calculate offset for multiple bridges on same span
+                const offset = index * 4; // 4 pixels per additional bridge
+                
+                ctx.strokeStyle = '#3498db';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                
+                if (bridge.start.x === bridge.end.x) {
+                    // Vertical bridge - offset horizontally
+                    ctx.moveTo(startX + offset, startY);
+                    ctx.lineTo(endX + offset, endY);
+                } else {
+                    // Horizontal bridge - offset vertically
+                    ctx.moveTo(startX, startY + offset);
+                    ctx.lineTo(endX, endY + offset);
+                }
+                
+                ctx.stroke();
+            });
         });
 
         // Draw bridge placement start indicator
