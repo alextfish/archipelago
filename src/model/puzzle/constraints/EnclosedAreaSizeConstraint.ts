@@ -22,11 +22,11 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     this.expectedSize = expectedSize;
   }
 
-  static fromSpec(params: { 
-    x: number; 
-    y: number; 
+  static fromSpec(params: {
+    x: number;
+    y: number;
     size: number;
-    [key: string]: any 
+    [key: string]: any
   }): EnclosedAreaSizeConstraint {
     return new EnclosedAreaSizeConstraint(params.x, params.y, params.size);
   }
@@ -54,7 +54,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
       return {
         satisfied: ok,
         affectedElements: ok ? [] : [`${this.x},${this.y}`],
-        message: ok ? undefined : 
+        message: ok ? undefined :
           `Cell (${this.x}, ${this.y}) with size=0 must be covered by a bridge or open to outside, but is in an enclosed area`,
         glyphMessage: ok ? undefined : "area must-not enclosed"
       };
@@ -91,8 +91,8 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     return {
       satisfied: ok,
       affectedElements: ok ? areaInfo.cells : [`${this.x},${this.y}`, ...areaInfo.cells],
-      message: ok ? undefined : 
-        areaInfo.isEnclosed 
+      message: ok ? undefined :
+        areaInfo.isEnclosed
           ? `Cell (${this.x}, ${this.y}) is in an enclosed area of size ${areaInfo.size}, but requires size ${this.expectedSize}`
           : `Cell (${this.x}, ${this.y}) is not in a fully enclosed area (requires size ${this.expectedSize})`,
       glyphMessage
@@ -126,7 +126,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
    */
   private createOccupancyMatrix(puzzle: BridgePuzzle): number[][] {
     const matrix: number[][] = [];
-    
+
     // Initialize matrix with 0s
     for (let y = 0; y <= puzzle.height; y++) {
       matrix[y] = new Array(puzzle.width + 1).fill(0);
@@ -168,21 +168,21 @@ export class EnclosedAreaSizeConstraint extends Constraint {
   }
 
   private isOutOfBounds(x: number, y: number, puzzle: BridgePuzzle): boolean {
-    return x <= 0 || x >= puzzle.width || y <= 0 || y >= puzzle.height;
+    return x < 0 || x > puzzle.width || y < 0 || y > puzzle.height;
   }
 
   private getEnclosedAreaSize(
-    puzzle: BridgePuzzle, 
-    startX: number, 
+    puzzle: BridgePuzzle,
+    startX: number,
     startY: number
   ): { size: number; isEnclosed: boolean; cells: string[] } {
     // Create occupancy matrix once
     const matrix = this.createOccupancyMatrix(puzzle);
-    
+
     const visited = new Set<string>();
     const queue: Array<{ x: number; y: number }> = [{ x: startX, y: startY }];
     const cellKey = (x: number, y: number) => `${x},${y}`;
-    
+
     visited.add(cellKey(startX, startY));
     let isEnclosed = true;
     const cells: string[] = [];
