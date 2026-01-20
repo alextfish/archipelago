@@ -28,7 +28,7 @@ describe('CollisionManager', () => {
                 { id: 'test-bridge', count: 5 }
             ],
             constraints: [],
-            maxNumBridges: 10
+            maxNumBridges: 2
         });
 
         puzzleBounds = { x: 100, y: 200, width: 160, height: 160 } as any; // 5x5 tiles at 32px each

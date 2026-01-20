@@ -45,7 +45,7 @@ describe("BridgePuzzle", () => {
       islands: mockIslands,
       bridgeTypes: mockBridgeTypes,
       constraints: mockConstraints,
-      maxNumBridges: 10
+      maxNumBridges: 2
     };
   });
 

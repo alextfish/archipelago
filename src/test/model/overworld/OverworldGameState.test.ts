@@ -21,7 +21,7 @@ describe('OverworldGameState', () => {
                 { id: 'single', count: 5 }
             ],
             constraints: [],
-            maxNumBridges: 10
+            maxNumBridges: 2
         });
     });
 
@@ -80,7 +80,7 @@ describe('OverworldGameState', () => {
                 islands: [{ id: 'island1', x: 1, y: 1 }],
                 bridgeTypes: [{ id: 'single', count: 5 }],
                 constraints: [],
-                maxNumBridges: 10
+                maxNumBridges: 2
             });
 
             gameState.saveOverworldPuzzleProgress('puzzle1', newMockPuzzle);

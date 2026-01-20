@@ -69,5 +69,5 @@
       "type": "NoCrossingConstraint"
     }
   ],
-  "maxNumBridges": 10
+  "maxNumBridges": 2
 }

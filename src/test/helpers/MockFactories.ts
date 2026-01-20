@@ -22,6 +22,6 @@ export const makeMockPuzzleSpec = (
         islands: [],
         bridgeTypes: [],
         constraints: [],
-        maxNumBridges: 10,
+        maxNumBridges: 2,
     ...overrides
 });
