@@ -94,16 +94,3 @@ export function normalizeRenderOrder(start: { x: number; y: number }, end: { x: 
   }
 }
 
-
-function getBridgeColour(colour?: string): number {
-  // Convert colour name to hex colour
-  switch (colour?.toLowerCase()) {
-    case 'black': return 0x000000;
-    case 'red': return 0xff0000;
-    case 'blue': return 0x0000ff;
-    case 'yellow': return 0xffff00;
-    case 'green': return 0x00ff00;
-    default: return 0x000000;
-  }
-}
-

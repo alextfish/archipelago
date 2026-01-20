@@ -178,6 +178,9 @@ export class BridgePuzzleScene extends Phaser.Scene {
             previewBridge: (bridge: any, opts: any) => {
                 mapScene.events.emit('previewBridge', bridge, opts);
             },
+            hidePreview: () => {
+                mapScene.events.emit('hidePreview');
+            },
             setPlacing: (isPlacing: boolean) => {
                 mapScene.events.emit('setPlacing', isPlacing);
             },

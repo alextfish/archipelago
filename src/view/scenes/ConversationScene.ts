@@ -24,6 +24,7 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     private choiceButtons: ChoiceButton[] = [];
     private npcPortrait: Phaser.GameObjects.Container | null = null;
     private playerPortrait: Phaser.GameObjects.Container | null = null;
+    // @ts-expect-error - currentNPC will be used in future updates
     private currentNPC: NPC | null = null;
 
     // Constants

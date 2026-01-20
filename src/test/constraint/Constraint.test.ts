@@ -2,17 +2,19 @@ import { describe, it, expect } from "vitest";
 import { IslandBridgeCountConstraint } from '@model/puzzle/constraints/IslandBridgeCountConstraint';
 import { AllBridgesPlacedConstraint } from '@model/puzzle/constraints/AllBridgesPlacedConstraint';
 import { NoCrossingConstraint } from "@model/puzzle/constraints/NoCrossingConstraint";
-import { makeMockPuzzle, makeMockPuzzleSpec } from "../helpers/MockFactories";
-import { BridgePuzzle } from "@model/puzzle/BridgePuzzle";
+import { makeMockPuzzle } from "../helpers/MockFactories";
+import { createBridgeType } from "@model/puzzle/BridgeType";
 
 
 
 describe("AllBridgesPlacedConstraint", () => {
+  const mockType = createBridgeType({ id: "mock" });
+
   it("passes when all bridges have both endpoints", () => {
     const puzzle = makeMockPuzzle({
       bridges: [
-        { id: "b1", start: { x: 1, y: 1 }, end: { x: 2, y: 2 } },
-        { id: "b2", start: { x: 3, y: 3 }, end: { x: 4, y: 4 } }
+        { id: "b1", start: { x: 1, y: 1 }, end: { x: 2, y: 2 }, type: mockType },
+        { id: "b2", start: { x: 3, y: 3 }, end: { x: 4, y: 4 }, type: mockType }
       ]
     });
 
@@ -25,8 +27,8 @@ describe("AllBridgesPlacedConstraint", () => {
   it("fails and lists unplaced bridges", () => {
     const puzzle = makeMockPuzzle({
       bridges: [
-        { id: "b1", start: { x: 1, y: 1 }, end: { x: 2, y: 2 } },
-        { id: "b2", start: { x: 3, y: 3 } } // missing end
+        { id: "b1", start: { x: 1, y: 1 }, end: { x: 2, y: 2 }, type: mockType },
+        { id: "b2", start: { x: 3, y: 3 }, type: mockType } // missing end
       ]
     });
 

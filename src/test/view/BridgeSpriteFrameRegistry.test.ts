@@ -2,9 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   BridgeSpriteFrames,
   BridgeVisualConstants,
-  getBridgeSegmentFrame,
-  type BridgeOrientation,
-  type BridgeSegmentPosition
+  getBridgeSegmentFrame
 } from '@view/BridgeSpriteFrameRegistry';
 
 describe('BridgeSpriteFrameRegistry', () => {

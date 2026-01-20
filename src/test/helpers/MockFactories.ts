@@ -12,7 +12,7 @@ export const makeMockPuzzle = (
     bridgesFromIsland: () => [],
     allBridgesPlaced: () => true,
     ...overrides
-});
+} as unknown as BridgePuzzle);
 
 export const makeMockPuzzleSpec = (
   overrides: Partial<PuzzleSpec> = {}
@@ -22,5 +22,6 @@ export const makeMockPuzzleSpec = (
         islands: [],
         bridgeTypes: [],
         constraints: [],
+        maxNumBridges: 2,
     ...overrides
 });

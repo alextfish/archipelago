@@ -93,7 +93,8 @@ describe('EmbeddedPuzzleRenderer Bridge Removal', () => {
                 { id: 'island2', x: 3, y: 1, constraints: [] }
             ],
             bridgeTypes: [{ id: 'single', colour: 'black', count: 5 }],
-            constraints: []
+            constraints: [],
+            maxNumBridges: 2
         });
 
         renderer.init(puzzle);

@@ -22,7 +22,7 @@ export class BridgeMustCoverIslandConstraint extends Constraint {
       if (!bridge.type.mustCoverIsland) continue;
 
       // Check if bridge passes over any island
-      const coversIsland = this.bridgeCoversAnyIsland(puzzle, bridge);
+      const coversIsland = this.bridgeCoversAnyIsland(puzzle, bridge as { start: { x: number; y: number }; end: { x: number; y: number } });
       
       if (!coversIsland) {
         violations.push(bridge.id);
