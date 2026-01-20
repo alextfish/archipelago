@@ -1467,8 +1467,21 @@ var PuzzleEditor = class {
         const paramType = typeof param === "string" ? "text" : param.type;
         if (paramName !== "x" && paramName !== "y") {
           const input = document.getElementById(`param_${paramName}`);
-          if (input) {
-            params[paramName] = paramType === "number" ? parseInt(input.value) : input.value;
+          if (input && input.value) {
+            if (paramType === "number") {
+              const numValue = parseInt(input.value);
+              if (!isNaN(numValue)) {
+                params[paramName] = numValue;
+              } else {
+                alert(`Please enter a valid number for ${paramName}`);
+                return;
+              }
+            } else {
+              params[paramName] = input.value;
+            }
+          } else {
+            alert(`Please enter a value for ${paramName}`);
+            return;
           }
         }
       });
