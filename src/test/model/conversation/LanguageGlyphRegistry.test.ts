@@ -26,30 +26,30 @@ describe('LanguageGlyphRegistry', () => {
             const registry = new LanguageGlyphRegistry();
             const frames = registry.getSpeechBubbleFrames('grass');
 
-            expect(frames.topLeft).toBe(1);
-            expect(frames.topEdge).toBe(2);
-            expect(frames.topRight).toBe(3);
-            expect(frames.leftEdge).toBe(11);
-            expect(frames.centre).toBe(12);
-            expect(frames.rightEdge).toBe(13);
-            expect(frames.bottomLeft).toBe(21);
-            expect(frames.bottomEdge).toBe(22);
-            expect(frames.bottomRight).toBe(23);
+            expect(frames.topLeft).toBe(0);
+            expect(frames.topEdge).toBe(1);
+            expect(frames.topRight).toBe(2);
+            expect(frames.leftEdge).toBe(10);
+            expect(frames.centre).toBe(11);
+            expect(frames.rightEdge).toBe(12);
+            expect(frames.bottomLeft).toBe(20);
+            expect(frames.bottomEdge).toBe(21);
+            expect(frames.bottomRight).toBe(22);
         });
 
         it('should return correct frames for fire language', () => {
             const registry = new LanguageGlyphRegistry();
             const frames = registry.getSpeechBubbleFrames('fire');
 
-            expect(frames.topLeft).toBe(4);
-            expect(frames.topEdge).toBe(5);
-            expect(frames.topRight).toBe(6);
-            expect(frames.leftEdge).toBe(14);
-            expect(frames.centre).toBe(15);
-            expect(frames.rightEdge).toBe(16);
-            expect(frames.bottomLeft).toBe(24);
-            expect(frames.bottomEdge).toBe(25);
-            expect(frames.bottomRight).toBe(26);
+            expect(frames.topLeft).toBe(3);
+            expect(frames.topEdge).toBe(4);
+            expect(frames.topRight).toBe(5);
+            expect(frames.leftEdge).toBe(13);
+            expect(frames.centre).toBe(14);
+            expect(frames.rightEdge).toBe(15);
+            expect(frames.bottomLeft).toBe(23);
+            expect(frames.bottomEdge).toBe(24);
+            expect(frames.bottomRight).toBe(25);
         });
 
         it('should throw error for unknown language', () => {
@@ -63,35 +63,35 @@ describe('LanguageGlyphRegistry', () => {
         it('should return correct frame for known grass words', () => {
             const registry = new LanguageGlyphRegistry();
 
-            expect(registry.getGlyphFrame('grass', 'you')).toBe(31);
-            expect(registry.getGlyphFrame('grass', 'me')).toBe(32);
-            expect(registry.getGlyphFrame('grass', 'bridge')).toBe(33);
-            expect(registry.getGlyphFrame('grass', 'want')).toBe(34);
-            expect(registry.getGlyphFrame('grass', 'build')).toBe(35);
-            expect(registry.getGlyphFrame('grass', 'adjacent')).toBe(36);
-            expect(registry.getGlyphFrame('grass', 'not')).toBe(37);
-            expect(registry.getGlyphFrame('grass', 'vertical')).toBe(38);
-            expect(registry.getGlyphFrame('grass', 'horizontal')).toBe(39);
+            expect(registry.getGlyphFrame('grass', 'you')).toBe(30);
+            expect(registry.getGlyphFrame('grass', 'me')).toBe(31);
+            expect(registry.getGlyphFrame('grass', 'bridge')).toBe(32);
+            expect(registry.getGlyphFrame('grass', 'want')).toBe(33);
+            expect(registry.getGlyphFrame('grass', 'build')).toBe(34);
+            expect(registry.getGlyphFrame('grass', 'adjacent')).toBe(35);
+            expect(registry.getGlyphFrame('grass', 'not')).toBe(36);
+            expect(registry.getGlyphFrame('grass', 'vertical')).toBe(37);
+            expect(registry.getGlyphFrame('grass', 'horizontal')).toBe(38);
         });
 
         it('should be case-insensitive', () => {
             const registry = new LanguageGlyphRegistry();
 
-            expect(registry.getGlyphFrame('grass', 'BRIDGE')).toBe(33);
-            expect(registry.getGlyphFrame('grass', 'BrIdGe')).toBe(33);
+            expect(registry.getGlyphFrame('grass', 'BRIDGE')).toBe(32);
+            expect(registry.getGlyphFrame('grass', 'BrIdGe')).toBe(32);
         });
 
         it('should return missing glyph frame for unknown grass words', () => {
             const registry = new LanguageGlyphRegistry();
 
-            expect(registry.getGlyphFrame('grass', 'unknown')).toBe(7);
-            expect(registry.getGlyphFrame('grass', 'invalid')).toBe(7);
+            expect(registry.getGlyphFrame('grass', 'unknown')).toBe(6);
+            expect(registry.getGlyphFrame('grass', 'invalid')).toBe(6);
         });
 
         it('should return missing glyph frame for unknown fire words', () => {
             const registry = new LanguageGlyphRegistry();
 
-            expect(registry.getGlyphFrame('fire', 'unknown')).toBe(8);
+            expect(registry.getGlyphFrame('fire', 'unknown')).toBe(7);
         });
 
         it('should throw error for unknown language', () => {
@@ -106,21 +106,21 @@ describe('LanguageGlyphRegistry', () => {
             const registry = new LanguageGlyphRegistry();
             const frames = registry.parseGlyphs('grass', 'me want adjacent vertical bridge');
 
-            expect(frames).toEqual([32, 34, 36, 38, 33]);
+            expect(frames).toEqual([31, 33, 35, 37, 32]);
         });
 
         it('should handle extra whitespace', () => {
             const registry = new LanguageGlyphRegistry();
             const frames = registry.parseGlyphs('grass', '  me   want  bridge  ');
 
-            expect(frames).toEqual([32, 34, 33]);
+            expect(frames).toEqual([31, 33, 32]);
         });
 
         it('should use missing glyph frame for unknown words', () => {
             const registry = new LanguageGlyphRegistry();
             const frames = registry.parseGlyphs('grass', 'me unknown bridge');
 
-            expect(frames).toEqual([32, 7, 33]);
+            expect(frames).toEqual([31, 6, 32]);
         });
     });
 

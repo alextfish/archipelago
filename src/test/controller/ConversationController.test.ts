@@ -137,7 +137,7 @@ describe('ConversationController', () => {
             expect(mockHost.displayNPCLineCalls).toHaveLength(1);
             expect(mockHost.displayNPCLineCalls[0].expression).toBe('neutral');
             expect(mockHost.displayNPCLineCalls[0].language).toBe('grass');
-            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([32, 34, 33]); // me, want, bridge
+            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([31, 33, 32]); // me, want, bridge
 
             // Should display choices
             expect(mockHost.displayChoicesCalls).toHaveLength(1);
@@ -167,7 +167,7 @@ describe('ConversationController', () => {
 
             // Should display first node again
             expect(mockHost.displayNPCLineCalls).toHaveLength(1);
-            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([32, 34, 33]);
+            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([31, 33, 32]);
         });
 
         it('should warn when starting new conversation while previous is active', () => {
@@ -194,7 +194,7 @@ describe('ConversationController', () => {
             // Should display next node
             expect(mockHost.displayNPCLineCalls).toHaveLength(1);
             expect(mockHost.displayNPCLineCalls[0].expression).toBe('happy');
-            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([31, 35, 33]); // you, build, bridge
+            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([30, 34, 32]); // you, build, bridge
         });
 
         it('should end conversation when node has end: true', () => {
@@ -222,12 +222,11 @@ describe('ConversationController', () => {
 
             controller.selectChoice(1); // Choose "No" with end: true
 
-            // Should mark as ended but not auto-cleanup
+            // Should mark as ended and notify host immediately
             expect(controller.getCurrentState()?.isEnded()).toBe(true);
             expect(controller.isActive()).toBe(false);
 
-            // Host must explicitly end to cleanup
-            controller.endConversation();
+            // Cleanup should have been called automatically
             expect(mockHost.hideConversationCalls).toBe(1);
             expect(mockHost.onConversationEndCalls).toBe(1);
         });
@@ -338,7 +337,7 @@ describe('ConversationController', () => {
 
             // Should display intro node again
             expect(mockHost.displayNPCLineCalls).toHaveLength(1);
-            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([32, 34, 33]);
+            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([31, 33, 32]);
         });
 
         it('should handle single-node conversations that end immediately', () => {
@@ -360,11 +359,9 @@ describe('ConversationController', () => {
             controller.startConversation(singleNodeSpec, testNPC);
             expect(controller.isActive()).toBe(true); // Conversation active after opening
 
-            controller.selectChoice(0); // Mark as ended
+            controller.selectChoice(0); // Ends immediately with cleanup
             expect(controller.getCurrentState()?.isEnded()).toBe(true);
             expect(controller.isActive()).toBe(false);
-
-            controller.endConversation(); // Cleanup
             expect(mockHost.onConversationEndCalls).toBe(1);
 
             mockHost.reset();
@@ -376,8 +373,6 @@ describe('ConversationController', () => {
 
             controller.selectChoice(0);
             expect(controller.isActive()).toBe(false);
-
-            controller.endConversation();
             expect(mockHost.onConversationEndCalls).toBe(1);
         });
     });
