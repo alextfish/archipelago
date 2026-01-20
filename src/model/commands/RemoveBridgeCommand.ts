@@ -10,7 +10,6 @@ import { Command } from "@model/commands/Command";
 export class RemoveBridgeCommand extends Command {
   private savedStart: Point | null = null;
   private savedEnd: Point | null = null;
-  private savedTypeId: string | null = null;
   private executed = false;
 
   constructor(
@@ -28,8 +27,7 @@ export class RemoveBridgeCommand extends Command {
       throw new Error(`No such bridge ${this.bridgeId}`);
     }
 
-    // Capture state necessary to undo (type + endpoints)
-    this.savedTypeId = bridge.type?.id ?? null;
+    // Capture state necessary to undo (endpoints)
     if (bridge.start && bridge.end) {
       this.savedStart = { x: bridge.start.x, y: bridge.start.y };
       this.savedEnd = { x: bridge.end.x, y: bridge.end.y };

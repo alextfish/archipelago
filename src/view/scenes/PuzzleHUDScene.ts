@@ -8,8 +8,6 @@ export class PuzzleHUDScene extends Phaser.Scene {
     private counts: Record<string, number> = {};
     private types: BridgeType[] = [];
     private solvedOverlay: Phaser.GameObjects.Container | null = null;
-    private currentController: PuzzleController | null = null;
-    private currentPuzzleType: 'overworld' | 'bridge' | null = null;
     private eventListeners: Array<{ event: string; callback: Function }> = [];
 
     constructor() {
@@ -103,11 +101,8 @@ export class PuzzleHUDScene extends Phaser.Scene {
      * Setup HUD for a specific puzzle type
      * Called by PuzzleHUDManager when entering puzzle mode
      */
-    setupForPuzzle(controller: PuzzleController, puzzleType: 'overworld' | 'bridge'): void {
+    setupForPuzzle(_controller: PuzzleController, puzzleType: 'overworld' | 'bridge'): void {
         console.log(`PuzzleHUDScene: Setting up for ${puzzleType} puzzle`);
-
-        this.currentController = controller;
-        this.currentPuzzleType = puzzleType;
 
         // Clear any existing event listeners
         this.cleanupEventListeners();
@@ -252,8 +247,6 @@ export class PuzzleHUDScene extends Phaser.Scene {
         this.cleanupEventListeners();
 
         // Reset state
-        this.currentController = null;
-        this.currentPuzzleType = null;
         this.counts = {};
         this.types = [];
 

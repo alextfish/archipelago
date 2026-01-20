@@ -24,7 +24,6 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     private choiceButtons: ChoiceButton[] = [];
     private npcPortrait: Phaser.GameObjects.Container | null = null;
     private playerPortrait: Phaser.GameObjects.Container | null = null;
-    private currentNPC: NPC | null = null;
 
     // Constants
     private readonly TILESET_KEY = 'language';
@@ -101,8 +100,6 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
      */
     startConversation(spec: ConversationSpec, npc: NPC): void {
         console.log('ConversationScene: startConversation called', { spec, npc });
-
-        this.currentNPC = npc;
 
         // Create controller if not exists
         if (!this.controller) {

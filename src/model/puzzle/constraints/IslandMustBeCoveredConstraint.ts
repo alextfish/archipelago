@@ -1,7 +1,6 @@
 import type { BridgePuzzle } from '../BridgePuzzle';
 import { Constraint } from './Constraint';
 import type { ConstraintResult } from './ConstraintResult';
-import type { Island } from '../Island';
 
 /**
  * Constraint for Ruins puzzle type: Islands with a "must_be_covered" marker

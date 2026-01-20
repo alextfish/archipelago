@@ -4,14 +4,17 @@ import {
   MustTouchAVerticalBridge,
 } from "@model/puzzle/constraints/GridCellConstraints";
 import { makeMockPuzzle } from "../helpers/MockFactories";
+import { createBridgeType } from "@model/puzzle/BridgeType";
 
 
 describe("GridCellConstraints", () => {
+  const mockType = createBridgeType({ id: "mock" });
+
   describe("MustTouchAHorizontalBridge", () => {
     it("passes when a horizontal bridge is adjacent", () => {
       const puzzle = makeMockPuzzle({
         bridges: [
-          { id: "b1", start: { x: 1, y: 2 }, end: { x: 3, y: 2 } },
+          { id: "b1", start: { x: 1, y: 2 }, end: { x: 3, y: 2 }, type: mockType },
         ]
       });
       const c = new MustTouchAHorizontalBridge(2, 1);
@@ -23,7 +26,7 @@ describe("GridCellConstraints", () => {
     it("fails when no horizontal bridge is adjacent", () => {
       const puzzle = makeMockPuzzle({
         bridges: [
-            { id: "b1", start: { x: 5, y: 5 }, end: { x: 7, y: 5 } },
+            { id: "b1", start: { x: 5, y: 5 }, end: { x: 7, y: 5 }, type: mockType },
         ]
       });
       const c = new MustTouchAHorizontalBridge(1, 1);
@@ -39,7 +42,7 @@ describe("GridCellConstraints", () => {
     it("passes when a vertical bridge is adjacent", () => {
       const puzzle = makeMockPuzzle({
         bridges: [
-        { id: "b1", start: { x: 3, y: 1 }, end: { x: 3, y: 4 } },
+        { id: "b1", start: { x: 3, y: 1 }, end: { x: 3, y: 4 }, type: mockType },
         ]
       });
       const c = new MustTouchAVerticalBridge(2, 3);
@@ -51,7 +54,7 @@ describe("GridCellConstraints", () => {
     it("fails when no vertical bridge is adjacent", () => {
       const puzzle = makeMockPuzzle({
         bridges: [
-            { id: "b1", start: { x: 7, y: 7 }, end: { x: 7, y: 9 } },
+            { id: "b1", start: { x: 7, y: 7 }, end: { x: 7, y: 9 }, type: mockType },
         ]
       });
       const c = new MustTouchAVerticalBridge(1, 1);
