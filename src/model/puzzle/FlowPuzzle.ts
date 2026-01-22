@@ -1,4 +1,4 @@
-import { BridgePuzzle } from "@model/puzzle/BridgePuzzle";
+import { BridgePuzzle, type PuzzleSpec } from "@model/puzzle/BridgePuzzle";
 import type { FlowPuzzleSpec, FlowSquareSpec, GridKey } from "./FlowTypes";
 import { gridKey, parseGridKey } from "./FlowTypes";
 import { ConnectivityManager } from "@model/ConnectivityManager";
@@ -14,7 +14,8 @@ export class FlowPuzzle extends BridgePuzzle {
   private edgeOutputCache: Set<GridKey> = new Set();
 
   constructor(spec: FlowPuzzleSpec) {
-    super({
+    // Convert FlowPuzzleSpec to PuzzleSpec for base class
+    const baseSpec: PuzzleSpec = {
       id: spec.id,
       type: spec.type,
       size: spec.size,
@@ -22,7 +23,8 @@ export class FlowPuzzle extends BridgePuzzle {
       bridgeTypes: spec.bridgeTypes,
       constraints: spec.constraints,
       maxNumBridges: spec.maxNumBridges
-    } as any);
+    };
+    super(baseSpec);
 
     if (Array.isArray(spec.flowSquares)) {
       for (const fs of spec.flowSquares) {

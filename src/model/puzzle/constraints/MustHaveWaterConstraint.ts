@@ -4,7 +4,7 @@ import type { BridgePuzzle } from "../BridgePuzzle";
 
 // Type guard to check if a puzzle has the tileHasWater method (i.e., is a FlowPuzzle)
 function hasTileHasWater(puzzle: BridgePuzzle): puzzle is BridgePuzzle & { tileHasWater(x: number, y: number): boolean } {
-  return typeof (puzzle as any).tileHasWater === "function";
+  return typeof (puzzle as unknown as { tileHasWater?: unknown }).tileHasWater === "function";
 }
 
 export class MustHaveWaterConstraint extends Constraint {
