@@ -1,3 +1,6 @@
+import type { Island } from "./Island";
+import type { BridgeTypeSpec } from "./BridgePuzzle";
+
 export type Direction = "N" | "S" | "E" | "W";
 
 /**
@@ -29,8 +32,8 @@ export interface FlowPuzzleSpec {
   id: string;
   type?: string;
   size: { width: number; height: number };
-  islands: any[];             // reuse existing Island spec type
-  bridgeTypes: any[];         // reuse BridgeTypeSpec
+  islands: Island[];
+  bridgeTypes: BridgeTypeSpec[];
   constraints: { type: string; params?: any }[];
   maxNumBridges: number;
   flowSquares?: FlowSquareSpec[]; // per-tile flow metadata

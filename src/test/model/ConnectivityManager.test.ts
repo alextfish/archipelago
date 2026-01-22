@@ -4,7 +4,7 @@ import { ConnectivityManager, ConnectivityState } from "@model/ConnectivityManag
 describe("ConnectivityManager", () => {
   it("computes pontoon passability according to water presence", () => {
     const width = 3, height = 1;
-    const flowSquares = new Map<string, any>();
+    const flowSquares = new Map<string, Partial<{ pontoon: boolean; rocky: boolean; obstacle: boolean }>>();
     flowSquares.set("1,0", { pontoon: true });
     const tiles = ConnectivityManager.computeBakedConnectivity({
       width, height,
