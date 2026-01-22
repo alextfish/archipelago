@@ -2,6 +2,11 @@ import type { ConstraintResult } from "./ConstraintResult";
 import { Constraint } from "./Constraint";
 import type { BridgePuzzle } from "../BridgePuzzle";
 
+// Type guard to check if a puzzle has the tileHasWater method (i.e., is a FlowPuzzle)
+function hasTileHasWater(puzzle: BridgePuzzle): puzzle is BridgePuzzle & { tileHasWater(x: number, y: number): boolean } {
+  return typeof (puzzle as any).tileHasWater === "function";
+}
+
 export class MustHaveWaterConstraint extends Constraint {
   x: number;
   y: number;
@@ -16,9 +21,8 @@ export class MustHaveWaterConstraint extends Constraint {
   }
 
   check(puzzle: BridgePuzzle): ConstraintResult {
-    // FlowPuzzle extends BridgePuzzle, so cast safely at runtime
-    const maybe = puzzle as unknown as { tileHasWater?: (x: number, y: number) => boolean };
-    const has = typeof maybe.tileHasWater === "function" ? maybe.tileHasWater(this.x, this.y) : false;
+    // Use type guard to safely check for FlowPuzzle
+    const has = hasTileHasWater(puzzle) ? puzzle.tileHasWater(this.x, this.y) : false;
     this.violations = has ? [] : [`${this.x},${this.y}`];
     return {
       satisfied: has,

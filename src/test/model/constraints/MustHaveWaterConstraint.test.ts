@@ -15,9 +15,10 @@ describe("MustHaveWaterConstraint", () => {
         { x: 1, y: 0, outgoing: [] }
       ],
       edgeInputs: [{ x: 0, y: 0 }],
-      constraints: [{ type: "MustHaveWaterConstraint", params: { x: 1, y: 0 } }]
+      constraints: [{ type: "MustHaveWaterConstraint", params: { x: 1, y: 0 } }],
+      maxNumBridges: 2
     };
-    const p = new FlowPuzzle(spec as any);
+    const p = new FlowPuzzle(spec);
 
     expect(p.tileHasWater(1, 0)).toBe(true);
 
@@ -28,7 +29,7 @@ describe("MustHaveWaterConstraint", () => {
     if (b && b.id) p.placeBridge(b.id, { x: 0, y: -1 }, { x: 0, y: 2 });
 
     const c = new MustHaveWaterConstraint(1, 0);
-    const result = c.check(p as any);
+    const result = c.check(p);
     expect(result.satisfied).toBe(false);
   });
 
@@ -43,11 +44,12 @@ describe("MustHaveWaterConstraint", () => {
         { x: 1, y: 0, outgoing: [] }
       ],
       edgeInputs: [{ x: 0, y: 0 }],
-      constraints: [{ type: "MustHaveWaterConstraint", params: { x: 1, y: 0 } }]
+      constraints: [{ type: "MustHaveWaterConstraint", params: { x: 1, y: 0 } }],
+      maxNumBridges: 2
     };
-    const p = new FlowPuzzle(spec as any);
+    const p = new FlowPuzzle(spec);
     const c = new MustHaveWaterConstraint(1, 0);
-    const r = c.check(p as any);
+    const r = c.check(p);
     expect(r.satisfied).toBe(true);
   });
 });

@@ -15,9 +15,10 @@ describe("FlowPuzzle basic water propagation and blocking", () => {
         { x: 2, y: 0, outgoing: [] }
       ],
       edgeInputs: [{ x: 0, y: 0 }],
-      constraints: []
+      constraints: [],
+      maxNumBridges: 2
     };
-    const p = new FlowPuzzle(spec as any);
+    const p = new FlowPuzzle(spec);
     expect(p.tileHasWater(0, 0)).toBe(true);
     expect(p.tileHasWater(1, 0)).toBe(true);
     expect(p.tileHasWater(2, 0)).toBe(true);
@@ -36,9 +37,10 @@ describe("FlowPuzzle basic water propagation and blocking", () => {
         { x: 3, y: 0, outgoing: [] }
       ],
       edgeInputs: [{ x: 0, y: 0 }],
-      constraints: []
+      constraints: [],
+      maxNumBridges: 2
     };
-    const p = new FlowPuzzle(spec as any);
+    const p = new FlowPuzzle(spec);
     expect(p.tileHasWater(0, 0)).toBe(true);
     expect(p.tileHasWater(1, 0)).toBe(true);
     expect(p.tileHasWater(2, 0)).toBe(false);
@@ -62,9 +64,10 @@ describe("FlowPuzzle basic water propagation and blocking", () => {
         { x: 4, y: 0, outgoing: [] }
       ],
       edgeInputs: [{ x: 0, y: 0 }],
-      constraints: []
+      constraints: [],
+      maxNumBridges: 2
     };
-    const p = new FlowPuzzle(spec as any);
+    const p = new FlowPuzzle(spec);
     expect(p.tileHasWater(3, 0)).toBe(true);
 
     // simulate placing a vertical bridge covering x=2
@@ -94,9 +97,10 @@ describe("FlowPuzzle basic water propagation and blocking", () => {
         { x: 2, y: 0, outgoing: [] }
       ],
       edgeInputs: [],
-      constraints: []
+      constraints: [],
+      maxNumBridges: 2
     };
-    const p = new FlowPuzzle(spec as any);
+    const p = new FlowPuzzle(spec);
     const allowed = p.couldPlaceBridgeOfType("L", "R", "wood");
     expect(allowed).toBe(false);
   });

@@ -2,7 +2,6 @@ import { BridgePuzzle } from "@model/puzzle/BridgePuzzle";
 import type { FlowPuzzleSpec, FlowSquareSpec, GridKey } from "./FlowTypes";
 import { gridKey, parseGridKey } from "./FlowTypes";
 import { ConnectivityManager } from "@model/ConnectivityManager";
-import type { Bridge } from "@model/puzzle/Bridge";
 
 /**
  * FlowPuzzle extends BridgePuzzle with water propagation state.
@@ -21,8 +20,8 @@ export class FlowPuzzle extends BridgePuzzle {
       size: spec.size,
       islands: spec.islands,
       bridgeTypes: spec.bridgeTypes,
-      constraints: spec.constraints ?? [],
-      maxNumBridges: spec.maxNumBridges ?? 2
+      constraints: spec.constraints,
+      maxNumBridges: spec.maxNumBridges
     } as any);
 
     if (Array.isArray(spec.flowSquares)) {
@@ -211,7 +210,7 @@ export class FlowPuzzle extends BridgePuzzle {
       height: this.height,
       tileHasWater: (x, y) => this.tileHasWater(x, y),
       getFlowSquare: (x, y) => this.getFlowSquare(x, y),
-      placedBridges: this.placedBridges as Bridge[]
+      placedBridges: this.placedBridges
     });
   }
 }

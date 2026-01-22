@@ -31,8 +31,8 @@ export interface FlowPuzzleSpec {
   size: { width: number; height: number };
   islands: any[];             // reuse existing Island spec type
   bridgeTypes: any[];         // reuse BridgeTypeSpec
-  constraints?: { type: string; params?: any }[];
-  maxNumBridges?: number;
+  constraints: { type: string; params?: any }[];
+  maxNumBridges: number;
   flowSquares?: FlowSquareSpec[]; // per-tile flow metadata
   edgeInputs?: { x: number; y: number }[]; // coordinates that supply water in from the edge
 }
