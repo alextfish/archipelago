@@ -76,7 +76,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     }
 
     showPreview(start: Point, end: Point, bridgeType: BridgeType): void {
-        console.log(`EmbeddedPuzzleRenderer.showPreview: start(${start.x},${start.y}) end(${end.x},${end.y}) type=${bridgeType.id}`);
+        // console.log(`EmbeddedPuzzleRenderer.showPreview: start(${start.x},${start.y}) end(${end.x},${end.y}) type=${bridgeType.id}`);
         this.hidePreview();
 
         const tempBridge: Bridge = {
@@ -89,7 +89,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
         this.previewGraphics = this.createBridgeContainer(tempBridge);
         this.previewGraphics.setAlpha(BridgeVisualConstants.PREVIEW_ALPHA);
         this.puzzleContainer.add(this.previewGraphics);
-        console.log(`EmbeddedPuzzleRenderer.showPreview: Preview container created with ${this.previewGraphics.list.length} sprites, depth=${this.previewGraphics.depth}`);
+        // console.log(`EmbeddedPuzzleRenderer.showPreview: Preview container created with ${this.previewGraphics.list.length} sprites, depth=${this.previewGraphics.depth}`);
     }
 
     hidePreview(): void {
@@ -170,13 +170,13 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
         const startWorld = this.gridMapper.gridToWorld(bridge.start.x, bridge.start.y);
         const endWorld = this.gridMapper.gridToWorld(bridge.end.x, bridge.end.y);
 
-        const cam = this.scene.cameras.main;
-        const viewportTL = { x: cam.scrollX, y: cam.scrollY };
-        const viewportBR = { x: cam.scrollX + cam.width / cam.zoom, y: cam.scrollY + cam.height / cam.zoom };
+        // const cam = this.scene.cameras.main;
+        // const viewportTL = { x: cam.scrollX, y: cam.scrollY };
+        // const viewportBR = { x: cam.scrollX + cam.width / cam.zoom, y: cam.scrollY + cam.height / cam.zoom };
 
-        console.log(`EmbeddedPuzzleRenderer: Bridge ${bridge.id} grid(${bridge.start.x},${bridge.start.y})->(${bridge.end.x},${bridge.end.y}) mapped to world(${startWorld.x},${startWorld.y})->(${endWorld.x},${endWorld.y})`);
-        console.log(`  Puzzle bounds offset: (${this.puzzleBounds.x}, ${this.puzzleBounds.y})`);
-        console.log(`  Viewport: TL(${viewportTL.x.toFixed(0)},${viewportTL.y.toFixed(0)}) BR(${viewportBR.x.toFixed(0)},${viewportBR.y.toFixed(0)}) zoom=${cam.zoom.toFixed(2)}`);
+        // console.log(`EmbeddedPuzzleRenderer: Bridge ${bridge.id} grid(${bridge.start.x},${bridge.start.y})->(${bridge.end.x},${bridge.end.y}) mapped to world(${startWorld.x},${startWorld.y})->(${endWorld.x},${endWorld.y})`);
+        // console.log(`  Puzzle bounds offset: (${this.puzzleBounds.x}, ${this.puzzleBounds.y})`);
+        // console.log(`  Viewport: TL(${viewportTL.x.toFixed(0)},${viewportTL.y.toFixed(0)}) BR(${viewportBR.x.toFixed(0)},${viewportBR.y.toFixed(0)}) zoom=${cam.zoom.toFixed(2)}`);
 
         // Calculate world length and angle
         const dx = endWorld.x - startWorld.x;
@@ -260,12 +260,12 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
             container.add(sprite);
         }
 
-        console.log(`  Container has ${container.list.length} sprites after creation`);
-        if (container.list.length > 0) {
-            const firstSprite = container.list[0] as Phaser.GameObjects.Sprite;
-            console.log(`  First sprite: pos(${firstSprite.x},${firstSprite.y}) origin(${firstSprite.originX},${firstSprite.originY}) visible=${firstSprite.visible} alpha=${firstSprite.alpha} depth=${firstSprite.depth}`);
-            console.log(`  First sprite texture: ${firstSprite.texture.key} frame=${firstSprite.frame.name}`);
-        }
+        // console.log(`  Container has ${container.list.length} sprites after creation`);
+        // if (container.list.length > 0) {
+        //     const firstSprite = container.list[0] as Phaser.GameObjects.Sprite;
+        //     console.log(`  First sprite: pos(${firstSprite.x},${firstSprite.y}) origin(${firstSprite.originX},${firstSprite.originY}) visible=${firstSprite.visible} alpha=${firstSprite.alpha} depth=${firstSprite.depth}`);
+        //     console.log(`  First sprite texture: ${firstSprite.texture.key} frame=${firstSprite.frame.name}`);
+        // }
 
         // Add clickable outline for placed bridges
         if (addClickableOutline) {

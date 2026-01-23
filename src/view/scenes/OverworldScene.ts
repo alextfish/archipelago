@@ -5,12 +5,9 @@ import { OverworldGameState } from '@model/overworld/OverworldGameState';
 import { CollisionManager } from '@model/overworld/CollisionManager';
 import { OverworldBridgeManager } from '@model/overworld/OverworldBridgeManager';
 import { CameraManager } from '@view/CameraManager';
-import { EmbeddedPuzzleRenderer } from '@view/EmbeddedPuzzleRenderer';
-import { PuzzleController } from '@controller/PuzzleController';
-import { PuzzleInputHandler } from '@controller/PuzzleInputHandler';
-import type { PuzzleHost } from '@controller/PuzzleHost';
-import { defaultTileConfig } from '@model/overworld/MapConfig';
+import { OverworldPuzzleController } from '@controller/OverworldPuzzleController';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
+import { defaultTileConfig } from '@model/overworld/MapConfig';
 import { PlayerController } from '@view/PlayerController';
 import { InteractionCursor, type Interactable } from '@view/InteractionCursor';
 import { RoofManager } from '@view/RoofManager';
@@ -38,11 +35,13 @@ export class OverworldScene extends Phaser.Scene {
   private collisionManager: CollisionManager;
   private bridgeManager?: OverworldBridgeManager;
   private cameraManager: CameraManager;
-  private activePuzzleController?: PuzzleController;
-  private puzzleRenderer?: EmbeddedPuzzleRenderer;
-  private puzzleInputHandler?: PuzzleInputHandler;
+  private puzzleController?: OverworldPuzzleController; // New: replaces direct puzzle management
   private tiledMapData?: any;
+
+  // Store pointer handlers so we can restore them after puzzle mode
   private puzzleEntryPointerHandler?: (pointer: Phaser.Input.Pointer) => void;
+  private pointerMoveHandler?: (pointer: Phaser.Input.Pointer) => void;
+  private pointerUpHandler?: () => void;
 
   // Interaction cursor system
   private interactionCursor?: InteractionCursor;
@@ -250,6 +249,18 @@ export class OverworldScene extends Phaser.Scene {
       // Load all puzzles from the map
       const puzzles = this.puzzleManager.loadPuzzlesFromMap(this.tiledMapData);
       console.log(`Loaded ${puzzles.size} overworld puzzles`);
+
+      // Create puzzle controller now that we have all dependencies
+      this.puzzleController = new OverworldPuzzleController(
+        this,
+        this.gameState,
+        this.puzzleManager,
+        this.cameraManager,
+        this.collisionManager,
+        this.bridgeManager,
+        this.tiledMapData
+      );
+      console.log('OverworldPuzzleController created');
 
       // Set up puzzle interaction checking
       this.setupPuzzleInteraction();
@@ -627,8 +638,11 @@ export class OverworldScene extends Phaser.Scene {
    * Set up puzzle interaction checking
    */
   private setupPuzzleInteraction(): void {
+    console.log('[DIAGNOSTIC] setupPuzzleInteraction: Setting up input handlers');
+
     // Add E key for interacting with focused target or entering puzzles
     this.input.keyboard?.on('keydown-E', () => {
+      console.log('[DIAGNOSTIC] E key pressed, gameMode:', this.gameMode);
       // If there's a focused target, interact with it
       const focusedTarget = this.interactionCursor?.getCurrentTarget();
       if (focusedTarget) {
@@ -644,8 +658,11 @@ export class OverworldScene extends Phaser.Scene {
     // Add pointer/touch input for mobile devices
     // Store the handler so we can remove it later if needed
     this.puzzleEntryPointerHandler = (pointer: Phaser.Input.Pointer) => {
+      console.log('[DIAGNOSTIC] pointerdown handler called, gameMode:', this.gameMode, 'worldPos:', pointer.worldX.toFixed(0), pointer.worldY.toFixed(0));
+
       // Only handle clicks in exploration mode
       if (this.gameMode !== 'exploration') {
+        console.log('[DIAGNOSTIC] Ignoring click - not in exploration mode');
         return;
       }
 
@@ -717,7 +734,7 @@ export class OverworldScene extends Phaser.Scene {
     this.input.on('pointerdown', this.puzzleEntryPointerHandler);
 
     // Add pointer move handler for continuous movement while held
-    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+    this.pointerMoveHandler = (pointer: Phaser.Input.Pointer) => {
       // Only update destination if pointer is held and in exploration mode
       if (!this.isPointerHeld || this.gameMode !== 'exploration') {
         return;
@@ -731,12 +748,14 @@ export class OverworldScene extends Phaser.Scene {
       const worldX = pointer.worldX;
       const worldY = pointer.worldY;
       this.playerController.setTargetPosition(worldX, worldY);
-    });
+    };
+    this.input.on('pointermove', this.pointerMoveHandler);
 
     // Add pointer up handler to stop tracking
-    this.input.on('pointerup', () => {
+    this.pointerUpHandler = () => {
       this.isPointerHeld = false;
-    });
+    };
+    this.input.on('pointerup', this.pointerUpHandler);
 
     console.log('Puzzle interaction set up - press E or tap focused interactable to interact, tap elsewhere to move');
   }
@@ -925,45 +944,12 @@ export class OverworldScene extends Phaser.Scene {
    * Enter overworld puzzle mode
    */
   public async enterOverworldPuzzle(puzzleId: string): Promise<void> {
-    console.log(`Entering overworld puzzle: ${puzzleId}`);
-
-    if (!this.tiledMapData) {
-      console.error('No tilemap data available for puzzle entry');
-      return;
-    }
-
-    // Get the puzzle
-    const puzzle = this.puzzleManager.getPuzzleById(puzzleId);
-    if (!puzzle) {
-      console.error(`Puzzle not found: ${puzzleId}`);
-      return;
-    }
-
-    // Get puzzle bounds
-    const puzzleBounds = this.puzzleManager.getPuzzleBounds(puzzleId);
-    if (!puzzleBounds) {
-      console.error(`No bounds found for puzzle: ${puzzleId}`);
+    if (!this.puzzleController) {
+      console.error('Puzzle controller not initialized');
       return;
     }
 
     try {
-      // Set active puzzle in game state
-      this.gameState.setActivePuzzle(puzzleId, puzzle);
-
-      // Create puzzle bounds rectangle
-      const boundsRect = new Phaser.Geom.Rectangle(
-        puzzleBounds.x,
-        puzzleBounds.y,
-        puzzleBounds.width,
-        puzzleBounds.height
-      );
-
-      // Blank this puzzle's region from bridges layer (whether completed or not)
-      // This allows editing and restores proper collision
-      if (this.bridgeManager) {
-        this.bridgeManager.blankPuzzleRegion(puzzleId, boundsRect);
-      }
-
       // Enter puzzle mode
       this.gameMode = 'puzzle';
 
@@ -977,54 +963,9 @@ export class OverworldScene extends Phaser.Scene {
         this.playerController.setEnabled(false);
       }
 
-      // Store camera state BEFORE stopping follow, so we capture where the camera is while following
-      // Then stop following and transition
-      this.cameraManager.storeCameraState();
-      this.cameras.main.stopFollow();
-
-      // Transition camera to puzzle (uses 2-cell margin defined in CameraManager)
-      await this.cameraManager.transitionToPuzzle(boundsRect);
-
-      // Create embedded puzzle renderer
-      this.puzzleRenderer = new EmbeddedPuzzleRenderer(
-        this,
-        boundsRect,
-        'sprout-tiles'
-      );
-
-      // Create puzzle controller
-      this.activePuzzleController = new PuzzleController(
-        puzzle,
-        this.puzzleRenderer,
-        this.createOverworldPuzzleHost(puzzleId)
-      );
-
-      // Set up input handling for puzzle
-      this.puzzleInputHandler = new PuzzleInputHandler(
-        this,
-        this.activePuzzleController,
-        this.puzzleRenderer
-      );
-
-      // Initialize puzzle systems
-      this.puzzleRenderer.init(puzzle);
-      this.puzzleInputHandler.setupInputHandlers();
-      this.activePuzzleController.enterPuzzle();
-
-      // Update collision for bridges
-      this.collisionManager.updateCollisionFromBridges(puzzle, boundsRect);
-
-      // Show HUD using PuzzleHUDManager
-      PuzzleHUDManager.getInstance().enterPuzzle(
-        this,
-        this.activePuzzleController,
-        'overworld'
-      );
-
       // Setup HUD event listeners
       const hudScene = this.scene.get('PuzzleHUDScene');
       if (hudScene) {
-        // Listen for HUD button clicks
         hudScene.events.on('exit', this.handleHUDExit, this);
         hudScene.events.on('undo', this.handleHUDUndo, this);
         hudScene.events.on('redo', this.handleHUDRedo, this);
@@ -1037,16 +978,10 @@ export class OverworldScene extends Phaser.Scene {
       // Setup Escape key to exit puzzle
       this.input.keyboard?.on('keydown-ESC', this.handleEscapeKey, this);
 
-      // Emit puzzle setup events for HUD
-      const bridgeTypes = puzzle.getAvailableBridgeTypes();
-      console.log('OverworldScene: Emitting setTypes with', bridgeTypes);
-      this.events.emit('setTypes', bridgeTypes);
-
-      const counts = puzzle.availableCounts();
-      console.log('OverworldScene: Emitting updateCounts with', counts);
-      this.events.emit('updateCounts', counts);
-
-      console.log(`Successfully entered overworld puzzle: ${puzzleId}`);
+      // Delegate to controller for puzzle lifecycle
+      await this.puzzleController.enterPuzzle(puzzleId, (mode: 'puzzle') => {
+        this.gameMode = mode;
+      });
 
     } catch (error) {
       console.error(`Failed to enter overworld puzzle: ${puzzleId}`, error);
@@ -1058,31 +993,16 @@ export class OverworldScene extends Phaser.Scene {
    * Exit overworld puzzle mode
    */
   public async exitOverworldPuzzle(success: boolean): Promise<void> {
+    if (!this.puzzleController) {
+      console.warn('No puzzle controller to exit');
+      return;
+    }
+
     // Guard against re-entrant calls (prevents infinite loop when puzzle is solved)
     if (this.isExitingPuzzle) {
       console.log('Already exiting puzzle, ignoring duplicate call');
       return;
     }
-
-    const activeData = this.gameState.getActivePuzzle();
-    if (!activeData) {
-      console.warn('No active puzzle to exit');
-      return;
-    }
-
-    console.log(`Exiting overworld puzzle: ${activeData.id} (success parameter: ${success})`);
-
-    // Check if the puzzle is currently in a solved state, even if exiting via cancel/escape
-    // This allows players to re-enter solved puzzles and exit without losing completion status
-    if (!success && this.activePuzzleController) {
-      const isSolved = this.activePuzzleController.isSolved();
-      if (isSolved) {
-        console.log('Puzzle is currently solved despite exit request - treating as success');
-        success = true;
-      }
-    }
-
-    console.log(`Final exit mode: ${success ? 'SOLVED' : 'CANCELLED'}`);
 
     this.isExitingPuzzle = true;
 
@@ -1102,98 +1022,42 @@ export class OverworldScene extends Phaser.Scene {
       // Clean up Escape key listener
       this.input.keyboard?.off('keydown-ESC', this.handleEscapeKey, this);
 
-      // Hide HUD using PuzzleHUDManager
-      PuzzleHUDManager.getInstance().exitPuzzle();
+      // Delegate to controller for puzzle exit
+      console.log('[DIAGNOSTIC] About to call puzzleController.exitPuzzle, success:', success);
+      await this.puzzleController.exitPuzzle(success, (mode: 'exploration') => {
+        console.log('[DIAGNOSTIC] onModeChange callback called, setting mode to:', mode);
+        this.gameMode = mode;
+      });
+      console.log('[DIAGNOSTIC] puzzleController.exitPuzzle completed');
 
-      // Save puzzle state before exiting
-      if (this.activePuzzleController) {
-        this.gameState.saveOverworldPuzzleProgress(activeData.id, activeData.puzzle);
-        // Don't call controller.exitPuzzle() as it would trigger onPuzzleExited callback
-        // which would call this method again, creating an infinite loop
-      }
-
-      // Clean up puzzle input handler
-      if (this.puzzleInputHandler) {
-        this.puzzleInputHandler.destroy();
-        this.puzzleInputHandler = undefined;
-      }
-
-      // Clean up puzzle renderer
-      if (this.puzzleRenderer) {
-        this.puzzleRenderer.destroy();
-        this.puzzleRenderer = undefined;
-      }
-
-      // Handle collision and bridge rendering based on whether puzzle was solved
-      const puzzleBounds = this.puzzleManager.getPuzzleBounds(activeData.id);
-      console.log(`DEBUG getPuzzleBounds for "${activeData.id}":`, puzzleBounds);
-      const boundsRect = puzzleBounds ? new Phaser.Geom.Rectangle(
-        puzzleBounds.x,
-        puzzleBounds.y,
-        puzzleBounds.width,
-        puzzleBounds.height
-      ) : null;
-
-      if (success) {
-        // If solved: bake bridges to bridges layer and mark as completed
-        console.log('Puzzle solved - baking bridges to overworld');
-        console.log(`  Active puzzle ID: "${activeData.id}"`);
-        console.log(`  Bridge manager exists: ${!!this.bridgeManager}`);
-        console.log(`  Puzzle bounds: ${puzzleBounds ? JSON.stringify(puzzleBounds) : 'NULL'}`);
-        console.log(`  Bounds rect exists: ${!!boundsRect}`);
-        console.log(`  Number of bridges: ${activeData.puzzle.bridges.length}`);
-
-        if (this.bridgeManager && boundsRect) {
-          const bridges = activeData.puzzle.bridges;
-          console.log('  Calling bakePuzzleBridges...');
-          this.bridgeManager.bakePuzzleBridges(activeData.id, boundsRect, bridges);
-          console.log('  bakePuzzleBridges completed');
-        } else {
-          console.error('  CANNOT BAKE: missing bridge manager or bounds');
-          console.error(`    bridgeManager: ${this.bridgeManager ? 'EXISTS' : 'NULL'}`);
-          console.error(`    boundsRect: ${boundsRect ? 'EXISTS' : 'NULL'}`);
-        }
-        this.gameState.markPuzzleCompleted(activeData.id);
-      } else {
-        // If cancelled: check if it was previously completed
-        const wasCompleted = this.gameState.isPuzzleCompleted(activeData.id);
-
-        if (wasCompleted) {
-          // Was completed, now being re-entered and cancelled
-          // Clear completion status and blank the region again (already blanked on entry, but be explicit)
-          console.log('Previously completed puzzle cancelled - clearing completion status');
-          this.gameState.clearPuzzleCompletion(activeData.id);
-          if (this.bridgeManager && boundsRect) {
-            this.bridgeManager.blankPuzzleRegion(activeData.id, boundsRect);
-          }
-        } else {
-          // Was never completed, just restore collision
-          console.log('Incomplete puzzle cancelled - restoring collision');
-          this.collisionManager.restoreOriginalCollision();
-        }
-      }
-
-      // Resume camera following player BEFORE transition so it pans to player while zooming
-      this.cameras.main.startFollow(this.player);
-
-      // Return camera to overworld (just zooms, camera follow handles panning to player)
-      await this.cameraManager.transitionToOverworld();
-
-      // Exit puzzle mode and re-enable player movement
-      this.gameMode = 'exploration';
+      // Re-enable player movement
       if (this.playerController) {
         this.playerController.setEnabled(true);
+        console.log('[DIAGNOSTIC] Player controller re-enabled');
       }
 
-      // Restore pointer handler for puzzle entry (it was removed by PuzzleInputHandler)
+      // Restore all pointer handlers (they were removed by PuzzleInputHandler.destroy())
+      console.log('[DIAGNOSTIC] Restoring input handlers after puzzle exit');
+      console.log('[DIAGNOSTIC] - puzzleEntryPointerHandler exists:', !!this.puzzleEntryPointerHandler);
+      console.log('[DIAGNOSTIC] - pointerMoveHandler exists:', !!this.pointerMoveHandler);
+      console.log('[DIAGNOSTIC] - pointerUpHandler exists:', !!this.pointerUpHandler);
+      console.log('[DIAGNOSTIC] - gameMode:', this.gameMode);
+
       if (this.puzzleEntryPointerHandler) {
         this.input.off('pointerdown', this.puzzleEntryPointerHandler); // Remove first to avoid duplicates
         this.input.on('pointerdown', this.puzzleEntryPointerHandler);
+        console.log('[DIAGNOSTIC] pointerdown handler restored');
       }
-
-      // Clear active puzzle
-      this.gameState.clearActivePuzzle();
-      this.activePuzzleController = undefined;
+      if (this.pointerMoveHandler) {
+        this.input.off('pointermove', this.pointerMoveHandler); // Remove first to avoid duplicates
+        this.input.on('pointermove', this.pointerMoveHandler);
+        console.log('[DIAGNOSTIC] pointermove handler restored');
+      }
+      if (this.pointerUpHandler) {
+        this.input.off('pointerup', this.pointerUpHandler); // Remove first to avoid duplicates
+        this.input.on('pointerup', this.pointerUpHandler);
+        console.log('[DIAGNOSTIC] pointerup handler restored');
+      }
 
       console.log('Successfully exited overworld puzzle');
 
@@ -1206,32 +1070,10 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   /**
-   * Create puzzle host for overworld puzzles
-   */
-  private createOverworldPuzzleHost(puzzleId: string): PuzzleHost {
-    return {
-      loadPuzzle: (_puzzleID: string) => {
-        // Already loaded
-      },
-      onPuzzleSolved: () => {
-        console.log(`Overworld puzzle ${puzzleId} solved!`);
-        this.exitOverworldPuzzle(true);
-      },
-      onPuzzleExited: (success: boolean) => {
-        this.exitOverworldPuzzle(success);
-      },
-      onBridgeCountsChanged: (counts: Record<string, number>) => {
-        console.log('OverworldScene: Bridge counts changed, emitting updateCounts with', counts);
-        this.events.emit('updateCounts', counts);
-      }
-    };
-  }
-
-  /**
    * Check if currently in overworld puzzle mode
    */
   public isInPuzzleMode(): boolean {
-    return this.gameState.getActivePuzzle() !== null;
+    return this.puzzleController?.isInPuzzleMode() ?? false;
   }
 
   /**
@@ -1239,7 +1081,7 @@ export class OverworldScene extends Phaser.Scene {
    */
   private handleHUDExit(): void {
     console.log('OverworldScene: HUD Exit button clicked');
-    if (this.activePuzzleController) {
+    if (this.puzzleController) {
       this.exitOverworldPuzzle(false);
     }
   }
@@ -1249,8 +1091,8 @@ export class OverworldScene extends Phaser.Scene {
    */
   private handleHUDUndo(): void {
     console.log('OverworldScene: HUD Undo button clicked');
-    if (this.activePuzzleController) {
-      this.activePuzzleController.undo();
+    if (this.puzzleController) {
+      this.puzzleController.handleUndo();
     }
   }
 
@@ -1259,8 +1101,8 @@ export class OverworldScene extends Phaser.Scene {
    */
   private handleHUDRedo(): void {
     console.log('OverworldScene: HUD Redo button clicked');
-    if (this.activePuzzleController) {
-      this.activePuzzleController.redo();
+    if (this.puzzleController) {
+      this.puzzleController.handleRedo();
     }
   }
 
@@ -1269,19 +1111,8 @@ export class OverworldScene extends Phaser.Scene {
    */
   private handleTypeSelected(typeId: string): void {
     console.log('OverworldScene: Bridge type selected:', typeId);
-    if (!this.activePuzzleController) return;
-
-    // Find the bridge type by ID
-    const puzzle = this.activePuzzleController['puzzle']; // Access private field
-    const bridgeTypes = puzzle.getAvailableBridgeTypes();
-    const selectedType = bridgeTypes.find(bt => bt.id === typeId);
-
-    if (selectedType) {
-      // Update controller's selected type
-      this.activePuzzleController.selectBridgeType(selectedType);
-
-      // Notify HUD to update visual selection
-      this.events.emit('setSelectedType', typeId);
+    if (this.puzzleController) {
+      this.puzzleController.handleTypeSelected(typeId);
     }
   }
 
@@ -1301,8 +1132,8 @@ export class OverworldScene extends Phaser.Scene {
    */
   private handleBridgeClicked(bridgeId: string): void {
     console.log('OverworldScene: Bridge clicked', bridgeId);
-    if (this.activePuzzleController) {
-      this.activePuzzleController.removeBridge(bridgeId);
+    if (this.puzzleController) {
+      this.puzzleController.handleBridgeClicked(bridgeId);
     }
   }
 

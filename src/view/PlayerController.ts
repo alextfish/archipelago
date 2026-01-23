@@ -239,6 +239,7 @@ export class PlayerController {
      * Called when player taps/clicks a location
      */
     setTargetPosition(worldX: number, worldY: number): void {
+        console.log(`[DIAGNOSTIC] PlayerController.setTargetPosition called: (${worldX.toFixed(0)}, ${worldY.toFixed(0)}), enabled: ${this.enabled}`);
         this.targetPosition = { x: worldX, y: worldY };
         this.stuckFrames = 0;
         this.lastPlayerPosition = undefined;
@@ -410,6 +411,7 @@ export class PlayerController {
      * Enable or disable player movement
      */
     setEnabled(enabled: boolean): void {
+        console.log('[DIAGNOSTIC] PlayerController.setEnabled:', enabled);
         this.enabled = enabled;
         if (!enabled) {
             // Stop movement when disabled
