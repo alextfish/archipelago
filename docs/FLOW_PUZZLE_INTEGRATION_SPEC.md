@@ -164,7 +164,76 @@ export class FlowPuzzleRenderer extends EmbeddedPuzzleRenderer {
 }
 ```
 
-### 1.3 Rendering Details
+### 1.3 Real-Time Water State Updates
+
+**Important**: The FlowPuzzleRenderer needs to emit events when water state changes so the overworld view can update in real-time while the player is solving the puzzle. This allows visible river tiles outside the puzzle bounds to update as bridges are placed/removed.
+
+```typescript
+export class FlowPuzzleRenderer extends EmbeddedPuzzleRenderer {
+  // ... existing fields
+  
+  override updateFromPuzzle(puzzle: BridgePuzzle): void {
+    super.updateFromPuzzle(puzzle);
+    
+    if (this.flowPuzzle) {
+      const previousWaterState = this.getCurrentWaterState();
+      
+      // Update water visuals
+      this.updateWaterTiles();
+      this.updateFlowArrows();
+      
+      // Emit event with water state changes for overworld to update
+      const currentWaterState = this.getCurrentWaterState();
+      const changes = this.computeWaterStateChanges(previousWaterState, currentWaterState);
+      
+      if (changes.flooded.size > 0 || changes.drained.size > 0) {
+        this.scene.events.emit('flow-puzzle-water-changed', {
+          puzzleID: this.flowPuzzle.id,
+          flooded: Array.from(changes.flooded),
+          drained: Array.from(changes.drained)
+        });
+      }
+    }
+  }
+  
+  private getCurrentWaterState(): Set<string> {
+    const state = new Set<string>();
+    if (!this.flowPuzzle) return state;
+    
+    const waterGrid = this.flowPuzzle.getHasWaterGrid();
+    for (const [key, hasWater] of waterGrid) {
+      if (hasWater) {
+        state.add(key);
+      }
+    }
+    return state;
+  }
+  
+  private computeWaterStateChanges(
+    previous: Set<string>,
+    current: Set<string>
+  ): { flooded: Set<string>; drained: Set<string> } {
+    const flooded = new Set<string>();
+    const drained = new Set<string>();
+    
+    // Find newly flooded tiles
+    for (const tile of current) {
+      if (!previous.has(tile)) {
+        flooded.add(tile);
+      }
+    }
+    
+    // Find newly drained tiles
+    for (const tile of previous) {
+      if (!current.has(tile)) {
+        drained.add(tile);
+      }
+    }
+    
+    return { flooded, drained };
+  }
+}
+```
 
 **Water Tiles**: Each flow square gets a base sprite that switches between:
 - `water-filled`: When `flowPuzzle.tileHasWater(x, y)` is true
@@ -186,7 +255,7 @@ export class FlowPuzzleRenderer extends EmbeddedPuzzleRenderer {
 - Read `flowSquare.rocky` and `flowSquare.obstacle` flags
 - Render with distinct visuals to communicate rules
 
-### 1.4 Animation Support
+### 1.4 Rendering Details
 
 ```typescript
 private animateWaterStateChange(gridKey: string, nowHasWater: boolean): void {
@@ -210,7 +279,7 @@ private animateWaterStateChange(gridKey: string, nowHasWater: boolean): void {
 }
 ```
 
-### 1.5 Testing Strategy
+### 1.5 Animation Support
 
 While the renderer is view-layer code (primarily tested manually), extract helper methods for unit testing:
 
@@ -236,99 +305,252 @@ export class FlowRenderingUtils {
 
 ## 2. Model Layer Enhancements
 
-### 2.1 WaterPropagationEngine (New Class)
+### 2.1 RiverChannel (New Type)
 
-**Purpose**: Pure model logic for computing water connectivity across multiple FlowPuzzles.
+**Purpose**: Represents a continuous river channel in the overworld between puzzles.
+
+**Location**: `src/model/overworld/RiverChannel.ts`
+
+A river channel is a set of connected overworld tiles that can carry water from FlowPuzzle edge outputs to other FlowPuzzle edge inputs. These are extracted from the Tiled map at load time.
+
+```typescript
+/**
+ * Represents a river channel between FlowPuzzle edges.
+ * Contains the world tile coordinates that make up the channel.
+ */
+export interface RiverChannel {
+  id: string; // Unique identifier for this channel
+  tiles: { worldX: number; worldY: number }[]; // Ordered list of tiles in the channel
+  sourcePuzzleID: string; // ID of upstream FlowPuzzle
+  sourceEdgeTile: { localX: number; localY: number }; // Edge tile in source puzzle (local coords)
+  targetPuzzleID: string; // ID of downstream FlowPuzzle
+  targetEdgeTile: { localX: number; localY: number }; // Edge tile in target puzzle (local coords)
+}
+```
+
+### 2.2 WaterPropagationEngine (New Class)
+
+**Purpose**: Pure model logic for computing water flow across FlowPuzzles and river channels.
 
 **Location**: `src/model/overworld/WaterPropagationEngine.ts`
 
 **Responsibilities**:
-- Map edge outputs from solved puzzles to edge inputs of neighboring puzzles
-- Handle coordinate transformations between puzzle-local and world coordinates
-- Compute global water state by traversing puzzle graph
+- Store river channel connectivity information (extracted from Tiled at load time)
+- Trace water flow from FlowPuzzle edge outputs through river channels to downstream puzzles
+- Compute which river tiles should have water vs be drained
+- Compute edge inputs for downstream FlowPuzzles
+- Use GridToWorldMapper for coordinate conversions
 - Provide deterministic, testable water propagation
 
 ```typescript
+import type { GridToWorldMapper } from '@view/GridToWorldMapper';
+import type { RiverChannel } from './RiverChannel';
+
 /**
- * Pure model class for computing water propagation across overworld FlowPuzzles.
- * Uses graph traversal to determine which puzzles receive water from upstream sources.
+ * Pure model class for computing water propagation across overworld.
+ * Traces water from FlowPuzzle outputs through river channels to downstream puzzles.
  */
 export class WaterPropagationEngine {
-  /**
-   * Represents a puzzle's position and water input/output edges in world coordinates
-   */
-  interface PuzzleNode {
-    puzzleID: string;
-    bounds: { x: number; y: number; width: number; height: number };
-    edgeOutputs: { worldX: number; worldY: number }[]; // World coordinates
+  private riverChannels: RiverChannel[] = [];
+  private gridMapper: GridToWorldMapper;
+  
+  // Map from puzzle edge tile (world coords) to list of channels starting there
+  private channelsBySource: Map<string, RiverChannel[]> = new Map();
+  
+  // Map from puzzle edge tile (world coords) to channel ending there
+  private channelsByTarget: Map<string, RiverChannel> = new Map();
+  
+  constructor(gridMapper: GridToWorldMapper) {
+    this.gridMapper = gridMapper;
   }
   
   /**
-   * Map of edges between puzzles. Key is world coordinate, value is list of puzzles
-   * that have an edge at that coordinate.
+   * Initialize with river channels extracted from Tiled map at load time.
    */
-  private edgeMap: Map<string, string[]> = new Map();
-  
-  /**
-   * Builds the edge connectivity graph from a set of puzzle nodes
-   */
-  buildConnectivityGraph(nodes: PuzzleNode[]): void {
-    // For each puzzle's edge outputs, find which puzzles have inputs at same world coords
-    // Build bi-directional mapping
+  setRiverChannels(channels: RiverChannel[]): void {
+    this.riverChannels = channels;
+    this.buildChannelMaps();
   }
   
   /**
-   * Given a solved puzzle with new edge outputs, compute updated inputs for connected puzzles.
-   * Returns map of puzzleID → list of edge input coordinates (in puzzle-local space).
+   * Build lookup maps for efficient channel queries.
+   */
+  private buildChannelMaps(): void {
+    this.channelsBySource.clear();
+    this.channelsByTarget.clear();
+    
+    for (const channel of this.riverChannels) {
+      // Convert source puzzle edge tile to world coordinates
+      const sourcePuzzleBounds = this.getPuzzleBounds(channel.sourcePuzzleID);
+      const sourceWorld = this.gridMapper.gridToWorld(
+        channel.sourceEdgeTile.localX,
+        channel.sourceEdgeTile.localY
+      );
+      const sourceKey = `${sourceWorld.x},${sourceWorld.y}`;
+      
+      if (!this.channelsBySource.has(sourceKey)) {
+        this.channelsBySource.set(sourceKey, []);
+      }
+      this.channelsBySource.get(sourceKey)!.push(channel);
+      
+      // Convert target puzzle edge tile to world coordinates
+      const targetPuzzleBounds = this.getPuzzleBounds(channel.targetPuzzleID);
+      const targetWorld = this.gridMapper.gridToWorld(
+        channel.targetEdgeTile.localX,
+        channel.targetEdgeTile.localY
+      );
+      const targetKey = `${targetWorld.x},${targetWorld.y}`;
+      this.channelsByTarget.set(targetKey, channel);
+    }
+  }
+  
+  /**
+   * Compute water propagation from a FlowPuzzle's edge outputs.
+   * Returns:
+   * - flooded: Set of world tile coordinates that should have water
+   * - drained: Set of world tile coordinates that should be drained
+   * - downstreamInputs: Map of puzzleID → edge input coordinates (in local space)
    */
   computePropagation(
     sourcePuzzleID: string,
-    sourceEdgeOutputs: { worldX: number; worldY: number }[],
-    allNodes: PuzzleNode[]
-  ): Map<string, { x: number; y: number }[]> {
-    const result = new Map<string, { x: number; y: number }[]>();
+    edgeOutputs: { localX: number; localY: number }[],
+    puzzleBounds: { x: number; y: number; width: number; height: number }
+  ): {
+    flooded: Set<string>; // World tile keys "x,y"
+    drained: Set<string>; // World tile keys "x,y"
+    downstreamInputs: Map<string, { x: number; y: number }[]>;
+  } {
+    const flooded = new Set<string>();
+    const downstreamInputs = new Map<string, { x: number; y: number }[]>();
     
-    // For each output edge from source puzzle:
-    // 1. Convert to world coordinates
-    // 2. Look up which puzzles have inputs at those world coordinates
-    // 3. Convert back to target puzzle's local coordinates
-    // 4. Accumulate inputs per target puzzle
+    // For each edge output from the source puzzle
+    for (const localOutput of edgeOutputs) {
+      // Convert to world coordinates
+      const worldOutput = this.gridMapper.gridToWorld(
+        localOutput.localX + Math.floor(puzzleBounds.x / this.gridMapper.getCellSize()),
+        localOutput.localY + Math.floor(puzzleBounds.y / this.gridMapper.getCellSize())
+      );
+      const outputKey = `${worldOutput.x},${worldOutput.y}`;
+      
+      // Find channels starting from this edge
+      const channels = this.channelsBySource.get(outputKey) || [];
+      
+      for (const channel of channels) {
+        // Mark all tiles in this channel as flooded
+        for (const tile of channel.tiles) {
+          flooded.add(`${tile.worldX},${tile.worldY}`);
+        }
+        
+        // Add edge input to downstream puzzle
+        if (!downstreamInputs.has(channel.targetPuzzleID)) {
+          downstreamInputs.set(channel.targetPuzzleID, []);
+        }
+        downstreamInputs.get(channel.targetPuzzleID)!.push({
+          x: channel.targetEdgeTile.localX,
+          y: channel.targetEdgeTile.localY
+        });
+      }
+    }
     
-    return result;
+    // Compute drained tiles: all channel tiles not in flooded set
+    const drained = new Set<string>();
+    for (const channel of this.riverChannels) {
+      for (const tile of channel.tiles) {
+        const key = `${tile.worldX},${tile.worldY}`;
+        if (!flooded.has(key)) {
+          drained.add(key);
+        }
+      }
+    }
+    
+    return { flooded, drained, downstreamInputs };
   }
   
   /**
-   * Helper: Convert puzzle-local coordinates to world coordinates
+   * Helper to get puzzle bounds (would be injected or passed in real implementation)
    */
-  static localToWorld(
-    localX: number, 
-    localY: number, 
-    bounds: { x: number; y: number }
-  ): { worldX: number; worldY: number } {
-    // Assuming each puzzle grid cell = 32px world units
-    const tileSize = 32;
-    return {
-      worldX: bounds.x + localX * tileSize,
-      worldY: bounds.y + localY * tileSize
-    };
+  private getPuzzleBounds(puzzleID: string): { x: number; y: number } {
+    // This would come from OverworldPuzzleManager
+    throw new Error('Not implemented - inject puzzle bounds lookup');
+  }
+}
+```
+
+### 2.3 RiverChannelExtractor (New Utility)
+
+**Purpose**: Extract river channel connectivity from Tiled map at load time.
+
+**Location**: `src/model/overworld/RiverChannelExtractor.ts`
+
+```typescript
+import type { RiverChannel } from './RiverChannel';
+
+/**
+ * Extracts river channel connectivity from Tiled map layer.
+ * Analyzes "flowingWater" layer (or similar) to find continuous channels
+ * connecting FlowPuzzle edge tiles.
+ */
+export class RiverChannelExtractor {
+  /**
+   * Extract river channels from Tiled map data.
+   * Uses flood-fill algorithm to trace connected water tiles.
+   * 
+   * @param tiledMapData - Tiled map JSON data
+   * @param flowLayerName - Name of layer containing water tiles (e.g., "flowingWater")
+   * @param puzzleRegions - Map of puzzle IDs to their bounds and edge tiles
+   * @returns List of river channels connecting puzzles
+   */
+  static extractChannels(
+    tiledMapData: any,
+    flowLayerName: string,
+    puzzleRegions: Map<string, {
+      bounds: { x: number; y: number; width: number; height: number };
+      edgeTiles: { x: number; y: number; edge: 'N' | 'S' | 'E' | 'W' }[];
+    }>
+  ): RiverChannel[] {
+    const channels: RiverChannel[] = [];
+    
+    // 1. Find the flow layer in Tiled data
+    const flowLayer = tiledMapData.layers.find((l: any) => l.name === flowLayerName);
+    if (!flowLayer) {
+      console.warn(`Flow layer "${flowLayerName}" not found in Tiled map`);
+      return channels;
+    }
+    
+    // 2. Build a grid of water tiles from layer data
+    const waterGrid = this.buildWaterGrid(flowLayer);
+    
+    // 3. For each puzzle edge tile, trace downstream to find channels
+    for (const [puzzleID, region] of puzzleRegions) {
+      for (const edgeTile of region.edgeTiles) {
+        const channel = this.traceChannel(
+          puzzleID,
+          edgeTile,
+          waterGrid,
+          puzzleRegions
+        );
+        if (channel) {
+          channels.push(channel);
+        }
+      }
+    }
+    
+    return channels;
   }
   
-  /**
-   * Helper: Convert world coordinates to puzzle-local coordinates
-   */
-  static worldToLocal(
-    worldX: number,
-    worldY: number,
-    bounds: { x: number; y: number }
-  ): { x: number; y: number } | null {
-    const tileSize = 32;
-    const localX = Math.floor((worldX - bounds.x) / tileSize);
-    const localY = Math.floor((worldY - bounds.y) / tileSize);
-    
-    // Validate that coordinates are within puzzle bounds
-    if (localX < 0 || localY < 0) return null;
-    
-    return { x: localX, y: localY };
+  private static buildWaterGrid(flowLayer: any): Set<string> {
+    // Implementation: parse layer data to identify water tiles
+    return new Set<string>();
+  }
+  
+  private static traceChannel(
+    sourcePuzzleID: string,
+    sourceEdge: { x: number; y: number; edge: 'N' | 'S' | 'E' | 'W' },
+    waterGrid: Set<string>,
+    puzzleRegions: Map<string, any>
+  ): RiverChannel | null {
+    // Implementation: flood-fill from source edge until reaching another puzzle edge
+    return null;
   }
 }
 ```
@@ -337,50 +559,70 @@ export class WaterPropagationEngine {
 
 ```typescript
 describe('WaterPropagationEngine', () => {
-  it('propagates water from upstream puzzle to downstream puzzle', () => {
-    const engine = new WaterPropagationEngine();
+  it('propagates water through river channels', () => {
+    const gridMapper = new GridToWorldMapper(32);
+    const engine = new WaterPropagationEngine(gridMapper);
     
-    const upstream: PuzzleNode = {
-      puzzleID: 'river-top',
-      bounds: { x: 0, y: 0, width: 96, height: 32 },
-      edgeOutputs: [{ worldX: 96, worldY: 16 }] // Right edge, middle row
+    const channel: RiverChannel = {
+      id: 'river-1',
+      tiles: [
+        { worldX: 96, worldY: 16 },
+        { worldX: 128, worldY: 16 },
+        { worldX: 160, worldY: 16 }
+      ],
+      sourcePuzzleID: 'puzzle-A',
+      sourceEdgeTile: { localX: 3, localY: 0 },
+      targetPuzzleID: 'puzzle-B',
+      targetEdgeTile: { localX: 0, localY: 0 }
     };
     
-    const downstream: PuzzleNode = {
-      puzzleID: 'river-middle',
-      bounds: { x: 96, y: 0, width: 96, height: 32 },
-      edgeOutputs: []
-    };
+    engine.setRiverChannels([channel]);
     
-    const propagation = engine.computePropagation(
-      'river-top',
-      upstream.edgeOutputs,
-      [upstream, downstream]
+    const result = engine.computePropagation(
+      'puzzle-A',
+      [{ localX: 3, localY: 0 }],
+      { x: 0, y: 0, width: 128, height: 32 }
     );
     
-    expect(propagation.get('river-middle')).toEqual([
-      { x: 0, y: 0 } // Left edge of downstream puzzle
+    expect(result.flooded.size).toBe(3);
+    expect(result.downstreamInputs.get('puzzle-B')).toEqual([
+      { x: 0, y: 0 }
     ]);
   });
   
-  it('handles multiple connected puzzles in a river network', () => {
-    // Test complex graph with branches and joins
+  it('drains channels when upstream output stops', () => {
+    // Test that channels not receiving water are marked as drained
   });
   
-  it('converts coordinates correctly between local and world space', () => {
-    const bounds = { x: 64, y: 128 };
-    const world = WaterPropagationEngine.localToWorld(2, 3, bounds);
-    expect(world).toEqual({ worldX: 128, worldY: 224 });
+  it('handles branching river channels', () => {
+    // Test when one output feeds multiple downstream channels
+  });
+});
+
+describe('RiverChannelExtractor', () => {
+  it('extracts river channels from Tiled map', () => {
+    const mockTiledData = createMockTiledMapWithRiver();
+    const puzzleRegions = new Map([
+      ['puzzle-A', { bounds: { x: 0, y: 0, width: 128, height: 32 }, edgeTiles: [...] }],
+      ['puzzle-B', { bounds: { x: 256, y: 0, width: 128, height: 32 }, edgeTiles: [...] }]
+    ]);
     
-    const local = WaterPropagationEngine.worldToLocal(128, 224, bounds);
-    expect(local).toEqual({ x: 2, y: 3 });
+    const channels = RiverChannelExtractor.extractChannels(
+      mockTiledData,
+      'flowingWater',
+      puzzleRegions
+    );
+    
+    expect(channels.length).toBeGreaterThan(0);
+    expect(channels[0].sourcePuzzleID).toBe('puzzle-A');
+    expect(channels[0].targetPuzzleID).toBe('puzzle-B');
   });
 });
 ```
 
-### 2.2 OverworldGameState Enhancements
+### 2.4 OverworldGameState Enhancements
 
-**Purpose**: Extend existing `OverworldGameState` to track FlowPuzzle-specific state.
+**Purpose**: Extend existing `OverworldGameState` to track FlowPuzzle-specific state and coordinate water propagation.
 
 **New Fields**:
 
@@ -388,14 +630,20 @@ describe('WaterPropagationEngine', () => {
 export class OverworldGameState {
   // Existing fields...
   
-  // NEW: Track solved FlowPuzzles and their edge outputs
+  // NEW: Track solved FlowPuzzles and their edge outputs (local coordinates)
   private flowPuzzleOutputs: Map<string, { x: number; y: number }[]> = new Map();
   
-  // NEW: Cache of computed edge inputs for each FlowPuzzle
+  // NEW: Cache of computed edge inputs for each FlowPuzzle (local coordinates)
   private flowPuzzleInputs: Map<string, { x: number; y: number }[]> = new Map();
   
+  // NEW: Current water state of overworld river tiles (world coordinates)
+  private overworldWaterState: Set<string> = new Set(); // Keys: "worldX,worldY"
+  
   // NEW: Instance of water propagation engine
-  private waterPropagation: WaterPropagationEngine = new WaterPropagationEngine();
+  private waterPropagation?: WaterPropagationEngine;
+  
+  // NEW: Reference to overworld puzzle manager (for bounds lookup)
+  private puzzleManager?: OverworldPuzzleManager;
 }
 ```
 
@@ -403,37 +651,81 @@ export class OverworldGameState {
 
 ```typescript
 /**
- * Update water propagation when a FlowPuzzle is solved.
- * Extracts edge outputs, propagates to connected puzzles, updates inputs.
+ * Initialize water propagation system with river channels and puzzle manager.
+ * Called once at game load after Tiled map is parsed.
+ */
+initializeWaterPropagation(
+  waterPropagation: WaterPropagationEngine,
+  puzzleManager: OverworldPuzzleManager
+): void {
+  this.waterPropagation = waterPropagation;
+  this.puzzleManager = puzzleManager;
+}
+
+/**
+ * Update water propagation when a FlowPuzzle's state changes.
+ * Returns the tiles that changed state (for view updates).
+ * 
+ * This is called:
+ * - When player places/removes a bridge in active FlowPuzzle (real-time updates)
+ * - When player exits a solved FlowPuzzle (final baking)
  */
 updateFlowPuzzleWaterState(
   puzzleID: string,
-  puzzle: FlowPuzzle,
-  puzzleBounds: { x: number; y: number; width: number; height: number }
-): void {
-  // 1. Get edge outputs from solved puzzle (local coordinates)
+  puzzle: FlowPuzzle
+): {
+  flooded: Set<string>; // World tile keys that now have water
+  drained: Set<string>; // World tile keys that are now drained
+  affectedPuzzles: Map<string, { x: number; y: number }[]>; // Puzzle ID → new edge inputs
+} {
+  if (!this.waterPropagation || !this.puzzleManager) {
+    throw new Error('Water propagation not initialized');
+  }
+  
+  // 1. Get puzzle bounds
+  const bounds = this.puzzleManager.getPuzzleBounds(puzzleID);
+  if (!bounds) {
+    throw new Error(`No bounds for puzzle ${puzzleID}`);
+  }
+  
+  // 2. Get edge outputs from puzzle (local coordinates)
   const localOutputs = puzzle.getEdgeOutput();
   
-  // 2. Convert to world coordinates using puzzle bounds
-  const worldOutputs = localOutputs.map(({ x, y }) => 
-    WaterPropagationEngine.localToWorld(x, y, puzzleBounds)
-  );
-  
-  // 3. Store outputs
+  // 3. Store outputs for this puzzle
   this.flowPuzzleOutputs.set(puzzleID, localOutputs);
   
-  // 4. Compute propagation to connected puzzles
-  const allNodes = this.buildPuzzleNodeList();
+  // 4. Compute propagation through river channels
   const propagation = this.waterPropagation.computePropagation(
     puzzleID,
-    worldOutputs,
-    allNodes
+    localOutputs,
+    bounds
   );
   
-  // 5. Update edge inputs for affected puzzles
-  for (const [targetPuzzleID, inputs] of propagation) {
+  // 5. Update overworld water state
+  // Remove old water tiles
+  const oldTiles = new Set(this.overworldWaterState);
+  
+  // Add new flooded tiles
+  for (const tile of propagation.flooded) {
+    this.overworldWaterState.add(tile);
+    oldTiles.delete(tile); // Not changed if already had water
+  }
+  
+  // Remove drained tiles
+  for (const tile of propagation.drained) {
+    this.overworldWaterState.delete(tile);
+  }
+  
+  // 6. Update edge inputs for affected puzzles
+  for (const [targetPuzzleID, inputs] of propagation.downstreamInputs) {
     this.flowPuzzleInputs.set(targetPuzzleID, inputs);
   }
+  
+  return {
+    flooded: propagation.flooded,
+    drained: propagation.drained,
+    affectedPuzzles: propagation.downstreamInputs
+  };
 }
 
 /**
@@ -445,31 +737,37 @@ getFlowPuzzleInputs(puzzleID: string): { x: number; y: number }[] {
 }
 
 /**
- * Get edge outputs for a solved FlowPuzzle.
+ * Check if a world tile currently has water.
  */
-getFlowPuzzleOutputs(puzzleID: string): { x: number; y: number }[] {
-  return this.flowPuzzleOutputs.get(puzzleID) ?? [];
+tileHasWater(worldX: number, worldY: number): boolean {
+  return this.overworldWaterState.has(`${worldX},${worldY}`);
 }
 
 /**
- * Helper: Build list of all FlowPuzzle nodes with bounds and outputs.
- * Requires access to OverworldPuzzleManager to get puzzle bounds.
+ * Get all world tiles that currently have water.
  */
-private buildPuzzleNodeList(): PuzzleNode[] {
-  // Implementation would iterate through all puzzles and build node list
-  // Requires coordination with OverworldPuzzleManager
+getWaterTiles(): { worldX: number; worldY: number }[] {
+  const tiles: { worldX: number; worldY: number }[] = [];
+  for (const key of this.overworldWaterState) {
+    const [x, y] = key.split(',').map(Number);
+    tiles.push({ worldX: x, worldY: y });
+  }
+  return tiles;
 }
 ```
 
 **Persistence**:
 
-Extend `exportState()` and `importState()` to include water propagation state:
+Both bridges AND water state must persist across game sessions. Extend `exportState()` and `importState()`:
 
 ```typescript
 exportState(): {
-  // ... existing fields
+  // ... existing fields (activePuzzleId, puzzleProgress, completedPuzzles)
+  
+  // NEW: FlowPuzzle water state
   flowPuzzleOutputs: Record<string, { x: number; y: number }[]>;
   flowPuzzleInputs: Record<string, { x: number; y: number }[]>;
+  overworldWaterState: string[]; // Array of "worldX,worldY" keys
 }
 
 importState(state: { ... }): void {
@@ -482,6 +780,24 @@ importState(state: { ... }): void {
   if (state.flowPuzzleInputs) {
     this.flowPuzzleInputs = new Map(Object.entries(state.flowPuzzleInputs));
   }
+  if (state.overworldWaterState) {
+    this.overworldWaterState = new Set(state.overworldWaterState);
+  }
+  
+  // After restoring state, recompute water visuals if needed
+  // This ensures the overworld displays correctly on load
+}
+```
+
+**Alternative**: Store only puzzle states and recompute everything on load. This is simpler but slower:
+
+```typescript
+// On load, after restoring puzzle states:
+for (const [puzzleID, puzzle] of this.puzzleProgress) {
+  if (puzzle instanceof FlowPuzzle) {
+    // Recompute water propagation
+    this.updateFlowPuzzleWaterState(puzzleID, puzzle);
+  }
 }
 ```
 
@@ -493,266 +809,374 @@ describe('OverworldGameState FlowPuzzle integration', () => {
     const state = new OverworldGameState();
     const outputs = [{ x: 2, y: 0 }, { x: 3, y: 0 }];
     
-    // Simulate solving a puzzle
     const mockPuzzle = createMockFlowPuzzle(outputs);
-    state.updateFlowPuzzleWaterState('river-1', mockPuzzle, {
-      x: 0, y: 0, width: 128, height: 32
-    });
+    state.updateFlowPuzzleWaterState('river-1', mockPuzzle);
     
-    expect(state.getFlowPuzzleOutputs('river-1')).toEqual(outputs);
+    const retrieved = state.getFlowPuzzleInputs('river-1');
+    expect(retrieved).toBeDefined();
   });
   
-  it('propagates water to downstream puzzles', () => {
-    // Test multi-puzzle propagation
+  it('real-time updates: propagates water during puzzle solving', () => {
+    // Test that water propagation works when puzzle state changes mid-solve
+    const state = new OverworldGameState();
+    const puzzle = createMockFlowPuzzle([{ x: 2, y: 0 }]);
+    
+    // First update
+    const changes1 = state.updateFlowPuzzleWaterState('river-1', puzzle);
+    expect(changes1.flooded.size).toBeGreaterThan(0);
+    
+    // Player places bridge, water state changes
+    puzzle.placeBridge('bridge-1', { x: 1, y: 0 }, { x: 1, y: 2 });
+    
+    // Second update shows different tiles
+    const changes2 = state.updateFlowPuzzleWaterState('river-1', puzzle);
+    expect(changes2.drained.size).toBeGreaterThan(0);
   });
   
   it('exports and imports flow puzzle state correctly', () => {
-    // Test persistence
+    const state = new OverworldGameState();
+    // ... setup state
+    
+    const exported = state.exportState();
+    expect(exported.flowPuzzleOutputs).toBeDefined();
+    expect(exported.overworldWaterState).toBeDefined();
+    
+    const newState = new OverworldGameState();
+    newState.importState(exported);
+    // Verify state was restored correctly
   });
 });
 ```
 
 ---
 
-## 3. Controller Layer: FlowPuzzleController
+## 3. Controller Layer Enhancements
 
-### 3.1 Purpose
+### 3.1 OverworldPuzzleController Refactoring
 
-Extends `OverworldPuzzleController` to handle FlowPuzzle-specific interactions:
-- Apply edge inputs when entering a FlowPuzzle
-- Trigger water propagation when puzzle is solved
-- Update view based on water state changes
-- Coordinate with enhanced collision manager
+**Purpose**: Make `OverworldPuzzleController` extensible for FlowPuzzle-specific logic without code duplication.
 
-### 3.2 Class Definition
+**Key Changes**: Extract renderer creation and puzzle host creation into overridable methods.
 
 ```typescript
-/**
- * Controller for FlowPuzzle-specific overworld interactions.
- * Extends OverworldPuzzleController to add water propagation coordination.
- */
-export class FlowPuzzleController extends OverworldPuzzleController {
-  private flowRenderer?: FlowPuzzleRenderer;
+export class OverworldPuzzleController {
+  // ... existing fields
   
   /**
-   * Override enterPuzzle to handle FlowPuzzle-specific setup
+   * Enter puzzle solving mode for a specific puzzle.
+   * Now calls template methods for extension points.
    */
-  override async enterPuzzle(
-    puzzleID: string,
+  public async enterPuzzle(
+    puzzleId: string,
     onModeChange: (mode: 'puzzle') => void
   ): Promise<void> {
-    const puzzle = this.puzzleManager.getPuzzleById(puzzleID);
+    console.log(`OverworldPuzzleController: Entering puzzle: ${puzzleId}`);
     
-    // Check if this is a FlowPuzzle
-    if (puzzle instanceof FlowPuzzle) {
-      await this.enterFlowPuzzle(puzzleID, puzzle, onModeChange);
-    } else {
-      // Delegate to parent for regular BridgePuzzles
-      await super.enterPuzzle(puzzleID, onModeChange);
+    // ... existing validation and setup code
+    
+    const puzzle = this.puzzleManager.getPuzzleById(puzzleId);
+    if (!puzzle) {
+      throw new Error(`Puzzle not found: ${puzzleId}`);
+    }
+    
+    const puzzleBounds = this.puzzleManager.getPuzzleBounds(puzzleId);
+    if (!puzzleBounds) {
+      throw new Error(`No bounds found for puzzle: ${puzzleId}`);
+    }
+    
+    try {
+      // Set active puzzle in game state
+      this.gameState.setActivePuzzle(puzzleId, puzzle);
+      this.currentPuzzleId = puzzleId;
+      
+      const boundsRect = new Phaser.Geom.Rectangle(
+        puzzleBounds.x,
+        puzzleBounds.y,
+        puzzleBounds.width,
+        puzzleBounds.height
+      );
+      
+      // Apply puzzle-specific setup BEFORE entering (extension point)
+      await this.beforeEnterPuzzle(puzzleId, puzzle, boundsRect);
+      
+      // Blank puzzle region
+      if (this.bridgeManager) {
+        this.bridgeManager.blankPuzzleRegion(puzzleId, boundsRect);
+      }
+      
+      // Notify view to enter puzzle mode
+      onModeChange('puzzle');
+      
+      // Camera transition
+      this.cameraManager.storeCameraState();
+      await this.cameraManager.transitionToPuzzle(boundsRect);
+      
+      // Create renderer (extension point - can be overridden)
+      this.puzzleRenderer = this.createPuzzleRenderer(boundsRect);
+      
+      // Create puzzle controller with host callbacks
+      this.activePuzzleController = new PuzzleController(
+        puzzle,
+        this.puzzleRenderer,
+        this.createPuzzleHost(puzzleId, puzzle, boundsRect)
+      );
+      
+      // Set up input handling
+      this.puzzleInputHandler = new PuzzleInputHandler(
+        this.scene,
+        this.activePuzzleController,
+        this.puzzleRenderer
+      );
+      
+      // Initialize puzzle systems
+      this.puzzleRenderer.init(puzzle);
+      this.puzzleInputHandler.setupInputHandlers();
+      this.activePuzzleController.enterPuzzle();
+      
+      // Update collision for bridges
+      this.collisionManager.updateCollisionFromBridges(puzzle, boundsRect);
+      
+      // Show HUD
+      PuzzleHUDManager.getInstance().enterPuzzle(
+        this.scene,
+        this.activePuzzleController,
+        'overworld'
+      );
+      
+      // Emit puzzle setup events for HUD
+      const bridgeTypes = puzzle.getAvailableBridgeTypes();
+      this.scene.events.emit('setTypes', bridgeTypes);
+      
+      const counts = puzzle.availableCounts();
+      this.scene.events.emit('updateCounts', counts);
+      
+      console.log(`Successfully entered puzzle: ${puzzleId}`);
+      
+    } catch (error) {
+      console.error(`Failed to enter puzzle: ${puzzleId}`, error);
+      await this.exitPuzzle(false, () => {});
+      throw error;
     }
   }
   
   /**
-   * Enter a FlowPuzzle with water propagation setup
+   * Extension point: Create puzzle renderer.
+   * Subclasses can override to create specialized renderers.
    */
-  private async enterFlowPuzzle(
-    puzzleID: string,
-    puzzle: FlowPuzzle,
-    onModeChange: (mode: 'puzzle') => void
-  ): Promise<void> {
-    // Get computed edge inputs from game state
-    const edgeInputs = this.gameState.getFlowPuzzleInputs(puzzleID);
-    
-    // Apply edge inputs to puzzle before entering
-    if (edgeInputs.length > 0) {
-      puzzle.setEdgeInputs(edgeInputs);
-    }
-    
-    // Get puzzle bounds
-    const puzzleBounds = this.puzzleManager.getPuzzleBounds(puzzleID);
-    if (!puzzleBounds) {
-      throw new Error(`No bounds found for puzzle: ${puzzleID}`);
-    }
-    
-    const boundsRect = new Phaser.Geom.Rectangle(
-      puzzleBounds.x,
-      puzzleBounds.y,
-      puzzleBounds.width,
-      puzzleBounds.height
-    );
-    
-    // Set active puzzle in game state
-    this.gameState.setActivePuzzle(puzzleID, puzzle);
-    this.currentPuzzleId = puzzleID;
-    
-    // Blank puzzle region
-    if (this.bridgeManager) {
-      this.bridgeManager.blankPuzzleRegion(puzzleID, boundsRect);
-    }
-    
-    // Notify view
-    onModeChange('puzzle');
-    
-    // Camera transition
-    this.cameraManager.storeCameraState();
-    await this.cameraManager.transitionToPuzzle(boundsRect);
-    
-    // Create FlowPuzzleRenderer instead of EmbeddedPuzzleRenderer
-    this.flowRenderer = new FlowPuzzleRenderer(
+  protected createPuzzleRenderer(boundsRect: Phaser.Geom.Rectangle): EmbeddedPuzzleRenderer {
+    return new EmbeddedPuzzleRenderer(
       this.scene,
       boundsRect,
       'sprout-tiles'
     );
-    this.puzzleRenderer = this.flowRenderer;
-    
-    // Continue with standard puzzle setup...
-    this.activePuzzleController = new PuzzleController(
-      puzzle,
-      this.flowRenderer,
-      this.createFlowPuzzleHost(puzzleID, puzzle, boundsRect)
-    );
-    
-    // ... rest of setup (input handler, HUD, etc.)
   }
   
   /**
-   * Create puzzle host with FlowPuzzle-specific callbacks
+   * Extension point: Setup before entering puzzle.
+   * Subclasses can override to add puzzle-specific initialization.
    */
-  private createFlowPuzzleHost(
-    puzzleID: string,
-    puzzle: FlowPuzzle,
-    bounds: Phaser.Geom.Rectangle
+  protected async beforeEnterPuzzle(
+    puzzleId: string,
+    puzzle: BridgePuzzle,
+    boundsRect: Phaser.Geom.Rectangle
+  ): Promise<void> {
+    // Base implementation does nothing
+  }
+  
+  /**
+   * Extension point: Create puzzle host callbacks.
+   * Now includes boundsRect for FlowPuzzle needs.
+   */
+  protected createPuzzleHost(
+    puzzleId: string,
+    puzzle: BridgePuzzle,
+    boundsRect: Phaser.Geom.Rectangle
   ): PuzzleHost {
     return {
-      ...this.createPuzzleHost(puzzleID),
-      
+      loadPuzzle: (_puzzleID: string) => {
+        // Already loaded
+      },
       onPuzzleSolved: () => {
-        console.log(`FlowPuzzle ${puzzleID} solved!`);
-        
-        // Extract and store edge outputs
-        this.updateWaterPropagation(puzzleID, puzzle, bounds);
-        
-        // Call parent's onPuzzleSolved via scene
+        console.log(`Puzzle ${puzzleId} solved!`);
         setTimeout(() => {
           (this.scene as any).exitOverworldPuzzle(true);
         }, 0);
+      },
+      onPuzzleExited: (success: boolean) => {
+        setTimeout(() => {
+          (this.scene as any).exitOverworldPuzzle(success);
+        }, 0);
+      },
+      onBridgeCountsChanged: (counts: Record<string, number>) => {
+        this.scene.events.emit('updateCounts', counts);
       }
     };
+  }
+  
+  /**
+   * Extension point: Handle puzzle solving completion.
+   * Called after puzzle is solved but before exit.
+   */
+  protected async onPuzzleSolved(
+    puzzleId: string,
+    puzzle: BridgePuzzle,
+    boundsRect: Phaser.Geom.Rectangle
+  ): Promise<void> {
+    // Base implementation does nothing
+  }
+}
+```
+
+### 3.2 FlowPuzzleController (Extends OverworldPuzzleController)
+
+**Purpose**: Add FlowPuzzle-specific behavior by overriding extension points.
+
+**Key Points**:
+- No code duplication - reuses parent's enterPuzzle flow
+- Only overrides specific extension points
+- Gets bounds from puzzle manager, doesn't require as parameter
+
+```typescript
+export class FlowPuzzleController extends OverworldPuzzleController {
+  /**
+   * Override renderer creation to use FlowPuzzleRenderer
+   */
+  protected override createPuzzleRenderer(boundsRect: Phaser.Geom.Rectangle): FlowPuzzleRenderer {
+    return new FlowPuzzleRenderer(
+      this.scene,
+      boundsRect,
+      'sprout-tiles'
+    );
+  }
+  
+  /**
+   * Override beforeEnterPuzzle to apply edge inputs
+   */
+  protected override async beforeEnterPuzzle(
+    puzzleId: string,
+    puzzle: BridgePuzzle,
+    boundsRect: Phaser.Geom.Rectangle
+  ): Promise<void> {
+    if (puzzle instanceof FlowPuzzle) {
+      // Get computed edge inputs from game state
+      const edgeInputs = this.gameState.getFlowPuzzleInputs(puzzleId);
+      
+      // Apply edge inputs to puzzle
+      if (edgeInputs.length > 0) {
+        puzzle.setEdgeInputs(edgeInputs);
+      }
+      
+      // Listen for water state changes during solving
+      this.scene.events.on('flow-puzzle-water-changed', this.onWaterStateChanged, this);
+    }
+  }
+  
+  /**
+   * Override puzzle host to add water propagation on solve
+   */
+  protected override createPuzzleHost(
+    puzzleId: string,
+    puzzle: BridgePuzzle,
+    boundsRect: Phaser.Geom.Rectangle
+  ): PuzzleHost {
+    const baseHost = super.createPuzzleHost(puzzleId, puzzle, boundsRect);
+    
+    if (puzzle instanceof FlowPuzzle) {
+      return {
+        ...baseHost,
+        onPuzzleSolved: () => {
+          // Update water propagation before calling parent
+          this.updateWaterPropagation(puzzleId, puzzle as FlowPuzzle);
+          
+          // Call parent's onPuzzleSolved
+          baseHost.onPuzzleSolved?.();
+        }
+      };
+    }
+    
+    return baseHost;
+  }
+  
+  /**
+   * Handle real-time water state changes while solving.
+   * Called when player places/removes bridges.
+   */
+  private onWaterStateChanged(event: {
+    puzzleID: string;
+    flooded: string[];
+    drained: string[];
+  }): void {
+    if (event.puzzleID !== this.currentPuzzleId) return;
+    
+    const puzzle = this.getActivePuzzle();
+    if (!(puzzle instanceof FlowPuzzle)) return;
+    
+    // Update water propagation in real-time
+    const changes = this.gameState.updateFlowPuzzleWaterState(
+      event.puzzleID,
+      puzzle
+    );
+    
+    // Update overworld visuals for changed tiles
+    this.updateOverworldWaterTiles(changes.flooded, changes.drained);
   }
   
   /**
    * Update water propagation when puzzle is solved.
    * Extracted as separate method for unit testing.
    */
-  updateWaterPropagation(
-    puzzleID: string,
-    puzzle: FlowPuzzle,
-    bounds: Phaser.Geom.Rectangle
-  ): void {
-    const boundsObj = {
-      x: bounds.x,
-      y: bounds.y,
-      width: bounds.width,
-      height: bounds.height
-    };
-    
+  private updateWaterPropagation(puzzleID: string, puzzle: FlowPuzzle): void {
     // Update game state with new water connectivity
-    this.gameState.updateFlowPuzzleWaterState(puzzleID, puzzle, boundsObj);
+    const changes = this.gameState.updateFlowPuzzleWaterState(puzzleID, puzzle);
     
-    // Get affected puzzles (those that received new inputs)
-    const affectedPuzzles = this.getAffectedPuzzles(puzzleID);
+    // Update overworld visuals
+    this.updateOverworldWaterTiles(changes.flooded, changes.drained);
     
-    // Update their water state in the overworld
-    this.updateOverworldWaterDisplay(affectedPuzzles);
-  }
-  
-  /**
-   * Get list of puzzles affected by water propagation.
-   * Extracted for testing.
-   */
-  getAffectedPuzzles(sourcePuzzleID: string): string[] {
-    // Query game state or water propagation engine
-    // Return list of puzzle IDs that received new edge inputs
-    return [];
-  }
-  
-  /**
-   * Update overworld display for puzzles with changed water state.
-   * Extracted for testing.
-   */
-  updateOverworldWaterDisplay(puzzleIDs: string[]): void {
-    // For each affected puzzle:
-    // - Get its baked connectivity
-    // - Update collision manager
-    // - Update visual tiles in overworld scene
-    
-    for (const puzzleID of puzzleIDs) {
-      const puzzle = this.puzzleManager.getPuzzleById(puzzleID);
-      if (puzzle instanceof FlowPuzzle) {
-        const bounds = this.puzzleManager.getPuzzleBounds(puzzleID);
-        if (bounds) {
-          this.updatePuzzleOverworldDisplay(puzzleID, puzzle, bounds);
-        }
+    // Update edge inputs for affected downstream puzzles
+    for (const [targetPuzzleID, inputs] of changes.affectedPuzzles) {
+      const targetPuzzle = this.puzzleManager.getPuzzleById(targetPuzzleID);
+      if (targetPuzzle instanceof FlowPuzzle) {
+        targetPuzzle.setEdgeInputs(inputs);
       }
     }
   }
   
   /**
-   * Update overworld display for a single FlowPuzzle.
-   * Called after water propagation affects the puzzle.
+   * Update overworld water tile visuals.
+   * Extracted for testing.
    */
-  private updatePuzzleOverworldDisplay(
-    puzzleID: string,
-    puzzle: FlowPuzzle,
-    bounds: { x: number; y: number; width: number; height: number }
-  ): void {
-    // Get baked connectivity
-    const connectivity = puzzle.getBakedConnectivity();
-    
-    // Update collision manager
-    const boundsRect = new Phaser.Geom.Rectangle(
-      bounds.x, bounds.y, bounds.width, bounds.height
-    );
-    this.collisionManager.updateFromConnectivity(connectivity, boundsRect);
-    
-    // Update visual tiles (water/mud sprites) in OverworldScene
-    // This would require a method on OverworldScene to update tile visuals
-    // e.g., this.scene.updateFlowTiles(puzzleID, connectivity);
+  private updateOverworldWaterTiles(flooded: Set<string>, drained: Set<string>): void {
+    // Call OverworldScene method to update tile visuals
+    // This would be implemented in OverworldScene
+    if (this.scene && typeof (this.scene as any).updateWaterTiles === 'function') {
+      (this.scene as any).updateWaterTiles(
+        Array.from(flooded).map(key => {
+          const [x, y] = key.split(',').map(Number);
+          return { worldX: x, worldY: y };
+        }),
+        Array.from(drained).map(key => {
+          const [x, y] = key.split(',').map(Number);
+          return { worldX: x, worldY: y };
+        })
+      );
+    }
   }
   
   /**
-   * Override exitPuzzle to handle FlowPuzzle-specific cleanup
+   * Override exitPuzzle to clean up water event listeners
    */
   override async exitPuzzle(
     success: boolean,
     onModeChange: (mode: 'exploration') => void
   ): Promise<void> {
-    const activeData = this.gameState.getActivePuzzle();
-    
-    if (activeData && activeData.puzzle instanceof FlowPuzzle && success) {
-      // Ensure water propagation is up to date
-      const bounds = this.puzzleManager.getPuzzleBounds(activeData.id);
-      if (bounds) {
-        const boundsRect = new Phaser.Geom.Rectangle(
-          bounds.x, bounds.y, bounds.width, bounds.height
-        );
-        this.updateWaterPropagation(activeData.id, activeData.puzzle, boundsRect);
-      }
-    }
-    
-    // Cleanup flow renderer
-    if (this.flowRenderer) {
-      this.flowRenderer.destroy();
-      this.flowRenderer = undefined;
-    }
+    // Clean up event listeners
+    this.scene.events.off('flow-puzzle-water-changed', this.onWaterStateChanged, this);
     
     // Call parent exit logic
     await super.exitPuzzle(success, onModeChange);
   }
 }
 ```
-
-### 3.3 Testing Strategy
 
 Extract testable logic into separate methods:
 
@@ -795,20 +1219,27 @@ The existing `CollisionManager` handles binary collision (passable/blocked). For
 
 ### 4.2 Enhanced Implementation
 
-**Option A: Extend CollisionManager** (Recommended)
-
 Add new methods to handle `ConnectivityState` from `ConnectivityManager`:
 
 ```typescript
+import { GridToWorldMapper } from '@view/GridToWorldMapper';
+
 export class CollisionManager {
   // Existing fields...
+  private gridMapper: GridToWorldMapper;
   
   // NEW: Store multi-level walkability state
   private walkabilityState: Map<string, ConnectivityState> = new Map();
   
+  constructor(overworldScene: OverworldScene, gridMapper: GridToWorldMapper) {
+    this.overworldScene = overworldScene;
+    this.gridMapper = gridMapper;
+  }
+  
   /**
    * Update collision from FlowPuzzle baked connectivity.
    * Maps ConnectivityState to overworld collision.
+   * Uses GridToWorldMapper for coordinate conversions.
    */
   updateFromConnectivity(
     connectivity: ConnectivityTile[],
@@ -817,20 +1248,24 @@ export class CollisionManager {
     console.log(`CollisionManager: Updating from connectivity (${connectivity.length} tiles)`);
     
     for (const tile of connectivity) {
-      // Convert puzzle-local coordinates to world tile coordinates
-      const worldX = puzzleBounds.x + tile.x * this.tileSize;
-      const worldY = puzzleBounds.y + tile.y * this.tileSize;
-      const tileX = Math.floor(worldX / this.tileSize);
-      const tileY = Math.floor(worldY / this.tileSize);
+      // Convert puzzle-local coordinates to world coordinates using GridToWorldMapper
+      const worldPos = this.gridMapper.gridToWorld(tile.x, tile.y);
+      const adjustedWorld = {
+        x: worldPos.x + puzzleBounds.x,
+        y: worldPos.y + puzzleBounds.y
+      };
+      
+      // Convert world pixels to tile coordinates
+      const tilePos = this.gridMapper.worldToGrid(adjustedWorld.x, adjustedWorld.y);
       
       // Store walkability state
-      const key = `${tileX},${tileY}`;
+      const key = `${tilePos.x},${tilePos.y}`;
       this.walkabilityState.set(key, tile.state);
       
       // Map to binary collision for now (compatibility with existing player movement)
       // Later, player movement will be enhanced to read walkabilityState directly
       const hasCollision = this.mapStateToCollision(tile.state);
-      this.overworldScene.setCollisionAt(tileX, tileY, hasCollision);
+      this.overworldScene.setCollisionAt(tilePos.x, tilePos.y, hasCollision);
     }
   }
   
@@ -898,19 +1333,6 @@ export class CollisionManager {
   }
 }
 ```
-
-**Option B: Create Separate WalkabilityManager** (Alternative)
-
-If multi-level walkability is complex enough, create a dedicated manager:
-
-```typescript
-export class WalkabilityManager {
-  // Dedicated class for height-based walkability
-  // Separate from binary collision management
-}
-```
-
-**Recommendation**: Option A (extend CollisionManager) is simpler and maintains cohesion.
 
 ### 4.3 Player Movement Integration
 
@@ -980,65 +1402,81 @@ describe('CollisionManager walkability', () => {
 ### 5.1 Initial Setup (Game Load)
 
 ```
-1. OverworldScene initializes
-2. OverworldGameState loads persisted state (if any)
-   - Restores flowPuzzleOutputs and flowPuzzleInputs
-3. WaterPropagationEngine builds connectivity graph
-4. For each solved FlowPuzzle:
+1. OverworldScene initializes, loads Tiled map
+2. RiverChannelExtractor analyzes "flowingWater" layer
+   - Traces river channels from FlowPuzzle edges across overworld tiles
+   - Builds RiverChannel objects with tile lists
+3. WaterPropagationEngine initialized with channels and GridToWorldMapper
+4. OverworldGameState loads persisted state (if any)
+   - Restores flowPuzzleOutputs, flowPuzzleInputs, overworldWaterState
+   - If no persisted state, river channels are empty (no water)
+5. OverworldGameState.initializeWaterPropagation(engine, puzzleManager)
+6. For each saved FlowPuzzle with outputs:
    - Apply edge inputs to puzzle instance
-   - Get baked connectivity
-   - Update CollisionManager with connectivity
-   - Update overworld tiles with water/mud visuals
+   - Recompute propagation (may have changed if not saved)
+   - Update overworld water tile sprites
+   - Get baked connectivity and update CollisionManager
 ```
 
 ### 5.2 Entering a FlowPuzzle
 
 ```
 1. Player interacts with FlowPuzzle trigger
-2. FlowPuzzleController.enterPuzzle(puzzleID) is called
-3. Check if puzzle is FlowPuzzle type
-4. Retrieve computed edge inputs from OverworldGameState
-5. Apply edge inputs to puzzle: puzzle.setEdgeInputs(inputs)
-   - This triggers puzzle.recomputeWater() internally
-6. Create FlowPuzzleRenderer (extends EmbeddedPuzzleRenderer)
-7. FlowPuzzleRenderer renders:
-   - Base bridge puzzle elements (islands, bridges)
+2. FlowPuzzleController.enterPuzzle(puzzleID) calls parent method
+3. Parent calls beforeEnterPuzzle() extension point:
+   - Retrieve computed edge inputs from OverworldGameState
+   - Apply edge inputs: puzzle.setEdgeInputs(inputs)
+   - Puzzle internally calls recomputeWater()
+   - Register for 'flow-puzzle-water-changed' event
+4. Parent calls createPuzzleRenderer() extension point:
+   - FlowPuzzleController returns FlowPuzzleRenderer instance
+5. FlowPuzzleRenderer.init() renders initial state:
+   - Base elements (islands, placed bridges)
    - Water tiles (filled or drained based on hasWater)
    - Flow arrows (only on tiles with water)
    - Pontoons, rocky tiles, obstacles
-8. Player solves puzzle by placing bridges (dams)
+6. Player begins placing/removing bridges
 ```
 
-### 5.3 Solving a FlowPuzzle
+### 5.3 Solving a FlowPuzzle (Real-Time Updates)
 
 ```
-1. Player places/removes bridges
-2. FlowPuzzle.placeBridge() / removeBridge() triggers recomputeWater()
-3. Water state updates, view refreshes
-4. PuzzleController detects puzzle is solved (all constraints satisfied)
-5. FlowPuzzleController.onPuzzleSolved() callback is invoked
-6. Call updateWaterPropagation():
-   a. Extract edge outputs from puzzle
-   b. Store in OverworldGameState.flowPuzzleOutputs
-   c. Call WaterPropagationEngine.computePropagation()
-   d. Update flowPuzzleInputs for downstream puzzles
-   e. For each affected puzzle:
-      - Get baked connectivity (reflects new water state)
-      - Update CollisionManager
-      - Update overworld tile visuals
-7. Exit puzzle and return to overworld
-8. Player sees updated water state in affected areas
+1. Player places or removes a bridge
+2. FlowPuzzle.placeBridge() / removeBridge() automatically calls recomputeWater()
+3. FlowPuzzleRenderer.updateFromPuzzle() detects water state changes:
+   - Computes diff: which tiles newly flooded/drained
+   - Emits 'flow-puzzle-water-changed' event with diff
+4. FlowPuzzleController.onWaterStateChanged() event handler:
+   a. Calls gameState.updateFlowPuzzleWaterState(puzzleID, puzzle)
+   b. WaterPropagationEngine.computePropagation() traces water through channels
+   c. Returns { flooded, drained, affectedPuzzles }
+   d. Calls updateOverworldWaterTiles(flooded, drained)
+5. OverworldScene.updateWaterTiles() updates visible river sprites:
+   - Flooded tiles → switch to "water-filled" sprite
+   - Drained tiles → switch to "drained-riverbed" sprite
+   - Changes are visible IMMEDIATELY outside puzzle bounds
+6. Downstream FlowPuzzles receive updated edge inputs
+7. PuzzleController validates constraints continuously
+8. When all constraints satisfied → onPuzzleSolved() callback
+9. FlowPuzzleController.updateWaterPropagation() (final update):
+   - Ensures water state is current
+   - Gets baked connectivity from all affected puzzles
+   - Updates CollisionManager (only on exit, not during solving)
+10. Exit puzzle, player sees updated overworld with correct collision
 ```
 
 ### 5.4 Returning to a Previously Solved FlowPuzzle
 
 ```
 1. Player re-enters a solved FlowPuzzle
-2. Edge inputs are applied (from OverworldGameState)
+2. Edge inputs are applied (from OverworldGameState cache)
 3. Puzzle displays current water state based on inputs
-4. Player can modify solution (change bridges)
-5. Water recalculates, potentially affecting downstream puzzles
-6. On exit, propagation runs again to update affected areas
+4. Player can modify solution (add/remove bridges)
+5. Real-time updates propagate as in 5.3
+6. If player changes solution significantly:
+   - Downstream puzzles' water may change
+   - Overworld visuals update in real-time
+7. On exit, final propagation and collision baking occurs
 ```
 
 ---
@@ -1094,38 +1532,78 @@ preload() {
 
 ### Phase 1: Model Layer (Week 1)
 
+- [ ] Implement `RiverChannel` type definition
+- [ ] Implement `RiverChannelExtractor` utility for Tiled map analysis
+  - [ ] Parse "flowingWater" layer
+  - [ ] Trace connected components from puzzle edges
+  - [ ] Build channel objects with tile lists
 - [ ] Implement `WaterPropagationEngine` class
+  - [ ] Use GridToWorldMapper (not hardcoded tileSize)
+  - [ ] Store and query river channels
+  - [ ] Compute water flow through channels
 - [ ] Add unit tests for water propagation logic
-- [ ] Enhance `OverworldGameState` with flow puzzle methods
-- [ ] Add tests for state management
-- [ ] Add persistence (export/import) tests
+  - [ ] Test channel extraction
+  - [ ] Test multi-puzzle propagation
+  - [ ] Test coordinate conversions via GridToWorldMapper
+- [ ] Enhance `OverworldGameState` with FlowPuzzle methods
+  - [ ] Add water state tracking fields
+  - [ ] Implement `updateFlowPuzzleWaterState()`
+  - [ ] Implement persistence (export/import with water state)
+- [ ] Add tests for state management and persistence
 
 ### Phase 2: View Layer (Week 2)
 
 - [ ] Implement `FlowPuzzleRenderer` extending `EmbeddedPuzzleRenderer`
-- [ ] Add water tile rendering
-- [ ] Add flow arrow rendering with animations
-- [ ] Add pontoon, rocky, obstacle rendering
+  - [ ] Water tile rendering (filled/drained states)
+  - [ ] Flow arrow rendering (N/S/E/W overlays)
+  - [ ] Pontoon, rocky, obstacle tile rendering
+  - [ ] Real-time event emission: `'flow-puzzle-water-changed'`
+- [ ] Add `OverworldScene.updateWaterTiles()` method
+  - [ ] Update river tile sprites based on flooded/drained sets
+  - [ ] Handle real-time updates during puzzle solving
 - [ ] Manual testing of visuals
 - [ ] Extract and unit test helper functions
 
 ### Phase 3: Controller Layer (Week 3)
 
-- [ ] Implement `FlowPuzzleController` extending `OverworldPuzzleController`
-- [ ] Add water propagation coordination
-- [ ] Integrate with `WaterPropagationEngine`
-- [ ] Add tests for controller logic
+- [ ] Refactor `OverworldPuzzleController` for extensibility
+  - [ ] Add `createPuzzleRenderer()` extension point
+  - [ ] Add `beforeEnterPuzzle()` extension point
+  - [ ] Add `createPuzzleHost()` with boundsRect parameter
+  - [ ] Template method pattern: no code duplication
+- [ ] Implement `FlowPuzzleController` extending parent
+  - [ ] Override extension points only
+  - [ ] Listen for `'flow-puzzle-water-changed'` event
+  - [ ] Call `updateFlowPuzzleWaterState()` on event
+  - [ ] Update overworld water tiles in real-time
+- [ ] Add tests for controller logic (extracted methods)
 - [ ] Enhance `CollisionManager` with walkability states
+  - [ ] Use GridToWorldMapper (not hardcoded tileSize)
+  - [ ] Add `updateFromConnectivity()` method
+  - [ ] Add height-aware movement validation
 - [ ] Add tests for multi-level collision
 
 ### Phase 4: Integration & Polish (Week 4)
 
 - [ ] Integrate all components in `OverworldScene`
+  - [ ] Call `RiverChannelExtractor` at load time
+  - [ ] Initialize `WaterPropagationEngine`
+  - [ ] Connect event listeners
 - [ ] Add overworld tile visual updates
-- [ ] Update player movement logic for height-based walkability
+  - [ ] Implement sprite swapping for water/riverbed
+  - [ ] Test visibility of changes outside puzzle bounds
+- [ ] Test real-time water propagation
+  - [ ] Place bridge, verify overworld updates immediately
+  - [ ] Remove bridge, verify water returns
+- [ ] Update player movement logic for height-based walkability (optional)
 - [ ] End-to-end testing of complete flow:
-  - Enter FlowPuzzle with inputs
-  - Solve puzzle
+  - [ ] Enter FlowPuzzle with inputs
+  - [ ] Solve puzzle with real-time overworld updates
+  - [ ] Verify downstream puzzle receives inputs
+  - [ ] Verify collision and visuals update correctly
+  - [ ] Test persistence: save, reload, verify state
+- [ ] Performance optimization (if needed)
+- [ ] Polish animations and transitions
   - Verify water propagates
   - Check downstream puzzle receives inputs
   - Verify collision and visuals update
@@ -1198,36 +1676,114 @@ These are potential future improvements not included in the initial implementati
 
 ---
 
-## 11. Open Questions
+## 11. Design Clarifications (Addressed from Review)
 
-1. **Puzzle boundaries**: How are neighboring FlowPuzzle boundaries defined in Tiled map?
-   - Proposed: Use object layer with puzzle regions and edge markers
+### 11.1 River Channel Connectivity
 
-2. **Performance**: What's the maximum number of FlowPuzzles expected in an overworld?
-   - Affects optimization strategy for water propagation
+**Clarification**: Water doesn't just flow puzzle-to-puzzle at edge boundaries. River channels span many overworld tiles between FlowPuzzles.
 
-3. **Player Z-index**: How should player sprite depth change when moving between high/low areas?
-   - Option A: Simple depth override based on current tile
-   - Option B: Parallax effect with gradual depth transitions
-   - Option C: No visual distinction (gameplay only)
+**Solution**: 
+- `RiverChannelExtractor` analyzes Tiled map "flowingWater" layer at load time
+- Traces connected components from FlowPuzzle edge tiles downstream
+- Stores channels as ordered lists of world tile coordinates
+- `WaterPropagationEngine` uses these channels to compute water flow across the overworld
 
-4. **Water animation**: Static sprites or animated?
-   - Proposed: Static initially, animated in future enhancement
+### 11.2 Real-Time Visual Updates
 
-5. **Bridge baking persistence**: Should baked bridges persist across game sessions?
-   - Proposed: Yes, via OverworldGameState persistence
+**Clarification**: Overworld visuals must update WHILE player is solving a FlowPuzzle, not just on exit.
+
+**Solution**:
+- `FlowPuzzleRenderer.updateFromPuzzle()` emits `'flow-puzzle-water-changed'` event
+- `FlowPuzzleController` listens for this event and immediately calls `updateFlowPuzzleWaterState()`
+- This propagates water changes through river channels in real-time
+- `OverworldScene` updates water/riverbed tile sprites based on changes
+- Collision is only baked on puzzle exit (optimization)
+
+### 11.3 Code Reuse
+
+**Clarification**: Don't duplicate logic between `OverworldPuzzleController` and `FlowPuzzleController`.
+
+**Solution**:
+- Refactor `OverworldPuzzleController` to use template method pattern
+- Extract extension points: `createPuzzleRenderer()`, `beforeEnterPuzzle()`, `createPuzzleHost()`
+- `FlowPuzzleController` only overrides these methods
+- Zero code duplication in puzzle entry/exit flow
+
+### 11.4 Use Existing Helpers
+
+**Clarification**: Use `GridToWorldMapper` for coordinate conversions, don't hardcode tileSize.
+
+**Solution**:
+- `WaterPropagationEngine` takes `GridToWorldMapper` in constructor
+- All coordinate conversions use `gridMapper.gridToWorld()` and `worldToGrid()`
+- `CollisionManager` also uses `GridToWorldMapper`
+- No hardcoded `tileSize = 32` multiplications
+
+### 11.5 Persistence Requirements
+
+**Clarification**: Both bridges AND water state must persist across sessions.
+
+**Solution**:
+- `OverworldGameState.exportState()` includes:
+  - `flowPuzzleOutputs`: Edge outputs for each solved puzzle
+  - `flowPuzzleInputs`: Computed inputs for each puzzle
+  - `overworldWaterState`: Current water state of all river tiles
+- On import, can either:
+  - **Option A**: Restore all state directly (faster load)
+  - **Option B**: Restore puzzle states, recompute water (simpler)
+- Recommended: Option A for performance
+
+### 11.6 Scale Expectations
+
+**Clarification**: Overworld may have 12-20 FlowPuzzles with 2-4 output edges each.
+
+**Design Impact**:
+- River channel extraction happens once at load time
+- Water propagation is O(channels + puzzles), very fast
+- Real-time updates only recompute affected channels
+- No performance concerns at this scale
 
 ---
 
-## Conclusion
+## 12. Updated Open Questions
 
-This architectural specification provides a comprehensive design for integrating FlowPuzzles into the Archipelago overworld. The design maintains clean MVC separation, prioritizes testability, and follows established patterns in the codebase.
+~~1. **Puzzle boundaries**: How are neighboring FlowPuzzle boundaries defined in Tiled map?~~
+   - **ANSWERED**: River channels span overworld tiles, extracted from "flowingWater" layer
+
+~~2. **Performance**: What's the maximum number of FlowPuzzles expected in an overworld?~~
+   - **ANSWERED**: 12-20 FlowPuzzles, no performance concerns
+
+3. **Player Z-index**: How should player sprite depth change when moving between high/low areas?
+   - **ANSWERED**: No visual distinction needed (gameplay only)
+
+~~4. **Water animation**: Static sprites or animated?~~
+   - **ANSWERED**: Static initially, no animation needed yet
+
+~~5. **Bridge baking persistence**: Should baked bridges persist across game sessions?~~
+   - **ANSWERED**: Yes, both bridges AND water state persist
+
+---
+
+## 13. Conclusion
+
+This architectural specification provides a comprehensive design for integrating FlowPuzzles into the Archipelago overworld, **updated based on review feedback**. The design maintains clean MVC separation, prioritizes testability, and follows established patterns in the codebase.
 
 Key design decisions:
 
-- **Pure model logic**: `WaterPropagationEngine` is framework-agnostic and fully unit-testable
-- **Renderer extension**: `FlowPuzzleRenderer` builds on `EmbeddedPuzzleRenderer` for code reuse
-- **Controller coordination**: `FlowPuzzleController` orchestrates without containing puzzle logic
-- **Incremental enhancement**: Collision system enhanced without breaking existing functionality
+- **River channel model**: Water flows across many overworld tiles between puzzles, not just at boundaries. `RiverChannelExtractor` analyzes Tiled map at load time to build connectivity graph.
+- **Real-time updates**: Water propagation happens DURING puzzle solving, not just on exit. FlowPuzzleRenderer emits events, controller updates overworld visuals immediately.
+- **Pure model logic**: `WaterPropagationEngine` is framework-agnostic, uses `GridToWorldMapper` for coordinates, fully unit-testable.
+- **Code reuse**: `OverworldPuzzleController` refactored with template method pattern. `FlowPuzzleController` only overrides extension points, zero duplication.
+- **Renderer extension**: `FlowPuzzleRenderer` builds on `EmbeddedPuzzleRenderer` for code reuse.
+- **Collision enhancement**: `CollisionManager` uses `GridToWorldMapper`, enhanced without breaking existing functionality.
+- **Persistence**: Both bridges AND water state persist across sessions via `OverworldGameState.exportState()`.
 
 The implementation plan breaks down the work into manageable phases, each with clear deliverables and tests. This approach minimizes integration risk and allows for iterative refinement.
+
+### Key Architectural Improvements from Review
+
+1. **Water spans overworld tiles**: Not just puzzle-to-puzzle connections
+2. **Real-time visual feedback**: Updates visible during puzzle solving
+3. **Template method pattern**: Extensibility without duplication
+4. **Use existing helpers**: GridToWorldMapper throughout
+5. **Complete persistence**: Water state saved across sessions
