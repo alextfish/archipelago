@@ -311,20 +311,26 @@ export class FlowRenderingUtils {
 
 **Location**: `src/model/overworld/RiverChannel.ts`
 
-A river channel is a set of connected overworld tiles that can carry water from FlowPuzzle edge outputs to other FlowPuzzle edge inputs. These are extracted from the Tiled map at load time.
+A river channel is a set of connected overworld tiles that can carry water from FlowPuzzle edge outputs to other FlowPuzzle edge inputs. These are extracted from the Tiled map at load time. All coordinates are in tile units (not pixels).
 
 ```typescript
+import type { GridKey } from '@model/puzzle/FlowTypes';
+
 /**
  * Represents a river channel between FlowPuzzle edges.
- * Contains the world tile coordinates that make up the channel.
+ * All coordinates are in tile units (world tile coordinates).
  */
 export interface RiverChannel {
   id: string; // Unique identifier for this channel
-  tiles: { worldX: number; worldY: number }[]; // Ordered list of tiles in the channel
+  tiles: GridKey[]; // Ordered list of tiles in the channel (world tile coords as GridKey)
   sourcePuzzleID: string; // ID of upstream FlowPuzzle
   sourceEdgeTile: { localX: number; localY: number }; // Edge tile in source puzzle (local coords)
+  sourceWorldTileX: number; // World tile X coordinate of source edge
+  sourceWorldTileY: number; // World tile Y coordinate of source edge
   targetPuzzleID: string; // ID of downstream FlowPuzzle
   targetEdgeTile: { localX: number; localY: number }; // Edge tile in target puzzle (local coords)
+  targetWorldTileX: number; // World tile X coordinate of target edge
+  targetWorldTileY: number; // World tile Y coordinate of target edge
 }
 ```
 
@@ -339,29 +345,32 @@ export interface RiverChannel {
 - Trace water flow from FlowPuzzle edge outputs through river channels to downstream puzzles
 - Compute which river tiles should have water vs be drained
 - Compute edge inputs for downstream FlowPuzzles
-- Use GridToWorldMapper for coordinate conversions
+- Work entirely in tile/grid coordinates (not pixels)
 - Provide deterministic, testable water propagation
 
+**Important**: As a model class, WaterPropagationEngine works in tile coordinates only. All coordinates are in grid/tile units (worldTileX, worldTileY), not pixel units. Pixel conversion is handled by view layer classes.
+
 ```typescript
-import type { GridToWorldMapper } from '@view/GridToWorldMapper';
+import type { GridKey } from '@model/puzzle/FlowTypes';
+import { gridKey, parseGridKey } from '@model/puzzle/FlowTypes';
 import type { RiverChannel } from './RiverChannel';
 
 /**
  * Pure model class for computing water propagation across overworld.
  * Traces water from FlowPuzzle outputs through river channels to downstream puzzles.
+ * Works entirely in tile coordinates (not pixels).
  */
 export class WaterPropagationEngine {
   private riverChannels: RiverChannel[] = [];
-  private gridMapper: GridToWorldMapper;
   
-  // Map from puzzle edge tile (world coords) to list of channels starting there
-  private channelsBySource: Map<string, RiverChannel[]> = new Map();
+  // Map from puzzle edge tile (world tile coords) to list of channels starting there
+  private channelsBySource: Map<GridKey, RiverChannel[]> = new Map();
   
-  // Map from puzzle edge tile (world coords) to channel ending there
-  private channelsByTarget: Map<string, RiverChannel> = new Map();
+  // Map from puzzle edge tile (world tile coords) to channel ending there
+  private channelsByTarget: Map<GridKey, RiverChannel> = new Map();
   
-  constructor(gridMapper: GridToWorldMapper) {
-    this.gridMapper = gridMapper;
+  constructor() {
+    // No dependencies - pure model logic
   }
   
   /**
@@ -380,65 +389,54 @@ export class WaterPropagationEngine {
     this.channelsByTarget.clear();
     
     for (const channel of this.riverChannels) {
-      // Convert source puzzle edge tile to world coordinates
-      const sourcePuzzleBounds = this.getPuzzleBounds(channel.sourcePuzzleID);
-      const sourceWorld = this.gridMapper.gridToWorld(
-        channel.sourceEdgeTile.localX,
-        channel.sourceEdgeTile.localY
-      );
-      const sourceKey = `${sourceWorld.x},${sourceWorld.y}`;
+      // Source and target are already in world tile coordinates
+      const sourceKey = gridKey(channel.sourceWorldTileX, channel.sourceWorldTileY);
       
       if (!this.channelsBySource.has(sourceKey)) {
         this.channelsBySource.set(sourceKey, []);
       }
       this.channelsBySource.get(sourceKey)!.push(channel);
       
-      // Convert target puzzle edge tile to world coordinates
-      const targetPuzzleBounds = this.getPuzzleBounds(channel.targetPuzzleID);
-      const targetWorld = this.gridMapper.gridToWorld(
-        channel.targetEdgeTile.localX,
-        channel.targetEdgeTile.localY
-      );
-      const targetKey = `${targetWorld.x},${targetWorld.y}`;
+      const targetKey = gridKey(channel.targetWorldTileX, channel.targetWorldTileY);
       this.channelsByTarget.set(targetKey, channel);
     }
   }
   
   /**
    * Compute water propagation from a FlowPuzzle's edge outputs.
-   * Returns:
-   * - flooded: Set of world tile coordinates that should have water
-   * - drained: Set of world tile coordinates that should be drained
-   * - downstreamInputs: Map of puzzleID → edge input coordinates (in local space)
+   * All coordinates are in tile units (not pixels).
+   * 
+   * @param sourcePuzzleID - ID of the puzzle whose water state changed
+   * @param edgeOutputs - Edge output tiles in puzzle-local coordinates
+   * @param puzzleBounds - Puzzle bounds in world tile coordinates
+   * @returns flooded/drained tiles and downstream inputs
    */
   computePropagation(
     sourcePuzzleID: string,
     edgeOutputs: { localX: number; localY: number }[],
-    puzzleBounds: { x: number; y: number; width: number; height: number }
+    puzzleBounds: { tileX: number; tileY: number; width: number; height: number }
   ): {
-    flooded: Set<string>; // World tile keys "x,y"
-    drained: Set<string>; // World tile keys "x,y"
+    flooded: Set<GridKey>; // World tile keys
+    drained: Set<GridKey>; // World tile keys
     downstreamInputs: Map<string, { x: number; y: number }[]>;
   } {
-    const flooded = new Set<string>();
+    const flooded = new Set<GridKey>();
     const downstreamInputs = new Map<string, { x: number; y: number }[]>();
     
     // For each edge output from the source puzzle
     for (const localOutput of edgeOutputs) {
-      // Convert to world coordinates
-      const worldOutput = this.gridMapper.gridToWorld(
-        localOutput.localX + Math.floor(puzzleBounds.x / this.gridMapper.getCellSize()),
-        localOutput.localY + Math.floor(puzzleBounds.y / this.gridMapper.getCellSize())
-      );
-      const outputKey = `${worldOutput.x},${worldOutput.y}`;
+      // Convert to world tile coordinates
+      const worldTileX = puzzleBounds.tileX + localOutput.localX;
+      const worldTileY = puzzleBounds.tileY + localOutput.localY;
+      const outputKey = gridKey(worldTileX, worldTileY);
       
       // Find channels starting from this edge
       const channels = this.channelsBySource.get(outputKey) || [];
       
       for (const channel of channels) {
         // Mark all tiles in this channel as flooded
-        for (const tile of channel.tiles) {
-          flooded.add(`${tile.worldX},${tile.worldY}`);
+        for (const tileKey of channel.tiles) {
+          flooded.add(tileKey);
         }
         
         // Add edge input to downstream puzzle
@@ -453,25 +451,16 @@ export class WaterPropagationEngine {
     }
     
     // Compute drained tiles: all channel tiles not in flooded set
-    const drained = new Set<string>();
+    const drained = new Set<GridKey>();
     for (const channel of this.riverChannels) {
-      for (const tile of channel.tiles) {
-        const key = `${tile.worldX},${tile.worldY}`;
-        if (!flooded.has(key)) {
-          drained.add(key);
+      for (const tileKey of channel.tiles) {
+        if (!flooded.has(tileKey)) {
+          drained.add(tileKey);
         }
       }
     }
     
     return { flooded, drained, downstreamInputs };
-  }
-  
-  /**
-   * Helper to get puzzle bounds (would be injected or passed in real implementation)
-   */
-  private getPuzzleBounds(puzzleID: string): { x: number; y: number } {
-    // This would come from OverworldPuzzleManager
-    throw new Error('Not implemented - inject puzzle bounds lookup');
   }
 }
 ```
@@ -484,11 +473,14 @@ export class WaterPropagationEngine {
 
 ```typescript
 import type { RiverChannel } from './RiverChannel';
+import type { GridKey } from '@model/puzzle/FlowTypes';
+import { gridKey } from '@model/puzzle/FlowTypes';
 
 /**
  * Extracts river channel connectivity from Tiled map layer.
  * Analyzes "flowingWater" layer (or similar) to find continuous channels
  * connecting FlowPuzzle edge tiles.
+ * Works entirely in tile coordinates (not pixels).
  */
 export class RiverChannelExtractor {
   /**
@@ -497,14 +489,14 @@ export class RiverChannelExtractor {
    * 
    * @param tiledMapData - Tiled map JSON data
    * @param flowLayerName - Name of layer containing water tiles (e.g., "flowingWater")
-   * @param puzzleRegions - Map of puzzle IDs to their bounds and edge tiles
+   * @param puzzleRegions - Map of puzzle IDs to their bounds and edge tiles (in tile coordinates)
    * @returns List of river channels connecting puzzles
    */
   static extractChannels(
     tiledMapData: any,
     flowLayerName: string,
     puzzleRegions: Map<string, {
-      bounds: { x: number; y: number; width: number; height: number };
+      bounds: { tileX: number; tileY: number; width: number; height: number };
       edgeTiles: { x: number; y: number; edge: 'N' | 'S' | 'E' | 'W' }[];
     }>
   ): RiverChannel[] {
@@ -517,15 +509,21 @@ export class RiverChannelExtractor {
       return channels;
     }
     
-    // 2. Build a grid of water tiles from layer data
+    // 2. Build a grid of water tiles from layer data (in tile coordinates)
     const waterGrid = this.buildWaterGrid(flowLayer);
     
     // 3. For each puzzle edge tile, trace downstream to find channels
     for (const [puzzleID, region] of puzzleRegions) {
       for (const edgeTile of region.edgeTiles) {
+        // Convert local edge tile to world tile coordinates
+        const worldTileX = region.bounds.tileX + edgeTile.x;
+        const worldTileY = region.bounds.tileY + edgeTile.y;
+        
         const channel = this.traceChannel(
           puzzleID,
-          edgeTile,
+          { localX: edgeTile.x, localY: edgeTile.y, edge: edgeTile.edge },
+          worldTileX,
+          worldTileY,
           waterGrid,
           puzzleRegions
         );
@@ -538,18 +536,22 @@ export class RiverChannelExtractor {
     return channels;
   }
   
-  private static buildWaterGrid(flowLayer: any): Set<string> {
+  private static buildWaterGrid(flowLayer: any): Set<GridKey> {
     // Implementation: parse layer data to identify water tiles
-    return new Set<string>();
+    // Returns set of GridKeys for tiles with water
+    return new Set<GridKey>();
   }
   
   private static traceChannel(
     sourcePuzzleID: string,
-    sourceEdge: { x: number; y: number; edge: 'N' | 'S' | 'E' | 'W' },
-    waterGrid: Set<string>,
+    sourceEdge: { localX: number; localY: number; edge: 'N' | 'S' | 'E' | 'W' },
+    sourceWorldTileX: number,
+    sourceWorldTileY: number,
+    waterGrid: Set<GridKey>,
     puzzleRegions: Map<string, any>
   ): RiverChannel | null {
     // Implementation: flood-fill from source edge until reaching another puzzle edge
+    // Returns channel with tiles as GridKeys, all in world tile coordinates
     return null;
   }
 }
@@ -558,22 +560,27 @@ export class RiverChannelExtractor {
 **Testing**:
 
 ```typescript
+import { gridKey } from '@model/puzzle/FlowTypes';
+
 describe('WaterPropagationEngine', () => {
   it('propagates water through river channels', () => {
-    const gridMapper = new GridToWorldMapper(32);
-    const engine = new WaterPropagationEngine(gridMapper);
+    const engine = new WaterPropagationEngine();
     
     const channel: RiverChannel = {
       id: 'river-1',
       tiles: [
-        { worldX: 96, worldY: 16 },
-        { worldX: 128, worldY: 16 },
-        { worldX: 160, worldY: 16 }
+        gridKey(3, 0),  // World tile coordinates
+        gridKey(4, 0),
+        gridKey(5, 0)
       ],
       sourcePuzzleID: 'puzzle-A',
       sourceEdgeTile: { localX: 3, localY: 0 },
+      sourceWorldTileX: 3,
+      sourceWorldTileY: 0,
       targetPuzzleID: 'puzzle-B',
-      targetEdgeTile: { localX: 0, localY: 0 }
+      targetEdgeTile: { localX: 0, localY: 0 },
+      targetWorldTileX: 5,
+      targetWorldTileY: 0
     };
     
     engine.setRiverChannels([channel]);
@@ -581,7 +588,7 @@ describe('WaterPropagationEngine', () => {
     const result = engine.computePropagation(
       'puzzle-A',
       [{ localX: 3, localY: 0 }],
-      { x: 0, y: 0, width: 128, height: 32 }
+      { tileX: 0, tileY: 0, width: 4, height: 1 }
     );
     
     expect(result.flooded.size).toBe(3);
@@ -603,8 +610,14 @@ describe('RiverChannelExtractor', () => {
   it('extracts river channels from Tiled map', () => {
     const mockTiledData = createMockTiledMapWithRiver();
     const puzzleRegions = new Map([
-      ['puzzle-A', { bounds: { x: 0, y: 0, width: 128, height: 32 }, edgeTiles: [...] }],
-      ['puzzle-B', { bounds: { x: 256, y: 0, width: 128, height: 32 }, edgeTiles: [...] }]
+      ['puzzle-A', { 
+        bounds: { tileX: 0, tileY: 0, width: 4, height: 1 }, 
+        edgeTiles: [{ x: 3, y: 0, edge: 'E' }] 
+      }],
+      ['puzzle-B', { 
+        bounds: { tileX: 8, tileY: 0, width: 4, height: 1 }, 
+        edgeTiles: [{ x: 0, y: 0, edge: 'W' }] 
+      }]
     ]);
     
     const channels = RiverChannelExtractor.extractChannels(
@@ -616,6 +629,7 @@ describe('RiverChannelExtractor', () => {
     expect(channels.length).toBeGreaterThan(0);
     expect(channels[0].sourcePuzzleID).toBe('puzzle-A');
     expect(channels[0].targetPuzzleID).toBe('puzzle-B');
+    expect(channels[0].sourceWorldTileX).toBe(3); // World tile coordinates
   });
 });
 ```
@@ -627,6 +641,8 @@ describe('RiverChannelExtractor', () => {
 **New Fields**:
 
 ```typescript
+import type { GridKey } from '@model/puzzle/FlowTypes';
+
 export class OverworldGameState {
   // Existing fields...
   
@@ -636,8 +652,8 @@ export class OverworldGameState {
   // NEW: Cache of computed edge inputs for each FlowPuzzle (local coordinates)
   private flowPuzzleInputs: Map<string, { x: number; y: number }[]> = new Map();
   
-  // NEW: Current water state of overworld river tiles (world coordinates)
-  private overworldWaterState: Set<string> = new Set(); // Keys: "worldX,worldY"
+  // NEW: Current water state of overworld river tiles (world tile coordinates)
+  private overworldWaterState: Set<GridKey> = new Set();
   
   // NEW: Instance of water propagation engine
   private waterPropagation?: WaterPropagationEngine;
@@ -665,6 +681,7 @@ initializeWaterPropagation(
 /**
  * Update water propagation when a FlowPuzzle's state changes.
  * Returns the tiles that changed state (for view updates).
+ * All coordinates are in tile units (world tile coordinates).
  * 
  * This is called:
  * - When player places/removes a bridge in active FlowPuzzle (real-time updates)
@@ -674,19 +691,27 @@ updateFlowPuzzleWaterState(
   puzzleID: string,
   puzzle: FlowPuzzle
 ): {
-  flooded: Set<string>; // World tile keys that now have water
-  drained: Set<string>; // World tile keys that are now drained
+  flooded: Set<GridKey>; // World tile keys that now have water
+  drained: Set<GridKey>; // World tile keys that are now drained
   affectedPuzzles: Map<string, { x: number; y: number }[]>; // Puzzle ID → new edge inputs
 } {
   if (!this.waterPropagation || !this.puzzleManager) {
     throw new Error('Water propagation not initialized');
   }
   
-  // 1. Get puzzle bounds
+  // 1. Get puzzle bounds (in tile coordinates)
   const bounds = this.puzzleManager.getPuzzleBounds(puzzleID);
   if (!bounds) {
     throw new Error(`No bounds for puzzle ${puzzleID}`);
   }
+  
+  // Convert pixel bounds to tile bounds
+  const tileBounds = {
+    tileX: Math.floor(bounds.x / 32), // Assuming 32px tile size (view layer constant)
+    tileY: Math.floor(bounds.y / 32),
+    width: Math.floor(bounds.width / 32),
+    height: Math.floor(bounds.height / 32)
+  };
   
   // 2. Get edge outputs from puzzle (local coordinates)
   const localOutputs = puzzle.getEdgeOutput();
@@ -698,7 +723,7 @@ updateFlowPuzzleWaterState(
   const propagation = this.waterPropagation.computePropagation(
     puzzleID,
     localOutputs,
-    bounds
+    tileBounds
   );
   
   // 5. Update overworld water state
@@ -738,21 +763,17 @@ getFlowPuzzleInputs(puzzleID: string): { x: number; y: number }[] {
 
 /**
  * Check if a world tile currently has water.
+ * Coordinates are in world tile units.
  */
-tileHasWater(worldX: number, worldY: number): boolean {
-  return this.overworldWaterState.has(`${worldX},${worldY}`);
+tileHasWater(worldTileX: number, worldTileY: number): boolean {
+  return this.overworldWaterState.has(gridKey(worldTileX, worldTileY));
 }
 
 /**
- * Get all world tiles that currently have water.
+ * Get all world tiles that currently have water (as GridKeys).
  */
-getWaterTiles(): { worldX: number; worldY: number }[] {
-  const tiles: { worldX: number; worldY: number }[] = [];
-  for (const key of this.overworldWaterState) {
-    const [x, y] = key.split(',').map(Number);
-    tiles.push({ worldX: x, worldY: y });
-  }
-  return tiles;
+getWaterTiles(): GridKey[] {
+  return Array.from(this.overworldWaterState);
 }
 ```
 
@@ -767,7 +788,7 @@ exportState(): {
   // NEW: FlowPuzzle water state
   flowPuzzleOutputs: Record<string, { x: number; y: number }[]>;
   flowPuzzleInputs: Record<string, { x: number; y: number }[]>;
-  overworldWaterState: string[]; // Array of "worldX,worldY" keys
+  overworldWaterState: string[]; // Array of GridKey strings ("worldTileX,worldTileY")
 }
 
 importState(state: { ... }): void {
@@ -781,7 +802,8 @@ importState(state: { ... }): void {
     this.flowPuzzleInputs = new Map(Object.entries(state.flowPuzzleInputs));
   }
   if (state.overworldWaterState) {
-    this.overworldWaterState = new Set(state.overworldWaterState);
+    // Import GridKeys from saved strings
+    this.overworldWaterState = new Set(state.overworldWaterState as GridKey[]);
   }
   
   // After restoring state, recompute water visuals if needed
@@ -1219,27 +1241,30 @@ The existing `CollisionManager` handles binary collision (passable/blocked). For
 
 ### 4.2 Enhanced Implementation
 
+**Important**: CollisionManager is a model/controller boundary class. It should work in tile coordinates, not pixel coordinates. The view layer (OverworldScene) handles pixel conversions.
+
 Add new methods to handle `ConnectivityState` from `ConnectivityManager`:
 
 ```typescript
-import { GridToWorldMapper } from '@view/GridToWorldMapper';
+import type { ConnectivityState, ConnectivityTile } from '@model/ConnectivityManager';
 
 export class CollisionManager {
   // Existing fields...
-  private gridMapper: GridToWorldMapper;
+  private tileSize: number = 32; // Still needed for internal coordinate conversions
   
   // NEW: Store multi-level walkability state
   private walkabilityState: Map<string, ConnectivityState> = new Map();
   
-  constructor(overworldScene: OverworldScene, gridMapper: GridToWorldMapper) {
+  constructor(overworldScene: OverworldScene) {
     this.overworldScene = overworldScene;
-    this.gridMapper = gridMapper;
   }
   
   /**
    * Update collision from FlowPuzzle baked connectivity.
    * Maps ConnectivityState to overworld collision.
-   * Uses GridToWorldMapper for coordinate conversions.
+   * 
+   * @param connectivity - Connectivity tiles in puzzle-local coordinates
+   * @param puzzleBounds - Puzzle bounds in pixel coordinates (from OverworldPuzzleManager)
    */
   updateFromConnectivity(
     connectivity: ConnectivityTile[],
@@ -1248,24 +1273,22 @@ export class CollisionManager {
     console.log(`CollisionManager: Updating from connectivity (${connectivity.length} tiles)`);
     
     for (const tile of connectivity) {
-      // Convert puzzle-local coordinates to world coordinates using GridToWorldMapper
-      const worldPos = this.gridMapper.gridToWorld(tile.x, tile.y);
-      const adjustedWorld = {
-        x: worldPos.x + puzzleBounds.x,
-        y: worldPos.y + puzzleBounds.y
-      };
+      // Convert puzzle-local tile coords to world pixel coords
+      const worldPixelX = puzzleBounds.x + tile.x * this.tileSize;
+      const worldPixelY = puzzleBounds.y + tile.y * this.tileSize;
       
-      // Convert world pixels to tile coordinates
-      const tilePos = this.gridMapper.worldToGrid(adjustedWorld.x, adjustedWorld.y);
+      // Convert world pixels to world tile coordinates
+      const worldTileX = Math.floor(worldPixelX / this.tileSize);
+      const worldTileY = Math.floor(worldPixelY / this.tileSize);
       
       // Store walkability state
-      const key = `${tilePos.x},${tilePos.y}`;
+      const key = `${worldTileX},${worldTileY}`;
       this.walkabilityState.set(key, tile.state);
       
       // Map to binary collision for now (compatibility with existing player movement)
       // Later, player movement will be enhanced to read walkabilityState directly
       const hasCollision = this.mapStateToCollision(tile.state);
-      this.overworldScene.setCollisionAt(tilePos.x, tilePos.y, hasCollision);
+      this.overworldScene.setCollisionAt(worldTileX, worldTileY, hasCollision);
     }
   }
   
@@ -1405,16 +1428,16 @@ describe('CollisionManager walkability', () => {
 1. OverworldScene initializes, loads Tiled map
 2. RiverChannelExtractor analyzes "flowingWater" layer
    - Traces river channels from FlowPuzzle edges across overworld tiles
-   - Builds RiverChannel objects with tile lists
-3. WaterPropagationEngine initialized with channels and GridToWorldMapper
+   - Builds RiverChannel objects with tile lists (all in tile coordinates)
+3. WaterPropagationEngine initialized with channels
 4. OverworldGameState loads persisted state (if any)
-   - Restores flowPuzzleOutputs, flowPuzzleInputs, overworldWaterState
+   - Restores flowPuzzleOutputs, flowPuzzleInputs, overworldWaterState (as GridKeys)
    - If no persisted state, river channels are empty (no water)
 5. OverworldGameState.initializeWaterPropagation(engine, puzzleManager)
 6. For each saved FlowPuzzle with outputs:
    - Apply edge inputs to puzzle instance
    - Recompute propagation (may have changed if not saved)
-   - Update overworld water tile sprites
+   - Update overworld water tile sprites (view converts tiles to pixels)
    - Get baked connectivity and update CollisionManager
 ```
 
@@ -1532,21 +1555,22 @@ preload() {
 
 ### Phase 1: Model Layer (Week 1)
 
-- [ ] Implement `RiverChannel` type definition
+- [ ] Implement `RiverChannel` type definition (using GridKey)
 - [ ] Implement `RiverChannelExtractor` utility for Tiled map analysis
   - [ ] Parse "flowingWater" layer
   - [ ] Trace connected components from puzzle edges
-  - [ ] Build channel objects with tile lists
+  - [ ] Build channel objects with tile lists (all tile coordinates, no pixels)
 - [ ] Implement `WaterPropagationEngine` class
-  - [ ] Use GridToWorldMapper (not hardcoded tileSize)
+  - [ ] Work entirely in tile coordinates (no pixels)
+  - [ ] Use `GridKey` from `FlowTypes` for coordinate keys
   - [ ] Store and query river channels
   - [ ] Compute water flow through channels
 - [ ] Add unit tests for water propagation logic
   - [ ] Test channel extraction
   - [ ] Test multi-puzzle propagation
-  - [ ] Test coordinate conversions via GridToWorldMapper
+  - [ ] Verify all coordinates are tile-based
 - [ ] Enhance `OverworldGameState` with FlowPuzzle methods
-  - [ ] Add water state tracking fields
+  - [ ] Add water state tracking fields (using GridKey)
   - [ ] Implement `updateFlowPuzzleWaterState()`
   - [ ] Implement persistence (export/import with water state)
 - [ ] Add tests for state management and persistence
@@ -1578,7 +1602,7 @@ preload() {
   - [ ] Update overworld water tiles in real-time
 - [ ] Add tests for controller logic (extracted methods)
 - [ ] Enhance `CollisionManager` with walkability states
-  - [ ] Use GridToWorldMapper (not hardcoded tileSize)
+  - [ ] Work in tile coordinates internally
   - [ ] Add `updateFromConnectivity()` method
   - [ ] Add height-aware movement validation
 - [ ] Add tests for multi-level collision
@@ -1709,15 +1733,17 @@ These are potential future improvements not included in the initial implementati
 - `FlowPuzzleController` only overrides these methods
 - Zero code duplication in puzzle entry/exit flow
 
-### 11.4 Use Existing Helpers
+### 11.4 Model Layer Purity
 
-**Clarification**: Use `GridToWorldMapper` for coordinate conversions, don't hardcode tileSize.
+**Clarification**: Model classes should never know about pixel coordinates or view-layer helpers like GridToWorldMapper.
 
 **Solution**:
-- `WaterPropagationEngine` takes `GridToWorldMapper` in constructor
-- All coordinate conversions use `gridMapper.gridToWorld()` and `worldToGrid()`
-- `CollisionManager` also uses `GridToWorldMapper`
-- No hardcoded `tileSize = 32` multiplications
+- `WaterPropagationEngine` works entirely in tile coordinates (worldTileX, worldTileY)
+- All `RiverChannel` coordinates are in tile units
+- `OverworldGameState` stores water state as `GridKey` (branded tile coordinate keys)
+- `CollisionManager` converts from tile to pixel internally only when interfacing with OverworldScene
+- View layer handles all pixel coordinate conversions
+- Use `GridKey` from `FlowTypes` as branded type for coordinate keys (type safety)
 
 ### 11.5 Persistence Requirements
 
@@ -1772,10 +1798,12 @@ Key design decisions:
 
 - **River channel model**: Water flows across many overworld tiles between puzzles, not just at boundaries. `RiverChannelExtractor` analyzes Tiled map at load time to build connectivity graph.
 - **Real-time updates**: Water propagation happens DURING puzzle solving, not just on exit. FlowPuzzleRenderer emits events, controller updates overworld visuals immediately.
-- **Pure model logic**: `WaterPropagationEngine` is framework-agnostic, uses `GridToWorldMapper` for coordinates, fully unit-testable.
+- **Pure model logic**: `WaterPropagationEngine` is framework-agnostic, **works entirely in tile coordinates** (not pixels), fully unit-testable.
+- **Branded types**: Use `GridKey` from `FlowTypes` for type-safe tile coordinate keys throughout model layer.
+- **Model layer purity**: Model classes never reference pixel coordinates or view helpers like `GridToWorldMapper`. All coordinates are tile-based.
 - **Code reuse**: `OverworldPuzzleController` refactored with template method pattern. `FlowPuzzleController` only overrides extension points, zero duplication.
 - **Renderer extension**: `FlowPuzzleRenderer` builds on `EmbeddedPuzzleRenderer` for code reuse.
-- **Collision enhancement**: `CollisionManager` uses `GridToWorldMapper`, enhanced without breaking existing functionality.
+- **Collision enhancement**: `CollisionManager` uses tile coordinates internally, enhanced without breaking existing functionality.
 - **Persistence**: Both bridges AND water state persist across sessions via `OverworldGameState.exportState()`.
 
 The implementation plan breaks down the work into manageable phases, each with clear deliverables and tests. This approach minimizes integration risk and allows for iterative refinement.
@@ -1785,5 +1813,5 @@ The implementation plan breaks down the work into manageable phases, each with c
 1. **Water spans overworld tiles**: Not just puzzle-to-puzzle connections
 2. **Real-time visual feedback**: Updates visible during puzzle solving
 3. **Template method pattern**: Extensibility without duplication
-4. **Use existing helpers**: GridToWorldMapper throughout
-5. **Complete persistence**: Water state saved across sessions
+4. **Model layer purity**: Tile coordinates only, no pixel logic or view dependencies
+5. **Type safety**: GridKey branded type for coordinate keys
