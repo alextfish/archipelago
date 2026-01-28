@@ -52,10 +52,12 @@ export function attachTestMarker(
     marker.id = options.id;
     marker.dataset.testid = options.testId || options.id;
     marker.style.position = 'absolute';
+    // Allow pointer events so automation tools can interact
     marker.style.pointerEvents = 'auto';
     marker.style.background = 'transparent';
     marker.style.zIndex = '1000';
-    
+    marker.style.cursor = 'pointer';
+
     // Show border during development for visibility
     if (options.showBorder !== false) {
         marker.style.border = '2px dashed rgba(255, 0, 0, 0.3)';
@@ -68,6 +70,61 @@ export function attachTestMarker(
     marker.style.height = `${height}px`;
 
     document.body.appendChild(marker);
+
+    // Forward pointer events to Phaser
+    let isDragging = false;
+
+    const forwardEventToPhaser = (domEvent: PointerEvent, eventType: string) => {
+        const canvas = scene.game.canvas;
+        const rect = canvas.getBoundingClientRect();
+        const camera = scene.cameras.main;
+
+        // Calculate position relative to canvas (screen coordinates)
+        const canvasX = domEvent.clientX - rect.left;
+        const canvasY = domEvent.clientY - rect.top;
+
+        // Convert screen coordinates to world coordinates
+        // Account for camera position and zoom
+        const worldX = (canvasX / camera.zoom) + camera.worldView.x;
+        const worldY = (canvasY / camera.zoom) + camera.worldView.y;
+
+        // Get Phaser's input manager and active pointer
+        const input = scene.input;
+        const pointer = input.activePointer;
+
+        // Update pointer position (x/y are screen coords, worldX/Y are world coords)
+        pointer.x = canvasX;
+        pointer.y = canvasY;
+        pointer.worldX = worldX;
+        pointer.worldY = worldY;
+
+        // Emit the event to Phaser's input system
+        input.emit(eventType, pointer, []);
+
+        // Prevent default to avoid double-handling
+        domEvent.preventDefault();
+        domEvent.stopPropagation();
+    };
+
+    marker.addEventListener('pointerdown', (e) => {
+        isDragging = true;
+        forwardEventToPhaser(e, 'pointerdown');
+    });
+
+    // Use window for move/up to handle dragging outside marker
+    const handlePointerMove = (e: PointerEvent) => {
+        if (!isDragging) return;
+        forwardEventToPhaser(e, 'pointermove');
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+        if (!isDragging) return;
+        isDragging = false;
+        forwardEventToPhaser(e, 'pointerup');
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
 
     // Function to update marker position
     const updatePosition = () => {
@@ -94,11 +151,11 @@ export function attachTestMarker(
         // Transform world coordinates to camera space (0,0 = top-left of camera view)
         const cameraSpaceX = (worldLeft - camera.worldView.x) * camera.zoom;
         const cameraSpaceY = (worldTop - camera.worldView.y) * camera.zoom;
-        
+
         // Convert camera space to viewport coordinates
         const viewportX = canvasRect.left + cameraSpaceX;
         const viewportY = canvasRect.top + cameraSpaceY;
-        
+
         // Convert to document coordinates
         const documentX = viewportX + window.scrollX;
         const documentY = viewportY + window.scrollY;
@@ -116,6 +173,11 @@ export function attachTestMarker(
     scene.events.once('shutdown', () => {
         console.log(`[TEST] Removing test marker: ${options.id}`);
         scene.events.off('postupdate', updatePosition);
+
+        // Clean up event listeners
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', handlePointerUp);
+
         if (marker.parentElement) {
             marker.parentElement.removeChild(marker);
         }
