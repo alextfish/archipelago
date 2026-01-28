@@ -13,6 +13,7 @@ import { InteractionCursor, type Interactable } from '@view/InteractionCursor';
 import { RoofManager } from '@view/RoofManager';
 import { NPC } from '@model/conversation/NPC';
 import type { ConversationSpec } from '@model/conversation/ConversationData';
+import { attachTestMarker, isTestMode } from '@helpers/TestMarkers';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -190,6 +191,18 @@ export class OverworldScene extends Phaser.Scene {
     // Create player sprite
     this.player = this.physics.add.sprite(playerStart.x, playerStart.y, 'builder', 0);
     this.player.setCollideWorldBounds(true);
+
+    // Add test marker for player
+    if (isTestMode()) {
+      attachTestMarker(this, this.player, {
+        id: 'player',
+        testId: 'player',
+        width: 32,
+        height: 32,
+        showBorder: true
+      });
+      console.log(`[TEST] Added test marker for player at (${playerStart.x}, ${playerStart.y})`);
+    }
 
     // Set up camera to follow player
     this.cameras.main.startFollow(this.player);
@@ -409,6 +422,18 @@ export class OverworldScene extends Phaser.Scene {
       sprite.setOrigin(0, 1); // Bottom-left origin to align with tile coordinates
       sprite.setDepth(worldY); // Use Y-sorting for depth
       this.npcSprites.set(npc.id, sprite);
+
+      // Add test marker for automated testing
+      if (isTestMode()) {
+        attachTestMarker(this, sprite, {
+          id: `npc-${npc.id}`,
+          testId: `npc-${npc.id}`,
+          width: this.tiledMapData.tilewidth,
+          height: this.tiledMapData.tileheight,
+          showBorder: true
+        });
+        console.log(`[TEST] Added test marker for NPC: ${npc.id} at tile (${tileX}, ${tileY}), world (${worldX}, ${worldY})`);
+      }
 
       console.log(`Loaded NPC: ${npc.name} at (${tileX}, ${tileY}), language: ${language}, conversation: ${conversationFile || 'none'}`);
     }

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Archipelago - Test Mode</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        #game-container {
+            position: relative;
+        }
+
+        #test-mode-indicator {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 10000;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="test-mode-indicator">TEST MODE</div>
+    <div id="game-container"></div>
+    <script type="module">
+        // Set test mode before importing the game
+        window.__TEST_MODE__ = true;
+        import('/src/main.ts');
+
+        // Log console messages for automation
+        console.log('[TEST] Archipelago Test Mode Initialized');
+        console.log('[TEST] Test markers are enabled');
+        console.log('[TEST] Game loading...');
+    </script>
+</body>
+
+</html>
