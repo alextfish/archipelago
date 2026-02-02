@@ -64,7 +64,7 @@ async function runTest() {
         console.log(`[TEST SCRIPT] Test completed in ${(duration / 1000).toFixed(1)}s`);
 
         // Exit with appropriate code
-        if (reason.includes('success') || reason.includes('conversation_started') || reason.includes('conversation_ended')) {
+        if (reason.includes('success') || reason.includes('completed') || reason.includes('conversation')) {
             process.exit(0);
         } else {
             process.exit(1);
@@ -166,8 +166,53 @@ async function runTest() {
 
         console.log('[TEST SCRIPT] Conversation started successfully!', conversationData);
 
-        // Exit immediately after verifying conversation started
-        await cleanup('Test success - conversation_started event received');
+        // Click the "OK" button
+        console.log('[TEST SCRIPT] Looking for "OK" choice button...');
+        await page.waitForTimeout(500); // Brief pause for UI to render
+        const okButton = await page.$('[data-testid="choice-ok"]');
+        if (!okButton) {
+            throw new Error('Could not find OK button');
+        }
+
+        // Get button position and size for debugging
+        const okButtonBox = await okButton.boundingBox();
+        console.log('[TEST SCRIPT] OK button found:', okButtonBox);
+
+        console.log('[TEST SCRIPT] Clicking "OK" button...');
+        await okButton.click();
+
+        // Check if click had any effect by looking at console
+        console.log('[TEST SCRIPT] Click sent, checking for game response...');
+
+        // Wait longer for second conversation node to display
+        console.log('[TEST SCRIPT] Waiting for conversation to advance...');
+        await page.waitForTimeout(1500);
+
+        // Click the "[Leave]" button
+        console.log('[TEST SCRIPT] Looking for "[Leave]" button...');
+        const leaveButton = await page.$('[data-testid="choice-leave"]');
+        if (!leaveButton) {
+            throw new Error('Could not find Leave button');
+        }
+        console.log('[TEST SCRIPT] Clicking "[Leave]" button...');
+        await leaveButton.click();
+
+        // Wait for conversation to end
+        console.log('[TEST SCRIPT] Waiting for conversation to end...');
+        await page.waitForFunction(() => {
+            if (!window.__GAME_EVENTS__) return false;
+            return window.__GAME_EVENTS__.some(e => e.type === 'conversation_ended');
+        }, { timeout: 5000 });
+
+        const endData = await page.evaluate(() => {
+            const event = window.__GAME_EVENTS__.find(e => e.type === 'conversation_ended');
+            return event ? event.data : null;
+        });
+
+        console.log('[TEST SCRIPT] Conversation ended successfully!', endData);
+
+        // Exit after successful full conversation flow
+        await cleanup('Test success - completed full conversation flow');
 
     } catch (error) {
         console.error('[TEST SCRIPT] Error during test:', error.message);

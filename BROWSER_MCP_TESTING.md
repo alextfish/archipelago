@@ -9,8 +9,9 @@ The test marker system and automated test infrastructure are now fully integrate
 ### 1. Test Marker System (`src/helpers/TestMarkers.ts`)
 - Creates transparent DOM elements positioned over Phaser game objects
 - Syncs position every frame to follow game objects
-- Forwards pointer events to Phaser (down, move, up with dragging support)
-- Enables browser automation tools to interact with game elements
+- **Direct callback invocation**: For UI elements (conversation buttons), calls custom `onClick` handlers directly
+- **Event forwarding**: For world objects (NPCs, player), forwards pointer events to Phaser input system
+- Enables browser automation tools to interact with both world and UI elements
 - Only active in test mode
 
 ### 2. Test Event System (`src/helpers/TestEvents.ts`)
@@ -27,6 +28,7 @@ The test marker system and automated test infrastructure are now fully integrate
 
 ### 4. Automated Test Script (`test-browser.mjs`)
 - Playwright-based browser automation
+- **Tests full conversation flow**: Player movement → NPC interaction → conversation choices → conversation end
 - **Combination timeout strategy**:
   * Maximum duration timeout (60s) - safety net
   * Idle detection timeout (10s) - closes when stuck
@@ -37,6 +39,10 @@ The test marker system and automated test infrastructure are now fully integrate
 ### 5. Test Markers Added
 - **Player sprite**: ID `player`, testID `player` (32x32 pixels)
 - **NPCs**: ID `npc-{npcId}`, testID `npc-{npcId}` (dynamic size based on sprite)
+- **Conversation choice buttons**: ID `choice-{index}-{normalized-text}`, testID `choice-{normalized-text}`
+  * Example: "OK" button → testID `choice-ok`
+  * Example: "I don't understand" → testID `choice-i-don-t-understand`
+- **Leave button**: ID `choice-leave`, testID `choice-leave` (shown when conversation ends)
 
 ### 6. Test Events Emitted
 - `conversation_started` - When NPC conversation begins
@@ -82,6 +88,20 @@ Navigate to: http://localhost:5174/test.html
 - "PlayerController: Player reached target"
 - Conversation-related logs
 
+### 6. Test Conversation Buttons
+**In Conversation Mode**:
+1. After entering conversation, choice button markers should appear
+2. Red dashed boxes should appear over each choice button
+3. Click on a choice button marker (e.g., "OK" button with testID `choice-ok`)
+4. Conversation should advance to the next node
+5. Click "[Leave]" button marker (testID `choice-leave`) to end conversation
+
+**Expected Console Logs**:
+- `[TEST] Added test marker for choice: "OK" (choice-ok)`
+- `[TEST MARKER] Calling custom onClick handler`
+- `[TEST EVENT] conversation_ended { conversationId, npcId, completed }`
+- Conversation markers are automatically removed when conversation ends
+
 ## Browser MCP Integration
 
 ### Using VS Code Browser MCP
@@ -102,6 +122,14 @@ The `.vscode/mcp.json` is configured with browsermcp. To use it:
    
    // After player reaches NPC, press E
    // (Browser MCP can simulate keyboard events)
+   
+   // In conversation, find and click choice buttons
+   const okButton = document.querySelector('[data-testid="choice-ok"]');
+   okButton.click();
+   
+   // Click leave button to exit
+   const leaveButton = document.querySelector('[data-testid="choice-leave"]');
+   leaveButton.click();
    ```
 
 3. **Read Console Logs**:
@@ -118,13 +146,23 @@ import { attachTestMarker, isTestMode } from '@helpers/TestMarkers';
 
 // Only in test mode
 if (isTestMode()) {
-  // Attach to a Phaser sprite
+  // Attach to a Phaser sprite (event forwarding)
   attachTestMarker(scene, sprite, {
     id: 'unique-id',
     testId: 'test-id-for-automation',
     width: 32,
     height: 32,
     showBorder: true  // Optional red dashed border
+  });
+  
+  // Attach with custom onClick callback (direct invocation)
+  attachTestMarker(scene, button, {
+    id: 'button-marker',
+    testId: 'button-test-id',
+    width: 200,
+    height: 60,
+    showBorder: true,
+    onClick: () => this.handleButtonClick()  // Called directly on click
   });
   
   // Attach to tile coordinates
@@ -145,6 +183,10 @@ const marker = document.querySelector('[data-testid="player"]');
 
 // Find all NPC markers
 const npcMarkers = document.querySelectorAll('[data-testid^="npc-"]');
+
+// Find conversation choice buttons
+const okButton = document.querySelector('[data-testid="choice-ok"]');
+const leaveButton = document.querySelector('[data-testid="choice-leave"]');
 
 // Get marker info
 const testId = marker.getAttribute('data-testid');
@@ -210,20 +252,32 @@ node test-browser.mjs
 The script will:
 1. Open test.html in Chromium
 2. Wait for game to load
-3. Find NPC markers
-4. Click first NPC to trigger tap-to-move
-5. Press E to interact
-6. Capture console logs
-7. Keep browser open for inspection
+3. Find and click NPC marker to trigger tap-to-move
+4. Wait for player movement (with timeout)
+5. Press E key to start conversation
+6. Wait for `conversation_started` event
+7. **Click "OK" conversation choice button**
+8. Wait for conversation to advance
+9. **Click "[Leave]" button to end conversation**
+10. Wait for `conversation_ended` event
+11. Close browser automatically
+12. Exit with code 0 (success) or 1 (failure/timeout)
+
+**Test Duration**: ~10-15 seconds for full conversation flow
+
+**Console Output**: Shows all browser console logs prefixed with `[BROWSER]`
 
 ## Success Criteria
 
 ✅ Test mode loads without errors
-✅ Test markers visible over game objects
+✅ Test markers visible over game objects (player, NPCs, conversation buttons)
 ✅ Markers sync position with camera movement
-✅ Clicking markers triggers game interaction
+✅ Clicking NPC markers triggers tap-to-move
+✅ Clicking conversation choice buttons advances conversation
+✅ Conversation events (`conversation_started`, `conversation_ended`) emit correctly
 ✅ Console logs confirm test mode active
-✅ Browser automation can interact with markers
+✅ Browser automation can complete full conversation flow
+✅ Test script exits automatically with correct exit code
 
 ## Architecture Notes
 

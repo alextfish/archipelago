@@ -7,6 +7,15 @@
 
 import type Phaser from 'phaser';
 
+export interface TestMarkerOptions {
+    id: string;
+    testId?: string;
+    width?: number;
+    height?: number;
+    showBorder?: boolean;
+    onClick?: () => void;  // Custom click handler
+}
+
 /**
  * Check if test markers should be enabled
  */
@@ -17,14 +26,6 @@ export function isTestMode(): boolean {
     }
     // Check Vite environment variables
     return import.meta.env.MODE === 'test' || import.meta.env.VITE_TEST_MODE === 'true';
-}
-
-interface TestMarkerOptions {
-    id: string;
-    testId?: string;
-    width?: number;
-    height?: number;
-    showBorder?: boolean;
 }
 
 /**
@@ -79,6 +80,8 @@ export function attachTestMarker(
         const rect = canvas.getBoundingClientRect();
         const camera = scene.cameras.main;
 
+        console.log('[TEST MARKER] Forwarding event:', eventType, 'scene:', scene.scene.key, 'camera:', camera);
+
         // Calculate position relative to canvas (screen coordinates)
         const canvasX = domEvent.clientX - rect.left;
         const canvasY = domEvent.clientY - rect.top;
@@ -87,6 +90,8 @@ export function attachTestMarker(
         // Account for camera position and zoom
         const worldX = (canvasX / camera.zoom) + camera.worldView.x;
         const worldY = (canvasY / camera.zoom) + camera.worldView.y;
+
+        console.log('[TEST MARKER] Screen:', canvasX, canvasY, 'World:', worldX, worldY);
 
         // Get Phaser's input manager and active pointer
         const input = scene.input;
@@ -107,7 +112,19 @@ export function attachTestMarker(
     };
 
     marker.addEventListener('pointerdown', (e) => {
+        console.log('[TEST MARKER] pointerdown on marker:', options.id);
         isDragging = true;
+
+        // If a custom onClick handler is provided, call it directly
+        if (options.onClick) {
+            console.log('[TEST MARKER] Calling custom onClick handler');
+            options.onClick();
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
+
+        // Otherwise, forward event to Phaser
         forwardEventToPhaser(e, 'pointerdown');
     });
 

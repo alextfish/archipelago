@@ -12,6 +12,7 @@ import type { ConversationSpec, ConversationEffect } from '@model/conversation/C
 import type { NPC } from '@model/conversation/NPC';
 import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
 import { NPCAppearanceRegistry } from '@model/conversation/NPCAppearanceRegistry';
+import { attachTestMarker, isTestMode } from '@helpers/TestMarkers';
 
 export class ConversationScene extends Phaser.Scene implements ConversationHost {
     private controller: ConversationController | null = null;
@@ -179,6 +180,20 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
             );
             button.setDepth(10);
             this.choiceButtons.push(button);
+
+            // Add test marker for automation
+            if (isTestMode()) {
+                attachTestMarker(this, button, {
+                    id: 'choice-leave',
+                    testId: 'choice-leave',
+                    width: this.CHOICE_WIDTH,
+                    height: this.CHOICE_HEIGHT,
+                    showBorder: true,
+                    onClick: () => this.onContinueClicked()
+                });
+                console.log('[TEST] Added test marker for Leave button');
+            }
+
             console.log('ConversationScene: [Leave] button created');
             return;
         }
@@ -201,6 +216,21 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
             );
             button.setDepth(10);
             this.choiceButtons.push(button);
+
+            // Add test marker for automation
+            if (isTestMode()) {
+                // Normalize choice text to create a valid ID (remove spaces, special chars)
+                const normalizedText = choice.text.toLowerCase().replace(/[^a-z0-9]/g, '-');
+                attachTestMarker(this, button, {
+                    id: `choice-${choice.index}-${normalizedText}`,
+                    testId: `choice-${normalizedText}`,
+                    width: this.CHOICE_WIDTH,
+                    height: this.CHOICE_HEIGHT,
+                    showBorder: true,
+                    onClick: () => this.onChoiceSelected(choice.index)
+                });
+                console.log(`[TEST] Added test marker for choice: "${choice.text}" (choice-${normalizedText})`);
+            }
 
             currentX += this.CHOICE_WIDTH + this.CHOICE_SPACING;
         }
@@ -227,6 +257,9 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
      */
     private onContinueClicked(): void {
         console.log('ConversationScene: Continue button clicked, ending conversation');
+        if (this.controller) {
+            this.controller.endConversation(); // Emit test event and clear state
+        }
         this.hideConversation();
         this.onConversationEnd();
     }
@@ -267,6 +300,7 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
      */
     onConversationEnd(): void {
         console.log('ConversationScene: onConversationEnd called');
+
         // Notify overworld that conversation has ended
         this.events.emit('conversationEnded');
     }

@@ -125,6 +125,7 @@ export class ConversationController {
 
             // No transition to new node, or no final NPC line - end immediately
             console.log('ConversationController: Ending conversation immediately');
+            this.endConversation(); // Emit test event and clear state
             this.host.hideConversation();
             this.host.onConversationEnd();
         } else {
@@ -169,6 +170,8 @@ export class ConversationController {
 
     /**
      * End the current conversation
+     * Emits test event and clears internal state
+     * Note: Does NOT call host methods - caller should do that
      */
     endConversation(): void {
         if (!this.state) {
@@ -181,9 +184,6 @@ export class ConversationController {
             npcId: this.currentNPC?.id,
             completed: this.state.isEnded()
         });
-
-        this.host.hideConversation();
-        this.host.onConversationEnd();
 
         // Clear state
         this.state = null;
