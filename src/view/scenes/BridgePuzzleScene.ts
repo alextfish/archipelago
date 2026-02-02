@@ -1,18 +1,18 @@
 import Phaser from 'phaser';
-import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
+import { BridgePuzzle, type PuzzleSpec } from '@model/puzzle/BridgePuzzle';
 import { PuzzleController } from '@controller/PuzzleController';
 import type { PuzzleHost } from '@controller/PuzzleHost';
 import { Environment } from '@helpers/Environment';
 import puzzleData from '../../data/puzzles/simple4IslandPuzzle.json';
 
 interface BridgePuzzleSceneData {
-    puzzleData?: any;
+    puzzleData?: PuzzleSpec;
 }
 
 export class BridgePuzzleScene extends Phaser.Scene {
     private puzzle: BridgePuzzle | null = null;
     private controller: PuzzleController | null = null;
-    private puzzleDataToLoad: any = null;
+    private puzzleDataToLoad: PuzzleSpec | null = null;
 
     constructor() {
         super({ key: 'BridgePuzzleScene' });

@@ -913,8 +913,8 @@ export class OverworldScene extends Phaser.Scene {
     try {
       console.log(`Starting puzzle from conversation: ${puzzleId}`);
       
-      // Load the puzzle data
-      const puzzlePath = `src/data/puzzles/${puzzleId}.json`;
+      // Load the puzzle data from resources directory
+      const puzzlePath = `resources/puzzles/${puzzleId}.json`;
       
       // Fetch the puzzle JSON
       const response = await fetch(puzzlePath);
@@ -934,9 +934,14 @@ export class OverworldScene extends Phaser.Scene {
       
       // Listen for puzzle completion
       const bridgePuzzleScene = this.scene.get('BridgePuzzleScene');
-      bridgePuzzleScene.events.once('puzzleExited', () => {
-        this.onConversationPuzzleComplete();
-      });
+      if (bridgePuzzleScene) {
+        bridgePuzzleScene.events.once('puzzleExited', () => {
+          this.onConversationPuzzleComplete();
+        });
+      } else {
+        console.error('BridgePuzzleScene not found');
+        this.gameMode = 'exploration';
+      }
       
     } catch (error) {
       console.error('Error starting conversation puzzle:', error);
