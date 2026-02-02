@@ -32,7 +32,32 @@
         "expression": "neutral",
         "glyphs": "you build bridge question"
       },
-      "end": true
+      "choices": [
+        {
+          "text": "Sure, I'll help!",
+          "effects": [
+            {
+              "type": "setExpression",
+              "expression": "happy"
+            },
+            {
+              "type": "startPuzzle",
+              "puzzleId": "sailor1_vertical_bridge"
+            }
+          ],
+          "end": true
+        },
+        {
+          "text": "Not right now",
+          "effects": [
+            {
+              "type": "setExpression",
+              "expression": "sad"
+            }
+          ],
+          "end": true
+        }
+      ]
     }
   }
 }

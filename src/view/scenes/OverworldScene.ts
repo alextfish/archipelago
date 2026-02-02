@@ -14,6 +14,7 @@ import { RoofManager } from '@view/RoofManager';
 import { NPC } from '@model/conversation/NPC';
 import type { ConversationSpec } from '@model/conversation/ConversationData';
 import { attachTestMarker, isTestMode } from '@helpers/TestMarkers';
+import { FilePuzzleLoader } from '@model/series/SeriesLoaders';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -885,7 +886,7 @@ export class OverworldScene extends Phaser.Scene {
   /**
    * Handle effects from conversation choices
    */
-  private handleConversationEffects(effects: any[]): void {
+  private async handleConversationEffects(effects: any[]): Promise<void> {
     console.log('Handling conversation effects:', effects);
 
     for (const effect of effects) {
@@ -897,13 +898,69 @@ export class OverworldScene extends Phaser.Scene {
           console.log(`TODO: Set flag ${effect.flagId} = ${effect.flagValue}`);
           break;
         case 'startPuzzle':
-          console.log(`TODO: Start puzzle ${effect.puzzleId}`);
+          await this.startConversationPuzzle(effect.puzzleId);
           break;
         case 'setExpression':
           // Expression changes are handled by the conversation system
           break;
       }
     }
+  }
+
+  /**
+   * Start a puzzle triggered by a conversation
+   */
+  private async startConversationPuzzle(puzzleId: string): Promise<void> {
+    try {
+      console.log(`Starting puzzle from conversation: ${puzzleId}`);
+      
+      // Load the puzzle data
+      const puzzleLoader = new FilePuzzleLoader();
+      const puzzlePath = `src/data/puzzles/${puzzleId}.json`;
+      
+      // Fetch the puzzle JSON
+      const response = await fetch(puzzlePath);
+      if (!response.ok) {
+        throw new Error(`Failed to load puzzle file: ${puzzlePath} (${response.status})`);
+      }
+      const puzzleData = await response.json();
+      
+      // Set game mode to puzzle
+      this.gameMode = 'puzzle';
+      
+      // Launch BridgePuzzleScene with the puzzle data
+      this.scene.launch('BridgePuzzleScene', { puzzleData });
+      
+      // Pause this scene while puzzle is active
+      this.scene.pause();
+      
+      // Listen for puzzle completion
+      const bridgePuzzleScene = this.scene.get('BridgePuzzleScene');
+      bridgePuzzleScene.events.once('puzzleExited', () => {
+        this.onConversationPuzzleComplete();
+      });
+      
+    } catch (error) {
+      console.error('Error starting conversation puzzle:', error);
+      // On error, resume normal gameplay
+      this.gameMode = 'exploration';
+    }
+  }
+
+  /**
+   * Handle completion of a conversation-triggered puzzle
+   */
+  private onConversationPuzzleComplete(): void {
+    console.log('Conversation puzzle completed, returning to overworld');
+    
+    // Resume this scene
+    this.scene.resume();
+    
+    // Stop the puzzle scene
+    this.scene.stop('BridgePuzzleScene');
+    
+    // Return to exploration mode
+    this.gameMode = 'exploration';
   }
 
   /**

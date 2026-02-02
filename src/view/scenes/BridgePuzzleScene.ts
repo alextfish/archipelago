@@ -5,12 +5,22 @@ import type { PuzzleHost } from '@controller/PuzzleHost';
 import { Environment } from '@helpers/Environment';
 import puzzleData from '../../data/puzzles/simple4IslandPuzzle.json';
 
+interface BridgePuzzleSceneData {
+    puzzleData?: any;
+}
+
 export class BridgePuzzleScene extends Phaser.Scene {
     private puzzle: BridgePuzzle | null = null;
     private controller: PuzzleController | null = null;
+    private puzzleDataToLoad: any = null;
 
     constructor() {
         super({ key: 'BridgePuzzleScene' });
+    }
+
+    init(data: BridgePuzzleSceneData) {
+        // Accept puzzle data passed from launching scene
+        this.puzzleDataToLoad = data.puzzleData || null;
     }
 
     preload() {
@@ -23,7 +33,9 @@ export class BridgePuzzleScene extends Phaser.Scene {
 
     create() {
         // Instantiate BridgePuzzle from spec
-        this.puzzle = new BridgePuzzle(puzzleData);
+        // Use passed puzzle data if available, otherwise use default
+        const dataToUse = this.puzzleDataToLoad || puzzleData;
+        this.puzzle = new BridgePuzzle(dataToUse);
 
         // Launch the IslandMapScene and pass it the puzzle
         console.log('BridgePuzzleScene: Launching IslandMapScene');
@@ -321,8 +333,11 @@ export class BridgePuzzleScene extends Phaser.Scene {
     }
 
     onPuzzleExited(success: boolean): void {
-        // Log result (no overworld yet)
+        // Log result and emit event for OverworldScene to handle
         console.log(`Puzzle exited: ${success ? 'solved' : 'unsolved'}`);
+        
+        // Emit event for OverworldScene to listen to
+        this.events.emit('puzzleExited', success);
     }
 
     onNoBridgeTypeAvailable(typeId: string): void {
