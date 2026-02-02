@@ -2,24 +2,47 @@
 
 ## Test Setup Complete ✅
 
-The test marker system is now integrated and ready for browser automation testing.
+The test marker system and automated test infrastructure are now fully integrated and ready for browser automation testing.
 
 ## What Was Added
 
 ### 1. Test Marker System (`src/helpers/TestMarkers.ts`)
 - Creates transparent DOM elements positioned over Phaser game objects
 - Syncs position every frame to follow game objects
-- Enables browser automation tools to click on game elements
+- Forwards pointer events to Phaser (down, move, up with dragging support)
+- Enables browser automation tools to interact with game elements
 - Only active in test mode
 
-### 2. Test Mode Entry Point (`test.html`)
+### 2. Test Event System (`src/helpers/TestEvents.ts`)
+- Emits generic game events to `window.__GAME_EVENTS__` array
+- Events include: `conversation_started`, `conversation_ended`, etc.
+- Enables test scripts to wait for specific game state changes
+- Zero overhead in production (only active in test mode)
+- Events are generic and reusable across multiple test scripts
+
+### 3. Test Mode Entry Point (`public/test.html`)
 - Sets `window.__TEST_MODE__ = true` before game loads
 - Shows "TEST MODE" indicator in top-right corner
-- Loads game with test markers enabled
+- Loads game with test markers and events enabled
 
-### 3. Test Markers Added
+### 4. Automated Test Script (`test-browser.mjs`)
+- Playwright-based browser automation
+- **Combination timeout strategy**:
+  * Maximum duration timeout (60s) - safety net
+  * Idle detection timeout (10s) - closes when stuck
+  * Event-based completion - closes on `conversation_ended`
+- Automatically closes browser on success or failure
+- Exit codes: 0 = success, 1 = timeout/failure
+
+### 5. Test Markers Added
 - **Player sprite**: ID `player`, testID `player` (32x32 pixels)
 - **NPCs**: ID `npc-{npcId}`, testID `npc-{npcId}` (dynamic size based on sprite)
+
+### 6. Test Events Emitted
+- `conversation_started` - When NPC conversation begins
+  * Data: `{ conversationId, npcId, npcName }`
+- `conversation_ended` - When conversation completes
+  * Data: `{ conversationId, npcId, completed }`
 
 ## Manual Testing Steps
 

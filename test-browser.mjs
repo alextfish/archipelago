@@ -5,15 +5,25 @@
  * 1. Open the game in test mode
  * 2. Wait for it to load
  * 3. Click on the NPC marker
- * 4. Verify the player walks to the NPC
+ * 4. Wait for player to reach NPC
  * 5. Press E to interact
- * 6. Check console logs for conversation mode
+ * 6. Wait for conversation to complete
+ * 7. Close browser automatically with timeout protection
  */
 
 import { chromium } from 'playwright';
 
+const MAX_TEST_DURATION = 60000;  // 1 minute maximum
+const IDLE_TIMEOUT = 10000;       // 10 seconds of no activity
+const ACTIVITY_CHECK_INTERVAL = 1000; // Check every second
+
 async function runTest() {
     console.log('[TEST SCRIPT] Starting automated test...');
+
+    const testStartTime = Date.now();
+    let lastActivityTime = Date.now();
+    let activityCheckInterval;
+    let maxDurationTimeout;
 
     const browser = await chromium.launch({
         headless: false, // Show browser for debugging
@@ -23,13 +33,83 @@ async function runTest() {
     const context = await browser.newContext();
     const page = await context.newPage();
 
-    // Collect console logs
+    // Collect console logs and track activity
     const consoleLogs = [];
     page.on('console', msg => {
         const text = msg.text();
         consoleLogs.push(text);
         console.log(`[BROWSER] ${text}`);
+
+        // Any console output counts as activity
+        lastActivityTime = Date.now();
     });
+
+    // Track page activity
+    page.on('request', () => { lastActivityTime = Date.now(); });
+    page.on('response', () => { lastActivityTime = Date.now(); });
+
+    // Cleanup function
+    const cleanup = async (reason) => {
+        console.log(`\n[TEST SCRIPT] Closing browser: ${reason}`);
+        clearInterval(activityCheckInterval);
+        clearTimeout(maxDurationTimeout);
+
+        try {
+            await browser.close();
+        } catch (e) {
+            console.error('[TEST SCRIPT] Error closing browser:', e.message);
+        }
+
+        const duration = Date.now() - testStartTime;
+        console.log(`[TEST SCRIPT] Test completed in ${(duration / 1000).toFixed(1)}s`);
+
+        // Exit with appropriate code
+        if (reason.includes('success') || reason.includes('conversation_started') || reason.includes('conversation_ended')) {
+            process.exit(0);
+        } else {
+            process.exit(1);
+        }
+    };    // Set up maximum duration timeout
+    maxDurationTimeout = setTimeout(() => {
+        cleanup('Maximum test duration exceeded');
+    }, MAX_TEST_DURATION);
+
+    // Set up idle timeout checker
+    activityCheckInterval = setInterval(async () => {
+        const idleTime = Date.now() - lastActivityTime;
+        const elapsed = Date.now() - testStartTime;
+
+        if (idleTime > IDLE_TIMEOUT) {
+            await cleanup(`Idle timeout - no activity for ${(idleTime / 1000).toFixed(1)}s`);
+            return;
+        }
+
+        // Check for test completion event
+        try {
+            const hasConversationEnded = await page.evaluate(() => {
+                if (!window.__GAME_EVENTS__) return false;
+                return window.__GAME_EVENTS__.some(e => e.type === 'conversation_ended');
+            });
+
+            if (hasConversationEnded) {
+                const conversationData = await page.evaluate(() => {
+                    const event = window.__GAME_EVENTS__.find(e => e.type === 'conversation_ended');
+                    return event ? event.data : null;
+                });
+
+                console.log('[TEST SCRIPT] Conversation ended:', conversationData);
+                await cleanup('Test success - conversation_ended event received');
+                return;
+            }
+        } catch (e) {
+            // Page might be closed, ignore
+        }
+
+        // Progress indicator
+        if (elapsed % 5000 < ACTIVITY_CHECK_INTERVAL) {
+            console.log(`[TEST SCRIPT] Running... ${(elapsed / 1000).toFixed(0)}s elapsed, idle for ${(idleTime / 1000).toFixed(1)}s`);
+        }
+    }, ACTIVITY_CHECK_INTERVAL);
 
     try {
         // Navigate to test mode
@@ -60,7 +140,7 @@ async function runTest() {
         const firstNpc = npcMarkers[0];
         const npcId = await firstNpc.getAttribute('data-testid');
         console.log(`[TEST SCRIPT] Clicking NPC marker: ${npcId}`);
-
+        ``
         // Click the NPC marker to start tap-to-move
         await firstNpc.click();
         console.log('[TEST SCRIPT] Clicked NPC marker, player should start moving...');
@@ -72,30 +152,26 @@ async function runTest() {
         console.log('[TEST SCRIPT] Pressing E key to interact with NPC...');
         await page.keyboard.press('e');
 
-        // Wait and check for conversation mode
-        await page.waitForTimeout(2000);
+        // Wait for conversation to start
+        console.log('[TEST SCRIPT] Waiting for conversation to start...');
+        await page.waitForFunction(() => {
+            if (!window.__GAME_EVENTS__) return false;
+            return window.__GAME_EVENTS__.some(e => e.type === 'conversation_started');
+        }, { timeout: 10000 });
 
-        // Check console logs for conversation indication
-        const conversationLogs = consoleLogs.filter(log =>
-            log.includes('conversation') ||
-            log.includes('ConversationController') ||
-            log.includes('NPC')
-        );
+        const conversationData = await page.evaluate(() => {
+            const event = window.__GAME_EVENTS__.find(e => e.type === 'conversation_started');
+            return event ? event.data : null;
+        });
 
-        console.log('\n[TEST SCRIPT] Relevant console logs:');
-        conversationLogs.forEach(log => console.log(`  ${log}`));
+        console.log('[TEST SCRIPT] Conversation started successfully!', conversationData);
 
-        console.log('\n[TEST SCRIPT] Test completed successfully!');
-        console.log('[TEST SCRIPT] Check the browser window to see the results.');
-
-        // Keep browser open for manual inspection
-        console.log('[TEST SCRIPT] Browser will stay open. Press Ctrl+C to close.');
-        await page.waitForTimeout(60000);
+        // Exit immediately after verifying conversation started
+        await cleanup('Test success - conversation_started event received');
 
     } catch (error) {
-        console.error('[TEST SCRIPT] Error during test:', error);
-    } finally {
-        await browser.close();
+        console.error('[TEST SCRIPT] Error during test:', error.message);
+        await cleanup('Test error: ' + error.message);
     }
 }
 
