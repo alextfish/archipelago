@@ -14,7 +14,6 @@ import { RoofManager } from '@view/RoofManager';
 import { NPC } from '@model/conversation/NPC';
 import type { ConversationSpec } from '@model/conversation/ConversationData';
 import { attachTestMarker, isTestMode } from '@helpers/TestMarkers';
-import { FilePuzzleLoader } from '@model/series/SeriesLoaders';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -915,7 +914,6 @@ export class OverworldScene extends Phaser.Scene {
       console.log(`Starting puzzle from conversation: ${puzzleId}`);
       
       // Load the puzzle data
-      const puzzleLoader = new FilePuzzleLoader();
       const puzzlePath = `src/data/puzzles/${puzzleId}.json`;
       
       // Fetch the puzzle JSON
