@@ -1,6 +1,7 @@
 import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import type { Bridge } from '@model/puzzle/Bridge';
 import type { OverworldScene } from '@view/scenes/OverworldScene';
+import type { Door } from '@model/overworld/Door';
 
 /**
  * Manages dynamic collision updates for overworld puzzles
@@ -11,6 +12,7 @@ export class CollisionManager {
     private originalCollision: Map<string, boolean> = new Map();
     private puzzleBounds: Phaser.Geom.Rectangle | null = null;
     private tileSize: number = 32;
+    private doors: Door[] = [];
 
     constructor(overworldScene: OverworldScene) {
         this.overworldScene = overworldScene;
@@ -159,5 +161,43 @@ export class CollisionManager {
         }
 
         return positions;
+    }
+
+    /**
+     * Register doors and set their initial collision state
+     */
+    registerDoors(doors: Door[]): void {
+        console.log(`CollisionManager: Registering ${doors.length} doors`);
+        this.doors = doors;
+        this.updateDoorCollisions();
+    }
+
+    /**
+     * Update collision for all doors based on their locked state
+     */
+    updateDoorCollisions(): void {
+        for (const door of this.doors) {
+            const blocked = door.isLocked();
+            for (const pos of door.getPositions()) {
+                this.overworldScene.setCollisionAt(pos.tileX, pos.tileY, blocked);
+            }
+        }
+    }
+
+    /**
+     * Update collision for a specific door
+     */
+    updateDoorCollision(door: Door): void {
+        const blocked = door.isLocked();
+        for (const pos of door.getPositions()) {
+            this.overworldScene.setCollisionAt(pos.tileX, pos.tileY, blocked);
+        }
+    }
+
+    /**
+     * Get all registered doors
+     */
+    getDoors(): readonly Door[] {
+        return this.doors;
     }
 }
