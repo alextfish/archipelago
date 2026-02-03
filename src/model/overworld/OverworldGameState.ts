@@ -15,6 +15,7 @@ export class OverworldGameState {
     private activePuzzleState?: BridgePuzzle;
     private puzzleProgress: Map<string, BridgePuzzle> = new Map();
     private completedPuzzles: Set<string> = new Set();
+    private unlockedDoors: Set<string> = new Set();
     
     // FlowPuzzle-specific state
     /** Track solved FlowPuzzles and their edge outputs (local coordinates) */
@@ -140,6 +141,28 @@ export class OverworldGameState {
     }
 
     /**
+     * Unlock a door by ID
+     */
+    unlockDoor(doorId: string): void {
+        console.log(`OverworldGameState: Unlocking door ${doorId}`);
+        this.unlockedDoors.add(doorId);
+    }
+
+    /**
+     * Check if a door is unlocked
+     */
+    isDoorUnlocked(doorId: string): boolean {
+        return this.unlockedDoors.has(doorId);
+    }
+
+    /**
+     * Get all unlocked door IDs
+     */
+    getUnlockedDoors(): string[] {
+        return Array.from(this.unlockedDoors);
+    }
+
+    /**
      * Get debug information about current state
      */
     getDebugInfo(): {
@@ -167,6 +190,7 @@ export class OverworldGameState {
         this.activePuzzleState = undefined;
         this.puzzleProgress.clear();
         this.completedPuzzles.clear();
+        this.unlockedDoors.clear();
         
         // Reset FlowPuzzle state
         this.flowPuzzleOutputs.clear();
@@ -301,6 +325,7 @@ export class OverworldGameState {
         activePuzzleId?: string;
         puzzleProgress: Record<string, any>;
         completedPuzzles: string[];
+        unlockedDoors: string[];
         flowPuzzleOutputs: Record<string, { x: number; y: number }[]>;
         flowPuzzleInputs: Record<string, { x: number; y: number }[]>;
         overworldWaterState: string[];
@@ -322,6 +347,7 @@ export class OverworldGameState {
             activePuzzleId: this.activePuzzleId,
             puzzleProgress: puzzleProgressObj,
             completedPuzzles: Array.from(this.completedPuzzles),
+            unlockedDoors: Array.from(this.unlockedDoors),
             flowPuzzleOutputs: Object.fromEntries(this.flowPuzzleOutputs),
             flowPuzzleInputs: Object.fromEntries(this.flowPuzzleInputs),
             overworldWaterState: Array.from(this.overworldWaterState) as string[]
@@ -336,6 +362,7 @@ export class OverworldGameState {
         activePuzzleId?: string;
         puzzleProgress: Record<string, any>;
         completedPuzzles: string[];
+        unlockedDoors?: string[];
         flowPuzzleOutputs?: Record<string, { x: number; y: number }[]>;
         flowPuzzleInputs?: Record<string, { x: number; y: number }[]>;
         overworldWaterState?: string[];
@@ -344,6 +371,7 @@ export class OverworldGameState {
 
         this.activePuzzleId = state.activePuzzleId;
         this.completedPuzzles = new Set(state.completedPuzzles);
+        this.unlockedDoors = new Set(state.unlockedDoors || []);
 
         // Import FlowPuzzle water state
         if (state.flowPuzzleOutputs) {

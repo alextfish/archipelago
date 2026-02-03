@@ -8,6 +8,7 @@ import type { ConversationSpec, ConversationEffect } from '@model/conversation/C
 import type { NPC } from '@model/conversation/NPC';
 import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
 import { NPCAppearanceRegistry } from '@model/conversation/NPCAppearanceRegistry';
+import { emitTestEvent } from '@helpers/TestEvents';
 
 export interface ConversationHost {
     /**
@@ -42,6 +43,7 @@ export class ConversationController {
     private glyphRegistry: LanguageGlyphRegistry;
     private appearanceRegistry: NPCAppearanceRegistry;
     private currentNPC: NPC | null = null;
+    private currentConversationId: string | null = null;
 
     constructor(
         host: ConversationHost,
@@ -67,6 +69,14 @@ export class ConversationController {
         // Always create a fresh state - conversations reset each time
         this.state = new ConversationState(spec);
         this.currentNPC = npc;
+        this.currentConversationId = spec.id;
+
+        // Emit test event
+        emitTestEvent('conversation_started', {
+            conversationId: spec.id,
+            npcId: spec.npcId,
+            npcName: npc.name
+        });
 
         // Display the first node
         this.displayCurrentNode();
@@ -115,6 +125,7 @@ export class ConversationController {
 
             // No transition to new node, or no final NPC line - end immediately
             console.log('ConversationController: Ending conversation immediately');
+            this.endConversation(); // Emit test event and clear state
             this.host.hideConversation();
             this.host.onConversationEnd();
         } else {
@@ -159,18 +170,25 @@ export class ConversationController {
 
     /**
      * End the current conversation
+     * Emits test event and clears internal state
+     * Note: Does NOT call host methods - caller should do that
      */
     endConversation(): void {
         if (!this.state) {
             return;
         }
 
-        this.host.hideConversation();
-        this.host.onConversationEnd();
+        // Emit test event before clearing state
+        emitTestEvent('conversation_ended', {
+            conversationId: this.currentConversationId,
+            npcId: this.currentNPC?.id,
+            completed: this.state.isEnded()
+        });
 
         // Clear state
         this.state = null;
         this.currentNPC = null;
+        this.currentConversationId = null;
     }
 
     /**

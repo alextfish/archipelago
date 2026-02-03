@@ -4,13 +4,15 @@
  */
 
 export interface ConversationEffect {
-    type: 'setExpression' | 'giveItem' | 'setFlag' | 'startPuzzle';
+    type: 'setExpression' | 'giveItem' | 'setFlag' | 'startPuzzle' | 'startSeries' | 'unlockDoor';
     expression?: string;      // For setExpression
     durationMs?: number;       // Duration for temporary effects
     itemId?: string;          // For giveItem
     flagId?: string;          // For setFlag
     flagValue?: boolean;      // For setFlag
     puzzleId?: string;        // For startPuzzle
+    seriesId?: string;        // For startSeries
+    doorId?: string;          // For unlockDoor
 }
 
 export interface ConversationChoice {
