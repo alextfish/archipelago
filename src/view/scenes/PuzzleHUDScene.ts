@@ -22,6 +22,8 @@ export class PuzzleHUDScene extends Phaser.Scene {
             onExit: () => this.events.emit('exit'),
             onUndo: () => this.events.emit('undo'),
             onRedo: () => this.events.emit('redo'),
+            onNavigateNext: () => this.events.emit('navigateNext'),
+            onNavigatePrevious: () => this.events.emit('navigatePrevious'),
         };
 
         this.sidebar = new PuzzleSidebar(this as Phaser.Scene, callbacks);
@@ -63,6 +65,19 @@ export class PuzzleHUDScene extends Phaser.Scene {
 
         this.events.on('updateIslandInfo', (totalCount: number, visibleCount: number, bounds?: { minX: number; maxX: number; minY: number; maxY: number }) => {
             this.sidebar?.updateIslandInfo(totalCount, visibleCount, bounds);
+        });
+
+        // Listen for series navigation events
+        this.events.on('setSeriesNavigationVisible', (visible: boolean) => {
+            this.sidebar?.setSeriesNavigationVisible(visible);
+        });
+
+        this.events.on('setNextEnabled', (enabled: boolean) => {
+            this.sidebar?.setNextEnabled(enabled);
+        });
+
+        this.events.on('setPreviousEnabled', (enabled: boolean) => {
+            this.sidebar?.setPreviousEnabled(enabled);
         });
 
         // Listen for solved notification and show a persistent HUD overlay
@@ -148,6 +163,19 @@ export class PuzzleHUDScene extends Phaser.Scene {
 
         this.setupEventListener(sourceScene.events, 'updateIslandInfo', (totalCount: number, visibleCount: number, bounds?: { minX: number; maxX: number; minY: number; maxY: number }) => {
             this.sidebar?.updateIslandInfo(totalCount, visibleCount, bounds);
+        });
+
+        // Series navigation events
+        this.setupEventListener(sourceScene.events, 'setSeriesNavigationVisible', (visible: boolean) => {
+            this.sidebar?.setSeriesNavigationVisible(visible);
+        });
+
+        this.setupEventListener(sourceScene.events, 'setNextEnabled', (enabled: boolean) => {
+            this.sidebar?.setNextEnabled(enabled);
+        });
+
+        this.setupEventListener(sourceScene.events, 'setPreviousEnabled', (enabled: boolean) => {
+            this.sidebar?.setPreviousEnabled(enabled);
         });
 
         this.setupEventListener(sourceScene.events, 'puzzleSolved', () => {

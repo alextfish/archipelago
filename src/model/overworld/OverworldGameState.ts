@@ -9,6 +9,7 @@ export class OverworldGameState {
     private activePuzzleState?: BridgePuzzle;
     private puzzleProgress: Map<string, BridgePuzzle> = new Map();
     private completedPuzzles: Set<string> = new Set();
+    private unlockedDoors: Set<string> = new Set();
 
     /**
      * Set the currently active overworld puzzle
@@ -118,6 +119,28 @@ export class OverworldGameState {
     }
 
     /**
+     * Unlock a door by ID
+     */
+    unlockDoor(doorId: string): void {
+        console.log(`OverworldGameState: Unlocking door ${doorId}`);
+        this.unlockedDoors.add(doorId);
+    }
+
+    /**
+     * Check if a door is unlocked
+     */
+    isDoorUnlocked(doorId: string): boolean {
+        return this.unlockedDoors.has(doorId);
+    }
+
+    /**
+     * Get all unlocked door IDs
+     */
+    getUnlockedDoors(): string[] {
+        return Array.from(this.unlockedDoors);
+    }
+
+    /**
      * Get debug information about current state
      */
     getDebugInfo(): {
@@ -145,6 +168,7 @@ export class OverworldGameState {
         this.activePuzzleState = undefined;
         this.puzzleProgress.clear();
         this.completedPuzzles.clear();
+        this.unlockedDoors.clear();
     }
 
     /**
@@ -154,6 +178,7 @@ export class OverworldGameState {
         activePuzzleId?: string;
         puzzleProgress: Record<string, any>;
         completedPuzzles: string[];
+        unlockedDoors: string[];
     } {
         const puzzleProgressObj: Record<string, any> = {};
         for (const [id, puzzle] of this.puzzleProgress) {
@@ -171,7 +196,8 @@ export class OverworldGameState {
         return {
             activePuzzleId: this.activePuzzleId,
             puzzleProgress: puzzleProgressObj,
-            completedPuzzles: Array.from(this.completedPuzzles)
+            completedPuzzles: Array.from(this.completedPuzzles),
+            unlockedDoors: Array.from(this.unlockedDoors)
         };
     }
 
@@ -183,11 +209,13 @@ export class OverworldGameState {
         activePuzzleId?: string;
         puzzleProgress: Record<string, any>;
         completedPuzzles: string[];
+        unlockedDoors?: string[];
     }): void {
         console.log('OverworldGameState: Importing state');
 
         this.activePuzzleId = state.activePuzzleId;
         this.completedPuzzles = new Set(state.completedPuzzles);
+        this.unlockedDoors = new Set(state.unlockedDoors || []);
 
         // Note: puzzleProgress would need to be reconstructed as BridgePuzzle objects
         // This is left as a future enhancement when persistence is fully implemented
