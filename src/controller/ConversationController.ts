@@ -44,6 +44,7 @@ export class ConversationController {
     private appearanceRegistry: NPCAppearanceRegistry;
     private currentNPC: NPC | null = null;
     private currentConversationId: string | null = null;
+    private hostCleanupCalled: boolean = false;
 
     constructor(
         host: ConversationHost,
@@ -70,6 +71,7 @@ export class ConversationController {
         this.state = new ConversationState(spec);
         this.currentNPC = npc;
         this.currentConversationId = spec.id;
+        this.hostCleanupCalled = false;
 
         // Emit test event
         emitTestEvent('conversation_started', {
@@ -118,16 +120,17 @@ export class ConversationController {
                 if (node.npc) {
                     console.log('ConversationController: Displaying final node, will wait for dismissal');
                     this.displayCurrentNode();
-                    // Don't call onConversationEnd yet - wait for player to dismiss
+                    // Don't end yet - wait for player to dismiss by calling endConversation()
                     return;
                 }
             }
 
             // No transition to new node, or no final NPC line - end immediately
             console.log('ConversationController: Ending conversation immediately');
-            this.endConversation(); // Emit test event and clear state
+            // Call host cleanup but don't clear state yet
             this.host.hideConversation();
             this.host.onConversationEnd();
+            this.hostCleanupCalled = true;
         } else {
             // Display next node
             this.displayCurrentNode();
@@ -170,8 +173,7 @@ export class ConversationController {
 
     /**
      * End the current conversation
-     * Emits test event and clears internal state
-     * Note: Does NOT call host methods - caller should do that
+     * Emits test event, calls host cleanup methods (if not already called), and clears internal state
      */
     endConversation(): void {
         if (!this.state) {
@@ -185,10 +187,17 @@ export class ConversationController {
             completed: this.state.isEnded()
         });
 
+        // Call host cleanup methods if not already called
+        if (!this.hostCleanupCalled) {
+            this.host.hideConversation();
+            this.host.onConversationEnd();
+        }
+
         // Clear state
         this.state = null;
         this.currentNPC = null;
         this.currentConversationId = null;
+        this.hostCleanupCalled = false;
     }
 
     /**

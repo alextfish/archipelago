@@ -56,10 +56,10 @@ The test marker system and automated test infrastructure are now fully integrate
 ```powershell
 npm run dev
 ```
-Server should start on http://localhost:5174/
+Server should start on http://localhost:5173/
 
 ### 2. Open Test Mode in Browser
-Navigate to: http://localhost:5174/test.html
+Navigate to: http://localhost:5173/test.html
 
 ### 3. Verify Test Mode Active
 **In Browser Console** (F12):
@@ -110,7 +110,7 @@ The `.vscode/mcp.json` is configured with browsermcp. To use it:
 
 1. **Open Browser via MCP**:
    - Browser MCP should connect to Chrome
-   - Navigate to http://localhost:5174/test.html
+   - Navigate to http://localhost:5173/test.html
 
 2. **Interact with Test Markers**:
    ```javascript

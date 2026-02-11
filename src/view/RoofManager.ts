@@ -16,7 +16,7 @@ interface RoofHideZone {
  */
 export class RoofManager {
     private scene: Phaser.Scene;
-    private roofLayer?: Phaser.Tilemaps.TilemapLayer;
+    private roofLayers: Phaser.Tilemaps.TilemapLayer[] = [];
     private hideZones: RoofHideZone[] = [];
     private tweens: Map<string, Phaser.Tweens.Tween> = new Map();
 
@@ -27,47 +27,63 @@ export class RoofManager {
     }
 
     /**
-     * Initialize the roof system with the roof layer and hide zones
+     * Initialize the roof system with the roof layers and hide zones
      */
     initialize(
         map: Phaser.Tilemaps.Tilemap,
-        roofLayer: Phaser.Tilemaps.TilemapLayer,
+        roofLayers: Phaser.Tilemaps.TilemapLayer | Phaser.Tilemaps.TilemapLayer[],
         tiledMapData: any
     ): void {
-        this.roofLayer = roofLayer;
+        // Accept either a single layer or an array of layers
+        this.roofLayers = Array.isArray(roofLayers) ? roofLayers : [roofLayers];
 
         // Extract roof hide zones from the map data
         this.extractRoofHideZones(map, tiledMapData);
 
-        console.log(`RoofManager: Initialized with ${this.hideZones.length} hide zones`);
+        console.log(`RoofManager: Initialized with ${this.roofLayers.length} roof layers and ${this.hideZones.length} hide zones`);
     }
 
     /**
-     * Extract roof hide zone polygons from the Tiled map
-     */
+     * Extract roof hide zone polygons from all "<anything>/roof hide zones" object layers in the Tiled map
+    */
     private extractRoofHideZones(map: Phaser.Tilemaps.Tilemap, tiledMapData: any): void {
         if (!tiledMapData || !tiledMapData.layers) {
             console.warn('RoofManager: No tilemap data available');
             return;
         }
 
-        // Find the "roof hide zones" object layer
-        const hideZoneLayer = tiledMapData.layers.find(
-            (layer: any) => layer.name === 'roof hide zones' && layer.type === 'objectgroup'
+        // Helper: Get the layer suffix (everything after the last '/')
+        const getLayerSuffix = (layerName: string): string => {
+            const lastSlash = layerName.lastIndexOf('/');
+            return lastSlash >= 0 ? layerName.substring(lastSlash + 1) : layerName;
+        };
+
+        // Find all "roof hide zones" object layers (e.g., "Beach/roof hide zones", "Forest/roof hide zones")
+        const hideZoneLayers = tiledMapData.layers.filter(
+            (layer: any) => layer.type === 'objectgroup' && getLayerSuffix(layer.name) === 'roof hide zones'
         );
 
-        if (!hideZoneLayer || !hideZoneLayer.objects) {
-            console.warn('RoofManager: No "roof hide zones" object layer found');
+        if (hideZoneLayers.length === 0) {
+            console.warn('RoofManager: No "*/roof hide zones" object layers found');
             return;
         }
 
-        // Process each polygon object in the layer
-        for (const obj of hideZoneLayer.objects) {
-            if (obj.polygon) {
-                const zone = this.createHideZone(obj, map);
-                if (zone) {
-                    this.hideZones.push(zone);
-                    console.log(`RoofManager: Added hide zone "${zone.id}" with ${zone.tiles.length} tiles`);
+        console.log(`RoofManager: Found ${hideZoneLayers.length} roof hide zones layers`);
+
+        // Process each layer
+        for (const hideZoneLayer of hideZoneLayers) {
+            if (!hideZoneLayer.objects) continue;
+
+            console.log(`RoofManager: Processing layer "${hideZoneLayer.name}" with ${hideZoneLayer.objects.length} objects`);
+
+            // Process each polygon object in the layer
+            for (const obj of hideZoneLayer.objects) {
+                if (obj.polygon) {
+                    const zone = this.createHideZone(obj, map);
+                    if (zone) {
+                        this.hideZones.push(zone);
+                        console.log(`RoofManager: Added hide zone "${zone.id}" with ${zone.tiles.length} tiles`);
+                    }
                 }
             }
         }
@@ -77,7 +93,7 @@ export class RoofManager {
      * Create a hide zone from a Tiled polygon object
      */
     private createHideZone(obj: any, map: Phaser.Tilemaps.Tilemap): RoofHideZone | null {
-        if (!obj.polygon || !this.roofLayer) {
+        if (!obj.polygon || this.roofLayers.length === 0) {
             return null;
         }
 
@@ -110,11 +126,12 @@ export class RoofManager {
         polygon: Phaser.Geom.Polygon,
         map: Phaser.Tilemaps.Tilemap
     ): { x: number; y: number }[] {
-        if (!this.roofLayer) {
+        if (this.roofLayers.length === 0) {
             return [];
         }
 
         const tiles: { x: number; y: number }[] = [];
+        const tileSet = new Set<string>(); // To avoid duplicates
         const bounds = Phaser.Geom.Polygon.GetAABB(polygon);
 
         // Convert bounds to tile coordinates
@@ -123,17 +140,23 @@ export class RoofManager {
         const endTileX = Math.ceil((bounds.x + bounds.width) / map.tileWidth);
         const endTileY = Math.ceil((bounds.y + bounds.height) / map.tileHeight);
 
-        // Check each tile in the bounding box
-        for (let ty = startTileY; ty <= endTileY; ty++) {
-            for (let tx = startTileX; tx <= endTileX; tx++) {
-                const tile = this.roofLayer.getTileAt(tx, ty);
-                if (tile) {
-                    // Check if tile center is inside polygon
-                    const tileCenterX = tx * map.tileWidth + map.tileWidth / 2;
-                    const tileCenterY = ty * map.tileHeight + map.tileHeight / 2;
+        // Check each tile in the bounding box across all roof layers
+        for (const roofLayer of this.roofLayers) {
+            for (let ty = startTileY; ty <= endTileY; ty++) {
+                for (let tx = startTileX; tx <= endTileX; tx++) {
+                    const tile = roofLayer.getTileAt(tx, ty);
+                    if (tile) {
+                        // Check if tile center is inside polygon
+                        const tileCenterX = tx * map.tileWidth + map.tileWidth / 2;
+                        const tileCenterY = ty * map.tileHeight + map.tileHeight / 2;
 
-                    if (polygon.contains(tileCenterX, tileCenterY)) {
-                        tiles.push({ x: tx, y: ty });
+                        if (polygon.contains(tileCenterX, tileCenterY)) {
+                            const key = `${tx},${ty}`;
+                            if (!tileSet.has(key)) {
+                                tileSet.add(key);
+                                tiles.push({ x: tx, y: ty });
+                            }
+                        }
                     }
                 }
             }
@@ -147,7 +170,7 @@ export class RoofManager {
      * Call this every frame from scene's update()
      */
     update(playerX: number, playerY: number): void {
-        if (!this.roofLayer || this.hideZones.length === 0) {
+        if (this.roofLayers.length === 0 || this.hideZones.length === 0) {
             return;
         }
 
@@ -182,20 +205,22 @@ export class RoofManager {
             this.tweens.delete(zone.id);
         }
 
-        // Set all tiles in this zone to fade out
-        for (const tilePos of zone.tiles) {
-            const tile = this.roofLayer!.getTileAt(tilePos.x, tilePos.y);
-            if (tile) {
-                // Create a tween to fade the tile
-                const tween = this.scene.tweens.add({
-                    targets: tile,
-                    alpha: 0,
-                    duration: this.FADE_DURATION,
-                    ease: 'Power2'
-                });
+        // Set all tiles in this zone to fade out across all roof layers
+        for (const roofLayer of this.roofLayers) {
+            for (const tilePos of zone.tiles) {
+                const tile = roofLayer.getTileAt(tilePos.x, tilePos.y);
+                if (tile) {
+                    // Create a tween to fade the tile
+                    const tween = this.scene.tweens.add({
+                        targets: tile,
+                        alpha: 0,
+                        duration: this.FADE_DURATION,
+                        ease: 'Power2'
+                    });
 
-                // Store the tween (we'll only track the last one per zone for simplicity)
-                this.tweens.set(zone.id, tween);
+                    // Store the tween (we'll only track the last one per zone for simplicity)
+                    this.tweens.set(zone.id, tween);
+                }
             }
         }
     }
@@ -213,20 +238,22 @@ export class RoofManager {
             this.tweens.delete(zone.id);
         }
 
-        // Set all tiles in this zone to fade in
-        for (const tilePos of zone.tiles) {
-            const tile = this.roofLayer!.getTileAt(tilePos.x, tilePos.y);
-            if (tile) {
-                // Create a tween to fade the tile back in
-                const tween = this.scene.tweens.add({
-                    targets: tile,
-                    alpha: 1,
-                    duration: this.FADE_DURATION,
-                    ease: 'Power2'
-                });
+        // Set all tiles in this zone to fade in across all roof layers
+        for (const roofLayer of this.roofLayers) {
+            for (const tilePos of zone.tiles) {
+                const tile = roofLayer.getTileAt(tilePos.x, tilePos.y);
+                if (tile) {
+                    // Create a tween to fade the tile back in
+                    const tween = this.scene.tweens.add({
+                        targets: tile,
+                        alpha: 1,
+                        duration: this.FADE_DURATION,
+                        ease: 'Power2'
+                    });
 
-                // Store the tween
-                this.tweens.set(zone.id, tween);
+                    // Store the tween
+                    this.tweens.set(zone.id, tween);
+                }
             }
         }
     }
@@ -241,6 +268,6 @@ export class RoofManager {
         }
         this.tweens.clear();
         this.hideZones = [];
-        this.roofLayer = undefined;
+        this.roofLayers = [];
     }
 }

@@ -54,7 +54,7 @@ export class OverworldScene extends Phaser.Scene {
 
   // Roof hiding system
   private roofManager?: RoofManager;
-  private roofsLayer?: Phaser.Tilemaps.TilemapLayer;
+  private roofsLayers: Phaser.Tilemaps.TilemapLayer[] = [];
 
   constructor() {
     super({ key: 'OverworldScene' });
@@ -68,7 +68,7 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   preload() {
-    // Load tilesets
+    // Load external tilesets (these reference images outside the map file)
     this.load.image('beachTileset', 'resources/tilesets/beach.png');
     this.load.image('grassTileset', 'resources/tilesets/SproutLandsGrassIslands.png');
 
@@ -88,7 +88,7 @@ export class OverworldScene extends Phaser.Scene {
     this.load.image('sailorNS', 'resources/sprites/sailorNS.png');
     this.load.image('sailorEW', 'resources/sprites/sailorEW.png');
 
-    // Load TMX file asynchronously
+    // Load TMX file asynchronously, then load embedded tilesets
     this.loadTmxFile();
   }
 
@@ -97,12 +97,67 @@ export class OverworldScene extends Phaser.Scene {
       console.log('Loading map file...');
       const tiledMapData = await MapUtils.loadTiledMap('resources/overworld.json');
 
+      // Load embedded tilesets from the map data
+      this.loadEmbeddedTilesets(tiledMapData);
+
       // Add the converted map data to Phaser's cache
       this.cache.tilemap.add('overworldMap', { format: 1, data: tiledMapData });
       console.log('Map file loaded and converted successfully');
     } catch (error) {
       console.error('Failed to load map file, using fallback:', error);
       this.createFallbackMap();
+    }
+  }
+
+  /**
+   * Load embedded tilesets from the map data
+   * Embedded tilesets have their image data included in the map file
+   */
+  private loadEmbeddedTilesets(tiledMapData: any): void {
+    if (!tiledMapData || !tiledMapData.tilesets) {
+      return;
+    }
+
+    console.log(`Checking ${tiledMapData.tilesets.length} tilesets for embedded images...`);
+
+    for (const tileset of tiledMapData.tilesets) {
+      // Embedded tilesets have the 'image' property as a data URL or a relative path
+      // They might also have 'tiles' array with individual tile images
+      if (tileset.image && !tileset.image.startsWith('resources/')) {
+        // This is likely an embedded tileset or uses a different path convention
+        const tilesetKey = `tileset_${tileset.name}`;
+
+        console.log(`Loading embedded tileset: ${tileset.name} (key: ${tilesetKey})`);
+
+        // If the image is a data URL, load it directly
+        if (tileset.image.startsWith('data:')) {
+          this.load.image(tilesetKey, tileset.image);
+        } else {
+          // Otherwise, it's a relative path - construct the full path
+          let imagePath: string;
+          if (tileset.image.startsWith('../')) {
+            // Remove ../ prefix
+            imagePath = tileset.image.substring(3);
+          } else if (tileset.image.startsWith('tilesets/')) {
+            // Already has tilesets/ prefix, just add resources/
+            imagePath = `resources/${tileset.image}`;
+          } else {
+            // No prefix, add full path
+            imagePath = `resources/tilesets/${tileset.image}`;
+          }
+          console.log(`  Loading from path: ${imagePath}`);
+          this.load.image(tilesetKey, imagePath);
+        }
+      } else if (tileset.image) {
+        console.log(`Tileset ${tileset.name} uses external image: ${tileset.image}`);
+      } else {
+        console.log(`Tileset ${tileset.name} has no image property (may be a collection)`);
+      }
+    }
+
+    // Start the loader if we added any new assets
+    if (!this.load.isLoading() && this.load.totalToLoad > 0) {
+      this.load.start();
     }
   } private createFallbackMap() {
     // Simple fallback map if TMX loading fails
@@ -162,23 +217,24 @@ export class OverworldScene extends Phaser.Scene {
     // Create the tilemap
     this.map = this.make.tilemap({ key: 'overworldMap' });
 
-    // Add tilesets
-    const beachTileset = this.map.addTilesetImage('beach', 'beachTileset');
-    const grassTileset = this.map.addTilesetImage('SproutLandsGrassIslands', 'grassTileset');
+    // Add all tilesets (both external and embedded)
+    const tilesets = this.loadAllTilesets();
 
-    if (!beachTileset) {
-      console.error('Failed to load beach tileset');
+    if (tilesets.length === 0) {
+      console.error('Failed to load any tilesets');
       return;
     }
 
-    // Auto-create all visual layers (layers with autoRender property or in the default list)
-    this.setupVisualLayers(beachTileset, grassTileset);
+    console.log(`Loaded ${tilesets.length} tilesets successfully`);
 
-    // Create collision layer if it exists
-    this.setupCollisionLayer(beachTileset, grassTileset);
+    // Auto-create all visual layers
+    this.setupVisualLayers(tilesets);
 
-    // Create roofs layer if it exists (should be above player)
-    this.setupRoofsLayer(beachTileset, grassTileset);
+    // Create collision layers
+    this.setupCollisionLayer(tilesets);
+
+    // Create roofs layers (should be above player)
+    this.setupRoofsLayer(tilesets);
 
     // Set world bounds to match map size
     const mapWidth = this.map.widthInPixels;
@@ -281,9 +337,9 @@ export class OverworldScene extends Phaser.Scene {
       // Initialize interaction cursor
       this.initializeInteractionCursor();
 
-      // Initialize roof manager if we have a roofs layer
-      if (this.roofsLayer && this.roofManager) {
-        this.roofManager.initialize(this.map, this.roofsLayer, this.tiledMapData);
+      // Initialize roof manager if we have roofs layers
+      if (this.roofsLayers.length > 0 && this.roofManager) {
+        this.roofManager.initialize(this.map, this.roofsLayers, this.tiledMapData);
       }
 
     } catch (error) {
@@ -366,20 +422,50 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   /**
-   * Load NPCs from the Tiled map "npcs" object layer
+   * Load NPCs from all "<anything>/npcs" object layers in the Tiled map
    */
   private loadNPCs(): void {
     if (!this.map) return;
 
-    const npcsLayer = this.map.getObjectLayer('npcs');
-    if (!npcsLayer) {
-      console.log('No NPCs layer found in map');
+    // Find all npcs object layers (e.g., "Beach/npcs", "Forest/npcs")
+    const npcsLayers = this.map.layers.filter(layer =>
+      layer.type === Phaser.Tilemaps.OBJECT_LAYER &&
+      this.getLayerSuffix(layer.name) === 'npcs'
+    );
+
+    if (npcsLayers.length === 0) {
+      console.log('No NPCs layers found in map');
+      return;
+    }
+
+    console.log(`Found ${npcsLayers.length} NPC layers`);
+
+    // Process all NPC layers
+    for (const layerData of npcsLayers) {
+      const npcsLayer = this.map.getObjectLayer(layerData.name);
+      if (!npcsLayer) {
+        console.warn(`Failed to get object layer: ${layerData.name}`);
+        continue;
+      }
+
+      this.loadNPCsFromLayer(npcsLayer, layerData.name);
+    }
+  }
+
+  /**
+   * Load NPCs from a specific object layer
+   */
+  private loadNPCsFromLayer(npcsLayer: Phaser.Tilemaps.ObjectLayer, layerName: string): void {
+    console.log(`Loading NPCs from layer: ${layerName}`);
+
+    if (!npcsLayer.objects) {
+      console.warn(`No objects in layer: ${layerName}`);
       return;
     }
 
     for (const obj of npcsLayer.objects) {
       if (!obj.name || typeof obj.x !== 'number' || typeof obj.y !== 'number') {
-        console.warn('Invalid NPC object:', obj);
+        console.warn(`Invalid NPC object in ${layerName}:`, obj);
         continue;
       }
 
@@ -440,29 +526,88 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   /**
-   * Setup visual tile layers that should be automatically rendered
-   * Looks for layers with the custom property "autoRender: true" or layers in the default list
+   * Load all tilesets (both external and embedded) from the map
    */
-  private setupVisualLayers(beachTileset: Phaser.Tilemaps.Tileset | null, grassTileset: Phaser.Tilemaps.Tileset | null) {
-    // Default layers to render (fallback if Tiled properties aren't set)
-    const defaultVisualLayers = ['beach', 'water', 'grass', 'ground'];
-    const tilesets = [beachTileset, grassTileset].filter(Boolean) as Phaser.Tilemaps.Tileset[];
+  private loadAllTilesets(): Phaser.Tilemaps.Tileset[] {
+    const tilesets: Phaser.Tilemaps.Tileset[] = [];
+    const mapData = this.cache.tilemap.get('overworldMap');
+
+    if (!mapData || !mapData.data || !mapData.data.tilesets) {
+      console.warn('No tileset data found in map');
+      return tilesets;
+    }
+
+    // Mapping of known external tileset names to their Phaser keys
+    const externalTilesetMapping: Record<string, string> = {
+      'beach': 'beachTileset',
+      'SproutLandsGrassIslands': 'grassTileset'
+    };
+
+    for (const tilesetData of mapData.data.tilesets) {
+      const tilesetName = tilesetData.name;
+
+      // Try external mapping first
+      let phaserKey = externalTilesetMapping[tilesetName];
+
+      // If not found, assume it's an embedded tileset
+      if (!phaserKey) {
+        phaserKey = `tileset_${tilesetName}`;
+      }
+
+      console.log(`Adding tileset: ${tilesetName} with key: ${phaserKey}`);
+
+      const tileset = this.map.addTilesetImage(tilesetName, phaserKey);
+
+      if (tileset) {
+        tilesets.push(tileset);
+        console.log(`  ✓ Tileset ${tilesetName} loaded successfully`);
+      } else {
+        console.warn(`  ✗ Failed to load tileset ${tilesetName} (key: ${phaserKey})`);
+      }
+    }
+
+    return tilesets;
+  }
+
+  /**
+   * Helper: Get the layer suffix (everything after the last '/')
+   */
+  private getLayerSuffix(layerName: string): string {
+    const lastSlash = layerName.lastIndexOf('/');
+    return lastSlash >= 0 ? layerName.substring(lastSlash + 1) : layerName;
+  }
+
+  /**
+   * Helper: Find all layers matching a suffix pattern (e.g., "collision" matches "Beach/collision", "Forest/collision")
+   */
+  private findLayersBySuffix(suffix: string): Phaser.Tilemaps.LayerData[] {
+    return this.map.layers.filter(layer => this.getLayerSuffix(layer.name) === suffix);
+  }
+
+  /**
+   * Setup visual tile layers that should be automatically rendered
+   * Looks for layers with the custom property "autoRender: true" or layers with common visual suffixes
+   */
+  private setupVisualLayers(tilesets: Phaser.Tilemaps.Tileset[]) {
+    // Visual layer suffixes to auto-render (e.g., "Beach/water", "Forest/ground")
+    const visualLayerSuffixes = ['beach', 'water', 'grass', 'ground', 'obstacles'];
 
     console.log('Setting up visual layers...');
 
     // Check all layers in the map
     for (const layerData of this.map.layers) {
       const layerName = layerData.name;
+      const layerSuffix = this.getLayerSuffix(layerName);
 
       // Skip special layers that are handled elsewhere
-      if (layerName === 'collision' ||
-        layerName === 'roofs' ||
+      if (layerSuffix === 'collision' ||
+        layerSuffix === 'roofs' ||
         layerName === OverworldBridgeManager.getBridgesLayerName()) {
         continue;
       }
 
       // Check if this layer should be auto-rendered
-      let shouldRender = defaultVisualLayers.includes(layerName);
+      let shouldRender = visualLayerSuffixes.includes(layerSuffix);
 
       // Also check for autoRender property in Tiled (if layer has properties)
       if (layerData.properties && Array.isArray(layerData.properties)) {
@@ -484,21 +629,32 @@ export class OverworldScene extends Phaser.Scene {
     }
   }
 
-  private setupCollisionLayer(beachTileset: Phaser.Tilemaps.Tileset | null, grassTileset: Phaser.Tilemaps.Tileset | null) {
-    const collisionLayerData = this.map.getLayer('collision');
-    if (collisionLayerData) {
-      const tilesets = [beachTileset, grassTileset].filter(Boolean) as Phaser.Tilemaps.Tileset[];
-      const collisionLayer = this.map.createLayer('collision', tilesets);
+  private setupCollisionLayer(tilesets: Phaser.Tilemaps.Tileset[]) {
+    // Find all collision layers (e.g., "Beach/collision", "Forest/collision")
+    const collisionLayers = this.findLayersBySuffix('collision');
 
-      if (collisionLayer) {
-        this.collisionLayer = collisionLayer;
-        this.setupCollisionDetection();
-        // Make collision layer invisible but functional
-        collisionLayer.setAlpha(0);
-        console.log('Collision layer created and configured');
+    if (collisionLayers.length > 0) {
+      console.log(`Found ${collisionLayers.length} collision layers`);
+
+      // Create all collision layers
+      for (const layerData of collisionLayers) {
+        const collisionLayer = this.map.createLayer(layerData.name, tilesets);
+
+        if (collisionLayer) {
+          // Store the first collision layer as the primary one
+          if (!this.collisionLayer) {
+            this.collisionLayer = collisionLayer;
+          }
+          // Make collision layer invisible but functional
+          collisionLayer.setAlpha(0);
+          console.log(`Collision layer "${layerData.name}" created and configured`);
+        }
       }
+
+      // Setup collision detection using all collision layers
+      this.setupCollisionDetection();
     } else {
-      console.warn('No collision layer found in map');
+      console.warn('No collision layers found in map');
     }
 
     // Setup bridges layer for completed puzzles
@@ -506,9 +662,8 @@ export class OverworldScene extends Phaser.Scene {
     console.log(`Looking for bridges layer '${OverworldBridgeManager.getBridgesLayerName()}': ${bridgesLayerData ? 'FOUND' : 'NOT FOUND'}`);
 
     if (bridgesLayerData) {
-      const tilesets = [grassTileset].filter(Boolean) as Phaser.Tilemaps.Tileset[];
-      console.log(`Creating bridges layer with ${tilesets.length} tilesets`);
-      const bridgesLayer = this.map.createLayer(OverworldBridgeManager.getBridgesLayerName(), tilesets);
+      console.log(`Creating bridges layer (with no tilesets)`);
+      const bridgesLayer = this.map.createLayer(OverworldBridgeManager.getBridgesLayerName(), []);
 
       if (bridgesLayer) {
         this.bridgesLayer = bridgesLayer;
@@ -522,28 +677,29 @@ export class OverworldScene extends Phaser.Scene {
     }
   }
 
-  private setupRoofsLayer(beachTileset: Phaser.Tilemaps.Tileset | null, grassTileset: Phaser.Tilemaps.Tileset | null) {
-    // Check if roofs layer exists in the tilemap data
-    const roofsLayerData = this.map.getLayer('roofs');
-    console.log('Looking for roofs layer:', roofsLayerData ? 'FOUND' : 'NOT FOUND');
+  private setupRoofsLayer(tilesets: Phaser.Tilemaps.Tileset[]) {
+    // Find all roofs layers (e.g., "Beach/roofs", "Forest/roofs")
+    const roofsLayersData = this.findLayersBySuffix('roofs');
+    console.log(`Looking for roofs layers: ${roofsLayersData.length} found`);
 
-    if (roofsLayerData) {
-      // Use both tilesets - roofs might use either
-      const tilesets = [beachTileset, grassTileset].filter(Boolean) as Phaser.Tilemaps.Tileset[];
-      console.log(`Creating roofs layer with ${tilesets.length} tilesets`);
+    if (roofsLayersData.length > 0) {
+      console.log(`Creating ${roofsLayersData.length} roofs layers with ${tilesets.length} tilesets`);
 
-      const roofsLayer = this.map.createLayer('roofs', tilesets);
+      for (const layerData of roofsLayersData) {
+        const roofsLayer = this.map.createLayer(layerData.name, tilesets);
 
-      if (roofsLayer) {
-        this.roofsLayer = roofsLayer;
-        // Set roof layer depth to appear above player (player is at default depth 0)
-        roofsLayer.setDepth(10);
-        console.log(`Roofs layer created successfully: depth=${roofsLayer.depth}, visible=${roofsLayer.visible}, alpha=${roofsLayer.alpha}`);
-      } else {
-        console.error('Failed to create roofs layer - createLayer returned null');
+        if (roofsLayer) {
+          // Store all roofs layers
+          this.roofsLayers.push(roofsLayer);
+          // Set roof layer depth to appear above player (player is at default depth 0)
+          roofsLayer.setDepth(10);
+          console.log(`Roofs layer "${layerData.name}" created successfully: depth=${roofsLayer.depth}, visible=${roofsLayer.visible}, alpha=${roofsLayer.alpha}`);
+        } else {
+          console.error(`Failed to create roofs layer "${layerData.name}" - createLayer returned null`);
+        }
       }
     } else {
-      console.log('No roofs layer found in map (optional)');
+      console.log('No roofs layers found in map (optional)');
     }
   }
   private findPlayerStartPosition(): { x: number; y: number } {
@@ -949,14 +1105,12 @@ export class OverworldScene extends Phaser.Scene {
       return false;
     }
 
-    // Get all layers and check for entry tiles
-    const entryTileIDs = defaultTileConfig.entryPointTileIDs;
-
+    // Get all layers and check for tiles with puzzleStart property
     for (const layer of this.map.layers) {
       if (layer.tilemapLayer) {
         const tile = layer.tilemapLayer.getTileAt(tileX, tileY);
-        if (tile && entryTileIDs.includes(tile.index)) {
-          console.log(`Player on entry tile ${tile.index} at (${tileX}, ${tileY})`);
+        if (tile && tile.properties && tile.properties.puzzleStart === true) {
+          console.log(`Player on puzzle start tile at (${tileX}, ${tileY})`);
           return true;
         }
       }
