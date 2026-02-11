@@ -14,6 +14,11 @@ import { RoofManager } from '@view/RoofManager';
 import { NPC } from '@model/conversation/NPC';
 import type { ConversationSpec } from '@model/conversation/ConversationData';
 import { attachTestMarker, isTestMode } from '@helpers/TestMarkers';
+import { NPCSeriesState } from '@model/conversation/NPCSeriesState';
+import { SeriesFactory, SeriesManager } from '@model/series/SeriesFactory';
+import { FilePuzzleLoader, LocalStorageProgressStore } from '@model/series/SeriesLoaders';
+import { NPCIconConfig } from '@view/NPCIconConfig';
+import { Door } from '@model/overworld/Door';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -51,10 +56,16 @@ export class OverworldScene extends Phaser.Scene {
   // NPC and conversation system
   private npcs: NPC[] = [];
   private npcSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  private npcIcons: Map<string, Phaser.GameObjects.Image> = new Map();
+  private npcSeriesStates: Map<string, NPCSeriesState> = new Map();
+  private seriesManager?: SeriesManager;
 
   // Roof hiding system
   private roofManager?: RoofManager;
   private roofsLayers: Phaser.Tilemaps.TilemapLayer[] = [];
+
+  // Door system
+  private doors: Door[] = [];
 
   constructor() {
     super({ key: 'OverworldScene' });
@@ -65,6 +76,12 @@ export class OverworldScene extends Phaser.Scene {
     this.collisionManager = new CollisionManager(this);
     this.cameraManager = new CameraManager(this);
     this.roofManager = new RoofManager(this);
+
+    // Initialize series manager
+    const puzzleLoader = new FilePuzzleLoader();
+    const progressStore = new LocalStorageProgressStore();
+    const seriesFactory = new SeriesFactory(puzzleLoader, progressStore);
+    this.seriesManager = new SeriesManager(seriesFactory, progressStore);
   }
 
   preload() {
@@ -87,6 +104,14 @@ export class OverworldScene extends Phaser.Scene {
     // Load NPC sprites
     this.load.image('sailorNS', 'resources/sprites/sailorNS.png');
     this.load.image('sailorEW', 'resources/sprites/sailorEW.png');
+
+    // Load NPC icon sprites (user will provide these files)
+    this.load.image(NPCIconConfig.INCOMPLETE, 'resources/sprites/icon-incomplete.png');
+    this.load.image(NPCIconConfig.COMPLETE, 'resources/sprites/icon-complete.png');
+
+    // Load NPC icon sprites (user will provide these files)
+    this.load.image(NPCIconConfig.INCOMPLETE, 'resources/sprites/icon-incomplete.png');
+    this.load.image(NPCIconConfig.COMPLETE, 'resources/sprites/icon-complete.png');
 
     // Load TMX file asynchronously, then load embedded tilesets
     this.loadTmxFile();
@@ -476,6 +501,8 @@ export class OverworldScene extends Phaser.Scene {
       // Get properties from Tiled object
       const properties = obj.properties as any[] | undefined;
       const conversationFile = properties?.find((p: any) => p.name === 'conversation')?.value;
+      const conversationFileSolved = properties?.find((p: any) => p.name === 'conversationSolved')?.value;
+      const seriesFile = properties?.find((p: any) => p.name === 'series')?.value;
       const language = properties?.find((p: any) => p.name === 'language')?.value || 'grass';
       const appearanceId = properties?.find((p: any) => p.name === 'appearance')?.value || 'sailorNS';
 
@@ -487,7 +514,9 @@ export class OverworldScene extends Phaser.Scene {
         tileY,
         language,
         appearanceId,
-        conversationFile
+        conversationFile,
+        conversationFileSolved,
+        seriesFile
       );
 
       this.npcs.push(npc);
@@ -521,8 +550,129 @@ export class OverworldScene extends Phaser.Scene {
         console.log(`[TEST] Added test marker for NPC: ${npc.id} at tile (${tileX}, ${tileY}), world (${worldX}, ${worldY})`);
       }
 
-      console.log(`Loaded NPC: ${npc.name} at (${tileX}, ${tileY}), language: ${language}, conversation: ${conversationFile || 'none'}`);
+      console.log(`Loaded NPC: ${npc.name} at (${tileX}, ${tileY}), language: ${language}, conversation: ${conversationFile || 'none'}, series: ${seriesFile || 'none'}`);
     }
+
+    // Load series for NPCs and create icons
+    this.loadNPCSeries();
+
+    // Load doors from object layer
+    this.loadDoors();
+  }
+
+  /**
+   * Load puzzle series for NPCs that have them and create icons
+   */
+  private async loadNPCSeries(): Promise<void> {
+    for (const npc of this.npcs) {
+      if (!npc.hasSeries()) {
+        // NPC has no series, create state with null series
+        const state = new NPCSeriesState(npc, null);
+        this.npcSeriesStates.set(npc.id, state);
+        continue;
+      }
+
+      try {
+        // Load series JSON
+        const seriesPath = npc.getSeriesPath();
+        const response = await fetch(seriesPath);
+        if (!response.ok) {
+          console.warn(`Failed to load series for NPC ${npc.id}: ${response.statusText}`);
+          const state = new NPCSeriesState(npc, null);
+          this.npcSeriesStates.set(npc.id, state);
+          continue;
+        }
+
+        const seriesJson = await response.json();
+        const series = await this.seriesManager!.loadSeries(seriesJson);
+
+        // Create state with loaded series
+        const state = new NPCSeriesState(npc, series);
+        this.npcSeriesStates.set(npc.id, state);
+
+        // Create icon sprite if needed
+        this.updateNPCIcon(npc);
+
+        console.log(`Loaded series '${series.title}' for NPC ${npc.id}, icon state: ${state.getIconState()}`);
+      } catch (error) {
+        console.error(`Error loading series for NPC ${npc.id}:`, error);
+        const state = new NPCSeriesState(npc, null);
+        this.npcSeriesStates.set(npc.id, state);
+      }
+    }
+  }
+
+  /**
+   * Update or create icon for an NPC based on their series state
+   */
+  private updateNPCIcon(npc: NPC): void {
+    const state = this.npcSeriesStates.get(npc.id);
+    if (!state) return;
+
+    const iconState = state.getIconState();
+    const npcSprite = this.npcSprites.get(npc.id);
+    if (!npcSprite) return;
+
+    // Remove existing icon if any
+    const existingIcon = this.npcIcons.get(npc.id);
+    if (existingIcon) {
+      existingIcon.destroy();
+      this.npcIcons.delete(npc.id);
+    }
+
+    // Create new icon if needed
+    if (iconState !== 'none') {
+      const iconKey = iconState === 'complete' ? NPCIconConfig.COMPLETE : NPCIconConfig.INCOMPLETE;
+      const icon = this.add.image(
+        npcSprite.x,
+        npcSprite.y + NPCIconConfig.ICON_OFFSET_Y,
+        iconKey
+      );
+      icon.setScale(NPCIconConfig.ICON_SCALE);
+      icon.setOrigin(0.5, 0.5);
+      icon.setDepth(npcSprite.depth + NPCIconConfig.ICON_DEPTH_OFFSET);
+      this.npcIcons.set(npc.id, icon);
+    }
+  }
+
+  /**
+   * Load doors from the Tiled map "doors" object layer
+   */
+  private loadDoors(): void {
+    if (!this.map) return;
+
+    const doorsLayer = this.map.getObjectLayer('doors');
+    if (!doorsLayer) {
+      console.log('No doors layer found in map');
+      return;
+    }
+
+    const tileWidth = this.tiledMapData?.tilewidth || 32;
+    const tileHeight = this.tiledMapData?.tileheight || 32;
+
+    for (const obj of doorsLayer.objects) {
+      try {
+        const door = Door.fromTiledObject(obj, tileWidth, tileHeight);
+        this.doors.push(door);
+        console.log(`Loaded door: ${door.id} at positions:`, door.getPositions(),
+          door.seriesId ? `linked to series: ${door.seriesId}` : 'no series link');
+      } catch (error) {
+        console.error('Error loading door from object:', obj, error);
+      }
+    }
+
+    // Register doors with collision manager
+    if (this.doors.length > 0) {
+      this.collisionManager.registerDoors(this.doors);
+      console.log(`Registered ${this.doors.length} doors with collision manager`);
+    }
+  }
+
+  /**
+   * Helper: Find all layers matching a suffix pattern (e.g., "collision" matches "Beach/collision", "Forest/collision")
+   */
+  private findLayersBySuffix(suffix: string): Phaser.Tilemaps.LayerData[] {
+    return this.map.layers.filter(layer => this.getLayerSuffix(layer.name) === suffix);
   }
 
   /**
@@ -575,13 +725,6 @@ export class OverworldScene extends Phaser.Scene {
   private getLayerSuffix(layerName: string): string {
     const lastSlash = layerName.lastIndexOf('/');
     return lastSlash >= 0 ? layerName.substring(lastSlash + 1) : layerName;
-  }
-
-  /**
-   * Helper: Find all layers matching a suffix pattern (e.g., "collision" matches "Beach/collision", "Forest/collision")
-   */
-  private findLayersBySuffix(suffix: string): Phaser.Tilemaps.LayerData[] {
-    return this.map.layers.filter(layer => this.getLayerSuffix(layer.name) === suffix);
   }
 
   /**
@@ -981,8 +1124,12 @@ export class OverworldScene extends Phaser.Scene {
     }
 
     try {
+      // Determine which conversation to use based on series state
+      const state = this.npcSeriesStates.get(npc.id);
+      const seriesSolved = state?.isSeriesCompleted() ?? false;
+
       // Load conversation JSON
-      const conversationPath = npc.getConversationPath();
+      const conversationPath = npc.getConversationPath(seriesSolved);
       const response = await fetch(conversationPath);
       if (!response.ok) {
         throw new Error(`Failed to load conversation: ${response.statusText}`);
@@ -992,7 +1139,7 @@ export class OverworldScene extends Phaser.Scene {
 
       // Switch to conversation mode
       this.gameMode = 'conversation';
-      console.log(`Switching to conversation mode with NPC: ${npc.name}`);
+      console.log(`Switching to conversation mode with NPC: ${npc.name} (series solved: ${seriesSolved})`);
 
       // Get conversation scene
       const conversationScene = this.scene.get('ConversationScene') as any;
@@ -1008,7 +1155,7 @@ export class OverworldScene extends Phaser.Scene {
 
       // Listen for conversation effects
       conversationScene.events.on('conversationEffects', (effects: any[]) => {
-        this.handleConversationEffects(effects);
+        this.handleConversationEffects(effects, npc);
       });
 
       // Launch the conversation scene if not already running
@@ -1049,7 +1196,7 @@ export class OverworldScene extends Phaser.Scene {
   /**
    * Handle effects from conversation choices
    */
-  private handleConversationEffects(effects: any[]): void {
+  private async handleConversationEffects(effects: any[], npc?: NPC): Promise<void> {
     console.log('Handling conversation effects:', effects);
 
     for (const effect of effects) {
@@ -1063,11 +1210,110 @@ export class OverworldScene extends Phaser.Scene {
         case 'startPuzzle':
           console.log(`TODO: Start puzzle ${effect.puzzleId}`);
           break;
+        case 'startSeries':
+          if (effect.seriesId) {
+            await this.startPuzzleSeries(effect.seriesId, npc);
+          }
+          break;
+        case 'unlockDoor':
+          if (effect.doorId) {
+            this.unlockDoor(effect.doorId);
+          }
+          break;
         case 'setExpression':
           // Expression changes are handled by the conversation system
           break;
       }
     }
+  }
+
+  /**
+   * Start a puzzle series, launching the first unsolved puzzle
+   */
+  private async startPuzzleSeries(seriesId: string, npc?: NPC): Promise<void> {
+    console.log(`Starting puzzle series: ${seriesId}`);
+
+    // If series is associated with an NPC, use their state
+    let series = null;
+    if (npc) {
+      const state = this.npcSeriesStates.get(npc.id);
+      series = state?.getSeries();
+
+      if (series && series.id !== seriesId) {
+        console.warn(`NPC ${npc.id} series mismatch: expected ${seriesId}, got ${series.id}`);
+        series = null;
+      }
+    }
+
+    // If we don't have the series yet, load it
+    if (!series) {
+      try {
+        const seriesPath = `src/data/series/${seriesId}.json`;
+        const response = await fetch(seriesPath);
+        if (!response.ok) {
+          throw new Error(`Failed to load series: ${response.statusText}`);
+        }
+        const seriesJson = await response.json();
+        series = await this.seriesManager!.loadSeries(seriesJson);
+      } catch (error) {
+        console.error(`Error loading series ${seriesId}:`, error);
+        return;
+      }
+    }
+
+    // Find the first unsolved puzzle
+    let firstUnsolvedId: string | null = null;
+    const entries = series.getAllPuzzleEntries();
+    for (const entry of entries) {
+      if (entry.unlocked && !entry.completed) {
+        firstUnsolvedId = entry.id;
+        break;
+      }
+    }
+
+    // If no unlocked incomplete puzzle, try first unlocked puzzle
+    if (!firstUnsolvedId) {
+      const firstUnlocked = entries.find(e => e.unlocked);
+      firstUnsolvedId = firstUnlocked?.id ?? null;
+    }
+
+    if (!firstUnsolvedId) {
+      console.warn(`No unlocked puzzles found in series ${seriesId}`);
+      return;
+    }
+
+    console.log(`Launching first unsolved puzzle: ${firstUnsolvedId}`);
+
+    // TODO: Actually launch the puzzle
+    // For now, just log
+    console.log(`TODO: Launch puzzle ${firstUnsolvedId} from series ${seriesId}`);
+  }
+
+  /**
+   * Unlock a door by ID
+   */
+  private unlockDoor(doorId: string): void {
+    const door = this.doors.find(d => d.id === doorId);
+    if (!door) {
+      console.warn(`Door ${doorId} not found`);
+      return;
+    }
+
+    if (!door.isLocked()) {
+      console.log(`Door ${doorId} is already unlocked`);
+      return;
+    }
+
+    console.log(`Unlocking door: ${doorId}`);
+    door.unlock();
+
+    // Update game state
+    this.gameState.unlockDoor(doorId);
+
+    // Update collision
+    this.collisionManager.updateDoorCollision(door);
+
+    console.log(`Door ${doorId} unlocked successfully`);
   }
 
   /**
