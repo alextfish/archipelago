@@ -23,7 +23,7 @@ export class OverworldScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private playerController?: PlayerController;
   private map!: Phaser.Tilemaps.Tilemap;
-  private collisionLayer!: Phaser.Tilemaps.TilemapLayer;
+  private collisionLayers: Phaser.Tilemaps.TilemapLayer[] = [];
   private bridgesLayer!: Phaser.Tilemaps.TilemapLayer;
   private collisionArray: boolean[][] = [];
   private gameMode: 'exploration' | 'conversation' | 'puzzle' = 'exploration';
@@ -266,13 +266,13 @@ export class OverworldScene extends Phaser.Scene {
     this.cameras.main.setZoom(2);
     this.cameras.main.roundPixels = true; // avoid subpixel gaps
 
-    // Set up input and player controller (pass collision layer for corner forgiveness)
+    // Set up input and player controller (pass first collision layer for corner forgiveness)
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.playerController = new PlayerController(this, this.player, this.cursors, this.collisionLayer);
+    this.playerController = new PlayerController(this, this.player, this.cursors, this.collisionLayers[0]);
 
-    // Enable collision between player and collision layer
-    if (this.collisionLayer) {
-      this.physics.add.collider(this.player, this.collisionLayer);
+    // Enable collision between player and all collision layers
+    for (const collisionLayer of this.collisionLayers) {
+      this.physics.add.collider(this.player, collisionLayer);
     }
 
     console.log('Overworld scene created successfully');
@@ -294,12 +294,12 @@ export class OverworldScene extends Phaser.Scene {
       this.tiledMapData = await MapUtils.loadTiledMap('resources/overworld.json');
 
       // Now that tiledMapData is loaded, create the bridge manager if we have a bridges layer
-      if (this.bridgesLayer && this.collisionLayer && !this.bridgeManager) {
+      if (this.bridgesLayer && this.collisionLayers.length > 0 && !this.bridgeManager) {
         console.log('Creating bridge manager now that tiledMapData is loaded');
         this.bridgeManager = new OverworldBridgeManager(
           this.map,
           this.bridgesLayer,
-          this.collisionLayer,
+          this.collisionLayers[0], // Pass first collision layer for utility functions
           this.collisionArray,
           this.tiledMapData
         );
@@ -631,20 +631,18 @@ export class OverworldScene extends Phaser.Scene {
 
   private setupCollisionLayer(tilesets: Phaser.Tilemaps.Tileset[]) {
     // Find all collision layers (e.g., "Beach/collision", "Forest/collision")
-    const collisionLayers = this.findLayersBySuffix('collision');
+    const collisionLayerData = this.findLayersBySuffix('collision');
 
-    if (collisionLayers.length > 0) {
-      console.log(`Found ${collisionLayers.length} collision layers`);
+    if (collisionLayerData.length > 0) {
+      console.log(`Found ${collisionLayerData.length} collision layers`);
 
       // Create all collision layers
-      for (const layerData of collisionLayers) {
+      for (const layerData of collisionLayerData) {
         const collisionLayer = this.map.createLayer(layerData.name, tilesets);
 
         if (collisionLayer) {
-          // Store the first collision layer as the primary one
-          if (!this.collisionLayer) {
-            this.collisionLayer = collisionLayer;
-          }
+          // Store all collision layers in array
+          this.collisionLayers.push(collisionLayer);
           // Make collision layer invisible but functional
           collisionLayer.setAlpha(0);
           console.log(`Collision layer "${layerData.name}" created and configured`);
@@ -732,7 +730,7 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   private setupCollisionDetection() {
-    if (!this.collisionLayer) return;
+    if (this.collisionLayers.length === 0) return;
 
     // Initialize collision array
     const mapWidth = this.map.width;
@@ -742,16 +740,26 @@ export class OverworldScene extends Phaser.Scene {
     for (let y = 0; y < mapHeight; y++) {
       this.collisionArray[y] = [];
       for (let x = 0; x < mapWidth; x++) {
-        const tile = this.collisionLayer.getTileAt(x, y);
-        // Check if tile exists and has 'collides' property set to true
-        this.collisionArray[y][x] = tile && tile.properties && tile.properties.collides === true;
+        // Check all collision layers - if ANY layer has collision at this position, mark it as collision
+        let hasCollision = false;
+        for (const collisionLayer of this.collisionLayers) {
+          const tile = collisionLayer.getTileAt(x, y);
+          // Check if tile exists and has 'collides' property set to true
+          if (tile && tile.properties && tile.properties.collides === true) {
+            hasCollision = true;
+            break; // No need to check other layers once we found collision
+          }
+        }
+        this.collisionArray[y][x] = hasCollision;
       }
     }
 
-    // Set collision by property on the layer
-    this.collisionLayer.setCollisionByProperty({ collides: true });
+    // Set collision by property on all collision layers
+    for (const collisionLayer of this.collisionLayers) {
+      collisionLayer.setCollisionByProperty({ collides: true });
+    }
 
-    console.log(`Collision array initialized: ${mapWidth}x${mapHeight}`);
+    console.log(`Collision array initialized: ${mapWidth}x${mapHeight} from ${this.collisionLayers.length} layers`);
 
     // Debug: count collision tiles
     let collisionCount = 0;
@@ -804,9 +812,9 @@ export class OverworldScene extends Phaser.Scene {
     if (tileX < 0 || tileX >= this.collisionArray[0].length) return;
     this.collisionArray[tileY][tileX] = hasCollision;
 
-    // Update the actual tilemap layer collision if needed
-    if (this.collisionLayer) {
-      const tile = this.collisionLayer.getTileAt(tileX, tileY);
+    // Update collision on all tilemap layers
+    for (const collisionLayer of this.collisionLayers) {
+      const tile = collisionLayer.getTileAt(tileX, tileY);
       if (tile) {
         tile.setCollision(hasCollision);
       }
