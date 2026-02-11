@@ -26,11 +26,12 @@ export interface TileLayerConfig {
  */
 export interface MapLayer {
     readonly name: string;
-    readonly type: 'tilelayer' | 'objectgroup';
+    readonly type: 'tilelayer' | 'objectgroup' | 'group';
     readonly width?: number;
     readonly height?: number;
     readonly data?: number[];
     readonly objects?: MapObject[];
+    readonly layers?: MapLayer[]; // For group layers
 }
 
 /**
@@ -70,9 +71,9 @@ export class MapPuzzleExtractor {
      * (e.g., "Beach/puzzles", "Forest/puzzles")
      */
     extractPuzzleDefinitions(tiledMap: TiledMapData): MapPuzzleDefinition[] {
-        // Find all puzzles object layers (e.g., "Beach/puzzles", "Forest/puzzles")
-        const puzzleLayers = tiledMap.layers.filter(layer =>
-            layer.type === 'objectgroup' && this.getLayerSuffix(layer.name) === 'puzzles'
+        // Find all puzzles object layers, including those nested in groups
+        const puzzleLayers = this.findAllLayersBySuffix(tiledMap.layers, 'puzzles').filter(
+            layer => layer.type === 'objectgroup'
         );
 
         if (puzzleLayers.length === 0) {
@@ -113,6 +114,27 @@ export class MapPuzzleExtractor {
     private getLayerSuffix(layerName: string): string {
         const lastSlash = layerName.lastIndexOf('/');
         return lastSlash >= 0 ? layerName.substring(lastSlash + 1) : layerName;
+    }
+
+    /**
+     * Recursively find all layers matching a suffix, even if nested in groups
+     */
+    private findAllLayersBySuffix(layers: MapLayer[], suffix: string): MapLayer[] {
+        const result: MapLayer[] = [];
+        
+        for (const layer of layers) {
+            // Check if this layer matches the suffix
+            if (this.getLayerSuffix(layer.name) === suffix) {
+                result.push(layer);
+            }
+            
+            // If this is a group layer, recursively search its children
+            if (layer.type === 'group' && layer.layers) {
+                result.push(...this.findAllLayersBySuffix(layer.layers, suffix));
+            }
+        }
+        
+        return result;
     }
 
     /**
@@ -455,21 +477,37 @@ export class MapPuzzleExtractor {
     }
 
     /**
-     * Find an object layer by name
+     * Find an object layer by name, searching recursively through groups
      */
     private findObjectLayer(tiledMap: TiledMapData, layerName: string): MapLayer | null {
-        return tiledMap.layers.find(layer =>
-            layer.type === 'objectgroup' && layer.name === layerName
-        ) || null;
+        return this.findLayerByName(tiledMap.layers, layerName, 'objectgroup');
     }
 
     /**
-     * Find a tile layer by name
+     * Find a tile layer by name, searching recursively through groups
      */
     private findTileLayer(tiledMap: TiledMapData, layerName: string): MapLayer | null {
-        return tiledMap.layers.find(layer =>
-            layer.type === 'tilelayer' && layer.name === layerName
-        ) || null;
+        return this.findLayerByName(tiledMap.layers, layerName, 'tilelayer');
+    }
+
+    /**
+     * Recursively find a layer by name and type
+     */
+    private findLayerByName(layers: MapLayer[], layerName: string, layerType: 'tilelayer' | 'objectgroup'): MapLayer | null {
+        for (const layer of layers) {
+            // Check if this layer matches
+            if (layer.type === layerType && layer.name === layerName) {
+                return layer;
+            }
+            
+            // If this is a group layer, recursively search its children
+            if (layer.type === 'group' && layer.layers) {
+                const found = this.findLayerByName(layer.layers, layerName, layerType);
+                if (found) return found;
+            }
+        }
+        
+        return null;
     }
 
     /**
@@ -514,9 +552,9 @@ export class MapPuzzleExtractor {
         definition: MapPuzzleDefinition,
         tiledMap: TiledMapData
     ): void {
-        // Find all puzzles object layers
-        const puzzleLayers = tiledMap.layers.filter(layer =>
-            layer.type === 'objectgroup' && this.getLayerSuffix(layer.name) === 'puzzles'
+        // Find all puzzles object layers, including those nested in groups
+        const puzzleLayers = this.findAllLayersBySuffix(tiledMap.layers, 'puzzles').filter(
+            layer => layer.type === 'objectgroup'
         );
 
         if (puzzleLayers.length === 0) {
