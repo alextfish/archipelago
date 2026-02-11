@@ -109,10 +109,6 @@ export class OverworldScene extends Phaser.Scene {
     this.load.image(NPCIconConfig.INCOMPLETE, 'resources/sprites/icon-incomplete.png');
     this.load.image(NPCIconConfig.COMPLETE, 'resources/sprites/icon-complete.png');
 
-    // Load NPC icon sprites (user will provide these files)
-    this.load.image(NPCIconConfig.INCOMPLETE, 'resources/sprites/icon-incomplete.png');
-    this.load.image(NPCIconConfig.COMPLETE, 'resources/sprites/icon-complete.png');
-
     // Load TMX file asynchronously, then load embedded tilesets
     this.loadTmxFile();
   }
@@ -452,21 +448,18 @@ export class OverworldScene extends Phaser.Scene {
   private loadNPCs(): void {
     if (!this.map) return;
 
-    // Find all npcs object layers (e.g., "Beach/npcs", "Forest/npcs")
-    const npcsLayers = this.map.layers.filter(layer =>
-      layer.type === Phaser.Tilemaps.OBJECT_LAYER &&
-      this.getLayerSuffix(layer.name) === 'npcs'
-    );
+    // Find all npcs layers (e.g., "Beach/npcs", "Forest/npcs") by suffix
+    const npcsLayersData = this.findLayersBySuffix('npcs');
 
-    if (npcsLayers.length === 0) {
+    if (npcsLayersData.length === 0) {
       console.log('No NPCs layers found in map');
       return;
     }
 
-    console.log(`Found ${npcsLayers.length} NPC layers`);
+    console.log(`Found ${npcsLayersData.length} NPC layers`);
 
     // Process all NPC layers
-    for (const layerData of npcsLayers) {
+    for (const layerData of npcsLayersData) {
       const npcsLayer = this.map.getObjectLayer(layerData.name);
       if (!npcsLayer) {
         console.warn(`Failed to get object layer: ${layerData.name}`);
