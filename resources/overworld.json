@@ -2431,10 +2431,28 @@
          "tileheight":32,
          "tiles":[
                 {
+                 "id":5,
+                 "properties":[
+                        {
+                         "name":"isIsland",
+                         "type":"bool",
+                         "value":true
+                        }]
+                }, 
+                {
                  "id":6,
                  "properties":[
                         {
                          "name":"puzzleStart",
+                         "type":"bool",
+                         "value":true
+                        }]
+                }, 
+                {
+                 "id":27,
+                 "properties":[
+                        {
+                         "name":"isIsland",
                          "type":"bool",
                          "value":true
                         }]
@@ -2449,10 +2467,28 @@
                         }]
                 }, 
                 {
+                 "id":39,
+                 "properties":[
+                        {
+                         "name":"isIsland",
+                         "type":"bool",
+                         "value":true
+                        }]
+                }, 
+                {
                  "id":40,
                  "properties":[
                         {
                          "name":"puzzleStart",
+                         "type":"bool",
+                         "value":true
+                        }]
+                }, 
+                {
+                 "id":51,
+                 "properties":[
+                        {
+                         "name":"isIsland",
                          "type":"bool",
                          "value":true
                         }]

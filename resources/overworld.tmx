@@ -59,9 +59,19 @@
  </tileset>
  <tileset firstgid="31" name="terrains" tilewidth="32" tileheight="32" tilecount="72" columns="12">
   <image source="tilesets/terrains.png" width="384" height="192"/>
+  <tile id="5">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
   <tile id="6">
    <properties>
     <property name="puzzleStart" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="27">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
    </properties>
   </tile>
   <tile id="28">
@@ -69,9 +79,19 @@
     <property name="puzzleStart" type="bool" value="true"/>
    </properties>
   </tile>
+  <tile id="39">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
   <tile id="40">
    <properties>
     <property name="puzzleStart" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="51">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
    </properties>
   </tile>
   <tile id="52">

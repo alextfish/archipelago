@@ -49,6 +49,32 @@ export interface MapObject {
 }
 
 /**
+ * Represents a tile property from a Tiled tileset
+ */
+export interface TileProperty {
+    readonly name: string;
+    readonly type: string;
+    readonly value: any;
+}
+
+/**
+ * Represents a tile definition in a tileset with custom properties
+ */
+export interface TileData {
+    readonly id: number;
+    readonly properties?: TileProperty[];
+}
+
+/**
+ * Represents a tileset referenced in a Tiled map
+ */
+export interface TilesetData {
+    readonly firstgid: number;
+    readonly name: string;
+    readonly tiles?: TileData[];
+}
+
+/**
  * Represents a complete Tiled map structure
  */
 export interface TiledMapData {
@@ -57,6 +83,7 @@ export interface TiledMapData {
     readonly tilewidth: number;
     readonly tileheight: number;
     readonly layers: MapLayer[];
+    readonly tilesets?: TilesetData[];
 }
 
 /**
@@ -121,20 +148,61 @@ export class MapPuzzleExtractor {
      */
     private findAllLayersBySuffix(layers: MapLayer[], suffix: string): MapLayer[] {
         const result: MapLayer[] = [];
-        
+
         for (const layer of layers) {
             // Check if this layer matches the suffix
             if (this.getLayerSuffix(layer.name) === suffix) {
                 result.push(layer);
             }
-            
+
             // If this is a group layer, recursively search its children
             if (layer.type === 'group' && layer.layers) {
                 result.push(...this.findAllLayersBySuffix(layer.layers, suffix));
             }
         }
-        
+
         return result;
+    }
+
+    /**
+     * Extract dynamic island tile IDs from tilesets based on isIsland property.
+     * Falls back to hard-coded config if no tiles have the isIsland property.
+     */
+    private extractIslandTileIDs(tiledMap: TiledMapData): number[] {
+        if (!tiledMap.tilesets) {
+            console.warn('No tilesets found in map, using hard-coded island tile IDs');
+            return this.tileConfig.islandTileIDs;
+        }
+
+        const islandTileIDs: number[] = [];
+
+        for (const tileset of tiledMap.tilesets) {
+            if (!tileset.tiles) {
+                continue;
+            }
+
+            for (const tile of tileset.tiles) {
+                // Check if this tile has the isIsland property set to true
+                const isIslandProperty = tile.properties?.find(
+                    prop => prop.name === 'isIsland' && prop.type === 'bool'
+                );
+
+                if (isIslandProperty && isIslandProperty.value === true) {
+                    // Global tile ID = tileset firstgid + local tile id
+                    const globalTileID = tileset.firstgid + tile.id;
+                    islandTileIDs.push(globalTileID);
+                    console.log(`Found island tile: ${tileset.name} tile ${tile.id} -> global ID ${globalTileID}`);
+                }
+            }
+        }
+
+        if (islandTileIDs.length === 0) {
+            console.warn('No tiles with isIsland=true found, using hard-coded island tile IDs');
+            return this.tileConfig.islandTileIDs;
+        }
+
+        console.log(`Using ${islandTileIDs.length} dynamically detected island tile IDs: [${islandTileIDs.join(', ')}]`);
+        return islandTileIDs;
     }
 
     /**
@@ -192,6 +260,9 @@ export class MapPuzzleExtractor {
     private extractIslands(definition: MapPuzzleDefinition, tiledMap: TiledMapData): Island[] {
         const islands: Island[] = [];
 
+        // Extract dynamic island tile IDs from tilesets
+        const islandTileIDs = this.extractIslandTileIDs(tiledMap);
+
         // Check relevant tile layers for island tiles
         const islandLayers = ['terrain', 'islands', 'puzzle_elements', 'beach'] // Added 'beach' layer
             .map(name => this.findTileLayer(tiledMap, name))
@@ -203,7 +274,7 @@ export class MapPuzzleExtractor {
         });
 
         for (const layer of islandLayers) {
-            const layerIslands = this.extractIslandsFromLayer(layer, definition, tiledMap);
+            const layerIslands = this.extractIslandsFromLayer(layer, definition, tiledMap, islandTileIDs);
             console.log(`  Found ${layerIslands.length} islands in layer ${layer.name}`);
             islands.push(...layerIslands);
         }
@@ -228,7 +299,8 @@ export class MapPuzzleExtractor {
     private extractIslandsFromLayer(
         layer: MapLayer,
         definition: MapPuzzleDefinition,
-        tiledMap: TiledMapData
+        tiledMap: TiledMapData,
+        islandTileIDs: number[]
     ): Island[] {
         if (!layer.data || !layer.width || !layer.height) {
             return [];
@@ -245,7 +317,7 @@ export class MapPuzzleExtractor {
 
         console.log(`    Checking puzzle ${definition.id} in layer ${layer.name}`);
         console.log(`    Puzzle bounds: tile (${puzzleStartX},${puzzleStartY}) to (${puzzleEndX},${puzzleEndY})`);
-        console.log(`    Looking for island tile IDs: [${this.tileConfig.islandTileIDs.join(', ')}]`);
+        console.log(`    Looking for island tile IDs: [${islandTileIDs.join(', ')}]`);
 
         // Scan the puzzle area for island tiles
         let tilesChecked = 0;
@@ -256,7 +328,7 @@ export class MapPuzzleExtractor {
                 const tileID = layer.data[tileIndex];
                 tilesChecked++;
 
-                if (this.tileConfig.islandTileIDs.includes(tileID)) {
+                if (islandTileIDs.includes(tileID)) {
                     tilesFound++;
                     // Convert to puzzle-relative coordinates
                     const relativeX = x - puzzleStartX;
@@ -499,14 +571,14 @@ export class MapPuzzleExtractor {
             if (layer.type === layerType && layer.name === layerName) {
                 return layer;
             }
-            
+
             // If this is a group layer, recursively search its children
             if (layer.type === 'group' && layer.layers) {
                 const found = this.findLayerByName(layer.layers, layerName, layerType);
                 if (found) return found;
             }
         }
-        
+
         return null;
     }
 
