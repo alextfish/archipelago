@@ -9,6 +9,7 @@ export interface MapPuzzleDefinition {
     readonly id: string;
     readonly bounds: { x: number; y: number; width: number; height: number };
     readonly metadata: Record<string, string>; // Custom properties from Tiled object
+    readonly regionGroup?: string; // The region group this puzzle belongs to (e.g., "Beach", "Forest")
 }
 
 /**
@@ -91,6 +92,8 @@ export interface TiledMapData {
  * Coordinates are grid-based and relative to puzzle bounds (0,0 = top-left of puzzle area)
  */
 export class MapPuzzleExtractor {
+    private cachedIslandTileIDs: number[] | null = null;
+
     constructor(private readonly tileConfig: TileLayerConfig) { }
 
     /**
@@ -115,6 +118,10 @@ export class MapPuzzleExtractor {
         for (const puzzleLayer of puzzleLayers) {
             console.log(`Processing puzzle layer: ${puzzleLayer.name} with ${puzzleLayer.objects?.length || 0} objects`);
 
+            // Use parent group as region (e.g., layer in "Forest" group → region="Forest")
+            const regionGroup = puzzleLayer.parentGroup;
+            console.log(`  Region group: ${regionGroup || 'none'}`);
+
             // Debug: show all objects in the puzzles layer
             if (puzzleLayer.objects) {
                 puzzleLayer.objects.forEach((obj, i) => {
@@ -127,7 +134,7 @@ export class MapPuzzleExtractor {
                 ?.filter(obj => obj.type === 'puzzle' ||
                     obj.name?.startsWith('puzzle_') ||
                     obj.name?.toLowerCase().includes('puzzle'))
-                .map(obj => this.createPuzzleDefinition(obj)) || [];
+                .map(obj => this.createPuzzleDefinition(obj, regionGroup)) || [];
 
             allDefinitions.push(...definitions);
         }
@@ -145,19 +152,21 @@ export class MapPuzzleExtractor {
 
     /**
      * Recursively find all layers matching a suffix, even if nested in groups
+     * Returns layers with their parent group name tracked
      */
-    private findAllLayersBySuffix(layers: MapLayer[], suffix: string): MapLayer[] {
-        const result: MapLayer[] = [];
+    private findAllLayersBySuffix(layers: MapLayer[], suffix: string, parentGroupName?: string): Array<MapLayer & { parentGroup?: string }> {
+        const result: Array<MapLayer & { parentGroup?: string }> = [];
 
         for (const layer of layers) {
             // Check if this layer matches the suffix
             if (this.getLayerSuffix(layer.name) === suffix) {
-                result.push(layer);
+                // Add parent group info to the layer
+                result.push({ ...layer, parentGroup: parentGroupName });
             }
 
             // If this is a group layer, recursively search its children
             if (layer.type === 'group' && layer.layers) {
-                result.push(...this.findAllLayersBySuffix(layer.layers, suffix));
+                result.push(...this.findAllLayersBySuffix(layer.layers, suffix, layer.name));
             }
         }
 
@@ -239,11 +248,12 @@ export class MapPuzzleExtractor {
     /**
      * Create a puzzle definition from a Tiled map object
      */
-    private createPuzzleDefinition(obj: MapObject): MapPuzzleDefinition {
+    private createPuzzleDefinition(obj: MapObject, regionGroup?: string): MapPuzzleDefinition {
         const metadata = this.extractObjectProperties(obj);
 
         return {
             id: obj.name || `puzzle_${obj.id}`,
+            regionGroup,
             bounds: {
                 x: obj.x,
                 y: obj.y,
@@ -260,15 +270,27 @@ export class MapPuzzleExtractor {
     private extractIslands(definition: MapPuzzleDefinition, tiledMap: TiledMapData): Island[] {
         const islands: Island[] = [];
 
-        // Extract dynamic island tile IDs from tilesets
-        const islandTileIDs = this.extractIslandTileIDs(tiledMap);
+        // Extract dynamic island tile IDs from tilesets (cached on first use)
+        if (this.cachedIslandTileIDs === null) {
+            this.cachedIslandTileIDs = this.extractIslandTileIDs(tiledMap);
+        }
+        const islandTileIDs = this.cachedIslandTileIDs;
 
         // Check relevant tile layers for island tiles
-        const islandLayers = ['terrain', 'islands', 'puzzle_elements', 'beach'] // Added 'beach' layer
-            .map(name => this.findTileLayer(tiledMap, name))
-            .filter(Boolean) as MapLayer[];
+        let islandLayers: MapLayer[];
+        if (definition.regionGroup) {
+            // Region-specific search: only check the "ground" layer within this region
+            const groundLayer = this.findLayerInRegion(tiledMap, definition.regionGroup, 'ground');
+            islandLayers = groundLayer ? [groundLayer] : [];
+            console.log(`Extracting islands for ${definition.id} from region ${definition.regionGroup}`);
+        } else {
+            // Fallback: global search for backward compatibility
+            islandLayers = ['terrain', 'islands', 'puzzle_elements', 'ground']
+                .map(name => this.findTileLayer(tiledMap, name))
+                .filter(Boolean) as MapLayer[];
+            console.log(`Extracting islands for ${definition.id} from ${islandLayers.length} tile layers (global search)`);
+        }
 
-        console.log(`Extracting islands for ${definition.id} from ${islandLayers.length} tile layers`);
         islandLayers.forEach(layer => {
             console.log(`  Checking layer: ${layer.name}`);
         });
@@ -549,13 +571,6 @@ export class MapPuzzleExtractor {
     }
 
     /**
-     * Find an object layer by name, searching recursively through groups
-     */
-    private findObjectLayer(tiledMap: TiledMapData, layerName: string): MapLayer | null {
-        return this.findLayerByName(tiledMap.layers, layerName, 'objectgroup');
-    }
-
-    /**
      * Find a tile layer by name, searching recursively through groups
      */
     private findTileLayer(tiledMap: TiledMapData, layerName: string): MapLayer | null {
@@ -565,7 +580,7 @@ export class MapPuzzleExtractor {
     /**
      * Recursively find a layer by name and type
      */
-    private findLayerByName(layers: MapLayer[], layerName: string, layerType: 'tilelayer' | 'objectgroup'): MapLayer | null {
+    private findLayerByName(layers: MapLayer[], layerName: string, layerType: 'tilelayer' | 'objectgroup' | 'group'): MapLayer | null {
         for (const layer of layers) {
             // Check if this layer matches
             if (layer.type === layerType && layer.name === layerName) {
@@ -580,6 +595,23 @@ export class MapPuzzleExtractor {
         }
 
         return null;
+    }
+
+    /**
+     * Find a layer within a specific region group
+     * E.g., find "ground" tilelayer within the "Beach" region group,
+     * or find "puzzles" objectgroup within the "Forest" region group
+     */
+    private findLayerInRegion(tiledMap: TiledMapData, regionName: string, layerName: string, layerType: 'tilelayer' | 'objectgroup' = 'tilelayer'): MapLayer | null {
+        // Find the region group first
+        const regionGroup = this.findLayerByName(tiledMap.layers, regionName, 'group');
+        if (!regionGroup || !regionGroup.layers) {
+            console.warn(`Region group "${regionName}" not found`);
+            return null;
+        }
+
+        // Find the layer within the region
+        return this.findLayerByName(regionGroup.layers, layerName, layerType);
     }
 
     /**
@@ -617,17 +649,25 @@ export class MapPuzzleExtractor {
     }
 
     /**
-     * Find and apply island constraints from constraint objects in all puzzles layers
+     * Find and apply island constraints from constraint objects in region-specific puzzles layer
      */
     private applyIslandConstraintsFromObjects(
         islands: Island[],
         definition: MapPuzzleDefinition,
         tiledMap: TiledMapData
     ): void {
-        // Find all puzzles object layers, including those nested in groups
-        const puzzleLayers = this.findAllLayersBySuffix(tiledMap.layers, 'puzzles').filter(
-            layer => layer.type === 'objectgroup'
-        );
+        // Find puzzles layers based on region
+        let puzzleLayers: MapLayer[];
+        if (definition.regionGroup) {
+            // Region-specific: only check the "puzzles" layer within this region
+            const puzzlesLayer = this.findLayerInRegion(tiledMap, definition.regionGroup, 'puzzles', 'objectgroup');
+            puzzleLayers = puzzlesLayer ? [puzzlesLayer] : [];
+        } else {
+            // Fallback: global search for backward compatibility
+            puzzleLayers = this.findAllLayersBySuffix(tiledMap.layers, 'puzzles');
+        }
+
+        puzzleLayers = puzzleLayers.filter(layer => layer.type === 'objectgroup');
 
         if (puzzleLayers.length === 0) {
             return;
