@@ -320,7 +320,7 @@ export class OverworldScene extends Phaser.Scene {
         this.bridgeManager = new OverworldBridgeManager(
           this.map,
           this.bridgesLayer,
-          this.collisionLayers[0], // Pass first collision layer for utility functions
+          this.collisionLayers, // Pass all collision layers
           this.collisionArray,
           this.tiledMapData
         );

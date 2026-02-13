@@ -26,7 +26,7 @@ export class OverworldBridgeManager {
     constructor(
         private map: Phaser.Tilemaps.Tilemap,
         private bridgesLayer: Phaser.Tilemaps.TilemapLayer,
-        private collisionLayer: Phaser.Tilemaps.TilemapLayer,
+        private collisionLayers: Phaser.Tilemaps.TilemapLayer[],
         private collisionArray: boolean[][],
         private tiledMapData: any
     ) {
@@ -119,19 +119,18 @@ export class OverworldBridgeManager {
             // Convert texture frame index to tilemap GID
             const gid = this.bridgeTilesetFirstGid + tileIndex;
 
-            console.log(`  About to place tile at (${tileX}, ${tileY}): gid=${gid}, tileIndex=${tileIndex}, firstGid=${this.bridgeTilesetFirstGid}`);
-
             // Add bridge visual to bridges layer
             const tile = this.bridgesLayer.putTileAt(gid, tileX, tileY);
             if (tile) {
                 tilesPlaced++;
-                console.log(`    Placed junction tile frame=${tileIndex} -> GID=${gid} at (${tileX}, ${tileY}) with connections: ${this.connectionsToString(connections)}`);
             }
 
-            // Remove collision from the collision layer at this position
-            const collisionTile = this.collisionLayer.getTileAt(tileX, tileY);
-            if (collisionTile) {
-                collisionTile.setCollision(false, false, false, false);
+            // Remove collision from all collision layers at this position
+            for (const collisionLayer of this.collisionLayers) {
+                const collisionTile = collisionLayer.getTileAt(tileX, tileY);
+                if (collisionTile) {
+                    collisionTile.setCollision(false, false, false, false);
+                }
             }
 
             // Make walkable by updating collision array
@@ -301,11 +300,13 @@ export class OverworldBridgeManager {
                 const collisionTile = collisionLayer.tilemapLayer.getTileAt(tileX, tileY);
                 const hasCollision = collisionTile !== null;
 
-                // Restore collision on the physics collision layer
-                const physicsCollisionTile = this.collisionLayer.getTileAt(tileX, tileY);
-                if (physicsCollisionTile && hasCollision) {
-                    physicsCollisionTile.setCollision(true, true, true, true);
-                    console.log(`    Restored collision at (${tileX}, ${tileY})`);
+                // Restore collision on all physics collision layers
+                for (const physicsCollisionLayer of this.collisionLayers) {
+                    const physicsCollisionTile = physicsCollisionLayer.getTileAt(tileX, tileY);
+                    if (physicsCollisionTile && hasCollision) {
+                        physicsCollisionTile.setCollision(true, true, true, true);
+                        console.log(`    Restored collision at (${tileX}, ${tileY})`);
+                    }
                 }
 
                 if (tileY >= 0 && tileY < this.collisionArray.length &&
