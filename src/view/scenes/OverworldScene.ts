@@ -796,12 +796,14 @@ export class OverworldScene extends Phaser.Scene {
     console.log(`Looking for bridges layer '${OverworldBridgeManager.getBridgesLayerName()}': ${bridgesLayerData ? 'FOUND' : 'NOT FOUND'}`);
 
     if (bridgesLayerData) {
-      console.log(`Creating bridges layer (with no tilesets)`);
-      const bridgesLayer = this.map.createLayer(OverworldBridgeManager.getBridgesLayerName(), []);
+      console.log(`Creating bridges layer with tilesets`);
+      const bridgesLayer = this.map.createLayer(OverworldBridgeManager.getBridgesLayerName(), tilesets);
 
       if (bridgesLayer) {
         this.bridgesLayer = bridgesLayer;
+        const layerTilesets = bridgesLayer.layer.tilemapLayer?.tileset || [];
         console.log(`Bridges layer created successfully: depth=${bridgesLayer.depth}, visible=${bridgesLayer.visible}, alpha=${bridgesLayer.alpha}`);
+        console.log(`Bridges layer tilesets: ${layerTilesets.map((ts: any) => ts.name).join(', ')}`);
         console.log('Bridge manager will be created after tiledMapData loads in initializeOverworldPuzzles()');
       } else {
         console.error('Failed to create bridges layer!');

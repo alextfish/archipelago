@@ -19,8 +19,9 @@ interface TileConnections {
  */
 export class OverworldBridgeManager {
     private static readonly BRIDGES_LAYER_NAME = 'bridges';
+    private static readonly BRIDGE_TILESET_IMAGE = 'SproutLandsGrassIslands.png';
 
-    private tilesetFirstGid: number = 0;
+    private bridgeTilesetFirstGid: number = 0;
 
     constructor(
         private map: Phaser.Tilemaps.Tilemap,
@@ -29,14 +30,34 @@ export class OverworldBridgeManager {
         private collisionArray: boolean[][],
         private tiledMapData: any
     ) {
-        // Find the firstgid of the SproutLandsGrassIslands tileset
-        const tileset = this.map.getTileset('SproutLandsGrassIslands');
-        if (tileset) {
-            this.tilesetFirstGid = tileset.firstgid;
-            console.log(`OverworldBridgeManager: SproutLandsGrassIslands tileset firstgid = ${this.tilesetFirstGid}`);
+        // Find the bridge tileset by searching for the image filename
+        this.bridgeTilesetFirstGid = this.findBridgeTilesetFirstGid();
+        if (this.bridgeTilesetFirstGid > 0) {
+            console.log(`OverworldBridgeManager: Found bridge tileset with firstgid = ${this.bridgeTilesetFirstGid}`);
         } else {
-            console.error('OverworldBridgeManager: Could not find SproutLandsGrassIslands tileset!');
+            console.error(`OverworldBridgeManager: Could not find tileset with image ${OverworldBridgeManager.BRIDGE_TILESET_IMAGE}`);
         }
+    }
+
+    /**
+     * Find the firstgid of the bridge tileset by searching for its image filename
+     */
+    private findBridgeTilesetFirstGid(): number {
+        // Search through all tilesets in the tiledMapData
+        if (!this.tiledMapData?.tilesets) {
+            console.warn('OverworldBridgeManager: No tilesets found in tiledMapData');
+            return 0;
+        }
+
+        for (const tilesetData of this.tiledMapData.tilesets) {
+            // Check if the tileset's image ends with our bridge tileset filename
+            if (tilesetData.image && tilesetData.image.endsWith(OverworldBridgeManager.BRIDGE_TILESET_IMAGE)) {
+                console.log(`OverworldBridgeManager: Found bridge tileset '${tilesetData.name}' with image ${tilesetData.image}`);
+                return tilesetData.firstgid;
+            }
+        }
+
+        return 0;
     }
 
     /**
@@ -53,6 +74,14 @@ export class OverworldBridgeManager {
         if (!this.bridgesLayer) {
             console.error('OverworldBridgeManager: No bridges layer available!');
             return;
+        }
+
+        // Check layer properties
+        const layerData = this.bridgesLayer.layer;
+        console.log(`  Layer dimensions: ${layerData.width}x${layerData.height}`);
+        console.log(`  Layer has data array: ${!!layerData.data}, length: ${layerData.data?.length}`);
+        if (layerData.data && layerData.data.length > 0) {
+            console.log(`  First row exists: ${!!layerData.data[0]}, length: ${layerData.data[0]?.length}`);
         }
 
         // Phase 1: Collect all bridge segments and their connections at each tile
@@ -73,13 +102,24 @@ export class OverworldBridgeManager {
         // Phase 2: Place appropriate tiles based on collected connections
         let tilesPlaced = 0;
         for (const [tileKey, connections] of tileConnectionsMap.entries()) {
-            const [tileX, tileY] = tileKey.split(',').map(Number);
+            const parts = tileKey.split(',');
+            if (parts.length !== 2) {
+                console.warn(`OverworldBridgeManager: Invalid tile key format: ${tileKey}`);
+                continue;
+            }
+            const [tileX, tileY] = parts.map(Number);
+            if (isNaN(tileX) || isNaN(tileY)) {
+                console.warn(`OverworldBridgeManager: Invalid tile coordinates from key ${tileKey}: (${tileX}, ${tileY})`);
+                continue;
+            }
 
             // Determine which sprite frame to use based on connections
             const tileIndex = this.getTileIndexForConnections(connections);
 
             // Convert texture frame index to tilemap GID
-            const gid = this.tilesetFirstGid + tileIndex;
+            const gid = this.bridgeTilesetFirstGid + tileIndex;
+
+            console.log(`  About to place tile at (${tileX}, ${tileY}): gid=${gid}, tileIndex=${tileIndex}, firstGid=${this.bridgeTilesetFirstGid}`);
 
             // Add bridge visual to bridges layer
             const tile = this.bridgesLayer.putTileAt(gid, tileX, tileY);

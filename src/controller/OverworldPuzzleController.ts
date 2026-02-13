@@ -242,18 +242,21 @@ export class OverworldPuzzleController {
 
             // Handle collision and bridge rendering based on whether puzzle was solved
             const puzzleBounds = this.puzzleManager.getPuzzleBounds(activeData.id);
+            console.log(`[exitPuzzle] Got puzzle bounds for ${activeData.id}:`, puzzleBounds);
             const boundsRect = puzzleBounds ? new Phaser.Geom.Rectangle(
                 puzzleBounds.x,
                 puzzleBounds.y,
                 puzzleBounds.width,
                 puzzleBounds.height
             ) : null;
+            console.log(`[exitPuzzle] Created boundsRect:`, boundsRect);
 
             const action = this.determineExitAction(actualSuccess, activeData.id);
 
             if (action === 'bake') {
                 // Puzzle solved: restore original collision first, then bake bridges
                 console.log('Puzzle solved - restoring collision and baking bridges to overworld');
+                console.log(`[exitPuzzle] About to bake ${activeData.puzzle.bridges.length} bridges`);
                 this.collisionManager.restoreOriginalCollision();
                 if (this.bridgeManager && boundsRect) {
                     const bridges = activeData.puzzle.bridges;

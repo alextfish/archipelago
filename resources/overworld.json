@@ -2522,6 +2522,19 @@
                         }]
                 }],
          "tilewidth":32
+        }, 
+        {
+         "columns":11,
+         "firstgid":103,
+         "image":"tilesets\/SproutLandsGrassIslands.png",
+         "imageheight":256,
+         "imagewidth":353,
+         "margin":0,
+         "name":"SproutLandsGrassIslands",
+         "spacing":0,
+         "tilecount":88,
+         "tileheight":32,
+         "tilewidth":32
         }],
  "tilewidth":32,
  "type":"map",
