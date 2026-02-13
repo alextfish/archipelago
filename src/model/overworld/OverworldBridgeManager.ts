@@ -33,7 +33,7 @@ export class OverworldBridgeManager {
         // Find the bridge tileset by searching for the image filename
         this.bridgeTilesetFirstGid = this.findBridgeTilesetFirstGid();
         if (this.bridgeTilesetFirstGid > 0) {
-            console.log(`OverworldBridgeManager: Found bridge tileset with firstgid = ${this.bridgeTilesetFirstGid}`);
+            // fine
         } else {
             console.error(`OverworldBridgeManager: Could not find tileset with image ${OverworldBridgeManager.BRIDGE_TILESET_IMAGE}`);
         }
