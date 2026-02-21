@@ -1,0 +1,54 @@
+{
+  "id": "editor_example",
+  "type": "standard",
+  "size": {
+    "width": 4,
+    "height": 4
+  },
+  "islands": [
+    {
+      "id": "A",
+      "x": 2,
+      "y": 2
+    },
+    {
+      "id": "B",
+      "x": 1,
+      "y": 4,
+      "constraints": [
+        "num_bridges=3"
+      ]
+    },
+    {
+      "id": "C",
+      "x": 3,
+      "y": 1,
+      "constraints": [
+        "num_bridges=1"
+      ]
+    }
+  ],
+  "bridgeTypes": [
+    {
+      "id": "black_2",
+      "colour": "black",
+      "length": 2,
+      "count": 2
+    },
+    {
+      "id": "black_1",
+      "colour": "black",
+      "length": 1,
+      "count": 1
+    }
+  ],
+  "constraints": [
+    {
+      "type": "AllBridgesPlacedConstraint"
+    },
+    {
+      "type": "NoCrossingConstraint"
+    }
+  ],
+  "maxNumBridges": 10
+}
