@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archipelago Puzzle Editor</title>
+    <link rel="stylesheet" href="./editor.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Archipelago Puzzle Editor</h1>
+            <div class="header-controls">
+                <button id="saveBtn" class="btn">Save</button>
+                <button id="loadBtn" class="btn">Load</button>
+                <button id="exportBtn" class="btn">Export JSON</button>
+                <button id="newBtn" class="btn">New Puzzle</button>
+            </div>
+        </header>
+
+        <div class="main-container">
+            <!-- Left panel: Constraints -->
+            <aside class="left-panel">
+                <h2>Constraints</h2>
+                <div class="mode-selector">
+                    <label>
+                        <input type="radio" name="mode" value="edit" checked>
+                        Edit Mode
+                    </label>
+                    <label>
+                        <input type="radio" name="mode" value="constraint">
+                        Add Constraint
+                    </label>
+                </div>
+                
+                <div id="constraintList" class="constraint-list">
+                    <!-- Constraint types will be populated here -->
+                </div>
+
+                <div id="puzzleConstraints" class="puzzle-constraints">
+                    <h3>Puzzle Constraints</h3>
+                    <div id="puzzleConstraintsList"></div>
+                </div>
+
+                <div id="cellConstraints" class="cell-constraints" style="display:none;">
+                    <h3>Cell Constraint Config</h3>
+                    <div id="cellConstraintConfig"></div>
+                </div>
+            </aside>
+
+            <!-- Center panel: Grid -->
+            <main class="center-panel">
+                <div class="puzzle-info">
+                    <div class="form-group">
+                        <label>Puzzle ID: <input type="text" id="puzzleId" placeholder="my_puzzle"></label>
+                    </div>
+                    <div class="form-group">
+                        <label>Width: <input type="number" id="gridWidth" value="4" min="2" max="20"></label>
+                        <label>Height: <input type="number" id="gridHeight" value="4" min="2" max="20"></label>
+                        <button id="resizeGrid" class="btn-small">Resize</button>
+                    </div>
+                </div>
+
+                <div class="canvas-container">
+                    <canvas id="gridCanvas" width="600" height="600"></canvas>
+                </div>
+
+                <div class="tool-controls">
+                    <button id="addIslandBtn" class="btn active">Add Island</button>
+                    <button id="removeIslandBtn" class="btn">Remove Island</button>
+                    <button id="addBridgeBtn" class="btn">Add Bridge</button>
+                </div>
+            </main>
+
+            <!-- Right panel: Bridge Types & Islands -->
+            <aside class="right-panel">
+                <section class="bridge-types">
+                    <h2>Bridge Types</h2>
+                    <div id="bridgeTypeList"></div>
+                    <button id="addBridgeType" class="btn-small">+ Add Bridge Type</button>
+                </section>
+
+                <section class="islands-list">
+                    <h2>Islands</h2>
+                    <div id="islandsList"></div>
+                </section>
+
+                <section class="test-solution" id="testSection">
+                    <h2>Test Solution</h2>
+                    <div id="testControls">
+                        <button id="validateBtn" class="btn">Validate</button>
+                        <button id="clearTestBtn" class="btn-small">Clear Test</button>
+                    </div>
+                    <div id="validationResults"></div>
+                </section>
+            </aside>
+        </div>
+    </div>
+
+    <script type="module" src="./editor.js"></script>
+</body>
+</html>

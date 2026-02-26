@@ -1,0 +1,386 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f5f5f5;
+    color: #333;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+header {
+    background: #2c3e50;
+    color: white;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.header-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.btn:hover {
+    background: #2980b9;
+}
+
+.btn.active {
+    background: #27ae60;
+}
+
+.btn-small {
+    background: #95a5a6;
+    color: white;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+}
+
+.btn-small:hover {
+    background: #7f8c8d;
+}
+
+.main-container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.left-panel, .right-panel {
+    width: 280px;
+    background: white;
+    padding: 1.5rem;
+    overflow-y: auto;
+    border-right: 1px solid #ddd;
+}
+
+.right-panel {
+    border-right: none;
+    border-left: 1px solid #ddd;
+}
+
+.center-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+.puzzle-info {
+    background: white;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.form-group {
+    margin-bottom: 0.75rem;
+    display: flex;
+    gap: 1rem;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"] {
+    padding: 0.4rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.canvas-container {
+    background: white;
+    padding: 2rem;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#gridCanvas {
+    border: 2px solid #34495e;
+    cursor: crosshair;
+}
+
+.tool-controls {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+h2 {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 0.5rem;
+}
+
+h3 {
+    font-size: 1rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    color: #34495e;
+}
+
+.mode-selector {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: #ecf0f1;
+    border-radius: 4px;
+}
+
+.mode-selector label {
+    display: block;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+}
+
+.mode-selector label:last-child {
+    margin-bottom: 0;
+}
+
+.mode-selector input[type="radio"] {
+    margin-right: 0.5rem;
+}
+
+.constraint-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.constraint-item {
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.constraint-item:hover {
+    background: #e9ecef;
+    border-color: #3498db;
+}
+
+.constraint-item.selected {
+    background: #3498db;
+    color: white;
+    border-color: #2980b9;
+}
+
+.constraint-item h4 {
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+.constraint-item p {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+#puzzleConstraintsList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.puzzle-constraint {
+    padding: 0.75rem;
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 4px;
+    position: relative;
+    font-size: 0.9rem;
+}
+
+.puzzle-constraint .remove-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: #dc3545;
+    color: white;
+    border: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+.cell-constraints {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+#cellConstraintConfig .param-group {
+    margin-bottom: 0.75rem;
+}
+
+#cellConstraintConfig .param-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+#cellConstraintConfig .param-group input {
+    width: 100%;
+    padding: 0.4rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+#cellConstraintConfig button {
+    margin-top: 0.5rem;
+}
+
+.bridge-types, .islands-list, .test-solution {
+    margin-bottom: 2rem;
+}
+
+#bridgeTypeList, #islandsList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.bridge-type-item, .island-item {
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    position: relative;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.bridge-type-item:hover {
+    background: #e9ecef;
+    border-color: #3498db;
+}
+
+.bridge-type-item.selected {
+    background: #3498db;
+    color: white;
+    border-color: #2980b9;
+}
+
+.bridge-type-item.selected input {
+    background: white;
+    color: #333;
+}
+
+.bridge-type-item .remove-btn, .island-item .remove-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: #dc3545;
+    color: white;
+    border: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+.bridge-type-item input, .island-item input {
+    width: 100%;
+    padding: 0.3rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-top: 0.25rem;
+    font-size: 0.85rem;
+}
+
+.island-item .island-constraints {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.island-item .island-constraints input {
+    margin-top: 0;
+}
+
+#validationResults {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.validation-message {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+}
+
+.validation-message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.validation-message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+#testControls {
+    display: flex;
+    gap: 0.5rem;
+}
