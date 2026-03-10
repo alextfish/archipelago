@@ -58,6 +58,8 @@ npm run dev
 ```
 Server should start on http://localhost:5173/
 
+**Note**: If port 5173 is already in use, Vite will automatically use the next available port (5174, 5175, etc.). Check the terminal output to see which port is being used.
+
 ### 2. Open Test Mode in Browser
 Navigate to: http://localhost:5173/test.html
 
@@ -220,6 +222,18 @@ if (isTestMode()) {
 ```
 
 ## Troubleshooting
+
+### JSON/MIME Type Errors
+If you see errors like `Expected a JavaScript-or-Wasm module script but the server responded with a MIME type of "application/json"`:
+- **Cause**: Attempting to import JSON files as ES modules  
+- **Solution**: JSON data files should be in `public/` and fetched at runtime using `fetch()`, not imported
+- **Examples**: Puzzle data (`public/data/puzzles/`), series data (`public/data/series/`)
+
+### Port Issues
+If you see errors about `localhost:5174` or other ports:
+- Check the terminal output from `npm run dev` to see which port Vite actually started on
+- Vite automatically increments the port (5173 → 5174 → 5175) if a port is already in use
+- Update your browser URL to match the actual port shown in the terminal
 
 ### Markers Not Visible
 1. Check browser console for `[TEST]` logs

@@ -3,7 +3,6 @@ import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import { PuzzleController } from '@controller/PuzzleController';
 import type { PuzzleHost } from '@controller/PuzzleHost';
 import { Environment } from '@helpers/Environment';
-import puzzleData from '../../data/puzzles/simple4IslandPuzzle.json';
 
 export class BridgePuzzleScene extends Phaser.Scene {
     private puzzle: BridgePuzzle | null = null;
@@ -21,7 +20,11 @@ export class BridgePuzzleScene extends Phaser.Scene {
         });
     }
 
-    create() {
+    async create() {
+        // Fetch puzzle data from public directory
+        const response = await fetch('data/puzzles/simple4IslandPuzzle.json');
+        const puzzleData = await response.json();
+
         // Instantiate BridgePuzzle from spec
         this.puzzle = new BridgePuzzle(puzzleData);
 
