@@ -16,6 +16,10 @@ export interface TestMarkerOptions {
     onClick?: () => void;  // Custom click handler
 }
 
+export interface TestConfig {
+    playerStartID?: string;
+}
+
 /**
  * Check if test markers should be enabled
  */
@@ -26,6 +30,16 @@ export function isTestMode(): boolean {
     }
     // Check Vite environment variables
     return import.meta.env.MODE === 'test' || import.meta.env.VITE_TEST_MODE === 'true';
+}
+
+/**
+ * Get test configuration parameters set by the test environment
+ */
+export function getTestConfig(): TestConfig {
+    if (typeof window !== 'undefined' && (window as any).__TEST_CONFIG__) {
+        return (window as any).__TEST_CONFIG__;
+    }
+    return {};
 }
 
 /**

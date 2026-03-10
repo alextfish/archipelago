@@ -61,10 +61,10 @@ export class NPC {
      * @param seriesSolved - Whether the series is solved (to select appropriate conversation)
      */
     getConversationPath(seriesSolved: boolean = false): string {
-        const file = seriesSolved && this.conversationFileSolved 
-            ? this.conversationFileSolved 
+        const file = seriesSolved && this.conversationFileSolved
+            ? this.conversationFileSolved
             : this.conversationFile;
-        
+
         if (!file) {
             throw new Error(`NPC ${this.id} has no conversation file`);
         }
@@ -78,6 +78,9 @@ export class NPC {
         if (!this.seriesFile) {
             throw new Error(`NPC ${this.id} has no series file`);
         }
-        return `src/data/series/${this.seriesFile}`;
+        // Series files should be in public/data/series/ for runtime fetching
+        // Add .json extension if not present
+        const filename = this.seriesFile.endsWith('.json') ? this.seriesFile : `${this.seriesFile}.json`;
+        return `data/series/${filename}`;
     }
 }

@@ -13,12 +13,13 @@ import { InteractionCursor, type Interactable } from '@view/InteractionCursor';
 import { RoofManager } from '@view/RoofManager';
 import { NPC } from '@model/conversation/NPC';
 import type { ConversationSpec } from '@model/conversation/ConversationData';
-import { attachTestMarker, isTestMode } from '@helpers/TestMarkers';
+import { attachTestMarker, isTestMode, getTestConfig } from '@helpers/TestMarkers';
 import { NPCSeriesState } from '@model/conversation/NPCSeriesState';
 import { SeriesFactory, SeriesManager } from '@model/series/SeriesFactory';
 import { FilePuzzleLoader, LocalStorageProgressStore } from '@model/series/SeriesLoaders';
 import { NPCIconConfig } from '@view/NPCIconConfig';
 import { Door } from '@model/overworld/Door';
+import { PlayerStartManager } from '@model/overworld/PlayerStartManager';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -66,6 +67,9 @@ export class OverworldScene extends Phaser.Scene {
 
   // Door system
   private doors: Door[] = [];
+
+  // Player start position management
+  private playerStartManager?: PlayerStartManager;
 
   constructor() {
     super({ key: 'OverworldScene' });
@@ -116,13 +120,17 @@ export class OverworldScene extends Phaser.Scene {
   private async loadTmxFile() {
     try {
       console.log('Loading map file...');
-      const tiledMapData = await MapUtils.loadTiledMap('resources/overworld.json');
+      this.tiledMapData = await MapUtils.loadTiledMap('resources/overworld.json');
+
+      // Initialize player start manager as soon as map data is available
+      this.playerStartManager = new PlayerStartManager(this.tiledMapData);
+      console.log('Player start manager initialized with', this.playerStartManager.getAllStarts().length, 'start positions');
 
       // Load embedded tilesets from the map data
-      this.loadEmbeddedTilesets(tiledMapData);
+      this.loadEmbeddedTilesets(this.tiledMapData);
 
       // Add the converted map data to Phaser's cache
-      this.cache.tilemap.add('overworldMap', { format: 1, data: tiledMapData });
+      this.cache.tilemap.add('overworldMap', { format: 1, data: this.tiledMapData });
       console.log('Map file loaded and converted successfully');
     } catch (error) {
       console.error('Failed to load map file, using fallback:', error);
@@ -262,7 +270,7 @@ export class OverworldScene extends Phaser.Scene {
     const mapHeight = this.map.heightInPixels;
     this.physics.world.setBounds(0, 0, mapWidth, mapHeight);
 
-    // Find player starting position
+    // Find player starting position (PlayerStartManager should be initialized from preload)
     const playerStart = this.findPlayerStartPosition();
 
     // Create player sprite
@@ -311,8 +319,17 @@ export class OverworldScene extends Phaser.Scene {
     try {
       console.log('Initializing overworld puzzle system...');
 
-      // Load the tilemap data for puzzle extraction
-      this.tiledMapData = await MapUtils.loadTiledMap('resources/overworld.json');
+      // tiledMapData should already be loaded from preload phase
+      if (!this.tiledMapData) {
+        console.warn('tiledMapData not loaded yet, loading now...');
+        this.tiledMapData = await MapUtils.loadTiledMap('resources/overworld.json');
+
+        // Initialize player start manager if not already done
+        if (!this.playerStartManager) {
+          this.playerStartManager = new PlayerStartManager(this.tiledMapData);
+          console.log('Player start manager initialized (late) with', this.playerStartManager.getAllStarts().length, 'start positions');
+        }
+      }
 
       // Now that tiledMapData is loaded, create the bridge manager if we have a bridges layer
       if (this.bridgesLayer && this.collisionLayers.length > 0 && !this.bridgeManager) {
@@ -446,27 +463,66 @@ export class OverworldScene extends Phaser.Scene {
    * Load NPCs from all "<anything>/npcs" object layers in the Tiled map
    */
   private loadNPCs(): void {
-    if (!this.map) return;
+    if (!this.map || !this.tiledMapData) return;
 
-    // Find all npcs layers (e.g., "Beach/npcs", "Forest/npcs") by suffix
-    const npcsLayersData = this.findLayersBySuffix('npcs');
+    // Find all npcs object layers (including nested) in tiledMapData
+    const npcsLayers: Array<{ name: string; fullPath: string; data: any }> = [];
+    this.findObjectLayersByName(this.tiledMapData.layers, 'npcs', npcsLayers, '');
 
-    if (npcsLayersData.length === 0) {
+    if (npcsLayers.length === 0) {
       console.log('No NPCs layers found in map');
       return;
     }
 
-    console.log(`Found ${npcsLayersData.length} NPC layers`);
+    console.log(`Found ${npcsLayers.length} NPC layers`);
 
     // Process all NPC layers
-    for (const layerData of npcsLayersData) {
-      const npcsLayer = this.map.getObjectLayer(layerData.name);
+    for (const layerInfo of npcsLayers) {
+      // Try both the full path and the simple name
+      let npcsLayer = this.map.getObjectLayer(layerInfo.fullPath);
       if (!npcsLayer) {
-        console.warn(`Failed to get object layer: ${layerData.name}`);
+        npcsLayer = this.map.getObjectLayer(layerInfo.name);
+      }
+
+      if (!npcsLayer) {
+        console.warn(`Failed to get object layer: ${layerInfo.fullPath} or ${layerInfo.name}`);
         continue;
       }
 
-      this.loadNPCsFromLayer(npcsLayer, layerData.name);
+      console.log(`Loading NPCs from layer: ${layerInfo.fullPath}`);
+      this.loadNPCsFromLayer(npcsLayer, layerInfo.fullPath);
+    }
+  }
+
+  /**
+   * Recursively find object layers by name suffix
+   * @param layers - Array of layer data to search
+   * @param suffix - The suffix to match (e.g., "npcs")
+   * @param results - Array to accumulate results
+   * @param parentPath - Path of parent groups (e.g., "Beach/")
+   */
+  private findObjectLayersByName(
+    layers: any[],
+    suffix: string,
+    results: Array<{ name: string; fullPath: string; data: any }>,
+    parentPath: string
+  ): void {
+    for (const layer of layers) {
+      const fullPath = parentPath ? `${parentPath}/${layer.name}` : layer.name;
+
+      // Check if this layer name matches the suffix
+      if (layer.name && this.getLayerSuffix(layer.name) === suffix && layer.type === 'objectgroup') {
+        results.push({
+          name: layer.name,
+          fullPath: fullPath,
+          data: layer
+        });
+      }
+
+      // Recursively search nested layers if this is a group
+      if (layer.type === 'group' && layer.layers) {
+        this.findObjectLayersByName(layer.layers, suffix, results, layer.name);
+      }
     }
   }
 
@@ -500,8 +556,9 @@ export class OverworldScene extends Phaser.Scene {
       const appearanceId = properties?.find((p: any) => p.name === 'appearance')?.value || 'sailorNS';
 
       // Create NPC instance
+      // Use Tiled's unique object ID for npc.id to ensure uniqueness (multiple NPCs can share the same name)
       const npc = new NPC(
-        obj.name,
+        String(obj.id),
         obj.name,
         tileX,
         tileY,
@@ -840,16 +897,38 @@ export class OverworldScene extends Phaser.Scene {
   }
   private findPlayerStartPosition(): { x: number; y: number } {
     try {
-      // Look for player start in scene transitions layer
-      const sceneTransitionsLayer = this.map.getObjectLayer('sceneTransitions');
+      // Check for test mode override
+      if (isTestMode()) {
+        const testConfig = getTestConfig();
+        if (testConfig.playerStartID && this.playerStartManager) {
+          const startPos = this.playerStartManager.getStartByID(testConfig.playerStartID);
+          if (startPos) {
+            console.log(`[TEST] Using player start "${testConfig.playerStartID}" at (${startPos.x}, ${startPos.y})`);
+            return { x: startPos.x, y: startPos.y };
+          } else {
+            console.warn(`[TEST] Player start "${testConfig.playerStartID}" not found, using default`);
+          }
+        }
+      }
 
+      // Use PlayerStartManager if available
+      if (this.playerStartManager) {
+        const defaultStart = this.playerStartManager.getDefaultStart();
+        if (defaultStart) {
+          console.log('Using default player start:', defaultStart);
+          return { x: defaultStart.x, y: defaultStart.y };
+        }
+      }
+
+      // Fallback: look for any player start in scene transitions layer
+      const sceneTransitionsLayer = this.map.getObjectLayer('sceneTransitions');
       if (sceneTransitionsLayer) {
         const playerStartObj = sceneTransitionsLayer.objects.find(obj =>
           obj.name === 'player start'
         );
 
         if (playerStartObj) {
-          console.log('Found player start object:', playerStartObj);
+          console.log('Found player start object (fallback):', playerStartObj);
           return {
             x: playerStartObj.x || 0,
             y: playerStartObj.y || 0
@@ -860,7 +939,7 @@ export class OverworldScene extends Phaser.Scene {
       console.warn('Error finding player start position:', error);
     }
 
-    // Fallback to center of map
+    // Final fallback to center of map
     const centerX = this.map.widthInPixels / 2;
     const centerY = this.map.heightInPixels / 2;
     console.warn('Player start not found, using map center:', centerX, centerY);

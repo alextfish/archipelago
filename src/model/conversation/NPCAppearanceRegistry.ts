@@ -43,6 +43,16 @@ export class NPCAppearanceRegistry {
                 sad: 2,
             },
         });
+
+        // Mage4 appearance (forest NPC)
+        this.appearances.set('Mage4', {
+            spriteKey: 'Mage4',
+            expressions: {
+                neutral: 0,
+                happy: 1,
+                sad: 2,
+            },
+        });
     }
 
     /**
