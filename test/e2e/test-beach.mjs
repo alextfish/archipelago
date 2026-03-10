@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Automated test for forest area conversation
- * Tests the conversation flow starting at the forest player start
+ * Automated test for beach area conversation
+ * Tests the conversation flow starting at the beach player start
  * This script will:
- * 1. Start the player at the "forest" player start
- * 2. Navigate to and interact with npcForestSeries1
+ * 1. Start the player at the "beach" player start
+ * 2. Navigate to and interact with an NPC
  * 3. Complete a conversation
  * 4. Verify the conversation completed successfully
  */
@@ -13,13 +13,13 @@ import {
     initTest,
     navigateAndWaitForLoad,
     completeConversation
-} from './test/playwright/helpers.mjs';
+} from '../playwright/helpers.mjs';
 
 async function runTest() {
-    // Initialize test with forest start
+    // Initialize test with beach start
     const { page, cleanup } = await initTest({
-        name: 'Forest Area',
-        playerStartID: 'forest',
+        name: 'Beach Area',
+        playerStartID: 'beach',
         headless: false,
         slowMo: 100
     });
@@ -39,13 +39,12 @@ async function runTest() {
             return;
         }
 
-        // Complete the conversation flow with forest NPC
-        // The NPC is at (1824, 1696), ID 48 from Tiled, close to the forest start at (1952, 1760)
-        // This NPC's conversation has different choices: "Can I help you?" and "Leave"
-        await completeConversation(page, 'npc-48', ['choice-can-i-help-you-']);
+        // Complete the conversation flow
+        // Click sailor NPC (ID 51 from Tiled, near beach at 1504, 2720)
+        await completeConversation(page, 'npc-51', ['choice-ok', 'choice-leave']);
 
-        console.log('[TEST] Forest area conversation test completed successfully!');
-        await cleanup('Test success - completed forest conversation flow');
+        console.log('[TEST] Beach area conversation test completed successfully!');
+        await cleanup('Test success - completed beach conversation flow');
 
     } catch (error) {
         console.error('[TEST] Error during test:', error.message);

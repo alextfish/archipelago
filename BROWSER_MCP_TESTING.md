@@ -26,7 +26,7 @@ The test marker system and automated test infrastructure are now fully integrate
 - Shows "TEST MODE" indicator in top-right corner
 - Loads game with test markers and events enabled
 
-### 4. Automated Test Script (`test-browser.mjs`)
+### 4. Automated Test Script (`test/e2e/test-beach.mjs`, `test/e2e/test-forest.mjs`)
 - Playwright-based browser automation
 - **Tests full conversation flow**: Player movement → NPC interaction → conversation choices → conversation end
 - **Combination timeout strategy**:
@@ -239,14 +239,15 @@ if (isTestMode()) {
 
 ## Automated Testing with Playwright
 
-A test script is available at `test-browser.mjs`. To run:
+Test scripts are available in `test/e2e/`. To run:
 
 ```powershell
 # Make sure dev server is running
 npm run dev
 
 # In another terminal
-node test-browser.mjs
+node test/e2e/test-beach.mjs
+node test/e2e/test-forest.mjs
 ```
 
 The script will:

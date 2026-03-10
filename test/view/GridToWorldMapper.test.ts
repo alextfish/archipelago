@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GridToWorldMapper } from '../../view/GridToWorldMapper';
+import { GridToWorldMapper } from '@view/GridToWorldMapper';
 
 describe('GridToWorldMapper', () => {
   it('maps (0,0) to world position with no offset', () => {

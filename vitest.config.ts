@@ -5,7 +5,7 @@ export default defineConfig({
     test: {
         globals: true,
         environment: 'happy-dom', // Provides browser-like environment with window object
-        setupFiles: ['./src/test/setup.ts'],
+        setupFiles: ['./test/setup.ts'],
     },
     resolve: {
         alias: {

@@ -210,10 +210,10 @@ describe('NPC', () => {
                 'sailorNS',
                 undefined,
                 undefined,
-                'tutorial-series.json'
+                'tutorial-series'
             );
 
-            expect(npc.getSeriesPath()).toBe('src/data/series/tutorial-series.json');
+            expect(npc.getSeriesPath()).toBe('data/series/tutorial-series.json');
         });
 
         it('should throw error when series file is undefined', () => {
