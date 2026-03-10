@@ -1,0 +1,27 @@
+{
+  "id": "forestNPC1",
+  "npcId": "npcForestSeries1",
+  "start": "intro",
+  "nodes": {
+    "intro": {
+      "npc": {
+        "expression": "neutral",
+        "glyphs": "you build bridge question"
+      },
+      "choices": [
+        {
+          "text": "Can I help you?",
+          "effects": [
+            { "type": "startSeries", "seriesId": "forestSeries1" },
+            { "type": "unlockDoor", "doorId": "gate1" }
+          ],
+          "end": true
+        },
+        {
+          "text": "Leave",
+          "end": true
+        }
+      ]
+    }
+  }
+}

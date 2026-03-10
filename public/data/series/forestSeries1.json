@@ -1,0 +1,34 @@
+{
+  "id": "forestSeries1",
+  "title": "Forest Puzzles",
+  "description": "A series of puzzles in the forest area",
+  "puzzles": [
+    {
+      "id": "forest-puzzle-1",
+      "title": "Forest Bridge",
+      "description": "Build a bridge in the forest",
+      "puzzleData": {
+        "id": "forest-1",
+        "type": "standard",
+        "size": { "width": 5, "height": 3 },
+        "islands": [
+          { "id": "A", "x": 1, "y": 1 },
+          { "id": "B", "x": 3, "y": 1 }
+        ],
+        "bridgeTypes": [
+          {
+            "id": "wood",
+            "colour": "#8B4513",
+            "count": 1,
+            "width": 1
+          }
+        ],
+        "constraints": [
+          { "type": "AllBridgesPlacedConstraint" }
+        ],
+        "maxNumBridges": 1
+      },
+      "hint": "Connect the two islands"
+    }
+  ]
+}
