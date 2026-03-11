@@ -115,7 +115,7 @@ export class CollisionManager {
         // Get all tile positions for this bridge
         const bridgeTiles = this.getBridgeTilePositions(bridge, puzzleBounds);
 
-        // Set collision for each tile
+        // Set walkable=true for each tile
         for (const { tileX, tileY } of bridgeTiles) {
             this.overworldScene.setCollisionAt(tileX, tileY, true);
         }
@@ -176,11 +176,9 @@ export class CollisionManager {
      * Update collision for all doors based on their locked state
      */
     updateDoorCollisions(): void {
+        console.log(`CollisionManager: Updating collision for ${this.doors.length} doors`);
         for (const door of this.doors) {
-            const blocked = door.isLocked();
-            for (const pos of door.getPositions()) {
-                this.overworldScene.setCollisionAt(pos.tileX, pos.tileY, blocked);
-            }
+            this.updateDoorCollision(door);
         }
     }
 
@@ -188,9 +186,14 @@ export class CollisionManager {
      * Update collision for a specific door
      */
     updateDoorCollision(door: Door): void {
-        const blocked = door.isLocked();
+        const locked = door.isLocked();
+        // Collision array: true = blocked, false = walkable
+        // So locked door needs collision=true to block movement
+        const blocked = locked;
+        console.log(`CollisionManager: Updating door ${door.id} collision: locked=${locked}, collision=${blocked}`);
         for (const pos of door.getPositions()) {
             this.overworldScene.setCollisionAt(pos.tileX, pos.tileY, blocked);
+            console.log(`  Set collision at (${pos.tileX}, ${pos.tileY}) to ${blocked}`);
         }
     }
 

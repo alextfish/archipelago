@@ -12,8 +12,7 @@
         {
           "text": "I'll help",
           "effects": [
-            { "type": "startSeries", "seriesId": "forestSeries1" },
-            { "type": "unlockDoor", "doorId": "forestSeries1" }
+            { "type": "startSeries", "seriesId": "forestSeries1" }
           ],
           "end": true
         },

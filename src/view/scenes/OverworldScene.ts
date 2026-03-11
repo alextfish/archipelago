@@ -21,6 +21,7 @@ import { FilePuzzleLoader, LocalStorageProgressStore } from '@model/series/Serie
 import { NPCIconConfig } from '@view/NPCIconConfig';
 import { Door } from '@model/overworld/Door';
 import { PlayerStartManager } from '@model/overworld/PlayerStartManager';
+import { getDoorSpriteFrame } from '@view/DoorSpriteRegistry';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -68,6 +69,7 @@ export class OverworldScene extends Phaser.Scene {
 
   // Door system
   private doors: Door[] = [];
+  private doorSprites: Map<string, Phaser.Tilemaps.Tile> = new Map();
 
   // Player start position management
   private playerStartManager?: PlayerStartManager;
@@ -509,6 +511,12 @@ export class OverworldScene extends Phaser.Scene {
       console.log(`Loading NPCs from layer: ${layerInfo.fullPath}`);
       this.loadNPCsFromLayer(npcsLayer, layerInfo.fullPath);
     }
+
+    // Load series for NPCs and create icons (once after all NPCs loaded)
+    this.loadNPCSeries();
+
+    // Load doors from object layers (once after all NPCs loaded)
+    this.loadDoors();
   }
 
   /**
@@ -547,8 +555,6 @@ export class OverworldScene extends Phaser.Scene {
    * Load NPCs from a specific object layer
    */
   private loadNPCsFromLayer(npcsLayer: Phaser.Tilemaps.ObjectLayer, layerName: string): void {
-    console.log(`Loading NPCs from layer: ${layerName}`);
-
     if (!npcsLayer.objects) {
       console.warn(`No objects in layer: ${layerName}`);
       return;
@@ -619,12 +625,6 @@ export class OverworldScene extends Phaser.Scene {
 
       console.log(`Loaded NPC: ${npc.name} at (${tileX}, ${tileY}), language: ${language}, conversation: ${conversationFile || 'none'}, series: ${seriesFile || 'none'}`);
     }
-
-    // Load series for NPCs and create icons
-    this.loadNPCSeries();
-
-    // Load doors from object layer
-    this.loadDoors();
   }
 
   /**
@@ -712,28 +712,55 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   /**
-   * Load doors from the Tiled map "doors" object layer
+   * Load doors from all "<anything>/doors" object layers in the Tiled map
    */
   private loadDoors(): void {
-    if (!this.map) return;
+    if (!this.map || !this.tiledMapData) return;
 
-    const doorsLayer = this.map.getObjectLayer('doors');
-    if (!doorsLayer) {
-      console.log('No doors layer found in map');
+    // Find all doors object layers (including nested) in tiledMapData
+    const doorsLayers: Array<{ name: string; fullPath: string; data: any }> = [];
+    this.findObjectLayersByName(this.tiledMapData.layers, 'doors', doorsLayers, '');
+
+    if (doorsLayers.length === 0) {
+      console.log('No doors layers found in map');
       return;
     }
 
-    const tileWidth = this.tiledMapData?.tilewidth || 32;
-    const tileHeight = this.tiledMapData?.tileheight || 32;
+    console.log(`Found ${doorsLayers.length} doors layers`);
 
-    for (const obj of doorsLayer.objects) {
-      try {
-        const door = Door.fromTiledObject(obj, tileWidth, tileHeight);
-        this.doors.push(door);
-        console.log(`Loaded door: ${door.id} at positions:`, door.getPositions(),
-          door.seriesId ? `linked to series: ${door.seriesId}` : 'no series link');
-      } catch (error) {
-        console.error('Error loading door from object:', obj, error);
+    const tileWidth = this.tiledMapData.tilewidth || 32;
+    const tileHeight = this.tiledMapData.tileheight || 32;
+
+    // Process all doors layers
+    for (const layerInfo of doorsLayers) {
+      // Try both the full path and the simple name
+      let doorsLayer = this.map.getObjectLayer(layerInfo.fullPath);
+      if (!doorsLayer) {
+        doorsLayer = this.map.getObjectLayer(layerInfo.name);
+      }
+
+      if (!doorsLayer) {
+        console.warn(`Failed to get object layer: ${layerInfo.fullPath} or ${layerInfo.name}`);
+        continue;
+      }
+
+      console.log(`Loading doors from layer: ${layerInfo.fullPath}`);
+
+      for (const obj of doorsLayer.objects) {
+        try {
+          const door = Door.fromTiledObject(obj, tileWidth, tileHeight);
+          this.doors.push(door);
+
+          // Create door sprite(s) for visual representation
+          this.createDoorSprites(door);
+
+          console.log(`Loaded door: ${door.id} at positions:`, door.getPositions(),
+            door.seriesId ? `linked to series: ${door.seriesId}` : 'no series link',
+            door.spriteId ? `sprite: ${door.spriteId}` : 'no sprite',
+            `locked: ${door.isLocked()}`);
+        } catch (error) {
+          console.error('Error loading door from object:', obj, error);
+        }
       }
     }
 
@@ -742,6 +769,117 @@ export class OverworldScene extends Phaser.Scene {
       this.collisionManager.registerDoors(this.doors);
       console.log(`Registered ${this.doors.length} doors with collision manager`);
     }
+  }
+
+  /**
+   * Create door sprites for visual representation
+   */
+  private createDoorSprites(door: Door): void {
+    if (!door.spriteId) {
+      console.warn(`Door ${door.id} has no spriteId, cannot create sprite`);
+      return;
+    }
+
+    // Get the appropriate sprite frame based on locked state (local frame within tileset)
+    const localFrameIndex = getDoorSpriteFrame(door.spriteId, door.isLocked());
+    if (localFrameIndex === null) {
+      console.warn(`Could not get sprite frame for door ${door.id} with spriteId ${door.spriteId}`);
+      return;
+    }
+
+    // Get the terrains tileset
+    const terrainsTileset = this.map.getTileset('terrains');
+    if (!terrainsTileset) {
+      console.error('Could not find terrains tileset for door sprites');
+      return;
+    }
+
+    // Convert local frame index to global tile index
+    // putTileAt expects a global index, so add the tileset's firstgid
+    const globalTileIndex = terrainsTileset.firstgid + localFrameIndex;
+    console.log(`Door ${door.id}: spriteId=${door.spriteId}, locked=${door.isLocked()}, localFrame=${localFrameIndex}, terrains.firstgid=${terrainsTileset.firstgid}, globalIndex=${globalTileIndex}`);
+
+    // Find an appropriate layer to place the door sprite
+    // Doors should be on a layer that renders above ground but below player
+    // Prefer the buildings layer, fallback to obstacles, then any suitable layer
+    let targetLayer: Phaser.Tilemaps.TilemapLayer | null = null;
+
+    // Try buildings layer first (best for doors)
+    const buildingsLayer = this.map.getLayer('buildings');
+    if (buildingsLayer && buildingsLayer.tilemapLayer) {
+      targetLayer = buildingsLayer.tilemapLayer;
+    }
+
+    // Fallback: try obstacles layers
+    if (!targetLayer) {
+      const obstaclesLayers = this.findLayersBySuffix('obstacles');
+      if (obstaclesLayers.length > 0) {
+        const layerName = obstaclesLayers[0].name;
+        targetLayer = this.map.getLayer(layerName)?.tilemapLayer || null;
+      }
+    }
+
+    // Last resort: use any non-collision layer
+    if (!targetLayer) {
+      for (const layer of this.map.layers) {
+        if (!layer.name.includes('collision') && !layer.name.includes('bridges')) {
+          targetLayer = layer.tilemapLayer || null;
+          if (targetLayer) break;
+        }
+      }
+    }
+
+    if (!targetLayer) {
+      console.warn(`No suitable layer found for door sprites`);
+      return;
+    }
+
+    // Place a tile for each position the door occupies
+    for (const pos of door.getPositions()) {
+      const tile = targetLayer.putTileAt(globalTileIndex, pos.tileX, pos.tileY);
+      if (tile) {
+        tile.setCollision(false); // Collision is handled by collision array, not tile collision
+        // Store reference to update later
+        const key = `${door.id}-${pos.tileX}-${pos.tileY}`;
+        this.doorSprites.set(key, tile);
+        console.log(`  Placed door tile at (${pos.tileX}, ${pos.tileY}), collision in array: ${this.hasCollisionAt(pos.tileX, pos.tileY)}`);
+      }
+    }
+  }
+
+  /**
+   * Update door sprite to reflect its current locked state
+   */
+  private updateDoorSprite(door: Door): void {
+    if (!door.spriteId) {
+      return;
+    }
+
+    const localFrameIndex = getDoorSpriteFrame(door.spriteId, door.isLocked());
+    if (localFrameIndex === null) {
+      return;
+    }
+
+    // Get terrains tileset for firstgid
+    const terrainsTileset = this.map.getTileset('terrains');
+    if (!terrainsTileset) {
+      console.error('Could not find terrains tileset for door sprite update');
+      return;
+    }
+
+    // Convert to global tile index
+    const globalTileIndex = terrainsTileset.firstgid + localFrameIndex;
+
+    // Update all tiles for this door
+    for (const pos of door.getPositions()) {
+      const key = `${door.id}-${pos.tileX}-${pos.tileY}`;
+      const tile = this.doorSprites.get(key);
+      if (tile) {
+        tile.index = globalTileIndex;
+      }
+    }
+
+    console.log(`Updated door ${door.id} sprite to ${door.isLocked() ? 'closed' : 'open'} state (localFrame=${localFrameIndex}, globalIndex=${globalTileIndex})`);
   }
 
   /**
@@ -1431,6 +1569,9 @@ export class OverworldScene extends Phaser.Scene {
     // Update collision
     this.collisionManager.updateDoorCollision(door);
 
+    // Update door sprite to show open state
+    this.updateDoorSprite(door);
+
     console.log(`Door ${doorId} unlocked successfully`);
   }
 
@@ -1619,9 +1760,16 @@ export class OverworldScene extends Phaser.Scene {
 
       console.log('Successfully exited overworld puzzle');
 
-      // Update NPC icons if this was part of a series
+      // Update NPC icons and unlock door if series is complete
       if (success && this.currentSeries) {
-        // Find the NPC associated with this series
+        // Check if the series is now complete
+        if (this.currentSeries.isSeriesCompleted()) {
+          console.log(`Series ${this.currentSeries.id} completed! Unlocking door...`);
+          // Unlock the door associated with this series
+          this.unlockDoor(this.currentSeries.id);
+        }
+        
+        // Find the NPC associated with this series and update their icon
         for (const [npcId, state] of this.npcSeriesStates.entries()) {
           if (state.getSeries()?.id === this.currentSeries.id) {
             const npc = this.npcs.find(n => n.id === npcId);

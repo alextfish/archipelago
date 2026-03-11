@@ -162,7 +162,6 @@ export class IslandMapScene extends Phaser.Scene {
     private initializeRenderer() {
         if (!this.puzzle) return;
 
-        console.log('IslandMapScene: Initializing renderer');
         // Create coordinate mapper with 32px cell size (sprites are 32x32)
         this.gridMapper = new GridToWorldMapper(32);
 
@@ -170,7 +169,6 @@ export class IslandMapScene extends Phaser.Scene {
         this.puzzleRenderer = new PhaserPuzzleRenderer(this, this.gridMapper, 'sprout-tiles');
 
         // Initialize renderer with puzzle
-        console.log('IslandMapScene: Calling renderer.init and updateFromPuzzle');
         this.puzzleRenderer.init(this.puzzle);
         this.puzzleRenderer.updateFromPuzzle(this.puzzle);
         console.log('IslandMapScene: Renderer initialized, island count:', this.puzzle.islands.length);
