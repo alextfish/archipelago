@@ -10,11 +10,16 @@ import type { Point } from "@model/puzzle/Point";
 import { orientationForDelta, normalizeRenderOrder } from "./PuzzleRenderer";
 import { parseNumBridgesConstraint } from "@model/puzzle/Island";
 import { BridgeSpriteFrames, BridgeVisualConstants } from "./BridgeSpriteFrameRegistry";
+import { ConstraintFeedbackDisplay } from "./ConstraintFeedbackDisplay";
+import { LanguageGlyphRegistry } from "@model/conversation/LanguageGlyphRegistry";
+import type { ConstraintDisplayItem } from "@model/puzzle/constraints/ConstraintDisplayItem";
 
 export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
   private scene: Phaser.Scene;
   private gridMapper: GridToWorldMapper = new GridToWorldMapper(64);
   private textureKey: string;
+  private languageTilesetKey: string;
+  private npcSpriteKey: string;
 
   // Track interactive hit zones so they can be disabled while the user is placing
   // a bridge (previews active). This prevents outlines from capturing clicks
@@ -29,11 +34,15 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
   private highlightGraphics: Phaser.GameObjects.Container | null = null;
   private flashGraphics: Phaser.GameObjects.Container | null = null;
   private flashTimer: Phaser.Time.TimerEvent | null = null;
+  private feedbackDisplay: ConstraintFeedbackDisplay | null = null;
+  private glyphRegistry: LanguageGlyphRegistry = new LanguageGlyphRegistry();
 
-  constructor(scene: Phaser.Scene, gridMapper: GridToWorldMapper, textureKey = 'sprout-tiles') {
+  constructor(scene: Phaser.Scene, gridMapper: GridToWorldMapper, textureKey = 'sprout-tiles', languageTilesetKey = 'language', npcSpriteKey = 'sailorNS') {
     this.scene = scene;
     this.gridMapper = gridMapper;
     this.textureKey = textureKey;
+    this.languageTilesetKey = languageTilesetKey;
+    this.npcSpriteKey = npcSpriteKey;
   }
 
   init(puzzle: BridgePuzzle): void {
@@ -512,6 +521,23 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
     // Renderer does not manage sidebar UI; no-op
   }
 
+  showConstraintFeedback(items: ConstraintDisplayItem[], puzzle: BridgePuzzle): void {
+    if (!this.feedbackDisplay) {
+      this.feedbackDisplay = new ConstraintFeedbackDisplay(
+        this.scene,
+        this.gridMapper,
+        this.glyphRegistry,
+        this.languageTilesetKey,
+        this.npcSpriteKey,
+      );
+    }
+    this.feedbackDisplay.update(items, puzzle);
+  }
+
+  hideConstraintFeedback(): void {
+    this.feedbackDisplay?.setVisible(false);
+  }
+
   update(_dt: number): void {
     // Optional per-frame updates (animations, etc.)
   }
@@ -550,6 +576,11 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
     if (this.flashTimer) {
       this.scene.time.removeEvent(this.flashTimer);
       this.flashTimer = null;
+    }
+
+    if (this.feedbackDisplay) {
+      this.feedbackDisplay.destroy();
+      this.feedbackDisplay = null;
     }
   }
 

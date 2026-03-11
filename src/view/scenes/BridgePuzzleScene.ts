@@ -202,6 +202,12 @@ export class BridgePuzzleScene extends Phaser.Scene {
             clearHighlights: () => {
                 mapScene.events.emit('clearHighlights');
             },
+            showConstraintFeedback: (items: any[], puzzle: any) => {
+                mapScene.events.emit('showConstraintFeedback', items, puzzle);
+            },
+            hideConstraintFeedback: () => {
+                mapScene.events.emit('hideConstraintFeedback');
+            },
             update: (dt: number) => {
                 mapScene.events.emit('updateRenderer', dt);
             },

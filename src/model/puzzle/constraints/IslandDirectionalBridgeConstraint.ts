@@ -1,6 +1,7 @@
 import type { BridgePuzzle } from '../BridgePuzzle';
 import { Constraint } from './Constraint';
 import type { ConstraintResult } from './ConstraintResult';
+import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
 import type { Island } from '../Island';
 import type { Bridge } from '../Bridge';
 
@@ -135,5 +136,13 @@ export class IslandDirectionalBridgeConstraint extends Constraint {
     }
 
     return counts;
+  }
+
+  override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    const result = this.check(puzzle);
+    return [{
+      elementID: this.islandId,
+      glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "good"),
+    }];
   }
 }

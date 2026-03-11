@@ -1,6 +1,7 @@
 import type { BridgePuzzle } from '../BridgePuzzle';
 import { Constraint } from './Constraint';
 import type { ConstraintResult } from './ConstraintResult';
+import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
 import type { Island } from '../Island';
 
 /**
@@ -146,5 +147,31 @@ export class IslandPassingBridgeCountConstraint extends Constraint {
     }
 
     return false;
+  }
+
+  /** Maps direction to the glyph word used in speech bubble messages. */
+  private directionGlyphWord(): string {
+    switch (this.direction) {
+      case 'above': return 'above';
+      case 'below': return 'below';
+      case 'left': return 'left-of';
+      case 'right': return 'right-of';
+      case 'adjacent': return 'adjacent';
+    }
+  }
+
+  override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    const island = puzzle.islands.find(i => i.id === this.islandId);
+    if (!island) return [];
+    const result = this.check(puzzle);
+    if (result.satisfied) {
+      return [{ elementID: this.islandId, glyphMessage: "good" }];
+    }
+    const dirWord = this.directionGlyphWord();
+    const passingBridges = this.findPassingBridges(puzzle, island);
+    const actualCount = passingBridges.length;
+    const prefix = actualCount < this.expectedCount ? "not-enough" : "too-many";
+    const glyphMessage = `${prefix} bridge ${dirWord} island`;
+    return [{ elementID: this.islandId, glyphMessage }];
   }
 }
