@@ -1,8 +1,9 @@
 import type { BridgePuzzle } from '../BridgePuzzle';
 import { Constraint } from './Constraint';
 import type { ConstraintResult } from './ConstraintResult';
+import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
 
-// Each island’s local bridge-count constraint must be satisfied
+// Each island's local bridge-count constraint must be satisfied
 
 export class IslandBridgeCountConstraint extends Constraint {
   check(puzzle: BridgePuzzle): ConstraintResult {
@@ -34,5 +35,30 @@ export class IslandBridgeCountConstraint extends Constraint {
       message: violations.length ? `Incorrect bridge count: ${violations.join(", ")}` : undefined,
       glyphMessage,
     };
+  }
+
+  override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    const items: ConstraintDisplayItem[] = [];
+
+    for (const island of puzzle.islands) {
+      const rule = island.constraints?.find(c => c.startsWith("num_bridges="));
+      if (!rule) continue;
+
+      const expected = Number(rule.split("=")[1]);
+      const actual = puzzle.bridgesFromIsland(island).length;
+
+      let glyphMessage: string;
+      if (actual === expected) {
+        glyphMessage = "good";
+      } else if (actual < expected) {
+        glyphMessage = "not-enough bridge";
+      } else {
+        glyphMessage = "too-many bridge";
+      }
+
+      items.push({ elementID: island.id, glyphMessage });
+    }
+
+    return items;
   }
 }

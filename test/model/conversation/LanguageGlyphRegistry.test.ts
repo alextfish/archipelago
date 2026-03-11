@@ -199,6 +199,12 @@ describe('LanguageGlyphRegistry', () => {
             expect(registry.getGlyphFrame('grass', 'below')).toBe(53);
         });
 
+        it('should have the good glyph registered', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(registry.getGlyphFrame('grass', 'good')).toBe(54);
+        });
+
         it('should have color glyphs registered', () => {
             const registry = new LanguageGlyphRegistry();
 

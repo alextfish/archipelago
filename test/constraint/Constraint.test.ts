@@ -151,3 +151,110 @@ describe("NoCrossingConstraint", () => {
     expect(result.satisfied).toBe(true);
   });
 });
+
+
+describe("IslandBridgeCountConstraint.getDisplayItems", () => {
+  const bridgesFromIsland = (island: any, bridges: any[]) =>
+    bridges.filter(b =>
+      (b.start?.x === island.x && b.start?.y === island.y) ||
+      (b.end?.x === island.x && b.end?.y === island.y)
+    );
+
+  it("returns an empty array when no islands have a num_bridges constraint", () => {
+    const puzzle = makeMockPuzzle({
+      islands: [
+        { id: "A", x: 1, y: 1, constraints: [] },
+        { id: "B", x: 3, y: 1, constraints: [] },
+      ],
+      bridges: [],
+      bridgesFromIsland: () => [],
+    });
+
+    const constraint = new IslandBridgeCountConstraint();
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toEqual([]);
+  });
+
+  it("returns 'good' when an island has the correct bridge count", () => {
+    const bridges = [
+      { id: "b1", start: { x: 1, y: 1 }, end: { x: 3, y: 1 }, type: { id: "t1" } },
+    ];
+    const islands = [
+      { id: "A", x: 1, y: 1, constraints: ["num_bridges=1"] },
+      { id: "B", x: 3, y: 1, constraints: [] },
+    ];
+    const puzzle = makeMockPuzzle({
+      islands,
+      bridges,
+      bridgesFromIsland: (island: any) => bridgesFromIsland(island, bridges),
+    });
+
+    const constraint = new IslandBridgeCountConstraint();
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "good" }]);
+  });
+
+  it("returns 'not-enough bridge' when island has too few bridges", () => {
+    const islands = [
+      { id: "A", x: 1, y: 1, constraints: ["num_bridges=2"] },
+    ];
+    const bridges = [
+      { id: "b1", start: { x: 1, y: 1 }, end: { x: 3, y: 1 }, type: { id: "t1" } },
+    ];
+    const puzzle = makeMockPuzzle({
+      islands,
+      bridges,
+      bridgesFromIsland: (island: any) => bridgesFromIsland(island, bridges),
+    });
+
+    const constraint = new IslandBridgeCountConstraint();
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge" }]);
+  });
+
+  it("returns 'too-many bridge' when island has too many bridges", () => {
+    const islands = [
+      { id: "A", x: 1, y: 1, constraints: ["num_bridges=1"] },
+    ];
+    const bridges = [
+      { id: "b1", start: { x: 1, y: 1 }, end: { x: 3, y: 1 }, type: { id: "t1" } },
+      { id: "b2", start: { x: 1, y: 1 }, end: { x: 1, y: 3 }, type: { id: "t1" } },
+    ];
+    const puzzle = makeMockPuzzle({
+      islands,
+      bridges,
+      bridgesFromIsland: (island: any) => bridgesFromIsland(island, bridges),
+    });
+
+    const constraint = new IslandBridgeCountConstraint();
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "too-many bridge" }]);
+  });
+
+  it("returns one item per constrained island with mixed satisfaction", () => {
+    const islands = [
+      { id: "A", x: 1, y: 1, constraints: ["num_bridges=1"] },
+      { id: "B", x: 3, y: 1, constraints: ["num_bridges=2"] },
+      { id: "C", x: 5, y: 1, constraints: [] },
+    ];
+    const bridges = [
+      { id: "b1", start: { x: 1, y: 1 }, end: { x: 3, y: 1 }, type: { id: "t1" } },
+    ];
+    const puzzle = makeMockPuzzle({
+      islands,
+      bridges,
+      bridgesFromIsland: (island: any) => bridgesFromIsland(island, bridges),
+    });
+
+    const constraint = new IslandBridgeCountConstraint();
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toHaveLength(2);
+    expect(items).toContainEqual({ elementID: "A", glyphMessage: "good" });
+    expect(items).toContainEqual({ elementID: "B", glyphMessage: "not-enough bridge" });
+  });
+});

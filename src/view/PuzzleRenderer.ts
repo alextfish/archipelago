@@ -2,6 +2,7 @@
 import type { BridgeType } from "@model/puzzle/BridgeType";
 import type { BridgePuzzle } from "../model/puzzle/BridgePuzzle";
 import type { Bridge } from "@model/puzzle/Bridge";
+import type { ConstraintDisplayItem } from "@model/puzzle/constraints/ConstraintDisplayItem";
 
 export interface PuzzleRenderer {
   /** Called once when session begins to let renderer create sprites. */
@@ -23,6 +24,15 @@ export interface PuzzleRenderer {
   highlightViolations(ids: string[]): void;
   flashInvalidPlacement(start: { x: number; y: number }, end: { x: number; y: number }): void;
   clearHighlights(): void;
+
+  /**
+   * Show constraint feedback: an NPC sprite and speech bubble next to each
+   * constrained element. Called whenever all bridges are placed.
+   */
+  showConstraintFeedback(items: ConstraintDisplayItem[], puzzle: BridgePuzzle): void;
+  /** Hide constraint feedback (called when not all bridges are placed). */
+  hideConstraintFeedback(): void;
+
   /** Per-frame update if needed for animations. */
   update(dt: number): void;
   /** Tear down (remove sprites) */

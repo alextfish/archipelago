@@ -21,6 +21,16 @@ export class IslandMapScene extends Phaser.Scene {
             frameWidth: 32,
             frameHeight: 32
         });
+        // Load language tileset for speech bubbles in constraint feedback
+        this.load.spritesheet('language', 'resources/tilesets/language.png', {
+            frameWidth: 32,
+            frameHeight: 32
+        });
+        // Load NPC sprite used for constraint feedback display
+        this.load.spritesheet('sailorNS', 'resources/sprites/sailorNS.png', {
+            frameWidth: 32,
+            frameHeight: 32
+        });
         console.log('IslandMapScene: preload() finished');
     }
 
@@ -81,6 +91,14 @@ export class IslandMapScene extends Phaser.Scene {
 
         this.events.on('destroyRenderer', () => {
             this.puzzleRenderer?.destroy();
+        });
+
+        this.events.on('showConstraintFeedback', (items: any[], puzzle: any) => {
+            this.puzzleRenderer?.showConstraintFeedback(items, puzzle);
+        });
+
+        this.events.on('hideConstraintFeedback', () => {
+            this.puzzleRenderer?.hideConstraintFeedback();
         });
 
         // Listen for coordinate conversion requests

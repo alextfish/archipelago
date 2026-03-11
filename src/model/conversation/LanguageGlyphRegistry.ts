@@ -69,6 +69,7 @@ export class LanguageGlyphRegistry {
             ['right-of', 51],
             ['above', 52],
             ['below', 53],
+            ['good', 54],
             // Color glyphs
             ['red', 60],
             ['blue', 61],

@@ -12,6 +12,7 @@ import { BridgePuzzle } from "./BridgePuzzle";
 import type { ValidationResult } from "./ValidationResult";
 import { Constraint } from "./constraints/Constraint";
 import type { ConstraintResult } from "./constraints/ConstraintResult";
+import type { ConstraintDisplayItem } from "./constraints/ConstraintDisplayItem";
 
 export class PuzzleValidator {
   private puzzle: BridgePuzzle;
@@ -64,6 +65,16 @@ export class PuzzleValidator {
    */
   isSolved(): boolean {
     return this.validateAll().allSatisfied;
+  }
+
+  /**
+   * Collects display items from all constraints that provide them.
+   * Each item describes what glyph to show in the speech bubble next to a
+   * constrained element when all bridges are placed.
+   */
+  getConstraintDisplayItems(): ConstraintDisplayItem[] {
+    const constraints: Constraint[] = (this.puzzle as any).constraints ?? [];
+    return constraints.flatMap(c => c.getDisplayItems(this.puzzle));
   }
 }
 //   /**
