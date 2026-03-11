@@ -14,6 +14,7 @@ import { RoofManager } from '@view/RoofManager';
 import { NPC } from '@model/conversation/NPC';
 import type { ConversationSpec } from '@model/conversation/ConversationData';
 import { attachTestMarker, isTestMode, getTestConfig } from '@helpers/TestMarkers';
+import { emitTestEvent } from '@helpers/TestEvents';
 import { NPCSeriesState } from '@model/conversation/NPCSeriesState';
 import { SeriesFactory, SeriesManager } from '@model/series/SeriesFactory';
 import { FilePuzzleLoader, LocalStorageProgressStore } from '@model/series/SeriesLoaders';
@@ -70,6 +71,10 @@ export class OverworldScene extends Phaser.Scene {
 
   // Player start position management
   private playerStartManager?: PlayerStartManager;
+
+  // Active series tracking (for navigation)
+  private currentSeries: any = null;
+  private currentSeriesPuzzleData: Map<string, any> = new Map();
 
   constructor() {
     super({ key: 'OverworldScene' });
@@ -647,6 +652,15 @@ export class OverworldScene extends Phaser.Scene {
 
         const seriesJson = await response.json();
         const series = await this.seriesManager!.loadSeries(seriesJson);
+
+        // Store puzzle data for launching
+        if (seriesJson.puzzles) {
+          for (const puzzle of seriesJson.puzzles) {
+            if (puzzle.id && puzzle.puzzleData) {
+              this.currentSeriesPuzzleData.set(puzzle.id, puzzle.puzzleData);
+            }
+          }
+        }
 
         // Create state with loaded series
         const state = new NPCSeriesState(npc, series);
@@ -1334,13 +1348,22 @@ export class OverworldScene extends Phaser.Scene {
     // If we don't have the series yet, load it
     if (!series) {
       try {
-        const seriesPath = `src/data/series/${seriesId}.json`;
+        const seriesPath = `data/series/${seriesId}.json`;
         const response = await fetch(seriesPath);
         if (!response.ok) {
           throw new Error(`Failed to load series: ${response.statusText}`);
         }
         const seriesJson = await response.json();
         series = await this.seriesManager!.loadSeries(seriesJson);
+
+        // Store puzzle data for launching
+        if (seriesJson.puzzles) {
+          for (const puzzle of seriesJson.puzzles) {
+            if (puzzle.id && puzzle.puzzleData) {
+              this.currentSeriesPuzzleData.set(puzzle.id, puzzle.puzzleData);
+            }
+          }
+        }
       } catch (error) {
         console.error(`Error loading series ${seriesId}:`, error);
         return;
@@ -1370,9 +1393,18 @@ export class OverworldScene extends Phaser.Scene {
 
     console.log(`Launching first unsolved puzzle: ${firstUnsolvedId}`);
 
-    // TODO: Actually launch the puzzle
-    // For now, just log
-    console.log(`TODO: Launch puzzle ${firstUnsolvedId} from series ${seriesId}`);
+    // Store the current series for navigation
+    this.currentSeries = series;
+
+    // Get the puzzle data
+    const puzzleData = this.currentSeriesPuzzleData.get(firstUnsolvedId);
+    if (!puzzleData) {
+      console.error(`No puzzle data found for ${firstUnsolvedId}`);
+      return;
+    }
+
+    // Launch BridgePuzzleScene with the puzzle data
+    this.scene.launch('BridgePuzzleScene', { puzzleData, seriesMode: true });
   }
 
   /**
@@ -1489,6 +1521,8 @@ export class OverworldScene extends Phaser.Scene {
         hudScene.events.on('undo', this.handleHUDUndo, this);
         hudScene.events.on('redo', this.handleHUDRedo, this);
         hudScene.events.on('typeSelected', this.handleTypeSelected, this);
+        hudScene.events.on('navigateNext', this.handleNavigateNext, this);
+        hudScene.events.on('navigatePrevious', this.handleNavigatePrevious, this);
       }
 
       // Setup bridge click listener for removal
@@ -1501,6 +1535,9 @@ export class OverworldScene extends Phaser.Scene {
       await this.puzzleController.enterPuzzle(puzzleId, (mode: 'puzzle') => {
         this.gameMode = mode;
       });
+
+      // Emit test event for automation
+      emitTestEvent('puzzle_entered', { puzzleId });
 
     } catch (error) {
       console.error(`Failed to enter overworld puzzle: ${puzzleId}`, error);
@@ -1533,6 +1570,8 @@ export class OverworldScene extends Phaser.Scene {
         hudScene.events.off('undo', this.handleHUDUndo, this);
         hudScene.events.off('redo', this.handleHUDRedo, this);
         hudScene.events.off('typeSelected', this.handleTypeSelected, this);
+        hudScene.events.off('navigateNext', this.handleNavigateNext, this);
+        hudScene.events.off('navigatePrevious', this.handleNavigatePrevious, this);
       }
 
       // Clean up bridge click listener
@@ -1580,6 +1619,19 @@ export class OverworldScene extends Phaser.Scene {
 
       console.log('Successfully exited overworld puzzle');
 
+      // Update NPC icons if this was part of a series
+      if (success && this.currentSeries) {
+        // Find the NPC associated with this series
+        for (const [npcId, state] of this.npcSeriesStates.entries()) {
+          if (state.getSeries()?.id === this.currentSeries.id) {
+            const npc = this.npcs.find(n => n.id === npcId);
+            if (npc) {
+              this.updateNPCIcon(npc);
+            }
+          }
+        }
+      }
+
     } catch (error) {
       console.error('Error exiting overworld puzzle:', error);
     } finally {
@@ -1600,6 +1652,8 @@ export class OverworldScene extends Phaser.Scene {
    */
   private handleHUDExit(): void {
     console.log('OverworldScene: HUD Exit button clicked');
+    // Clear series when exiting manually
+    this.currentSeries = null;
     if (this.puzzleController) {
       this.exitOverworldPuzzle(false);
     }
@@ -1642,7 +1696,47 @@ export class OverworldScene extends Phaser.Scene {
     console.log('OverworldScene: Escape key pressed');
     // Only handle if in puzzle mode
     if (this.isInPuzzleMode()) {
+      // Clear series when exiting manually
+      this.currentSeries = null;
       this.exitOverworldPuzzle(false);
+    }
+  }
+
+  /**
+   * Handle series navigation to next puzzle
+   */
+  private async handleNavigateNext(): Promise<void> {
+    console.log('OverworldScene: Navigate to next puzzle');
+    if (!this.currentSeries) {
+      console.warn('No active series for navigation');
+      return;
+    }
+
+    const result = this.currentSeries.navigateToNext();
+    if (result.success && result.puzzleId) {
+      // Exit current puzzle first
+      await this.exitOverworldPuzzle(false);
+      // Then enter the next one
+      await this.enterOverworldPuzzle(result.puzzleId);
+    }
+  }
+
+  /**
+   * Handle series navigation to previous puzzle
+   */
+  private async handleNavigatePrevious(): Promise<void> {
+    console.log('OverworldScene: Navigate to previous puzzle');
+    if (!this.currentSeries) {
+      console.warn('No active series for navigation');
+      return;
+    }
+
+    const result = this.currentSeries.navigateToPrevious();
+    if (result.success && result.puzzleId) {
+      // Exit current puzzle first
+      await this.exitOverworldPuzzle(false);
+      // Then enter the previous one
+      await this.enterOverworldPuzzle(result.puzzleId);
     }
   }
 

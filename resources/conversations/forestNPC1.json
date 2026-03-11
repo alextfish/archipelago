@@ -10,10 +10,10 @@
       },
       "choices": [
         {
-          "text": "Can I help you?",
+          "text": "I'll help",
           "effects": [
             { "type": "startSeries", "seriesId": "forestSeries1" },
-            { "type": "unlockDoor", "doorId": "gate1" }
+            { "type": "unlockDoor", "doorId": "forestSeries1" }
           ],
           "end": true
         },

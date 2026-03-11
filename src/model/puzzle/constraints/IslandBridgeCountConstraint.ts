@@ -6,6 +6,10 @@ import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
 // Each island's local bridge-count constraint must be satisfied
 
 export class IslandBridgeCountConstraint extends Constraint {
+  static fromSpec(_params?: { [key: string]: any }): IslandBridgeCountConstraint {
+    return new IslandBridgeCountConstraint();
+  }
+
   check(puzzle: BridgePuzzle): ConstraintResult {
     const violations: string[] = [];
     const violationGlyphs: string[] = [];

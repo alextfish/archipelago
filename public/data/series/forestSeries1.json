@@ -1,34 +1,63 @@
 {
   "id": "forestSeries1",
-  "title": "Forest Puzzles",
-  "description": "A series of puzzles in the forest area",
+  "title": "Forest Bridge Counting",
+  "description": "Learn to build bridges with counting constraints in the forest",
   "puzzles": [
     {
       "id": "forest-puzzle-1",
-      "title": "Forest Bridge",
-      "description": "Build a bridge in the forest",
+      "title": "First Count",
+      "description": "Some islands need a specific number of bridges",
       "puzzleData": {
         "id": "forest-1",
         "type": "standard",
-        "size": { "width": 5, "height": 3 },
+        "size": { "width": 6, "height": 4 },
         "islands": [
           { "id": "A", "x": 1, "y": 1 },
-          { "id": "B", "x": 3, "y": 1 }
+          { "id": "B", "x": 3, "y": 1, "constraints": ["num_bridges=2"] },
+          { "id": "C", "x": 1, "y": 3 },
+          { "id": "D", "x": 3, "y": 3 }
         ],
         "bridgeTypes": [
-          {
-            "id": "wood",
-            "colour": "#8B4513",
-            "count": 1,
-            "width": 1
-          }
+          { "id": "wood1", "colour": "#8B4513", "length": 2, "count": 1 },
+          { "id": "wood2", "colour": "#8B4513", "length": 2, "count": 1 },
+          { "id": "wood3", "colour": "#8B4513", "length": 2, "count": 1 }
         ],
         "constraints": [
-          { "type": "AllBridgesPlacedConstraint" }
+          { "type": "AllBridgesPlacedConstraint" },
+          { "type": "IslandBridgeCountConstraint" }
         ],
-        "maxNumBridges": 1
+        "maxNumBridges": 3
       },
-      "hint": "Connect the two islands"
+      "hint": "Island B needs exactly 2 bridges connected to it"
+    },
+    {
+      "id": "forest-puzzle-2",
+      "title": "Multiple Counts",
+      "description": "Now multiple islands have counting constraints",
+      "puzzleData": {
+        "id": "forest-2",
+        "type": "standard",
+        "size": { "width": 7, "height": 5 },
+        "islands": [
+          { "id": "A", "x": 1, "y": 2, "constraints": ["num_bridges=2"] },
+          { "id": "B", "x": 3, "y": 1 },
+          { "id": "C", "x": 3, "y": 3, "constraints": ["num_bridges=3"] },
+          { "id": "D", "x": 5, "y": 2 },
+          { "id": "E", "x": 6, "y": 4, "constraints": ["num_bridges=1"] }
+        ],
+        "bridgeTypes": [
+          { "id": "wood1", "colour": "#8B4513", "length": 2, "count": 1 },
+          { "id": "wood2", "colour": "#8B4513", "length": 2, "count": 1 },
+          { "id": "wood3", "colour": "#8B4513", "length": 2, "count": 1 },
+          { "id": "wood4", "colour": "#8B4513", "length": 2, "count": 1 }
+        ],
+        "constraints": [
+          { "type": "AllBridgesPlacedConstraint" },
+          { "type": "IslandBridgeCountConstraint" }
+        ],
+        "maxNumBridges": 4
+      },
+      "hint": "Three islands have specific bridge requirements"
     }
   ]
 }

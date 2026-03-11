@@ -3,13 +3,23 @@ import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import { PuzzleController } from '@controller/PuzzleController';
 import type { PuzzleHost } from '@controller/PuzzleHost';
 import { Environment } from '@helpers/Environment';
+import { emitTestEvent } from '@helpers/TestEvents';
 
 export class BridgePuzzleScene extends Phaser.Scene {
     private puzzle: BridgePuzzle | null = null;
     private controller: PuzzleController | null = null;
+    private puzzleData: any = null;
+    private seriesMode: boolean = false;
 
     constructor() {
         super({ key: 'BridgePuzzleScene' });
+    }
+
+    init(data?: { puzzleData?: any; seriesMode?: boolean }) {
+        if (data) {
+            this.puzzleData = data.puzzleData || null;
+            this.seriesMode = data.seriesMode || false;
+        }
     }
 
     preload() {
@@ -21,12 +31,35 @@ export class BridgePuzzleScene extends Phaser.Scene {
     }
 
     async create() {
-        // Fetch puzzle data from public directory
-        const response = await fetch('data/puzzles/simple4IslandPuzzle.json');
-        const puzzleData = await response.json();
+        let puzzleData;
 
-        // Instantiate BridgePuzzle from spec
-        this.puzzle = new BridgePuzzle(puzzleData);
+        // Use passed puzzle data if available (series mode), otherwise fetch default
+        if (this.puzzleData) {
+            puzzleData = this.puzzleData;
+            console.log('BridgePuzzleScene: Using provided puzzle data (series mode)');
+        } else {
+            // Fetch puzzle data from public directory
+            const response = await fetch('data/puzzles/simple4IslandPuzzle.json');
+            puzzleData = await response.json();
+            console.log('BridgePuzzleScene: Loaded default puzzle data');
+        }
+
+        try {
+            // Instantiate BridgePuzzle from spec
+            console.log('[BridgePuzzleScene] About to create BridgePuzzle from data:', puzzleData);
+            this.puzzle = new BridgePuzzle(puzzleData);
+            console.log('[BridgePuzzleScene] BridgePuzzle created successfully, id:', this.puzzle.id);
+
+            // Emit test event for automation (especially for series mode)
+            if (this.seriesMode) {
+                console.log(`[BridgePuzzleScene] Emitting puzzle_entered event for puzzle: ${this.puzzle.id}`);
+                emitTestEvent('puzzle_entered', { puzzleId: this.puzzle.id, seriesMode: true });
+                console.log('[BridgePuzzleScene] puzzle_entered event emitted');
+            }
+        } catch (error) {
+            console.error('[BridgePuzzleScene] Error creating BridgePuzzle:', error);
+            throw error;
+        }
 
         // Launch the IslandMapScene and pass it the puzzle
         console.log('BridgePuzzleScene: Launching IslandMapScene');

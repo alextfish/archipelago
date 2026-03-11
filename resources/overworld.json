@@ -1520,7 +1520,7 @@
                         {
                          "height":32,
                          "id":49,
-                         "name":"door forest 1",
+                         "name":"forestSeries1",
                          "properties":[
                                 {
                                  "name":"seriesId",
@@ -2404,7 +2404,7 @@
          "y":0
         }],
  "nextlayerid":34,
- "nextobjectid":52,
+ "nextobjectid":53,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.11.2",

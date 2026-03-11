@@ -1,24 +1,24 @@
 #!/usr/bin/env node
 /**
- * Automated test for forest area conversation
- * Tests the conversation flow starting at the forest player start
+ * Automated test for forest area NPC series puzzle
+ * Tests the conversation flow that spawns a puzzle series with BridgeCountConstraints
  * This script will:
  * 1. Start the player at the "forest" player start
  * 2. Navigate to and interact with npcForestSeries1
- * 3. Complete a conversation
- * 4. Verify the conversation completed successfully
+ * 3. Select "I'll help" to start the series
+ * 4. Verify that the series puzzle interface launches
  */
 
 import {
     initTest,
     navigateAndWaitForLoad,
-    completeConversation
+    waitForGameEvent
 } from '../playwright/helpers.mjs';
 
 async function runTest() {
     // Initialize test with forest start
     const { page, cleanup } = await initTest({
-        name: 'Forest Area',
+        name: 'Forest Series Puzzle',
         playerStartID: 'forest',
         headless: false,
         slowMo: 100
@@ -39,13 +39,53 @@ async function runTest() {
             return;
         }
 
-        // Complete the conversation flow with forest NPC
-        // The NPC is at (1824, 1696), ID 48 from Tiled, close to the forest start at (1952, 1760)
-        // This NPC's conversation has different choices: "Can I help you?" and "Leave"
-        await completeConversation(page, 'npc-48', ['choice-can-i-help-you-']);
+        // Click NPC marker to start moving
+        console.log('[TEST] Clicking NPC marker: npc-48');
+        const npcMarker = await page.$('[data-testid="npc-48"]');
+        if (!npcMarker) {
+            throw new Error('Could not find NPC marker: npc-48');
+        }
+        await npcMarker.click();
+        console.log('[TEST] Player should start moving to NPC...');
 
-        console.log('[TEST] Forest area conversation test completed successfully!');
-        await cleanup('Test success - completed forest conversation flow');
+        // Wait for player to reach NPC
+        await page.waitForTimeout(5000);
+
+        // Press E to interact
+        console.log('[TEST] Pressing E key to interact...');
+        await page.keyboard.press('e');
+
+        // Wait for conversation to start
+        console.log('[TEST] Waiting for conversation to start...');
+        await waitForGameEvent(page, 'conversation_started');
+
+        // Wait for choice button to appear and click "I'll help"
+        console.log('[TEST] Waiting for choice button: I\'ll help');
+        await page.waitForTimeout(1000); // Brief pause for UI
+
+        const choiceButton = await page.$('[data-testid="choice-i-ll-help"]');
+        if (!choiceButton) {
+            throw new Error('Could not find choice button: I\'ll help');
+        }
+
+        console.log('[TEST] Clicking choice: I\'ll help');
+        await choiceButton.click();
+
+        // Wait for conversation to end
+        console.log('[TEST] Waiting for conversation to end...');
+        await waitForGameEvent(page, 'conversation_ended');
+
+        // Wait for puzzle to be entered
+        console.log('[TEST] Waiting for puzzle to be entered...');
+        const puzzleEvent = await waitForGameEvent(page, 'puzzle_entered', 10000);
+
+        if (!puzzleEvent) {
+            throw new Error('Timeout waiting for puzzle_entered event');
+        }
+
+        console.log('[TEST] Puzzle entered successfully!', puzzleEvent);
+        console.log('[TEST] Forest series puzzle test completed successfully!');
+        await cleanup('Test success - series puzzle launched');
 
     } catch (error) {
         console.error('[TEST] Error during test:', error.message);

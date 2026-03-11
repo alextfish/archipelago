@@ -1,0 +1,23 @@
+{
+  "id": "forestNPC1Solved",
+  "npcId": "npcForestSeries1",
+  "start": "completed",
+  "nodes": {
+    "completed": {
+      "npc": {
+        "expression": "happy",
+        "glyphs": "you bridge good exclamation"
+      },
+      "choices": [
+        {
+          "text": "Thanks!",
+          "end": true
+        },
+        {
+          "text": "Leave",
+          "end": true
+        }
+      ]
+    }
+  }
+}
