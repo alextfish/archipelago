@@ -106,8 +106,20 @@ export class OverworldScene extends Phaser.Scene {
     });
 
     // Load NPC sprites
-    this.load.image('sailorNS', 'resources/sprites/sailorNS.png');
-    this.load.image('sailorEW', 'resources/sprites/sailorEW.png');
+    this.load.spritesheet('sailorNS', 'resources/sprites/sailorNS.png', {
+      frameWidth: 32,
+      frameHeight: 32
+    });
+    this.load.spritesheet('sailorEW', 'resources/sprites/sailorEW.png', {
+      frameWidth: 32,
+      frameHeight: 32
+    });
+
+    // Load language tileset for speech bubbles in constraint feedback
+    this.load.spritesheet('language', 'resources/tilesets/language.png', {
+      frameWidth: 32,
+      frameHeight: 32
+    });
 
     // Load NPC icon sprites (user will provide these files)
     this.load.image(NPCIconConfig.INCOMPLETE, 'resources/sprites/icon-incomplete.png');

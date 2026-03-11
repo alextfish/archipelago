@@ -72,6 +72,14 @@ class MockPuzzleRenderer implements PuzzleRenderer {
     this.dt = dt;
   }
 
+  showConstraintFeedback(_items: any[], _puzzle: BridgePuzzle): void {
+    // no-op for tests
+  }
+
+  hideConstraintFeedback(): void {
+    // no-op for tests
+  }
+
   destroy(): void {
     this.destroyCalled = true;
   }

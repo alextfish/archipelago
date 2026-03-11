@@ -146,3 +146,73 @@ describe("EnclosedAreaSizeConstraint", () => {
     expect(result.satisfied).toBe(true);
   });
 });
+
+describe("EnclosedAreaSizeConstraint.getDisplayItems", () => {
+  it("returns 'good' with the cell as elementID when satisfied", () => {
+    const islands = [
+      { id: "A", x: 1, y: 1 }, { id: "B", x: 3, y: 1 },
+      { id: "C", x: 1, y: 3 }, { id: "D", x: 3, y: 3 },
+    ];
+    const bridges = [
+      { id: "h1", start: { x: 1, y: 1 }, end: { x: 3, y: 1 }, type: { id: "b" } },
+      { id: "h2", start: { x: 1, y: 3 }, end: { x: 3, y: 3 }, type: { id: "b" } },
+      { id: "v1", start: { x: 1, y: 1 }, end: { x: 1, y: 3 }, type: { id: "b" } },
+      { id: "v2", start: { x: 3, y: 1 }, end: { x: 3, y: 3 }, type: { id: "b" } },
+    ];
+    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges, width: 4, height: 4 });
+
+    const constraint = new EnclosedAreaSizeConstraint(2, 2, 1);
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "good" }]);
+  });
+
+  it("returns 'area not enclosed' glyph message when cell is not enclosed", () => {
+    const puzzle = makeMockPuzzle({ islands: [], bridges: [], placedBridges: [], width: 5, height: 5 });
+
+    const constraint = new EnclosedAreaSizeConstraint(2, 2, 2);
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "area not enclosed" }]);
+  });
+
+  it("returns 'not-enough enclosed area' when enclosed area is too small", () => {
+    const islands = [
+      { id: "A", x: 1, y: 1 }, { id: "B", x: 3, y: 1 },
+      { id: "C", x: 1, y: 3 }, { id: "D", x: 3, y: 3 },
+    ];
+    const bridges = [
+      { id: "h1", start: { x: 1, y: 1 }, end: { x: 3, y: 1 }, type: { id: "b" } },
+      { id: "h2", start: { x: 1, y: 3 }, end: { x: 3, y: 3 }, type: { id: "b" } },
+      { id: "v1", start: { x: 1, y: 1 }, end: { x: 1, y: 3 }, type: { id: "b" } },
+      { id: "v2", start: { x: 3, y: 1 }, end: { x: 3, y: 3 }, type: { id: "b" } },
+    ];
+    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges, width: 5, height: 5 });
+
+    const constraint = new EnclosedAreaSizeConstraint(2, 2, 5); // expects 5 but area is 1
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "not-enough enclosed area" }]);
+  });
+
+  it("returns 'too-many enclosed area' when enclosed area is too large", () => {
+    // No bridges: cell is not enclosed (open), so would fail with 'area not enclosed'
+    // For 'too-many enclosed area' we need a scenario with isEnclosed=true and size > expected
+    const islands = [
+      { id: "A", x: 1, y: 1 }, { id: "B", x: 5, y: 1 },
+      { id: "C", x: 1, y: 5 }, { id: "D", x: 5, y: 5 },
+    ];
+    const bridges = [
+      { id: "h1", start: { x: 1, y: 1 }, end: { x: 5, y: 1 }, type: { id: "b" } },
+      { id: "h2", start: { x: 1, y: 5 }, end: { x: 5, y: 5 }, type: { id: "b" } },
+      { id: "v1", start: { x: 1, y: 1 }, end: { x: 1, y: 5 }, type: { id: "b" } },
+      { id: "v2", start: { x: 5, y: 1 }, end: { x: 5, y: 5 }, type: { id: "b" } },
+    ];
+    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges, width: 6, height: 6 });
+
+    const constraint = new EnclosedAreaSizeConstraint(3, 3, 1); // area is 9, expects 1
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toEqual([{ elementID: "3,3", glyphMessage: "too-many enclosed area" }]);
+  });
+});

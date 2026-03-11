@@ -8,6 +8,9 @@ import type { Bridge } from '@model/puzzle/Bridge';
 import { GridToWorldMapper } from './GridToWorldMapper';
 import { orientationForDelta } from './PuzzleRenderer';
 import { BridgeSpriteFrames, BridgeVisualConstants } from './BridgeSpriteFrameRegistry';
+import { ConstraintFeedbackDisplay } from './ConstraintFeedbackDisplay';
+import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
+import type { ConstraintDisplayItem } from '@model/puzzle/constraints/ConstraintDisplayItem';
 
 /**
  * Puzzle renderer that works embedded within the overworld scene
@@ -17,6 +20,8 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     private scene: Phaser.Scene;
     private gridMapper: GridToWorldMapper;
     private textureKey: string;
+    private languageTilesetKey: string;
+    private npcSpriteKey: string;
     private puzzleBounds: Phaser.Geom.Rectangle;
 
     // Graphics objects for embedded rendering
@@ -26,15 +31,21 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     private previewGraphics: Phaser.GameObjects.Container | null = null;
     private puzzleContainer: Phaser.GameObjects.Container;
     private isPlacing: boolean = false;
+    private feedbackDisplay: ConstraintFeedbackDisplay | null = null;
+    private glyphRegistry: LanguageGlyphRegistry = new LanguageGlyphRegistry();
 
     constructor(
         scene: Phaser.Scene,
         puzzleBounds: Phaser.Geom.Rectangle,
-        textureKey = 'sprout-tiles'
+        textureKey = 'sprout-tiles',
+        languageTilesetKey = 'language',
+        npcSpriteKey = 'sailorNS',
     ) {
         this.scene = scene;
         this.puzzleBounds = puzzleBounds;
         this.textureKey = textureKey;
+        this.languageTilesetKey = languageTilesetKey;
+        this.npcSpriteKey = npcSpriteKey;
 
         // Create grid mapper with puzzle bounds offset
         this.gridMapper = new GridToWorldMapper(32, {
@@ -127,6 +138,12 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
 
         // Destroy preview
         this.hidePreview();
+
+        // Destroy constraint feedback
+        if (this.feedbackDisplay) {
+            this.feedbackDisplay.destroy();
+            this.feedbackDisplay = null;
+        }
 
         // Destroy container and recreate it
         if (this.puzzleContainer) {
@@ -518,5 +535,22 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
      */
     update(_dt: number): void {
         // No per-frame updates needed for basic embedded renderer
+    }
+
+    showConstraintFeedback(items: ConstraintDisplayItem[], puzzle: BridgePuzzle): void {
+        if (!this.feedbackDisplay) {
+            this.feedbackDisplay = new ConstraintFeedbackDisplay(
+                this.scene,
+                this.gridMapper,
+                this.glyphRegistry,
+                this.languageTilesetKey,
+                this.npcSpriteKey,
+            );
+        }
+        this.feedbackDisplay.update(items, puzzle);
+    }
+
+    hideConstraintFeedback(): void {
+        this.feedbackDisplay?.setVisible(false);
     }
 }

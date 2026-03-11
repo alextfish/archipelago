@@ -430,9 +430,14 @@ export class PuzzleController {
             const failed = results.perConstraint.filter(p => !p.result.satisfied);
             const affected = failed.flatMap(f => f.result.affectedElements ?? []);
             this.renderer.highlightViolations(affected);
-            // and optionally show messages:
-            //const messages = failed.map(f => f.result.message).filter(Boolean);
-            //this.renderer.showValidationMessages(messages);
+        }
+
+        // Show per-constraint NPC+speech-bubble feedback whenever all bridges are placed
+        if (this.puzzle.allBridgesPlaced()) {
+            const displayItems = this.validator.getConstraintDisplayItems();
+            this.renderer.showConstraintFeedback(displayItems, this.puzzle);
+        } else {
+            this.renderer.hideConstraintFeedback();
         }
     }
 

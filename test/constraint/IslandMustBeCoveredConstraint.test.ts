@@ -81,3 +81,26 @@ describe("IslandMustBeCoveredConstraint", () => {
     expect(result.satisfied).toBe(false);
   });
 });
+
+describe("IslandMustBeCoveredConstraint.getDisplayItems", () => {
+  it("returns 'good' when island is covered", () => {
+    const islands = [{ id: "A", x: 1, y: 1 }, { id: "B", x: 2, y: 1 }, { id: "C", x: 3, y: 1 }];
+    const bridges = [{ id: "b1", start: { x: 1, y: 1 }, end: { x: 3, y: 1 }, type: { id: "t1" } }];
+    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges });
+
+    const constraint = new IslandMustBeCoveredConstraint("B");
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toEqual([{ elementID: "B", glyphMessage: "good" }]);
+  });
+
+  it("returns 'no bridge over island' when island is not covered", () => {
+    const islands = [{ id: "A", x: 1, y: 1 }, { id: "B", x: 2, y: 1 }];
+    const puzzle = makeMockPuzzle({ islands, bridges: [], placedBridges: [] });
+
+    const constraint = new IslandMustBeCoveredConstraint("B");
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toEqual([{ elementID: "B", glyphMessage: "no bridge over island" }]);
+  });
+});
