@@ -205,6 +205,12 @@ describe('LanguageGlyphRegistry', () => {
             expect(registry.getGlyphFrame('grass', 'good')).toBe(54);
         });
 
+        it('should have the water glyph registered', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(registry.getGlyphFrame('grass', 'water')).toBe(55);
+        });
+
         it('should have color glyphs registered', () => {
             const registry = new LanguageGlyphRegistry();
 

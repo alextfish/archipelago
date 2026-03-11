@@ -1,6 +1,7 @@
 import type { BridgePuzzle } from '../BridgePuzzle';
 import { Constraint } from './Constraint';
 import type { ConstraintResult } from './ConstraintResult';
+import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
 
 /**
  * Constraint for Ruins puzzle type: Islands with a "must_be_covered" marker
@@ -63,5 +64,13 @@ export class IslandMustBeCoveredConstraint extends Constraint {
       message: ok ? undefined : `Island ${this.islandId} at (${island.x}, ${island.y}) must be covered by a bridge`,
       glyphMessage: ok ? undefined : "no bridge over island"
     };
+  }
+
+  override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    const result = this.check(puzzle);
+    return [{
+      elementID: this.islandId,
+      glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "good"),
+    }];
   }
 }

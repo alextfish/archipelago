@@ -53,3 +53,50 @@ describe("MustHaveWaterConstraint", () => {
     expect(r.satisfied).toBe(true);
   });
 });
+
+describe("MustHaveWaterConstraint.getDisplayItems", () => {
+  it("returns 'good' with cell as elementID when water is present", () => {
+    const spec: FlowPuzzleSpec = {
+      id: "disptest-water",
+      size: { width: 2, height: 1 },
+      islands: [],
+      bridgeTypes: [],
+      flowSquares: [
+        { x: 0, y: 0, outgoing: ["E"], isSource: true },
+        { x: 1, y: 0, outgoing: [] },
+      ],
+      edgeInputs: [],
+      constraints: [],
+      maxNumBridges: 0,
+    };
+    const puzzle = new FlowPuzzle(spec);
+
+    const c = new MustHaveWaterConstraint(1, 0);
+    const items = c.getDisplayItems(puzzle);
+
+    expect(items).toEqual([{ elementID: "1,0", glyphMessage: "good" }]);
+  });
+
+  it("returns 'no water' when cell has no water", () => {
+    const spec: FlowPuzzleSpec = {
+      id: "disptest-nowater",
+      size: { width: 2, height: 1 },
+      islands: [],
+      bridgeTypes: [],
+      // No source and no edge inputs — nothing seeds water
+      flowSquares: [
+        { x: 0, y: 0, outgoing: [] },
+        { x: 1, y: 0, outgoing: [] },
+      ],
+      edgeInputs: [],
+      constraints: [],
+      maxNumBridges: 0,
+    };
+    const puzzle = new FlowPuzzle(spec);
+
+    const c = new MustHaveWaterConstraint(1, 0);
+    const items = c.getDisplayItems(puzzle);
+
+    expect(items).toEqual([{ elementID: "1,0", glyphMessage: "no water" }]);
+  });
+});

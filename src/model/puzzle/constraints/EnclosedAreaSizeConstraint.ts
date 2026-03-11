@@ -1,6 +1,7 @@
 import type { BridgePuzzle } from '../BridgePuzzle';
 import { Constraint } from './Constraint';
 import type { ConstraintResult } from './ConstraintResult';
+import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
 
 /**
  * Constraint for Farmlands puzzle type: Empty grid cells may have markers (N dots)
@@ -231,5 +232,13 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     }
 
     return { size: cells.length, isEnclosed, cells };
+  }
+
+  override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    const result = this.check(puzzle);
+    return [{
+      elementID: `${this.x},${this.y}`,
+      glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "area"),
+    }];
   }
 }

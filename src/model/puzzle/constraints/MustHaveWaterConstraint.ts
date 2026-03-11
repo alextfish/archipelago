@@ -1,4 +1,5 @@
 import type { ConstraintResult } from "./ConstraintResult";
+import type { ConstraintDisplayItem } from "./ConstraintDisplayItem";
 import { Constraint } from "./Constraint";
 import type { BridgePuzzle } from "../BridgePuzzle";
 
@@ -27,7 +28,16 @@ export class MustHaveWaterConstraint extends Constraint {
     return {
       satisfied: has,
       affectedElements: this.violations ?? [],
-      message: has ? undefined : `Tile (${this.x},${this.y}) must have water.`
+      message: has ? undefined : `Tile (${this.x},${this.y}) must have water.`,
+      glyphMessage: has ? undefined : "no water",
     };
+  }
+
+  override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    const result = this.check(puzzle);
+    return [{
+      elementID: `${this.x},${this.y}`,
+      glyphMessage: result.satisfied ? "good" : "no water",
+    }];
   }
 }

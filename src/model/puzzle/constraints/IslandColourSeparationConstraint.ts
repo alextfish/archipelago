@@ -1,6 +1,7 @@
 import type { BridgePuzzle } from '../BridgePuzzle';
 import { Constraint } from './Constraint';
 import type { ConstraintResult } from './ConstraintResult';
+import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
 import type { Island } from '../Island';
 
 /**
@@ -110,5 +111,21 @@ export class IslandColourSeparationConstraint extends Constraint {
     if (!colourConstraint) return undefined;
     
     return colourConstraint.split('=')[1];
+  }
+
+  override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    const result = this.check(puzzle);
+    const violatedIds = new Set(result.affectedElements ?? []);
+    const violationGlyph = result.glyphMessage ?? `${this.colour1} island must-not connected ${this.colour2} island`;
+
+    return puzzle.islands
+      .filter(island => {
+        const colour = this.getIslandColour(island);
+        return colour === this.colour1 || colour === this.colour2;
+      })
+      .map(island => ({
+        elementID: island.id,
+        glyphMessage: violatedIds.has(island.id) ? violationGlyph : "good",
+      }));
   }
 }

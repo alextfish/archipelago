@@ -89,3 +89,47 @@ describe("IslandVisibilityConstraint", () => {
     expect(result.satisfied).toBe(true);
   });
 });
+
+describe("IslandVisibilityConstraint.getDisplayItems", () => {
+  it("returns 'good' when the correct number of islands are visible", () => {
+    const islands = [
+      { id: "A", x: 1, y: 1 },
+      { id: "B", x: 2, y: 1 },
+    ];
+    const bridges = [{ id: "b1", start: { x: 1, y: 1 }, end: { x: 2, y: 1 }, type: { id: "t1" } }];
+    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges, width: 4, height: 3 });
+
+    const constraint = new IslandVisibilityConstraint("A", 1);
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "good" }]);
+  });
+
+  it("returns 'not-enough island connected' when too few islands are visible", () => {
+    const islands = [{ id: "A", x: 1, y: 1 }];
+    const puzzle = makeMockPuzzle({ islands, bridges: [], placedBridges: [], width: 4, height: 3 });
+
+    const constraint = new IslandVisibilityConstraint("A", 2);
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough island connected" }]);
+  });
+
+  it("returns 'too-many island connected' when too many islands are visible", () => {
+    const islands = [
+      { id: "A", x: 1, y: 1 },
+      { id: "B", x: 2, y: 1 },
+      { id: "C", x: 3, y: 1 },
+    ];
+    const bridges = [
+      { id: "b1", start: { x: 1, y: 1 }, end: { x: 2, y: 1 }, type: { id: "t1" } },
+      { id: "b2", start: { x: 2, y: 1 }, end: { x: 3, y: 1 }, type: { id: "t1" } },
+    ];
+    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges, width: 5, height: 3 });
+
+    const constraint = new IslandVisibilityConstraint("A", 1);
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "too-many island connected" }]);
+  });
+});

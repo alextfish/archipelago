@@ -1,6 +1,7 @@
 import type { BridgePuzzle } from '../BridgePuzzle';
 import { Constraint } from './Constraint';
 import type { ConstraintResult } from './ConstraintResult';
+import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
 import type { Island } from '../Island';
 
 /**
@@ -152,5 +153,13 @@ export class IslandVisibilityConstraint extends Constraint {
 
       return connects1to2 || connects2to1;
     });
+  }
+
+  override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    const result = this.check(puzzle);
+    return [{
+      elementID: this.islandId,
+      glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "good"),
+    }];
   }
 }
