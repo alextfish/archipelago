@@ -138,13 +138,18 @@ describe('ConstraintFeedbackDisplay', () => {
     const items: ConstraintDisplayItem[] = [{ elementID: 'A', glyphMessage: 'good' }];
 
     display.update(items, puzzle);
-    const firstSpriteCount = mockScene.add.sprite.mock.calls.length;
+
+    // Capture the sprites created in the first update
+    const firstSprites = mockScene.add.sprite.mock.results.map((r: any) => r.value);
+    expect(firstSprites).toHaveLength(1);
 
     display.update(items, puzzle);
-    const secondSpriteCount = mockScene.add.sprite.mock.calls.length;
 
-    // Second call should create the same number of new sprites (after clearing old ones)
-    expect(secondSpriteCount).toBe(firstSpriteCount * 2);
+    // The first sprite should have been destroyed before new ones were created
+    expect(firstSprites[0].destroy).toHaveBeenCalled();
+
+    // A new sprite should have been created for the second update
+    expect(mockScene.add.sprite).toHaveBeenCalledTimes(2);
   });
 
   it('hides all sprites and bubbles when setVisible(false) is called', () => {

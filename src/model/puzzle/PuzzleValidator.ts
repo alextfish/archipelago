@@ -73,8 +73,7 @@ export class PuzzleValidator {
    * constrained element when all bridges are placed.
    */
   getConstraintDisplayItems(): ConstraintDisplayItem[] {
-    const constraints: Constraint[] = (this.puzzle as any).constraints ?? [];
-    return constraints.flatMap(c => c.getDisplayItems(this.puzzle));
+    return this.puzzle.constraints.flatMap(c => c.getDisplayItems(this.puzzle));
   }
 }
 //   /**
