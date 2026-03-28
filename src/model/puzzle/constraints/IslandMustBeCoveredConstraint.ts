@@ -18,7 +18,7 @@ export class IslandMustBeCoveredConstraint extends Constraint {
     this.islandId = islandId;
   }
 
-  static fromSpec(params: { islandId: string; [key: string]: any }): IslandMustBeCoveredConstraint {
+  static fromSpec(params: { islandId: string;[key: string]: any }): IslandMustBeCoveredConstraint {
     return new IslandMustBeCoveredConstraint(params.islandId);
   }
 
@@ -71,6 +71,7 @@ export class IslandMustBeCoveredConstraint extends Constraint {
     return [{
       elementID: this.islandId,
       glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "good"),
+      constraintType: 'IslandMustBeCoveredConstraint',
     }];
   }
 }

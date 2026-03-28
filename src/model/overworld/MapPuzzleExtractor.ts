@@ -229,6 +229,15 @@ export class MapPuzzleExtractor {
         const bridgeTypes = this.extractBridgeTypes(definition);
         const maxNumBridges = this.calculateMaxBridges(definition);
 
+        // Auto-add IslandBridgeCountConstraint if any islands have num_bridges constraints
+        const hasIslandBridgeConstraints = islands.some(island =>
+            island.constraints?.some(c => c.startsWith('num_bridges='))
+        );
+        if (hasIslandBridgeConstraints && !constraints.some(c => c.type === 'IslandBridgeCountConstraint')) {
+            constraints.push({ type: 'IslandBridgeCountConstraint' });
+            console.log(`Auto-added IslandBridgeCountConstraint to puzzle ${definition.id} (islands have num_bridges constraints)`);
+        }
+
         const puzzleSpec: PuzzleSpec = {
             id: definition.id,
             type: definition.metadata.type || 'overworld',

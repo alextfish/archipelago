@@ -124,6 +124,18 @@ export class OverworldScene extends Phaser.Scene {
       frameWidth: 32,
       frameHeight: 32
     });
+    // Load NPC expression sprites for constraint feedback
+    this.load.image('sailorNS happy', 'resources/sprites/sailorNS happy.png');
+    this.load.image('sailorNS frown', 'resources/sprites/sailorNS frown.png');
+    this.load.image('sailorEW happy', 'resources/sprites/sailorEW happy.png');
+    this.load.image('sailorEW sad', 'resources/sprites/sailorEW sad.png');
+    this.load.image('Ruby happy', 'resources/sprites/Ruby happy.png');
+    this.load.image('Ruby frown', 'resources/sprites/Ruby frown.png');
+    this.load.image('Ruby neutral', 'resources/sprites/Ruby neutral.png');
+    this.load.image('Lyuba happy', 'resources/sprites/Lyuba happy.png');
+    this.load.image('Lyuba frown', 'resources/sprites/Lyuba frown.png');
+    this.load.image('Lyuba neutral', 'resources/sprites/Lyuba neutral.png');
+    this.load.image('LyubaCleric', 'resources/sprites/LyubaCleric.png');
     this.load.image('Mage1', 'resources/sprites/Mage1.png');
     this.load.image('Mage2', 'resources/sprites/Mage2.png');
     this.load.image('Mage3', 'resources/sprites/Mage3.png');

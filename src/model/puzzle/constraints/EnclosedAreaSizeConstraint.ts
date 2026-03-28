@@ -240,6 +240,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     return [{
       elementID: `${this.x},${this.y}`,
       glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "area not enclosed"),
+      constraintType: 'EnclosedAreaSizeConstraint',
     }];
   }
 }

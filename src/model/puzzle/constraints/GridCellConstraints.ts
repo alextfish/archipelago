@@ -73,7 +73,7 @@ abstract class GridCellConstraint extends Constraint {
  * adjacent to the given grid space.
  */
 export class MustTouchAHorizontalBridge extends GridCellConstraint {
-    static fromSpec(params: { x: number; y: number; [key: string]: any  }): MustTouchAHorizontalBridge {
+    static fromSpec(params: { x: number; y: number;[key: string]: any }): MustTouchAHorizontalBridge {
         return new MustTouchAHorizontalBridge(params.x, params.y);
     }
     check(puzzle: BridgePuzzle): ConstraintResult {
@@ -97,6 +97,7 @@ export class MustTouchAHorizontalBridge extends GridCellConstraint {
         return [{
             elementID: `${this.x},${this.y}`,
             glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "good"),
+            constraintType: 'MustTouchAHorizontalBridge',
         }];
     }
 }
@@ -106,7 +107,7 @@ export class MustTouchAHorizontalBridge extends GridCellConstraint {
  * adjacent to the given grid space.
  */
 export class MustTouchAVerticalBridge extends GridCellConstraint {
-    static fromSpec(params: { x: number; y: number; [key: string]: any  }): MustTouchAVerticalBridge {
+    static fromSpec(params: { x: number; y: number;[key: string]: any }): MustTouchAVerticalBridge {
         return new MustTouchAVerticalBridge(params.x, params.y);
     }
     check(puzzle: BridgePuzzle): ConstraintResult {
@@ -130,6 +131,7 @@ export class MustTouchAVerticalBridge extends GridCellConstraint {
         return [{
             elementID: `${this.x},${this.y}`,
             glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "good"),
+            constraintType: 'MustTouchAVerticalBridge',
         }];
     }
 }

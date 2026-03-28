@@ -1069,7 +1069,7 @@
   <objectgroup id="15" name="npcs">
    <object id="48" name="npcForestSeries1" x="1824" y="1696" width="32" height="32">
     <properties>
-     <property name="appearance" value="Mage4"/>
+     <property name="appearance" value="Lyuba"/>
      <property name="conversation" value="forestNPC1.json"/>
      <property name="conversationSolved" value="forestNPC1Solved.json"/>
      <property name="language" value="grass"/>

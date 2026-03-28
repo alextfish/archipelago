@@ -67,22 +67,31 @@ export class ConstraintFeedbackDisplay {
 
       const worldPos = this.gridMapper.gridToWorld(island.x, island.y);
 
-      // NPC sprite — just to the right of the island cell
+      // Determine if constraint is satisfied (glyphMessage is "good" when satisfied)
+      const isSatisfied = item.glyphMessage.trim() === 'good';
+      
+      // Choose NPC sprite based on constraint type
+      const baseSprite = item.constraintType === 'IslandBridgeCountConstraint' ? 'Ruby' : 'sailorNS';
+      
+      // Choose expression based on satisfaction: happy if satisfied, frown if not
+      const spriteKey = isSatisfied ? `${baseSprite} happy` : `${baseSprite} frown`;
+
+      // NPC sprite — aligned with the island horizontally, offset down by half a cell
       const npc = this.scene.add.sprite(
-        worldPos.x + cellSize,
-        worldPos.y,
-        this.npcSpriteKey,
+        worldPos.x,
+        worldPos.y + cellSize / 2,
+        spriteKey,
         0,
       );
       npc.setOrigin(0, 0);
       npc.setDepth(this.depth);
       this.npcSprites.push(npc);
 
-      // Speech bubble — just above and to the right of the island cell
+      // Speech bubble — aligned with island horizontally, offset up by bubble height + extra spacing
       const bubble = new SpeechBubble(this.scene, this.tilesetKey);
       const glyphFrames = this.glyphRegistry.parseGlyphs(this.language, item.glyphMessage);
       bubble.create(glyphFrames, this.language, this.glyphRegistry, 1);
-      bubble.setPosition(worldPos.x + cellSize, worldPos.y - bubbleHeightPx);
+      bubble.setPosition(worldPos.x + cellSize, worldPos.y - cellSize / 2);
       bubble.setDepth(this.depth + 1);
       this.speechBubbles.push(bubble);
     }

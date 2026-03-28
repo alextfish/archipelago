@@ -11,6 +11,7 @@ import { BridgeSpriteFrames, BridgeVisualConstants } from './BridgeSpriteFrameRe
 import { ConstraintFeedbackDisplay } from './ConstraintFeedbackDisplay';
 import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
 import type { ConstraintDisplayItem } from '@model/puzzle/constraints/ConstraintDisplayItem';
+import { parseNumBridgesConstraint } from '@model/puzzle/Island';
 
 /**
  * Puzzle renderer that works embedded within the overworld scene
@@ -26,6 +27,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
 
     // Graphics objects for embedded rendering
     private islandGraphics: Map<string, Phaser.GameObjects.Sprite> = new Map();
+    private islandLabels: Map<string, Phaser.GameObjects.Text> = new Map();
     private bridgeGraphics: Map<string, Phaser.GameObjects.Container> = new Map();
     private bridgeHitZones: Phaser.GameObjects.Zone[] = [];
     private previewGraphics: Phaser.GameObjects.Container | null = null;
@@ -39,7 +41,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
         puzzleBounds: Phaser.Geom.Rectangle,
         textureKey = 'sprout-tiles',
         languageTilesetKey = 'language',
-        npcSpriteKey = 'sailorNS',
+        npcSpriteKey = 'Ruby',
     ) {
         this.scene = scene;
         this.puzzleBounds = puzzleBounds;
@@ -133,6 +135,12 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
         }
         this.islandGraphics.clear();
 
+        // Destroy all island labels
+        for (const label of this.islandLabels.values()) {
+            label.destroy();
+        }
+        this.islandLabels.clear();
+
         // Destroy all bridge graphics
         this.destroyBridges();
 
@@ -163,6 +171,16 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
 
         this.puzzleContainer.add(sprite);
         this.islandGraphics.set(island.id, sprite);
+
+        // Add island label showing num_bridges constraint if present
+        const num = parseNumBridgesConstraint(island);
+        if (num !== null) {
+            const label = this.scene.add.text(worldPos.x + 12, worldPos.y + 6, String(num), { color: '#000', fontSize: '12px' });
+            label.setOrigin(0, 0);
+            label.setDepth(102); // Above islands
+            this.puzzleContainer.add(label);
+            this.islandLabels.set(island.id, label);
+        }
     }
 
     private createBridge(bridge: Bridge): void {

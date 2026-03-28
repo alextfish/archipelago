@@ -8,4 +8,6 @@ export interface ConstraintDisplayItem {
   elementID: string;
   /** Space-separated glyph words — "good" when satisfied, violation message otherwise */
   glyphMessage: string;
+  /** Type of constraint that generated this item (for choosing NPC sprite) */
+  constraintType?: string;
 }

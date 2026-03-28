@@ -38,6 +38,7 @@ export class MustHaveWaterConstraint extends Constraint {
     return [{
       elementID: `${this.x},${this.y}`,
       glyphMessage: result.satisfied ? "good" : "no water",
+      constraintType: 'MustHaveWaterConstraint',
     }];
   }
 }

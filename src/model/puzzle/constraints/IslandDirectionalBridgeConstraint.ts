@@ -28,10 +28,10 @@ export class IslandDirectionalBridgeConstraint extends Constraint {
     this.constraintType = constraintType as any;
   }
 
-  static fromSpec(params: { 
-    islandId: string; 
+  static fromSpec(params: {
+    islandId: string;
     constraintType: string;
-    [key: string]: any 
+    [key: string]: any
   }): IslandDirectionalBridgeConstraint {
     return new IslandDirectionalBridgeConstraint(params.islandId, params.constraintType);
   }
@@ -143,6 +143,7 @@ export class IslandDirectionalBridgeConstraint extends Constraint {
     return [{
       elementID: this.islandId,
       glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "good"),
+      constraintType: 'IslandDirectionalBridgeConstraint',
     }];
   }
 }

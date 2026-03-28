@@ -60,7 +60,7 @@ export class IslandBridgeCountConstraint extends Constraint {
         glyphMessage = "too-many bridge";
       }
 
-      items.push({ elementID: island.id, glyphMessage });
+      items.push({ elementID: island.id, glyphMessage, constraintType: 'IslandBridgeCountConstraint' });
     }
 
     return items;

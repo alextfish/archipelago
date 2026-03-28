@@ -22,14 +22,14 @@ export class IslandColourSeparationConstraint extends Constraint {
     this.colour2 = colour2;
   }
 
-  static fromSpec(params: { colour1: string; colour2: string; [key: string]: any }): IslandColourSeparationConstraint {
+  static fromSpec(params: { colour1: string; colour2: string;[key: string]: any }): IslandColourSeparationConstraint {
     return new IslandColourSeparationConstraint(params.colour1, params.colour2);
   }
 
   check(puzzle: BridgePuzzle): ConstraintResult {
     // Build adjacency map of connected islands
     const adjacencyMap = new Map<string, Set<string>>();
-    
+
     for (const island of puzzle.islands) {
       adjacencyMap.set(island.id, new Set<string>());
     }
@@ -104,12 +104,12 @@ export class IslandColourSeparationConstraint extends Constraint {
    * Expects a constraint like "colour=red" or "colour=blue"
    */
   private getIslandColour(island: Island): string | undefined {
-    const colourConstraint = island.constraints?.find(c => 
+    const colourConstraint = island.constraints?.find(c =>
       c.startsWith('colour=')
     );
-    
+
     if (!colourConstraint) return undefined;
-    
+
     return colourConstraint.split('=')[1];
   }
 
@@ -126,6 +126,7 @@ export class IslandColourSeparationConstraint extends Constraint {
       .map(island => ({
         elementID: island.id,
         glyphMessage: violatedIds.has(island.id) ? violationGlyph : "good",
+        constraintType: 'IslandColourSeparationConstraint',
       }));
   }
 }

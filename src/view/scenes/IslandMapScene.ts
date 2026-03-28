@@ -32,6 +32,12 @@ export class IslandMapScene extends Phaser.Scene {
             frameWidth: 32,
             frameHeight: 32
         });
+        // Load NPC expression sprites for constraint feedback
+        this.load.image('sailorNS happy', 'resources/sprites/sailorNS happy.png');
+        this.load.image('sailorNS frown', 'resources/sprites/sailorNS frown.png');
+        this.load.image('Ruby happy', 'resources/sprites/Ruby happy.png');
+        this.load.image('Ruby frown', 'resources/sprites/Ruby frown.png');
+        this.load.image('Ruby neutral', 'resources/sprites/Ruby neutral.png');
         console.log('IslandMapScene: preload() finished');
     }
 

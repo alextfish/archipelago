@@ -37,7 +37,7 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
   private feedbackDisplay: ConstraintFeedbackDisplay | null = null;
   private glyphRegistry: LanguageGlyphRegistry = new LanguageGlyphRegistry();
 
-  constructor(scene: Phaser.Scene, gridMapper: GridToWorldMapper, textureKey = 'sprout-tiles', languageTilesetKey = 'language', npcSpriteKey = 'sailorNS') {
+  constructor(scene: Phaser.Scene, gridMapper: GridToWorldMapper, textureKey = 'sprout-tiles', languageTilesetKey = 'language', npcSpriteKey = 'Ruby') {
     this.scene = scene;
     this.gridMapper = gridMapper;
     this.textureKey = textureKey;
