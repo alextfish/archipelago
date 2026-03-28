@@ -58,9 +58,9 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
             });
         }
 
-        // Load NPC sprites (sailorNS and sailorEW)
+        // Load NPC sprites (sailorNS, sailorEW, Lyuba, Mage4)
         // TODO: Load these based on which NPCs are in the game
-        const npcAppearances = ['sailorNS', 'sailorEW'];
+        const npcAppearances = ['sailorNS', 'sailorEW', 'Lyuba', 'Mage4'];
         for (const appearanceId of npcAppearances) {
             if (this.appearanceRegistry.hasAppearance(appearanceId)) {
                 const spritePath = this.appearanceRegistry.getSpritePath(appearanceId);
@@ -70,6 +70,28 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
                         frameHeight: 32,
                     });
                 }
+            }
+        }
+
+        // Load high-resolution face sprites for conversations
+        const faceSprites = [
+            'faces/Lyuba neutral',
+            'faces/Lyuba happy',
+            'faces/Lyuba frown',
+            'faces/Lyuba cleric neutral',
+            'faces/Lyuba cleric happy',
+            'faces/Lyuba cleric frown',
+            'faces/Lyuba cleric vhappy',
+            'faces/Lyuba cleric wink',
+            'faces/Ruby neutral',
+            'faces/Ruby happy',
+            'faces/Ruby frown',
+            'faces/Ruby vhappy',
+            'faces/Ruby wink',
+        ];
+        for (const faceKey of faceSprites) {
+            if (!this.textures.exists(faceKey)) {
+                this.load.image(faceKey, `resources/sprites/${faceKey}.png`);
             }
         }
     }
@@ -135,8 +157,8 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     }    /**
      * ConversationHost interface: Display NPC line
      */
-    displayNPCLine(expression: string, glyphFrames: number[], language: string): void {
-        console.log('ConversationScene: displayNPCLine called', { expression, glyphFrames: glyphFrames.length, language });
+    displayNPCLine(expression: string, glyphFrames: number[], language: string, customFrame?: string): void {
+        console.log('ConversationScene: displayNPCLine called', { expression, glyphFrames: glyphFrames.length, language, customFrame });
 
         if (!this.speechBubble) return;
 
@@ -151,8 +173,10 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
 
         console.log('ConversationScene: Speech bubble displayed');
 
-        // TODO: Update NPC sprite expression
-        // For now, we'll implement sprite display later
+        // Update NPC portrait if custom frame is provided
+        if (customFrame && this.npcPortrait) {
+            this.updatePortraitFrame(this.npcPortrait, customFrame);
+        }
     }
 
     /**
@@ -414,5 +438,16 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         container.setDepth(15); // Above other UI elements
 
         return container;
+    }
+
+    /**
+     * Update portrait to use a different sprite frame
+     */
+    private updatePortraitFrame(portrait: Phaser.GameObjects.Container, spriteKey: string): void {
+        // Get the sprite from the container (index 1, after the border)
+        const sprite = portrait.getAt(1) as Phaser.GameObjects.Sprite;
+        if (sprite) {
+            sprite.setTexture(spriteKey, 0);
+        }
     }
 }

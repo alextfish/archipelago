@@ -14,7 +14,7 @@ export interface ConversationHost {
     /**
      * Display NPC dialogue with glyphs
      */
-    displayNPCLine(expression: string, glyphFrames: number[], language: string): void;
+    displayNPCLine(expression: string, glyphFrames: number[], language: string, customFrame?: string): void;
 
     /**
      * Display player choice options
@@ -160,7 +160,7 @@ export class ConversationController {
             );
 
             console.log(`ConversationController: Displaying NPC line with ${glyphFrames.length} glyphs`);
-            this.host.displayNPCLine(expression, glyphFrames, this.currentNPC.language);
+            this.host.displayNPCLine(expression, glyphFrames, this.currentNPC.language, node.npc.frame);
         }
 
         // Always display choices (even if empty) to clear old buttons

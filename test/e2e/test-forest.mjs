@@ -89,6 +89,20 @@ async function runTest() {
         console.log('[TEST] Clicking choice: I\'ll help');
         await choiceButton.click();
 
+        // Wait for next conversation node (helpAccepted)
+        console.log('[TEST] Waiting for second conversation node...');
+        await page.waitForTimeout(1000);
+
+        // Click "Build" choice to start the series
+        console.log('[TEST] Waiting for choice button: Build');
+        const buildButton = await page.$('[data-testid="choice-build"]');
+        if (!buildButton) {
+            throw new Error('Could not find choice button: Build');
+        }
+
+        console.log('[TEST] Clicking choice: Build');
+        await buildButton.click();
+
         // Wait for conversation to end
         console.log('[TEST] Waiting for conversation to end...');
         await waitForGameEvent(page, 'conversation_ended');

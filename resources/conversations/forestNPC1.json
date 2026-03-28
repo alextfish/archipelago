@@ -6,18 +6,32 @@
     "intro": {
       "npc": {
         "expression": "neutral",
-        "glyphs": "you build bridge question"
+        "glyphs": "you build bridge question",
+        "frame": "faces/Lyuba neutral"
       },
       "choices": [
         {
           "text": "I'll help",
-          "effects": [
-            { "type": "startSeries", "seriesId": "forestSeries1" }
-          ],
-          "end": true
+          "next": "helpAccepted"
         },
         {
           "text": "Leave",
+          "end": true
+        }
+      ]
+    },
+    "helpAccepted": {
+      "npc": {
+        "expression": "happy",
+        "glyphs": "good happy",
+        "frame": "faces/Lyuba happy"
+      },
+      "choices": [
+        {
+          "text": "Build",
+          "effects": [
+            { "type": "startSeries", "seriesId": "forestSeries1" }
+          ],
           "end": true
         }
       ]

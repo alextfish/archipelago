@@ -132,6 +132,10 @@ export class OverworldScene extends Phaser.Scene {
     this.load.image('Ruby happy', 'resources/sprites/Ruby happy.png');
     this.load.image('Ruby frown', 'resources/sprites/Ruby frown.png');
     this.load.image('Ruby neutral', 'resources/sprites/Ruby neutral.png');
+    this.load.spritesheet('Lyuba', 'resources/sprites/Lyuba neutral.png', {
+      frameWidth: 32,
+      frameHeight: 32
+    });
     this.load.image('Lyuba happy', 'resources/sprites/Lyuba happy.png');
     this.load.image('Lyuba frown', 'resources/sprites/Lyuba frown.png');
     this.load.image('Lyuba neutral', 'resources/sprites/Lyuba neutral.png');
@@ -143,6 +147,21 @@ export class OverworldScene extends Phaser.Scene {
     this.load.image('Citizen1_Idle', 'resources/sprites/Citizen1_Idle.png');
     this.load.image('Citizen2_Idle', 'resources/sprites/Citizen2_Idle.png');
     this.load.image('Fighter2_Idle', 'resources/sprites/Fighter2_Idle.png');
+
+    // Load high-resolution face sprites for conversations
+    this.load.image('faces/Lyuba neutral', 'resources/sprites/faces/Lyuba neutral.png');
+    this.load.image('faces/Lyuba happy', 'resources/sprites/faces/Lyuba happy.png');
+    this.load.image('faces/Lyuba frown', 'resources/sprites/faces/Lyuba frown.png');
+    this.load.image('faces/Lyuba cleric neutral', 'resources/sprites/faces/Lyuba cleric neutral.png');
+    this.load.image('faces/Lyuba cleric happy', 'resources/sprites/faces/Lyuba cleric happy.png');
+    this.load.image('faces/Lyuba cleric frown', 'resources/sprites/faces/Lyuba cleric frown.png');
+    this.load.image('faces/Lyuba cleric vhappy', 'resources/sprites/faces/Lyuba cleric vhappy.png');
+    this.load.image('faces/Lyuba cleric wink', 'resources/sprites/faces/Lyuba cleric wink.png');
+    this.load.image('faces/Ruby neutral', 'resources/sprites/faces/Ruby neutral.png');
+    this.load.image('faces/Ruby happy', 'resources/sprites/faces/Ruby happy.png');
+    this.load.image('faces/Ruby frown', 'resources/sprites/faces/Ruby frown.png');
+    this.load.image('faces/Ruby vhappy', 'resources/sprites/faces/Ruby vhappy.png');
+    this.load.image('faces/Ruby wink', 'resources/sprites/faces/Ruby wink.png');
 
     // Load language tileset for speech bubbles in constraint feedback
     this.load.spritesheet('language', 'resources/tilesets/language.png', {

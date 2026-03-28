@@ -53,6 +53,16 @@ export class NPCAppearanceRegistry {
                 sad: 2,
             },
         });
+
+        // Lyuba appearance
+        this.appearances.set('Lyuba', {
+            spriteKey: 'Lyuba',
+            expressions: {
+                neutral: 0,
+                happy: 1,
+                sad: 2,
+            },
+        });
     }
 
     /**

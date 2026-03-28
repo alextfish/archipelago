@@ -27,6 +27,7 @@ export interface ConversationNode {
     npc?: {
         expression: string;     // NPC expression: 'neutral', 'happy', 'sad'
         glyphs: string;         // Space-separated glyph words
+        frame?: string;         // Optional: custom sprite key (e.g., 'faces/Lyuba neutral')
     };
     player?: {
         glyphs?: string;        // If player somehow speaks language
