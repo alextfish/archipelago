@@ -1161,29 +1161,34 @@ export class OverworldScene extends Phaser.Scene {
         let collisionType: CollisionType = CollisionType.WALKABLE;
         let hasWalkable = false;
         let hasWalkableLow = false;
+        let hasTile = false; // Track if we found any tile in collision layers
 
         // Check all source collision layers from Tiled
         for (const collisionLayer of this.collisionLayers) {
           const tile = collisionLayer.getTileAt(x, y);
-          if (tile && tile.properties) {
-            // Check for walkable property (upper ground)
-            if ('walkable' in tile.properties && tile.properties.walkable === true) {
-              hasWalkable = true;
-              collisionType = CollisionType.WALKABLE;
+          if (tile && tile.index !== -1) {
+            hasTile = true;
+
+            if (tile.properties) {
+              // Check for walkable property (upper ground)
+              if ('walkable' in tile.properties && tile.properties.walkable === true) {
+                hasWalkable = true;
+                collisionType = CollisionType.WALKABLE;
+              }
+              // Check for walkable_low property (lower ground)
+              if ('walkable_low' in tile.properties && tile.properties.walkable_low === true) {
+                hasWalkableLow = true;
+                collisionType = CollisionType.WALKABLE_LOW;
+              }
+              // Check for stairs (always passable)
+              if ('stairs' in tile.properties && tile.properties.stairs === true) {
+                collisionType = CollisionType.STAIRS;
+              }
             }
-            // Check for walkable_low property (lower ground)
-            if ('walkable_low' in tile.properties && tile.properties.walkable_low === true) {
-              hasWalkableLow = true;
-              collisionType = CollisionType.WALKABLE_LOW;
-            }
-            // Check if explicitly blocked (walkable: false or no walkable property)
-            if (('walkable' in tile.properties && tile.properties.walkable === false) ||
-              (!hasWalkable && !hasWalkableLow && tile.index !== -1)) {
+
+            // If tile has no walkable properties, it's blocked
+            if (!hasWalkable && !hasWalkableLow && collisionType !== CollisionType.STAIRS) {
               collisionType = CollisionType.BLOCKED;
-            }
-            // Check for stairs (always passable)
-            if ('stairs' in tile.properties && tile.properties.stairs === true) {
-              collisionType = CollisionType.STAIRS;
             }
           }
         }
@@ -1191,7 +1196,13 @@ export class OverworldScene extends Phaser.Scene {
         this.collisionArray[y][x] = collisionType;
 
         // Place tile in appropriate layer(s)
-        if (collisionType === CollisionType.STAIRS) {
+        // Only create collision if there's actually a tile in the collision layer
+        if (!hasTile) {
+          // No collision tile means walkable (normal ground)
+          upperGroundData[y][x] = 0;
+          lowerGroundData[y][x] = 0;
+          blockedData[y][x] = 0;
+        } else if (collisionType === CollisionType.STAIRS) {
           // Stairs: walkable on all layers
           upperGroundData[y][x] = 0;
           lowerGroundData[y][x] = 0;
@@ -1209,7 +1220,7 @@ export class OverworldScene extends Phaser.Scene {
           lowerGroundData[y][x] = 0;
           blockedData[y][x] = 0;
         } else {
-          // Always blocked (walls, obstacles)
+          // Tile exists but has no walkable properties = always blocked (walls, obstacles)
           upperGroundData[y][x] = 0;
           lowerGroundData[y][x] = 0;
           blockedData[y][x] = 1; // Always has collision
