@@ -1675,6 +1675,8 @@ export class OverworldScene extends Phaser.Scene {
       // Delegate to controller for puzzle lifecycle
       await this.puzzleController.enterPuzzle(puzzleId, (mode: 'puzzle') => {
         this.gameMode = mode;
+        // Stop camera follow so it doesn't snap back to player after zoom
+        this.cameras.main.stopFollow();
       });
 
       // Emit test event for automation
@@ -1726,6 +1728,8 @@ export class OverworldScene extends Phaser.Scene {
       await this.puzzleController.exitPuzzle(success, (mode: 'exploration') => {
         console.log('[DIAGNOSTIC] onModeChange callback called, setting mode to:', mode);
         this.gameMode = mode;
+        // Resume camera follow after returning to exploration
+        this.cameras.main.startFollow(this.player);
       });
       console.log('[DIAGNOSTIC] puzzleController.exitPuzzle completed');
 

@@ -111,6 +111,9 @@ We use git. **AI agents NEVER COMMIT TO GIT directly.** The human developer make
    # Continue to search for other strings
    Get-Content test-output.txt | Select-String -Pattern "removed"
    Get-Content test-output.txt | Select-String -Pattern "error"
+   
+   # Clean up when done (these files are .gitignore'd)
+   Remove-Item test-output.txt
    ```
 
 ### Unit Tests
