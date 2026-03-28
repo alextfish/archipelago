@@ -2466,6 +2466,11 @@
                          "name":"collides",
                          "type":"bool",
                          "value":false
+                        }, 
+                        {
+                         "name":"walkable",
+                         "type":"bool",
+                         "value":true
                         }]
                 }, 
                 {
@@ -2480,6 +2485,11 @@
                          "name":"collides",
                          "type":"bool",
                          "value":true
+                        }, 
+                        {
+                         "name":"walkable",
+                         "type":"bool",
+                         "value":false
                         }]
                 }, 
                 {
@@ -2494,6 +2504,11 @@
                          "name":"collides",
                          "type":"bool",
                          "value":true
+                        }, 
+                        {
+                         "name":"walkable",
+                         "type":"bool",
+                         "value":false
                         }]
                 }, 
                 {
@@ -2508,6 +2523,11 @@
                          "name":"collides",
                          "type":"bool",
                          "value":false
+                        }, 
+                        {
+                         "name":"walkable",
+                         "type":"bool",
+                         "value":true
                         }]
                 }, 
                 {
@@ -2522,6 +2542,11 @@
                          "name":"collides",
                          "type":"bool",
                          "value":false
+                        }, 
+                        {
+                         "name":"walkable",
+                         "type":"bool",
+                         "value":true
                         }]
                 }, 
                 {
@@ -2536,6 +2561,11 @@
                          "name":"collides",
                          "type":"bool",
                          "value":true
+                        }, 
+                        {
+                         "name":"walkable",
+                         "type":"bool",
+                         "value":false
                         }]
                 }, 
                 {
@@ -2550,6 +2580,11 @@
                          "name":"collides",
                          "type":"bool",
                          "value":false
+                        }, 
+                        {
+                         "name":"walkable",
+                         "type":"bool",
+                         "value":true
                         }]
                 }, 
                 {
@@ -2562,6 +2597,25 @@
                         }, 
                         {
                          "name":"collides",
+                         "type":"bool",
+                         "value":true
+                        }, 
+                        {
+                         "name":"walkable",
+                         "type":"bool",
+                         "value":false
+                        }]
+                }, 
+                {
+                 "id":8,
+                 "properties":[
+                        {
+                         "name":"walkable",
+                         "type":"bool",
+                         "value":false
+                        }, 
+                        {
+                         "name":"walkable_low",
                          "type":"bool",
                          "value":true
                         }]

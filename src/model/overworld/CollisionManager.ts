@@ -4,12 +4,28 @@ import type { OverworldScene } from '@view/scenes/OverworldScene';
 import type { Door } from '@model/overworld/Door';
 
 /**
+ * Collision type constants for multi-layer collision system
+ * - BLOCKED: Impassable terrain (value: 0)
+ * - WALKABLE: Normal walkable ground on upper layer (value: 1)
+ * - WALKABLE_LOW: Walkable ground on lower layer, like riverbeds (value: 2)
+ * - STAIRS: Layer-neutral stairs connecting upper and lower layers (value: 3)
+ */
+export const CollisionType = {
+    BLOCKED: 0,
+    WALKABLE: 1,
+    WALKABLE_LOW: 2,
+    STAIRS: 3,
+} as const;
+
+export type CollisionType = typeof CollisionType[keyof typeof CollisionType];
+
+/**
  * Manages dynamic collision updates for overworld puzzles
  * Converts puzzle bridges to overworld collision tiles and restores original state
  */
 export class CollisionManager {
     private overworldScene: OverworldScene;
-    private originalCollision: Map<string, boolean> = new Map();
+    private originalCollision: Map<string, CollisionType> = new Map();
     private puzzleBounds: Phaser.Geom.Rectangle | null = null;
     private tileSize: number = 32;
     private doors: Door[] = [];
@@ -45,9 +61,9 @@ export class CollisionManager {
         console.log('CollisionManager: Restoring original collision');
 
         // Restore all stored collision states
-        for (const [key, originalCollision] of this.originalCollision) {
+        for (const [key, originalCollisionType] of this.originalCollision) {
             const [x, y] = key.split(',').map(Number);
-            this.overworldScene.setCollisionAt(x, y, originalCollision);
+            this.overworldScene.setCollisionAt(x, y, originalCollisionType);
         }
 
         // Clear stored state
@@ -83,8 +99,8 @@ export class CollisionManager {
         // Restore original collision for each tile
         for (const { tileX, tileY } of bridgeTiles) {
             const key = `${tileX},${tileY}`;
-            const originalCollision = this.originalCollision.get(key) || false;
-            this.overworldScene.setCollisionAt(tileX, tileY, originalCollision);
+            const originalCollisionType = this.originalCollision.get(key) || CollisionType.WALKABLE;
+            this.overworldScene.setCollisionAt(tileX, tileY, originalCollisionType);
         }
     }
 
@@ -99,8 +115,8 @@ export class CollisionManager {
         for (let tileY = startTileY; tileY < endTileY; tileY++) {
             for (let tileX = startTileX; tileX < endTileX; tileX++) {
                 const key = `${tileX},${tileY}`;
-                const originalCollision = this.overworldScene.hasCollisionAt(tileX, tileY);
-                this.originalCollision.set(key, originalCollision);
+                const originalCollisionType = this.overworldScene.getCollisionAt(tileX, tileY);
+                this.originalCollision.set(key, originalCollisionType);
             }
         }
 
@@ -115,9 +131,9 @@ export class CollisionManager {
         // Get all tile positions for this bridge
         const bridgeTiles = this.getBridgeTilePositions(bridge, puzzleBounds);
 
-        // Set walkable=true for each tile
+        // Set walkable for each tile (bridges are always upper layer)
         for (const { tileX, tileY } of bridgeTiles) {
-            this.overworldScene.setCollisionAt(tileX, tileY, true);
+            this.overworldScene.setCollisionAt(tileX, tileY, CollisionType.WALKABLE);
         }
     }
 
@@ -187,13 +203,12 @@ export class CollisionManager {
      */
     updateDoorCollision(door: Door): void {
         const locked = door.isLocked();
-        // Collision array: true = blocked, false = walkable
-        // So locked door needs collision=true to block movement
-        const blocked = locked;
-        console.log(`CollisionManager: Updating door ${door.id} collision: locked=${locked}, collision=${blocked}`);
+        // Locked doors are blocked, unlocked doors are walkable
+        const collisionType = locked ? CollisionType.BLOCKED : CollisionType.WALKABLE;
+        console.log(`CollisionManager: Updating door ${door.id} collision: locked=${locked}, type=${collisionType}`);
         for (const pos of door.getPositions()) {
-            this.overworldScene.setCollisionAt(pos.tileX, pos.tileY, blocked);
-            console.log(`  Set collision at (${pos.tileX}, ${pos.tileY}) to ${blocked}`);
+            this.overworldScene.setCollisionAt(pos.tileX, pos.tileY, collisionType);
+            console.log(`  Set collision at (${pos.tileX}, ${pos.tileY}) to ${collisionType}`);
         }
     }
 

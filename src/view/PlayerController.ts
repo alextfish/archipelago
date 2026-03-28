@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { CollisionType } from '@model/overworld/CollisionManager';
 
 /**
  * Movement constants for player character
@@ -29,6 +30,11 @@ export class PlayerController {
 
     // Track facing direction for interaction cursor
     private facingDirection: 'up' | 'down' | 'left' | 'right' = 'down';
+
+    // Player layer tracking for multi-layer collision system
+    // 'upper' = normal ground level, 'lower' = riverbeds and lower areas
+    // Stairs are layer-neutral; layer changes only when exiting stairs
+    private playerLayer: 'upper' | 'lower' = 'upper';
 
     constructor(
         scene: Phaser.Scene,
@@ -452,5 +458,66 @@ export class PlayerController {
      */
     getFacingDirection(): 'up' | 'down' | 'left' | 'right' {
         return this.facingDirection;
+    }
+
+    /**
+     * Get the player's current layer
+     */
+    getPlayerLayer(): 'upper' | 'lower' {
+        return this.playerLayer;
+    }
+
+    /**
+     * Set the player's layer (used when transitioning via stairs)
+     */
+    setPlayerLayer(layer: 'upper' | 'lower'): void {
+        if (this.playerLayer !== layer) {
+            console.log(`Player layer changed: ${this.playerLayer} -> ${layer}`);
+            this.playerLayer = layer;
+        }
+    }
+
+    /**
+     * Validate if player can move to a tile based on collision type and current layer
+     * 
+     * @param targetType - The collision type of the target tile
+     * @param currentType - The collision type of the current tile (optional, for context)
+     * @returns Object with 'allowed' boolean and optional 'newLayer' if layer transition occurs
+     */
+    canMoveToTile(
+        targetType: CollisionType,
+        currentType?: CollisionType
+    ): { allowed: boolean; newLayer?: 'upper' | 'lower' } {
+        // BLOCKED tiles are never walkable
+        if (targetType === CollisionType.BLOCKED) {
+            return { allowed: false };
+        }
+
+        // STAIRS are always accessible from any layer, no layer change
+        if (targetType === CollisionType.STAIRS) {
+            return { allowed: true };
+        }
+
+        // Exiting stairs sets layer based on target type
+        if (currentType === CollisionType.STAIRS) {
+            if (targetType === CollisionType.WALKABLE) {
+                return { allowed: true, newLayer: 'upper' };
+            }
+            if (targetType === CollisionType.WALKABLE_LOW) {
+                return { allowed: true, newLayer: 'lower' };
+            }
+        }
+
+        // Normal tiles must match current layer
+        if (targetType === CollisionType.WALKABLE) {
+            return { allowed: this.playerLayer === 'upper' };
+        }
+
+        if (targetType === CollisionType.WALKABLE_LOW) {
+            return { allowed: this.playerLayer === 'lower' };
+        }
+
+        // Unknown collision type - block movement
+        return { allowed: false };
     }
 }

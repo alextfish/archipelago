@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { MapUtils } from '@model/overworld/MapConfig';
 import { OverworldPuzzleManager } from '@model/overworld/OverworldPuzzleManager';
 import { OverworldGameState } from '@model/overworld/OverworldGameState';
-import { CollisionManager } from '@model/overworld/CollisionManager';
+import { CollisionManager, CollisionType } from '@model/overworld/CollisionManager';
 import { OverworldBridgeManager } from '@model/overworld/OverworldBridgeManager';
 import { CameraManager } from '@view/CameraManager';
 import { OverworldPuzzleController } from '@controller/OverworldPuzzleController';
@@ -31,9 +31,12 @@ export class OverworldScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private playerController?: PlayerController;
   private map!: Phaser.Tilemaps.Tilemap;
-  private collisionLayers: Phaser.Tilemaps.TilemapLayer[] = [];
+  private collisionLayers: Phaser.Tilemaps.TilemapLayer[] = []; // All source collision layers from Tiled
+  private upperGroundLayer?: Phaser.Tilemaps.TilemapLayer; // Upper ground - blocks when player on lower layer
+  private lowerGroundLayer?: Phaser.Tilemaps.TilemapLayer; // Lower ground - blocks when player on upper layer
+  private blockedLayer?: Phaser.Tilemaps.TilemapLayer; // Always blocked
   private bridgesLayer!: Phaser.Tilemaps.TilemapLayer;
-  private collisionArray: boolean[][] = [];
+  private collisionArray: number[][] = [];
   private gameMode: 'exploration' | 'conversation' | 'puzzle' = 'exploration';
   private isExitingPuzzle: boolean = false; // Guard to prevent re-entrant exit calls
   private isPointerHeld: boolean = false; // Track if pointer is held down for continuous movement
@@ -318,9 +321,33 @@ export class OverworldScene extends Phaser.Scene {
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.playerController = new PlayerController(this, this.player, this.cursors, this.collisionLayers[0]);
 
-    // Enable collision between player and all collision layers
-    for (const collisionLayer of this.collisionLayers) {
-      this.physics.add.collider(this.player, collisionLayer);
+    // Enable layer-based collision with callbacks
+    // Blocked layer always collides
+    if (this.blockedLayer) {
+      this.physics.add.collider(this.player, this.blockedLayer);
+      console.log('Blocked layer collision enabled (always)');
+    }
+
+    // Upper ground only blocks when player is on LOWER layer
+    if (this.upperGroundLayer) {
+      this.physics.add.collider(
+        this.player,
+        this.upperGroundLayer,
+        undefined,
+        () => this.playerController?.getPlayerLayer() === 'lower'
+      );
+      console.log('Upper ground layer collision enabled (blocks when on lower layer)');
+    }
+
+    // Lower ground only blocks when player is on UPPER layer
+    if (this.lowerGroundLayer) {
+      this.physics.add.collider(
+        this.player,
+        this.lowerGroundLayer,
+        undefined,
+        () => this.playerController?.getPlayerLayer() === 'upper'
+      );
+      console.log('Lower ground layer collision enabled (blocks when on upper layer)');
     }
 
     console.log('Overworld scene created successfully');
@@ -1113,43 +1140,161 @@ export class OverworldScene extends Phaser.Scene {
   private setupCollisionDetection() {
     if (this.collisionLayers.length === 0) return;
 
-    // Initialize collision array
+    // Initialize collision array and create separate layers
     const mapWidth = this.map.width;
     const mapHeight = this.map.height;
 
+    // Create blank tilemaps for our three collision categories
+    const upperGroundData: number[][] = [];
+    const lowerGroundData: number[][] = [];
+    const blockedData: number[][] = [];
+
     this.collisionArray = [];
+
     for (let y = 0; y < mapHeight; y++) {
       this.collisionArray[y] = [];
+      upperGroundData[y] = [];
+      lowerGroundData[y] = [];
+      blockedData[y] = [];
+
       for (let x = 0; x < mapWidth; x++) {
-        // Check all collision layers - if ANY layer has collision at this position, mark it as collision
-        let hasCollision = false;
+        let collisionType: CollisionType = CollisionType.WALKABLE;
+        let hasWalkable = false;
+        let hasWalkableLow = false;
+
+        // Check all source collision layers from Tiled
         for (const collisionLayer of this.collisionLayers) {
           const tile = collisionLayer.getTileAt(x, y);
-          // Check if tile exists and has 'collides' property set to true
-          if (tile && tile.properties && tile.properties.collides === true) {
-            hasCollision = true;
-            break; // No need to check other layers once we found collision
+          if (tile && tile.properties) {
+            // Check for walkable property (upper ground)
+            if ('walkable' in tile.properties && tile.properties.walkable === true) {
+              hasWalkable = true;
+              collisionType = CollisionType.WALKABLE;
+            }
+            // Check for walkable_low property (lower ground)
+            if ('walkable_low' in tile.properties && tile.properties.walkable_low === true) {
+              hasWalkableLow = true;
+              collisionType = CollisionType.WALKABLE_LOW;
+            }
+            // Check if explicitly blocked (walkable: false or no walkable property)
+            if (('walkable' in tile.properties && tile.properties.walkable === false) ||
+              (!hasWalkable && !hasWalkableLow && tile.index !== -1)) {
+              collisionType = CollisionType.BLOCKED;
+            }
+            // Check for stairs (always passable)
+            if ('stairs' in tile.properties && tile.properties.stairs === true) {
+              collisionType = CollisionType.STAIRS;
+            }
           }
         }
-        this.collisionArray[y][x] = hasCollision;
+
+        this.collisionArray[y][x] = collisionType;
+
+        // Place tile in appropriate layer(s)
+        if (collisionType === CollisionType.STAIRS) {
+          // Stairs: walkable on all layers
+          upperGroundData[y][x] = 0;
+          lowerGroundData[y][x] = 0;
+          blockedData[y][x] = 0;
+        } else if (hasWalkableLow) {
+          // Lower ground: walkable on lower layer, blocked on upper layer
+          // Put in lowerGroundLayer which collides when player on upper
+          upperGroundData[y][x] = 0;
+          lowerGroundData[y][x] = 1; // Collision when player on upper layer
+          blockedData[y][x] = 0;
+        } else if (hasWalkable) {
+          // Upper ground: walkable on upper layer, blocked on lower layer
+          // Put in upperGroundLayer which collides when player on lower
+          upperGroundData[y][x] = 1; // Collision when player on lower layer
+          lowerGroundData[y][x] = 0;
+          blockedData[y][x] = 0;
+        } else {
+          // Always blocked (walls, obstacles)
+          upperGroundData[y][x] = 0;
+          lowerGroundData[y][x] = 0;
+          blockedData[y][x] = 1; // Always has collision
+        }
       }
     }
 
-    // Set collision by property on all collision layers
-    for (const collisionLayer of this.collisionLayers) {
-      collisionLayer.setCollisionByProperty({ collides: true });
-    }
+    // Create the three collision layers from our organized data
+    this.createCollisionLayer('upperGround', upperGroundData, mapWidth, mapHeight);
+    this.createCollisionLayer('lowerGround', lowerGroundData, mapWidth, mapHeight);
+    this.createCollisionLayer('blocked', blockedData, mapWidth, mapHeight);
 
-    console.log(`Collision array initialized: ${mapWidth}x${mapHeight} from ${this.collisionLayers.length} layers`);
+    console.log(`Collision system initialized: ${mapWidth}x${mapHeight}`);
 
-    // Debug: count collision tiles
-    let collisionCount = 0;
+    // Debug: count collision tiles by type
+    let blockedCount = 0;
+    let walkableCount = 0;
+    let walkableLowCount = 0;
+    let stairsCount = 0;
+
     for (let y = 0; y < mapHeight; y++) {
       for (let x = 0; x < mapWidth; x++) {
-        if (this.collisionArray[y][x]) collisionCount++;
+        const type = this.collisionArray[y][x];
+        if (type === CollisionType.BLOCKED) blockedCount++;
+        else if (type === CollisionType.WALKABLE) walkableCount++;
+        else if (type === CollisionType.WALKABLE_LOW) walkableLowCount++;
+        else if (type === CollisionType.STAIRS) stairsCount++;
       }
     }
-    console.log(`Found ${collisionCount} collision tiles`);
+
+    console.log(`Collision tiles: BLOCKED=${blockedCount}, WALKABLE=${walkableCount}, WALKABLE_LOW=${walkableLowCount}, STAIRS=${stairsCount}`);
+  }
+
+  /**
+   * Create a collision layer from tile data
+   */
+  private createCollisionLayer(name: string, data: number[][], width: number, height: number): void {
+    // Convert 2D array to flat array for Phaser
+    const flatData: number[] = [];
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        flatData.push(data[y][x]);
+      }
+    }
+
+    // Get the first available tileset (we just need any tileset for collision tiles)
+    const tileset = this.map.tilesets[0];
+    if (!tileset) {
+      console.error('No tileset available for collision layer creation');
+      return;
+    }
+
+    // Create a blank tilemap layer
+    const layer = this.map.createBlankLayer(name, tileset, 0, 0, width, height, 32, 32);
+    if (!layer) {
+      console.warn(`Failed to create collision layer: ${name}`);
+      return;
+    }
+
+    // Fill with tiles
+    let tileCount = 0;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (data[y][x] === 1) {
+          layer.putTileAt(1, x, y);
+          tileCount++;
+        }
+      }
+    }
+
+    // Enable collision on all tiles in this layer
+    layer.setCollisionBetween(1, 1);
+    layer.setVisible(false); // Hide the collision layer
+
+    // Store reference
+    if (name === 'upperGround') {
+      this.upperGroundLayer = layer;
+      console.log(`Upper ground layer created with ${tileCount} tiles`);
+    } else if (name === 'lowerGround') {
+      this.lowerGroundLayer = layer;
+      console.log(`Lower ground layer created with ${tileCount} tiles`);
+    } else if (name === 'blocked') {
+      this.blockedLayer = layer;
+      console.log(`Blocked layer created with ${tileCount} tiles`);
+    }
   }
 
   update() {
@@ -1177,29 +1322,59 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   /**
-   * Check if a tile position has collision
+   * Get collision type at a specific tile position
    */
-  public hasCollisionAt(tileX: number, tileY: number): boolean {
-    if (tileY < 0 || tileY >= this.collisionArray.length) return false;
-    if (tileX < 0 || tileX >= this.collisionArray[0].length) return false;
-    return this.collisionArray[tileY][tileX];
+  public getCollisionAt(tileX: number, tileY: number): CollisionType {
+    if (tileY < 0 || tileY >= this.collisionArray.length) return CollisionType.BLOCKED;
+    if (tileX < 0 || tileX >= this.collisionArray[0].length) return CollisionType.BLOCKED;
+    return this.collisionArray[tileY][tileX] as CollisionType;
   }
 
   /**
-   * Update collision at a specific tile position (for bridge building)
+   * Check if a tile position has collision (for backward compatibility)
+   * Returns true if the tile is blocked, false otherwise
    */
-  public setCollisionAt(tileX: number, tileY: number, hasCollision: boolean) {
+  public hasCollisionAt(tileX: number, tileY: number): boolean {
+    return this.getCollisionAt(tileX, tileY) === CollisionType.BLOCKED;
+  }
+
+  /**
+   * Update collision at a specific tile position
+   * Updates the collision array and the appropriate collision layer
+   */
+  public setCollisionAt(tileX: number, tileY: number, collisionType: CollisionType) {
     if (tileY < 0 || tileY >= this.collisionArray.length) return;
     if (tileX < 0 || tileX >= this.collisionArray[0].length) return;
-    this.collisionArray[tileY][tileX] = hasCollision;
+    this.collisionArray[tileY][tileX] = collisionType;
 
-    // Update collision on all tilemap layers
-    for (const collisionLayer of this.collisionLayers) {
-      const tile = collisionLayer.getTileAt(tileX, tileY);
-      if (tile) {
-        tile.setCollision(hasCollision);
+    // Clear tile from all layers first
+    if (this.upperGroundLayer) this.upperGroundLayer.removeTileAt(tileX, tileY);
+    if (this.lowerGroundLayer) this.lowerGroundLayer.removeTileAt(tileX, tileY);
+    if (this.blockedLayer) this.blockedLayer.removeTileAt(tileX, tileY);
+
+    // Place tile in appropriate layer based on collision type
+    if (collisionType === CollisionType.WALKABLE) {
+      // Upper ground: blocked on lower layer
+      // Put in upperGroundLayer which collides when player on lower
+      if (this.upperGroundLayer) {
+        const tile = this.upperGroundLayer.putTileAt(1, tileX, tileY);
+        if (tile) tile.setCollision(true);
+      }
+    } else if (collisionType === CollisionType.WALKABLE_LOW) {
+      // Lower ground: blocked on upper layer
+      // Put in lowerGroundLayer which collides when player on upper
+      if (this.lowerGroundLayer) {
+        const tile = this.lowerGroundLayer.putTileAt(1, tileX, tileY);
+        if (tile) tile.setCollision(true);
+      }
+    } else if (collisionType === CollisionType.BLOCKED) {
+      // Always blocked
+      if (this.blockedLayer) {
+        const tile = this.blockedLayer.putTileAt(1, tileX, tileY);
+        if (tile) tile.setCollision(true);
       }
     }
+    // STAIRS: no collision on any layer (tiles already removed above)
   }
 
   // === OVERWORLD PUZZLE METHODS ===
@@ -1911,6 +2086,19 @@ export class OverworldScene extends Phaser.Scene {
       puzzleStats: this.puzzleManager.getStats(),
       cameraInPuzzleView: this.cameraManager.isInPuzzleView(),
       activePuzzle: this.gameState.getActivePuzzle()?.id
+    };
+  }
+
+  /**
+   * Get player position for testing
+   */
+  public getPlayerPosition(): { x: number; y: number; tileX: number; tileY: number } | null {
+    if (!this.player || !this.tiledMapData) return null;
+    return {
+      x: this.player.x,
+      y: this.player.y,
+      tileX: Math.floor(this.player.x / this.tiledMapData.tilewidth),
+      tileY: Math.floor(this.player.y / this.tiledMapData.tileheight)
     };
   }
 }

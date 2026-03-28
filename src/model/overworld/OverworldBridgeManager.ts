@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { Bridge } from '@model/puzzle/Bridge';
 import type { OverworldGameState } from './OverworldGameState';
 import { BridgeSpriteFrames } from '@view/BridgeSpriteFrameRegistry';
+import { CollisionType } from './CollisionManager';
 
 /**
  * Tracks which directions have bridges at a tile
@@ -27,7 +28,7 @@ export class OverworldBridgeManager {
         private map: Phaser.Tilemaps.Tilemap,
         private bridgesLayer: Phaser.Tilemaps.TilemapLayer,
         private collisionLayers: Phaser.Tilemaps.TilemapLayer[],
-        private collisionArray: boolean[][],
+        private collisionArray: number[][],
         private tiledMapData: any
     ) {
         // Find the bridge tileset by searching for the image filename
@@ -133,10 +134,10 @@ export class OverworldBridgeManager {
                 }
             }
 
-            // Make walkable by updating collision array
+            // Make walkable by updating collision array (bridges are upper layer)
             if (tileY >= 0 && tileY < this.collisionArray.length &&
                 tileX >= 0 && tileX < this.collisionArray[tileY].length) {
-                this.collisionArray[tileY][tileX] = false;
+                this.collisionArray[tileY][tileX] = CollisionType.WALKABLE;
             }
         }
 
@@ -309,9 +310,11 @@ export class OverworldBridgeManager {
                     }
                 }
 
+                // Restore collision type in collision array
                 if (tileY >= 0 && tileY < this.collisionArray.length &&
                     tileX >= 0 && tileX < this.collisionArray[tileY].length) {
-                    this.collisionArray[tileY][tileX] = hasCollision;
+                    // If original tile was blocked, restore as BLOCKED; otherwise WALKABLE
+                    this.collisionArray[tileY][tileX] = hasCollision ? CollisionType.BLOCKED : CollisionType.WALKABLE;
                 }
             }
         }

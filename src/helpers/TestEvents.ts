@@ -86,3 +86,32 @@ export function clearTestEvents(): void {
         (window as any).__GAME_EVENTS__ = [];
     }
 }
+
+/**
+ * Get player position from the game for testing
+ * Returns null if not in test mode or player not available
+ */
+export function getPlayerPosition(): { x: number; y: number; tileX: number; tileY: number } | null {
+    if (!isTestMode() || typeof window === 'undefined') {
+        return null;
+    }
+
+    // Access the Phaser game instance
+    const game = (window as any).game;
+    if (!game || !game.scene) {
+        return null;
+    }
+
+    // Get the OverworldScene
+    const overworldScene = game.scene.getScene('OverworldScene');
+    if (!overworldScene) {
+        return null;
+    }
+
+    // Call the getPlayerPosition method if it exists
+    if (typeof (overworldScene as any).getPlayerPosition === 'function') {
+        return (overworldScene as any).getPlayerPosition();
+    }
+
+    return null;
+}
