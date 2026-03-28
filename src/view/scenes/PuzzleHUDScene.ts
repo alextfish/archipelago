@@ -9,12 +9,27 @@ export class PuzzleHUDScene extends Phaser.Scene {
     private types: BridgeType[] = [];
     private solvedOverlay: Phaser.GameObjects.Container | null = null;
     private eventListeners: Array<{ event: string; callback: Function }> = [];
+    private backgroundRect: Phaser.GameObjects.Rectangle | null = null;
 
     constructor() {
         super({ key: 'PuzzleHUDScene' });
     }
 
     create() {
+        // Create solid background that sits between the overworld and HUD elements
+        // This prevents the overworld from showing through the HUD
+        this.backgroundRect = this.add.rectangle(
+            0,
+            0,
+            this.scale.width,
+            this.scale.height,
+            0x1a1a1a,
+            0.85
+        );
+        this.backgroundRect.setOrigin(0, 0);
+        this.backgroundRect.setDepth(0);
+        this.backgroundRect.setScrollFactor(0);
+        this.backgroundRect.setVisible(false); // Hidden by default
         // Create the sidebar UI and wire its callbacks to scene events so other scenes
         // can listen for user actions.
         const callbacks = {
@@ -118,6 +133,13 @@ export class PuzzleHUDScene extends Phaser.Scene {
      */
     setupForPuzzle(_controller: PuzzleController, puzzleType: 'overworld' | 'bridge'): void {
         console.log(`PuzzleHUDScene: Setting up for ${puzzleType} puzzle`);
+
+        // Show background only for bridge puzzles (series/standalone)
+        // Overworld puzzles need to see the terrain, so no background
+        if (this.backgroundRect) {
+
+            this.backgroundRect.setVisible(puzzleType === 'bridge');
+        }
 
         // Clear any existing event listeners
         this.cleanupEventListeners();
@@ -290,9 +312,14 @@ export class PuzzleHUDScene extends Phaser.Scene {
     /**
      * Set visibility of the HUD scene
      */
-    setVisible(visible: boolean): void {
+    setVisible(visible: boolean, puzzleType: 'overworld' | 'bridge'): void {
         console.log(`PuzzleHUDScene: Setting visibility to ${visible}`);
         this.scene.setVisible(visible);
+
+        // Show/hide background with HUD
+        if (this.backgroundRect) {
+            this.backgroundRect.setVisible(visible && puzzleType === 'bridge');
+        }
 
         // Sidebar visibility is controlled by the scene visibility
         // No need to explicitly control it

@@ -10,6 +10,8 @@ export const MAX_TEST_DURATION = 60000;  // 1 minute maximum
 export const IDLE_TIMEOUT = 10000;       // 10 seconds of no activity
 export const ACTIVITY_CHECK_INTERVAL = 1000; // Check every second
 
+export const DEV_PORT = 5173; // Port where Vite serves the test page
+
 /**
  * Initialize a browser test session
  * @param {Object} config - Test configuration
@@ -113,13 +115,40 @@ export async function initTest(config) {
  */
 export async function navigateAndWaitForLoad(page) {
     console.log('[TEST] Opening test.html...');
-    await page.goto('http://localhost:5173/test.html');
+
+    // Listen for page errors
+    page.on('pageerror', (error) => {
+        console.error('[BROWSER ERROR]', error.message);
+    });
+
+    await page.goto(`http://localhost:${DEV_PORT}/test.html`);
 
     // Wait for Phaser to be available
     console.log('[TEST] Waiting for game to load...');
-    await page.waitForFunction(() => {
-        return window.Phaser !== undefined;
-    }, { timeout: 10000 });
+
+    // Check if page actually loaded
+    const title = await page.title();
+    console.log(`[TEST] Page title: "${title}"`);
+
+    // Check if test mode script ran
+    const testModeSet = await page.evaluate(() => {
+        return window.__TEST_MODE__ === true;
+    });
+    console.log(`[TEST] Test mode set: ${testModeSet}`);
+
+    try {
+        await page.waitForFunction(() => {
+            console.log('[TEST CHECK] Phaser:', typeof window.Phaser);
+            return window.Phaser !== undefined;
+        }, { timeout: 15000, polling: 1000 });
+        console.log('[TEST] Phaser loaded successfully');
+    } catch (e) {
+        console.error('[TEST] Timeout waiting for Phaser');
+        // Try to get more info about what's on the page
+        const bodyText = await page.evaluate(() => document.body.innerHTML.substring(0, 500));
+        console.log('[TEST] Page body:', bodyText);
+        throw e;
+    }
 
     // Wait a bit more for scene setup
     await page.waitForTimeout(3000);
@@ -236,4 +265,83 @@ export async function completeConversation(
 
     // Wait for conversation to end
     await waitForGameEvent(page, 'conversation_ended');
+}
+
+/**
+ * Get puzzle camera info (zoom, position) from browser
+ * @param {Object} page - Playwright page
+ * @returns {Promise<Object>} Camera info with zoom, scrollX, scrollY
+ */
+export async function getPuzzleCameraInfo(page) {
+    const cameraInfo = await page.evaluate(() => {
+        return window.__PUZZLE_CAMERA_INFO__ || { zoom: 1, scrollX: 0, scrollY: 0 };
+    });
+    console.log('[TEST] Puzzle camera info:', cameraInfo);
+    return cameraInfo;
+}
+
+/**
+ * Click a grid coordinate in the puzzle
+ * @param {Object} page - Playwright page
+ * @param {number} gridX - Grid X coordinate
+ * @param {number} gridY - Grid Y coordinate
+ * @param {number} [tileSize=32] - Size of each grid tile in pixels
+ */
+export async function clickPuzzleGrid(page, gridX, gridY, tileSize = 32) {
+    console.log(`[TEST] Clicking puzzle grid at (${gridX}, ${gridY})...`);
+
+    // Get camera info
+    const camera = await getPuzzleCameraInfo(page);
+
+    // Find the puzzle boundary marker
+    const marker = await page.$('[data-testid="puzzle-boundary"]');
+    if (!marker) {
+        throw new Error('Could not find puzzle boundary marker');
+    }
+
+    // Get marker position and size
+    const box = await marker.boundingBox();
+    if (!box) {
+        throw new Error('Could not get puzzle boundary box');
+    }
+
+    console.log(`[TEST] Puzzle boundary box:`, box);
+    console.log(`[TEST] Camera zoom: ${camera.zoom}, scroll: (${camera.scrollX}, ${camera.scrollY})`);
+
+    // Calculate world position of grid cell center
+    const worldX = (gridX + 0.5) * tileSize;
+    const worldY = (gridY + 0.5) * tileSize;
+
+    // Apply camera transformation: screen = (world - scroll) * zoom
+    const screenX = (worldX - camera.scrollX) * camera.zoom;
+    const screenY = (worldY - camera.scrollY) * camera.zoom;
+
+    // Click position relative to marker
+    const clickX = box.x + screenX;
+    const clickY = box.y + screenY;
+
+    console.log(`[TEST] Grid (${gridX}, ${gridY}) -> World (${worldX.toFixed(1)}, ${worldY.toFixed(1)}) -> Screen (${screenX.toFixed(1)}, ${screenY.toFixed(1)}) -> Click (${clickX.toFixed(1)}, ${clickY.toFixed(1)})`);
+
+    await page.mouse.click(clickX, clickY);
+    console.log(`[TEST] Clicked puzzle grid at (${gridX}, ${gridY})`);
+
+    // Brief pause to let game process the click
+    await page.waitForTimeout(300);
+}
+
+/**
+ * Place a bridge between two grid coordinates
+ * @param {Object} page - Playwright page
+ * @param {number} x1 - First grid X coordinate
+ * @param {number} y1 - First grid Y coordinate
+ * @param {number} x2 - Second grid X coordinate
+ * @param {number} y2 - Second grid Y coordinate
+ * @param {number} [tileSize=32] - Size of each grid tile in pixels
+ */
+export async function placeBridge(page, x1, y1, x2, y2, tileSize = 32) {
+    console.log(`[TEST] Placing bridge from (${x1}, ${y1}) to (${x2}, ${y2})...`);
+    await clickPuzzleGrid(page, x1, y1, tileSize);
+    await page.waitForTimeout(200);
+    await clickPuzzleGrid(page, x2, y2, tileSize);
+    await page.waitForTimeout(500); // Wait for bridge placement animation
 }

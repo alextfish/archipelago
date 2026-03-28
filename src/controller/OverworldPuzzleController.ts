@@ -380,12 +380,13 @@ export class OverworldPuzzleController {
             onPuzzleSolved: () => {
                 console.log(`Overworld puzzle ${puzzleId} solved!`);
                 console.log('[DIAGNOSTIC] onPuzzleSolved callback triggered');
-                // Call scene's exitOverworldPuzzle to properly clean up and restore state
-                // We need to use setTimeout to avoid calling scene method during puzzle validation
+                // Emit puzzleSolved event to show "Puzzle Solved!" overlay in HUD
+                this.scene.events.emit('puzzleSolved');
+                // Delay exit to allow "Puzzle Solved!" message to be visible for 1.5 seconds
                 setTimeout(() => {
-                    console.log('[DIAGNOSTIC] Calling scene.exitOverworldPuzzle from setTimeout');
+                    console.log('[DIAGNOSTIC] Calling scene.exitOverworldPuzzle after delay');
                     (this.scene as any).exitOverworldPuzzle(true);
-                }, 0);
+                }, 1500);
             },
             onPuzzleExited: (success: boolean) => {
                 console.log('[DIAGNOSTIC] onPuzzleExited callback triggered, success:', success);

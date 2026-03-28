@@ -84,8 +84,30 @@ async function runTest() {
         }
 
         console.log('[TEST] Puzzle entered successfully!', puzzleEvent);
+
+        // Wait for puzzle to be ready
+        await page.waitForTimeout(2000);
+
+        // Solve the puzzle
+        console.log('[TEST] Solving puzzle...');
+        const { placeBridge, getPuzzleCameraInfo } = await import('../playwright/helpers.mjs');
+
+        // Verify camera info is available
+        await getPuzzleCameraInfo(page);
+
+        // Solution: A(1,1)-B(3,1), B(3,1)-D(3,3), A(1,1)-C(1,3)
+        console.log('[TEST] Placing bridge 1: A(1,1) to B(3,1)');
+        await placeBridge(page, 1, 1, 3, 1);
+
+        console.log('[TEST] Placing bridge 2: B(3,1) to D(3,3)');
+        await placeBridge(page, 3, 1, 3, 3);
+
+        console.log('[TEST] Placing bridge 3: A(1,1) to C(1,3)');
+        await placeBridge(page, 1, 1, 1, 3);
+
+        console.log('[TEST] Puzzle solution entered!');
         console.log('[TEST] Forest series puzzle test completed successfully!');
-        await cleanup('Test success - series puzzle launched');
+        await cleanup('Test success - series puzzle solved');
 
     } catch (error) {
         console.error('[TEST] Error during test:', error.message);

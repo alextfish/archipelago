@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import { GridToWorldMapper } from '../GridToWorldMapper';
 import { PhaserPuzzleRenderer } from '../PhaserPuzzleRenderer';
+import { isTestMode, attachTestMarker } from '@helpers/TestMarkers';
 
 export class IslandMapScene extends Phaser.Scene {
     private puzzle: BridgePuzzle | null = null;
@@ -198,7 +199,42 @@ export class IslandMapScene extends Phaser.Scene {
             console.log(`Camera size: ${cam.width} x ${cam.height}`);
             console.log(`Camera center would be: (${cam.scrollX + cam.width / 2}, ${cam.scrollY + cam.height / 2})`);
             console.log('=== END CAMERA DEBUG ===');
+
+            // Expose camera info for Playwright tests
+            if (isTestMode()) {
+                (window as any).__PUZZLE_CAMERA_INFO__ = {
+                    zoom: cam.zoom,
+                    scrollX: cam.scrollX,
+                    scrollY: cam.scrollY
+                };
+                console.log('[TEST] Exposed puzzle camera info:', (window as any).__PUZZLE_CAMERA_INFO__);
+            }
         }, 100);
+
+        // Add test marker for puzzle boundary
+        if (isTestMode() && this.gridMapper) {
+            const cell = this.gridMapper.getCellSize();
+            const puzzleWidth = this.puzzle.islands.length > 0
+                ? (Math.max(...this.puzzle.islands.map(i => i.x)) + 1) * cell
+                : cell * 10;
+            const puzzleHeight = this.puzzle.islands.length > 0
+                ? (Math.max(...this.puzzle.islands.map(i => i.y)) + 1) * cell
+                : cell * 10;
+
+            // Create an invisible game object at origin to attach marker to
+            const markerObject = this.add.rectangle(0, 0, puzzleWidth, puzzleHeight, 0x000000, 0);
+            markerObject.setOrigin(0, 0);
+
+            attachTestMarker(this, markerObject, {
+                id: 'puzzle-boundary',
+                testId: 'puzzle-boundary',
+                width: puzzleWidth,
+                height: puzzleHeight,
+                showBorder: false // Don't show visual border, just DOM marker
+            });
+
+            console.log(`[TEST] Added puzzle boundary marker: ${puzzleWidth}x${puzzleHeight}`);
+        }
     }
 
     private adjustCameraForIslands() {
@@ -260,6 +296,16 @@ export class IslandMapScene extends Phaser.Scene {
             this.cameras.main.scrollX -= worldDeltaX;
             this.cameras.main.scrollY -= worldDeltaY;
             console.log(`Camera centered and nudged by world delta (${worldDeltaX.toFixed(2)}, ${worldDeltaY.toFixed(2)})`);
+
+            // Update exposed camera info for tests
+            if (isTestMode()) {
+                const cam = this.cameras.main;
+                (window as any).__PUZZLE_CAMERA_INFO__ = {
+                    zoom: cam.zoom,
+                    scrollX: cam.scrollX,
+                    scrollY: cam.scrollY
+                };
+            }
         }
     }
 

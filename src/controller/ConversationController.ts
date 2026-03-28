@@ -131,6 +131,8 @@ export class ConversationController {
             this.host.hideConversation();
             this.host.onConversationEnd();
             this.hostCleanupCalled = true;
+            // Now end conversation and emit test event
+            this.endConversation();
         } else {
             // Display next node
             this.displayCurrentNode();

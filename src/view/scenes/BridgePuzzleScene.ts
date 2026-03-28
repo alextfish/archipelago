@@ -4,6 +4,7 @@ import { PuzzleController } from '@controller/PuzzleController';
 import type { PuzzleHost } from '@controller/PuzzleHost';
 import { Environment } from '@helpers/Environment';
 import { emitTestEvent } from '@helpers/TestEvents';
+import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 
 export class BridgePuzzleScene extends Phaser.Scene {
     private puzzle: BridgePuzzle | null = null;
@@ -79,32 +80,27 @@ export class BridgePuzzleScene extends Phaser.Scene {
         const rendererProxy = this.createRendererProxy();
         this.controller = new PuzzleController(this.puzzle, rendererProxy, host);
 
-        // Launch the HUD scene which owns the sidebar UI. We'll communicate via
-        // scene events (clean separation between world and UI).
-        this.scene.launch('PuzzleHUDScene');
-        const hud = this.scene.get('PuzzleHUDScene');
+        // Show HUD using PuzzleHUDManager for proper setup (background, etc.)
+        PuzzleHUDManager.getInstance().enterPuzzle(this, this.controller, 'bridge');
 
-        // Wait until the HUD scene has finished initialising (it emits 'ready')
-        // before sending initial types/counts. This avoids racing where the
-        // BridgePuzzleScene emits events before PuzzleHUDScene.create() runs.
+        // Emit bridge types and counts for HUD
         const bridgeTypes = this.puzzle.getAvailableBridgeTypes();
         const counts = this.puzzle.availableCounts();
-        this.events.once('hudReady', () => {
-            this.events.emit('setTypes', bridgeTypes);
-            console.log('Sent bridge types to HUD:', bridgeTypes);
-            hud.events.emit('updateCounts', counts);
-            if (this.controller?.currentBridgeType) {
-                hud.events.emit('setSelectedType', this.controller.currentBridgeType.id);
-            }
-        });
+        this.events.emit('setTypes', bridgeTypes);
+        console.log('Sent bridge types to HUD:', bridgeTypes);
+        this.events.emit('updateCounts', counts);
+        if (this.controller?.currentBridgeType) {
+            this.events.emit('setSelectedType', this.controller.currentBridgeType.id);
+        }
 
         // Listen for HUD events (user actions)
+        const hud = this.scene.get('PuzzleHUDScene');
         hud.events.on('typeSelected', (typeId: string) => {
             const type = this.puzzle?.inventory.bridges.find(b => b.type.id === typeId)?.type;
             if (type) {
                 this.controller?.selectBridgeType(type);
                 // Notify HUD to update visual selection
-                hud.events.emit('setSelectedType', typeId);
+                this.events.emit('setSelectedType', typeId);
             }
         });
         hud.events.on('exit', () => this.controller?.exitPuzzle(false));
@@ -342,9 +338,13 @@ export class BridgePuzzleScene extends Phaser.Scene {
             },
             onPuzzleSolved: () => {
                 try { console.log('[PuzzleHost] onPuzzleSolved called (forwarding to HUD)'); } catch (e) { }
-                // Forward solved notification to the HUD scene so the overlay is drawn in UI space
-                const hud = this.scene.get('PuzzleHUDScene');
-                hud.events.emit('puzzleSolved');
+                // Forward solved notification to show "Puzzle Solved!" overlay
+                this.events.emit('puzzleSolved');
+                // Delay exit to allow message to be visible for 1.5 seconds
+                setTimeout(() => {
+                    console.log('[BridgePuzzleScene] Auto-exiting puzzle after delay');
+                    this.controller?.exitPuzzle(true);
+                }, 1500);
             },
             onPuzzleExited: (success: boolean) => this.onPuzzleExited(success),
             onNoBridgeTypeAvailable: (typeId: string) => this.onNoBridgeTypeAvailable(typeId),
@@ -363,8 +363,16 @@ export class BridgePuzzleScene extends Phaser.Scene {
     }
 
     onPuzzleExited(success: boolean): void {
-        // Log result (no overworld yet)
         console.log(`Puzzle exited: ${success ? 'solved' : 'unsolved'}`);
+
+        // Hide HUD using PuzzleHUDManager
+        PuzzleHUDManager.getInstance().exitPuzzle();
+
+        // Stop IslandMapScene
+        this.scene.stop('IslandMapScene');
+
+        // Stop this scene
+        this.scene.stop();
     }
 
     onNoBridgeTypeAvailable(typeId: string): void {

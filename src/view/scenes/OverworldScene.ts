@@ -1768,7 +1768,7 @@ export class OverworldScene extends Phaser.Scene {
           // Unlock the door associated with this series
           this.unlockDoor(this.currentSeries.id);
         }
-        
+
         // Find the NPC associated with this series and update their icon
         for (const [npcId, state] of this.npcSeriesStates.entries()) {
           if (state.getSeries()?.id === this.currentSeries.id) {
