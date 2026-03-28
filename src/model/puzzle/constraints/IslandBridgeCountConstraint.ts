@@ -6,6 +6,9 @@ import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
 // Each island's local bridge-count constraint must be satisfied
 
 export class IslandBridgeCountConstraint extends Constraint {
+  override readonly conversationFile = 'constraints/islandBridgeCount_unsatisfied.json';
+  override readonly conversationFileSolved = 'constraints/islandBridgeCount_satisfied.json';
+
   static fromSpec(_params?: { [key: string]: any }): IslandBridgeCountConstraint {
     return new IslandBridgeCountConstraint();
   }

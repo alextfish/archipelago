@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import fs from 'fs';
+import path from 'path';
 import { IslandBridgeCountConstraint } from '@model/puzzle/constraints/IslandBridgeCountConstraint';
 import { AllBridgesPlacedConstraint } from '@model/puzzle/constraints/AllBridgesPlacedConstraint';
 import { NoCrossingConstraint } from "@model/puzzle/constraints/NoCrossingConstraint";
@@ -193,7 +195,7 @@ describe("IslandBridgeCountConstraint.getDisplayItems", () => {
     const constraint = new IslandBridgeCountConstraint();
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "good" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "good", constraintType: "IslandBridgeCountConstraint" }]);
   });
 
   it("returns 'not-enough bridge' when island has too few bridges", () => {
@@ -212,7 +214,7 @@ describe("IslandBridgeCountConstraint.getDisplayItems", () => {
     const constraint = new IslandBridgeCountConstraint();
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge", constraintType: "IslandBridgeCountConstraint" }]);
   });
 
   it("returns 'too-many bridge' when island has too many bridges", () => {
@@ -232,7 +234,7 @@ describe("IslandBridgeCountConstraint.getDisplayItems", () => {
     const constraint = new IslandBridgeCountConstraint();
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "too-many bridge" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "too-many bridge", constraintType: "IslandBridgeCountConstraint" }]);
   });
 
   it("returns one item per constrained island with mixed satisfaction", () => {
@@ -254,7 +256,37 @@ describe("IslandBridgeCountConstraint.getDisplayItems", () => {
     const items = constraint.getDisplayItems(puzzle as any);
 
     expect(items).toHaveLength(2);
-    expect(items).toContainEqual({ elementID: "A", glyphMessage: "good" });
-    expect(items).toContainEqual({ elementID: "B", glyphMessage: "not-enough bridge" });
+    expect(items).toContainEqual({ elementID: "A", glyphMessage: "good", constraintType: "IslandBridgeCountConstraint" });
+    expect(items).toContainEqual({ elementID: "B", glyphMessage: "not-enough bridge", constraintType: "IslandBridgeCountConstraint" });
+  });
+});
+
+interface ConversationJSON {
+  start: string;
+  nodes: Record<string, {
+    npc: { expression: string; glyphs?: string };
+    choices?: Array<{ text: string; end?: boolean; next?: string }>;
+  }>;
+}
+
+describe("IslandBridgeCountConstraint conversation files", () => {
+  const conversationsDir = path.join(process.cwd(), 'resources/conversations');
+
+  it("satisfied conversation file has a happy expression", () => {
+    const constraint = new IslandBridgeCountConstraint();
+    const filePath = path.join(conversationsDir, constraint.conversationFileSolved!);
+    const json = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as ConversationJSON;
+
+    const startNode = json.nodes[json.start];
+    expect(startNode.npc.expression).toBe("happy");
+  });
+
+  it("unsatisfied conversation file has a neutral expression", () => {
+    const constraint = new IslandBridgeCountConstraint();
+    const filePath = path.join(conversationsDir, constraint.conversationFile!);
+    const json = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as ConversationJSON;
+
+    const startNode = json.nodes[json.start];
+    expect(startNode.npc.expression).toBe("neutral");
   });
 });

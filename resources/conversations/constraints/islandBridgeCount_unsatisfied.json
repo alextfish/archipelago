@@ -1,0 +1,18 @@
+{
+  "id": "islandBridgeCount_unsatisfied",
+  "start": "main",
+  "nodes": {
+    "main": {
+      "npc": {
+        "expression": "neutral",
+        "glyphs": "build bridge"
+      },
+      "choices": [
+        {
+          "text": "Leave",
+          "end": true
+        }
+      ]
+    }
+  }
+}
