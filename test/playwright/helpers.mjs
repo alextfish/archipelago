@@ -312,15 +312,16 @@ export async function clickPuzzleGrid(page, gridX, gridY, tileSize = 32) {
     const worldX = (gridX + 0.5) * tileSize;
     const worldY = (gridY + 0.5) * tileSize;
 
-    // Apply camera transformation: screen = (world - scroll) * zoom
-    const screenX = (worldX - camera.scrollX) * camera.zoom;
-    const screenY = (worldY - camera.scrollY) * camera.zoom;
+    // The puzzle-boundary marker is at world origin (0,0) after camera transformation.
+    // To click a world position, we just apply zoom (marker already accounts for camera scroll)
+    const screenOffsetX = worldX * camera.zoom;
+    const screenOffsetY = worldY * camera.zoom;
 
-    // Click position relative to marker
-    const clickX = box.x + screenX;
-    const clickY = box.y + screenY;
+    // Click position = marker position + offset
+    const clickX = box.x + screenOffsetX;
+    const clickY = box.y + screenOffsetY;
 
-    console.log(`[TEST] Grid (${gridX}, ${gridY}) -> World (${worldX.toFixed(1)}, ${worldY.toFixed(1)}) -> Screen (${screenX.toFixed(1)}, ${screenY.toFixed(1)}) -> Click (${clickX.toFixed(1)}, ${clickY.toFixed(1)})`);
+    console.log(`[TEST] Grid (${gridX}, ${gridY}) -> World (${worldX.toFixed(1)}, ${worldY.toFixed(1)}) -> Offset (${screenOffsetX.toFixed(1)}, ${screenOffsetY.toFixed(1)}) -> Click (${clickX.toFixed(1)}, ${clickY.toFixed(1)})`);
 
     await page.mouse.click(clickX, clickY);
     console.log(`[TEST] Clicked puzzle grid at (${gridX}, ${gridY})`);
@@ -344,4 +345,26 @@ export async function placeBridge(page, x1, y1, x2, y2, tileSize = 32) {
     await page.waitForTimeout(200);
     await clickPuzzleGrid(page, x2, y2, tileSize);
     await page.waitForTimeout(500); // Wait for bridge placement animation
+}
+
+/**
+ * Click on a bridge to remove it
+ * Clicks the midpoint between the two islands
+ * @param {Object} page - Playwright page
+ * @param {number} x1 - First grid X coordinate
+ * @param {number} y1 - First grid Y coordinate
+ * @param {number} x2 - Second grid X coordinate
+ * @param {number} y2 - Second grid Y coordinate
+ * @param {number} [tileSize=32] - Size of each grid tile in pixels
+ */
+export async function clickBridge(page, x1, y1, x2, y2, tileSize = 32) {
+    console.log(`[TEST] Clicking bridge between (${x1}, ${y1}) and (${x2}, ${y2}) to remove...`);
+
+    // Calculate midpoint between the two islands
+    const midX = (x1 + x2) / 2;
+    const midY = (y1 + y2) / 2;
+
+    // Click the midpoint
+    await clickPuzzleGrid(page, midX, midY, tileSize);
+    console.log(`[TEST] Clicked bridge midpoint at (${midX}, ${midY})`);
 }

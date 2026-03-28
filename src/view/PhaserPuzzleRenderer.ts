@@ -56,7 +56,6 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
 
       // Add click handler for island
       sprite.on('pointerdown', () => {
-        console.log(`PhaserPuzzleRenderer: Island clicked at grid (${island.x}, ${island.y}), world (${worldPos.x.toFixed(2)}, ${worldPos.y.toFixed(2)})`);
         this.scene.events.emit('island-clicked', worldPos.x, worldPos.y, island.x, island.y);
       });
 

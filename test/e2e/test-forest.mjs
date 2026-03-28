@@ -90,19 +90,29 @@ async function runTest() {
 
         // Solve the puzzle
         console.log('[TEST] Solving puzzle...');
-        const { placeBridge, getPuzzleCameraInfo } = await import('../playwright/helpers.mjs');
+        const { placeBridge, clickBridge, getPuzzleCameraInfo } = await import('../playwright/helpers.mjs');
 
         // Verify camera info is available
         await getPuzzleCameraInfo(page);
 
-        // Solution: A(1,1)-B(3,1), B(3,1)-D(3,3), A(1,1)-C(1,3)
-        console.log('[TEST] Placing bridge 1: A(1,1) to B(3,1)');
+        // First, place an INCORRECT bridge to test removal
+        console.log('[TEST] Placing INCORRECT bridge: C(1,3) to D(3,3) - should be removed');
+        await placeBridge(page, 1, 3, 3, 3);
+        await page.waitForTimeout(500);
+
+        // Click the bridge to remove it
+        console.log('[TEST] Clicking bridge C-D to remove it');
+        await clickBridge(page, 1, 3, 3, 3);
+        await page.waitForTimeout(500);
+
+        // Now place the correct solution: A(1,1)-B(3,1), B(3,1)-D(3,3), A(1,1)-C(1,3)
+        console.log('[TEST] Placing CORRECT bridge 1: A(1,1) to B(3,1)');
         await placeBridge(page, 1, 1, 3, 1);
 
-        console.log('[TEST] Placing bridge 2: B(3,1) to D(3,3)');
+        console.log('[TEST] Placing CORRECT bridge 2: B(3,1) to D(3,3)');
         await placeBridge(page, 3, 1, 3, 3);
 
-        console.log('[TEST] Placing bridge 3: A(1,1) to C(1,3)');
+        console.log('[TEST] Placing CORRECT bridge 3: A(1,1) to C(1,3)');
         await placeBridge(page, 1, 1, 1, 3);
 
         console.log('[TEST] Puzzle solution entered!');

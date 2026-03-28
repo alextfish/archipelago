@@ -153,6 +153,13 @@ export class IslandMapScene extends Phaser.Scene {
             bridgeScene.events.emit('island-pointerup', worldX, worldY, gridX, gridY);
         });
 
+        // Forward bridge clicks from renderer to BridgePuzzleScene
+        this.events.on('bridge-clicked', (bridgeId: string) => {
+            console.log(`IslandMapScene: Forwarding bridge click (${bridgeId}) to BridgePuzzleScene`);
+            const bridgeScene = this.scene.get('BridgePuzzleScene');
+            bridgeScene.events.emit('bridge-clicked', bridgeId);
+        });
+
         // Emit ready events to signal that IslandMapScene is fully initialized
         console.log('IslandMapScene: Emitting islandMapReady events to BridgePuzzleScene');
         const bridgeScene = this.scene.get('BridgePuzzleScene');

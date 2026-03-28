@@ -87,3 +87,32 @@ When the player solves an overworld puzzle, the bridges are added to the Overwor
 ### Source Control
 
 We use git. **AI agents NEVER COMMIT TO GIT directly.** The human developer makes git commits and pushes. You can use git to revert or stash changes if needed, but never commit.
+
+## Testing Best Practices
+
+### Playwright E2E Tests
+
+**CRITICAL: Playwright tests are slow and synchronous. Optimise for efficiency:**
+
+1. **Run once, grep multiple times**: Playwright tests take 15-60+ seconds to complete
+   - Run the test ONCE, save output to a file, and search that file: `node test/e2e/test-name.mjs 2>&1 | Out-File test-output.txt -Encoding utf8; Get-Content test-output.txt | Select-String -Pattern "bridge"`
+   - Then grep that file for different patterns: `Get-Content test-output.txt | Select-String -Pattern "pattern"`
+   - Only re-run the test if you've changed code that affects it
+
+2. **Don't repeatedly run for different log searches**: Each test run costs time
+   - ❌ BAD: Run test → grep A → run test → grep B → run test → grep C
+   - ✅ GOOD: Run test once → save output → grep A → grep B → grep C
+
+3. **Example efficient workflow**:
+   ```powershell
+   # Run once and search for first output
+   node test/e2e/test-forest.mjs 2>&1 | Out-File test-output.txt -Encoding utf8; Get-Content test-output.txt | Select-String -Pattern "bridge"
+
+   # Continue to search for other strings
+   Get-Content test-output.txt | Select-String -Pattern "removed"
+   Get-Content test-output.txt | Select-String -Pattern "error"
+   ```
+
+### Unit Tests
+
+Unit tests (Vitest) are fast and can be run repeatedly without concern. Use `npm test -- --watch` for continuous testing during development.
