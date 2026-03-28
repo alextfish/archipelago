@@ -357,6 +357,9 @@ export class OverworldScene extends Phaser.Scene {
     // Initialize shared puzzle HUD
     PuzzleHUDManager.getInstance().initializeHUD(this);
 
+    // Listen for series puzzle completion from BridgePuzzleScene
+    this.events.on('seriesPuzzleCompleted', this.handleSeriesPuzzleCompleted, this);
+
     // Initialize overworld puzzle system
     this.initializeOverworldPuzzles();
   }
@@ -1759,6 +1762,68 @@ export class OverworldScene extends Phaser.Scene {
     this.updateDoorSprite(door);
 
     console.log(`Door ${doorId} unlocked successfully`);
+  }
+
+  /**
+   * Handle completion of a puzzle within a series
+   * Called when BridgePuzzleScene completes a series puzzle
+   */
+  private handleSeriesPuzzleCompleted(data: { puzzleId: string; success: boolean }): void {
+    console.log(`[OverworldScene] Series puzzle completed: ${data.puzzleId}, success: ${data.success}`);
+
+    if (!this.currentSeries) {
+      console.warn('No current series - ignoring puzzle completion');
+      return;
+    }
+
+    if (!data.success) {
+      console.log('Puzzle was not successfully solved - not marking as complete');
+      return;
+    }
+
+    // Find the series entry that contains this puzzle data ID
+    // The puzzle data has an ID (e.g., "forest-1") but the series entries have their own IDs
+    const allEntries = this.currentSeries.getAllPuzzleEntries();
+    const matchingEntry = allEntries.find(entry => {
+      // Check if this entry's puzzle data is in our series puzzle data map
+      const puzzleData = this.currentSeriesPuzzleData.get(entry.id);
+      return puzzleData && puzzleData.id === data.puzzleId;
+    });
+
+    if (!matchingEntry) {
+      console.warn(`Could not find series entry for puzzle ${data.puzzleId}`);
+      return;
+    }
+
+    // Mark the puzzle as completed in the series using the entry ID
+    console.log(`Marking puzzle entry ${matchingEntry.id} (puzzle data: ${data.puzzleId}) as completed in series ${this.currentSeries.id}`);
+    const result = this.currentSeries.completePuzzle(matchingEntry.id);
+
+    if (result.success) {
+      console.log(`Puzzle ${matchingEntry.id} marked as completed`);
+      if (result.newlyUnlockedPuzzles.length > 0) {
+        console.log(`Newly unlocked puzzles: ${result.newlyUnlockedPuzzles.join(', ')}`);
+      }
+    }
+
+    // Check if the series is now complete
+    if (this.currentSeries.isSeriesCompleted()) {
+      console.log(`Series ${this.currentSeries.id} completed! Unlocking door...`);
+      // Unlock the door associated with this series
+      this.unlockDoor(this.currentSeries.id);
+
+      // Update NPC icon to show completion
+      for (const [npcId, state] of this.npcSeriesStates.entries()) {
+        if (state.getSeries()?.id === this.currentSeries.id) {
+          const npc = this.npcs.find(n => n.id === npcId);
+          if (npc) {
+            this.updateNPCIcon(npc);
+          }
+        }
+      }
+    } else {
+      console.log(`Series ${this.currentSeries.id} not yet complete`);
+    }
   }
 
   /**

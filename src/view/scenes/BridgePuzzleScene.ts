@@ -365,6 +365,19 @@ export class BridgePuzzleScene extends Phaser.Scene {
     onPuzzleExited(success: boolean): void {
         console.log(`Puzzle exited: ${success ? 'solved' : 'unsolved'}`);
 
+        // If in series mode and puzzle was solved, notify OverworldScene
+        if (this.seriesMode && success && this.puzzle) {
+            console.log(`[BridgePuzzleScene] Series puzzle ${this.puzzle.id} completed, notifying OverworldScene`);
+            const overworldScene = this.scene.get('OverworldScene');
+            if (overworldScene) {
+                // Emit event that OverworldScene can listen for
+                overworldScene.events.emit('seriesPuzzleCompleted', {
+                    puzzleId: this.puzzle.id,
+                    success: true
+                });
+            }
+        }
+
         // Hide HUD using PuzzleHUDManager
         PuzzleHUDManager.getInstance().exitPuzzle();
 
