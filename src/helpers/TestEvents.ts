@@ -115,3 +115,60 @@ export function getPlayerPosition(): { x: number; y: number; tileX: number; tile
 
     return null;
 }
+
+/**
+ * Check if an NPC sprite texture is loaded correctly
+ * Returns sprite status information for testing
+ */
+export function getNPCSpriteStatus(npcId: string): {
+    exists: boolean;
+    textureKey: string | null;
+    textureExists: boolean;
+    hasValidTexture: boolean;
+} | null {
+    if (!isTestMode() || typeof window === 'undefined') {
+        return null;
+    }
+
+    // Access the Phaser game instance
+    const game = (window as any).game;
+    if (!game || !game.scene) {
+        return null;
+    }
+
+    // Get the OverworldScene
+    const overworldScene = game.scene.getScene('OverworldScene');
+    if (!overworldScene) {
+        return null;
+    }
+
+    // Access npcSprites map
+    const npcSprites = (overworldScene as any).npcSprites;
+    if (!npcSprites) {
+        return null;
+    }
+
+    const sprite = npcSprites.get(npcId);
+    if (!sprite) {
+        return {
+            exists: false,
+            textureKey: null,
+            textureExists: false,
+            hasValidTexture: false
+        };
+    }
+
+    const textureKey = sprite.texture?.key || null;
+    const textureManager = (overworldScene as any).textures;
+    const textureExists = textureKey ? textureManager.exists(textureKey) : false;
+
+    // Check if it's the missing texture placeholder
+    const hasValidTexture = textureExists && textureKey !== '__MISSING';
+
+    return {
+        exists: true,
+        textureKey,
+        textureExists,
+        hasValidTexture
+    };
+}

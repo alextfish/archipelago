@@ -124,6 +124,13 @@ export class OverworldScene extends Phaser.Scene {
       frameWidth: 32,
       frameHeight: 32
     });
+    this.load.image('Mage1', 'resources/sprites/Mage1.png');
+    this.load.image('Mage2', 'resources/sprites/Mage2.png');
+    this.load.image('Mage3', 'resources/sprites/Mage3.png');
+    this.load.image('Mage4', 'resources/sprites/Mage4.png');
+    this.load.image('Citizen1_Idle', 'resources/sprites/Citizen1_Idle.png');
+    this.load.image('Citizen2_Idle', 'resources/sprites/Citizen2_Idle.png');
+    this.load.image('Fighter2_Idle', 'resources/sprites/Fighter2_Idle.png');
 
     // Load language tileset for speech bubbles in constraint feedback
     this.load.spritesheet('language', 'resources/tilesets/language.png', {

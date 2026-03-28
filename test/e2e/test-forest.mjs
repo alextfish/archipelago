@@ -39,6 +39,24 @@ async function runTest() {
             return;
         }
 
+        // Verify NPC sprite is loaded correctly
+        console.log('[TEST] Checking NPC sprite status...');
+        const npcSpriteStatus = await page.evaluate(() => {
+            return window.getNPCSpriteStatus ? window.getNPCSpriteStatus('48') : null;
+        });
+
+        if (npcSpriteStatus) {
+            console.log(`[TEST] NPC sprite status:`, npcSpriteStatus);
+            if (!npcSpriteStatus.hasValidTexture) {
+                console.warn(`[TEST] ⚠️  NPC sprite has invalid texture! Texture key: ${npcSpriteStatus.textureKey}`);
+                console.warn('[TEST] This will show as Phaser\'s black-and-green missing texture placeholder');
+            } else {
+                console.log(`[TEST] ✅ NPC sprite loaded successfully: ${npcSpriteStatus.textureKey}`);
+            }
+        } else {
+            console.warn('[TEST] Could not check NPC sprite status');
+        }
+
         // Click NPC marker to start moving
         console.log('[TEST] Clicking NPC marker: npc-48');
         const npcMarker = await page.$('[data-testid="npc-48"]');
