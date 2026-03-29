@@ -72,13 +72,13 @@ export class LanguageGlyphRegistry {
             ['good', 54],
             ['water', 55],
             // Color glyphs
-            ['red', 60],
-            ['blue', 61],
-            ['green', 62],
-            ['yellow', 63],
+            ['red', 56],
+            ['blue', 57],
+            ['green', 58],
+            ['yellow', 59],
             // Conversation glyphs
-            ['happy', 64],
-            ['sad', 65],
+            ['happy', 60],
+            ['sad', 61],
         ]);
 
         this.languages.set('grass', {
