@@ -22,20 +22,22 @@ export class ConstraintFeedbackDisplay {
   private gridMapper: GridToWorldMapper;
   private glyphRegistry: LanguageGlyphRegistry;
   private tilesetKey: string;
+  private npcSpriteKey: string;
   private language: string;
   private depth: number;
   private existingNPCSprites: Map<string, Phaser.GameObjects.Sprite>;
 
   private originalNPCTextures: Map<string, string> = new Map();
   private speechBubbles: SpeechBubble[] = [];
+  private createdNPCSprites: Phaser.GameObjects.Sprite[] = [];
 
   constructor(
     scene: Phaser.Scene,
     gridMapper: GridToWorldMapper,
     glyphRegistry: LanguageGlyphRegistry,
     tilesetKey: string,
-    _npcSpriteKey: string,
-    existingNPCSprites: Map<string, Phaser.GameObjects.Sprite>,
+    npcSpriteKey: string,
+    existingNPCSprites: Map<string, Phaser.GameObjects.Sprite> = new Map(),
     language: string = 'grass',
     depth: number = 200,
   ) {
@@ -43,6 +45,7 @@ export class ConstraintFeedbackDisplay {
     this.gridMapper = gridMapper;
     this.glyphRegistry = glyphRegistry;
     this.tilesetKey = tilesetKey;
+    this.npcSpriteKey = npcSpriteKey;
     this.existingNPCSprites = existingNPCSprites;
     this.language = language;
     this.depth = depth;
@@ -66,7 +69,8 @@ export class ConstraintFeedbackDisplay {
       // Determine if constraint is satisfied (glyphMessage is "good" when satisfied)
       const isSatisfied = item.glyphMessage.trim() === 'good';
       
-      // Update existing NPC sprite texture to show appropriate expression
+      // Update existing NPC sprite texture to show appropriate expression,
+      // or create a new sprite when no existing one is found
       const existingNPC = this.existingNPCSprites.get(island.id);
       if (existingNPC) {
         // Save original texture if not already saved
@@ -82,6 +86,16 @@ export class ConstraintFeedbackDisplay {
         
         // Update the texture of the existing sprite
         existingNPC.setTexture(spriteKey, 0);
+      } else {
+        // No existing NPC sprite — create a new one to the right of the island
+        const sprite = this.scene.add.sprite(
+          worldPos.x + cellSize,
+          worldPos.y,
+          this.npcSpriteKey,
+          0,
+        );
+        sprite.setDepth(this.depth);
+        this.createdNPCSprites.push(sprite);
       }
 
       // Speech bubble — aligned with island horizontally, offset up by bubble height + extra spacing
@@ -106,6 +120,10 @@ export class ConstraintFeedbackDisplay {
       }
       this.originalNPCTextures.clear();
     }
+
+    for (const sprite of this.createdNPCSprites) {
+      sprite.setVisible(visible);
+    }
     
     for (const bubble of this.speechBubbles) {
       bubble.setVisible(visible);
@@ -122,6 +140,12 @@ export class ConstraintFeedbackDisplay {
       }
     }
     this.originalNPCTextures.clear();
+
+    // Destroy created NPC sprites
+    for (const sprite of this.createdNPCSprites) {
+      sprite.destroy();
+    }
+    this.createdNPCSprites = [];
 
     // Destroy speech bubbles
     for (const bubble of this.speechBubbles) {

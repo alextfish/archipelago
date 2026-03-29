@@ -21,8 +21,8 @@ export class ConversationState {
         this.focusedChoiceIndex = null;
 
         // Set initial expression from starting node, or default to neutral
-        const startNode = this.getCurrentNode();
-        this.npcExpression = startNode.npc?.expression || 'neutral';
+        const startNode = this.spec.nodes[this.currentNodeId];
+        this.npcExpression = startNode?.npc?.expression || 'neutral';
     }
 
     /**
