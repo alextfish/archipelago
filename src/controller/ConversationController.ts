@@ -246,4 +246,25 @@ export class ConversationController {
     getAppearanceRegistry(): NPCAppearanceRegistry {
         return this.appearanceRegistry;
     }
+
+    /**
+     * Move keyboard focus to the next choice on the current node
+     */
+    focusNextChoice(): void {
+        this.state?.focusNextChoice();
+    }
+
+    /**
+     * Move keyboard focus to the previous choice on the current node
+     */
+    focusPreviousChoice(): void {
+        this.state?.focusPreviousChoice();
+    }
+
+    /**
+     * Get the index of the currently keyboard-focused choice, or null if none
+     */
+    getFocusedChoiceIndex(): number | null {
+        return this.state?.getFocusedChoiceIndex() ?? null;
+    }
 }

@@ -10,6 +10,7 @@ export class ChoiceButton extends Phaser.GameObjects.Container {
     private textLabel: Phaser.GameObjects.Text;
     private choiceIndex: number;
     private callback: (index: number) => void;
+    private isFocused: boolean = false;
 
     private readonly normalColor = 0x444444;
     private readonly hoverColor = 0x666666;
@@ -71,7 +72,9 @@ export class ChoiceButton extends Phaser.GameObjects.Container {
      * Handle hover end
      */
     private onHoverEnd(): void {
-        this.background.setFillStyle(this.normalColor);
+        if (!this.isFocused) {
+            this.background.setFillStyle(this.normalColor);
+        }
     }
 
     /**
@@ -79,6 +82,15 @@ export class ChoiceButton extends Phaser.GameObjects.Container {
      */
     private onClick(): void {
         this.callback(this.choiceIndex);
+    }
+
+    /**
+     * Set keyboard focus highlight on this button.
+     * Uses the same highlight colour as mouse hover.
+     */
+    setFocused(focused: boolean): void {
+        this.isFocused = focused;
+        this.background.setFillStyle(focused ? this.hoverColor : this.normalColor);
     }
 
     /**
