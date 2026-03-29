@@ -19,6 +19,10 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     private glyphRegistry: LanguageGlyphRegistry;
     private appearanceRegistry: NPCAppearanceRegistry;
 
+    // Debounce for confirm key to prevent rapid-fire advancement
+    private lastConfirmTime = 0;
+    private readonly CONFIRM_DEBOUNCE_MS = 300;
+
     // UI elements
     private overlay: Phaser.GameObjects.Rectangle | null = null;
     private speechBubble: SpeechBubble | null = null;
@@ -278,6 +282,11 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
             currentX += this.CHOICE_WIDTH + this.CHOICE_SPACING;
         }
 
+        // Auto-focus the first choice so E/SPACE immediately selects it without
+        // requiring the player to press Left/Right first.
+        this.controller?.focusNextChoice();
+        this.updateChoiceFocus();
+
         console.log('ConversationScene: Choice buttons created');
     }
 
@@ -411,6 +420,10 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
      * the leave button is showing.
      */
     private onConfirmKey(): void {
+        const now = Date.now();
+        if (now - this.lastConfirmTime < this.CONFIRM_DEBOUNCE_MS) return;
+        this.lastConfirmTime = now;
+
         const focusedIndex = this.controller?.isActive()
             ? this.controller.getFocusedChoiceIndex()
             : null;

@@ -6,7 +6,7 @@
     "completed": {
       "npc": {
         "expression": "happy",
-        "glyphs": "you bridge good exclamation"
+        "glyphs": "you bridge good"
       },
       "choices": [
         {

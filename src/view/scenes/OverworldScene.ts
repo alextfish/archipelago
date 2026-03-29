@@ -1628,6 +1628,7 @@ export class OverworldScene extends Phaser.Scene {
     // Add E key for interacting with focused target or entering puzzles
     this.input.keyboard?.on('keydown-E', () => {
       console.log('[DIAGNOSTIC] E key pressed, gameMode:', this.gameMode);
+      if (this.gameMode !== 'exploration') return;
       // If there's a focused target, interact with it
       const focusedTarget = this.interactionCursor?.getCurrentTarget();
       if (focusedTarget) {
