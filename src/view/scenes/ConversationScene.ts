@@ -25,7 +25,6 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     private choiceButtons: ChoiceButton[] = [];
     private npcPortrait: Phaser.GameObjects.Container | null = null;
     private playerPortrait: Phaser.GameObjects.Container | null = null;
-    // @ts-expect-error - currentNPC will be used in future updates
     private currentNPC: NPC | null = null;
 
     // Constants
@@ -173,9 +172,26 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
 
         console.log('ConversationScene: Speech bubble displayed');
 
-        // Update NPC portrait if custom frame is provided
-        if (customFrame && this.npcPortrait) {
-            this.updatePortraitFrame(this.npcPortrait, customFrame);
+        // Update NPC portrait
+        if (this.npcPortrait && this.currentNPC) {
+            let frameKey = customFrame;
+
+            // If no custom frame provided, try to get face texture from appearance registry
+            if (!frameKey) {
+                const faceKey = this.appearanceRegistry.getFaceTextureKey(
+                    this.currentNPC.appearanceId,
+                    expression
+                );
+
+                // Only use face texture if it exists
+                if (faceKey && this.textures.exists(faceKey)) {
+                    frameKey = faceKey;
+                }
+            }
+
+            if (frameKey) {
+                this.updatePortraitFrame(this.npcPortrait, frameKey);
+            }
         }
     }
 

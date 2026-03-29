@@ -1776,12 +1776,26 @@ export class OverworldScene extends Phaser.Scene {
     }
 
     try {
-      // Determine which conversation to use based on series state
-      const state = this.npcSeriesStates.get(npc.id);
-      const seriesSolved = state?.isSeriesCompleted() ?? false;
+      // Determine which conversation to use
+      let useSolvedConversation = false;
+
+      // For constraint NPCs, check puzzle completion status
+      if (npc.id.startsWith('constraint-')) {
+        // Extract puzzle ID from npc.id format: constraint-{puzzleId}-{type}-{islandId}
+        const match = npc.id.match(/^constraint-([^-]+)/);
+        if (match) {
+          const puzzleId = match[1];
+          useSolvedConversation = this.gameState.isPuzzleCompleted(puzzleId);
+          console.log(`Constraint NPC conversation: puzzle ${puzzleId} completed = ${useSolvedConversation}`);
+        }
+      } else {
+        // For series NPCs, check series state
+        const state = this.npcSeriesStates.get(npc.id);
+        useSolvedConversation = state?.isSeriesCompleted() ?? false;
+      }
 
       // Load conversation JSON
-      const conversationPath = npc.getConversationPath(seriesSolved);
+      const conversationPath = npc.getConversationPath(useSolvedConversation);
       const response = await fetch(conversationPath);
       if (!response.ok) {
         throw new Error(`Failed to load conversation: ${response.statusText}`);
@@ -1791,7 +1805,7 @@ export class OverworldScene extends Phaser.Scene {
 
       // Switch to conversation mode
       this.gameMode = 'conversation';
-      console.log(`Switching to conversation mode with NPC: ${npc.name} (series solved: ${seriesSolved})`);
+      console.log(`Switching to conversation mode with NPC: ${npc.name} (solved: ${useSolvedConversation})`);
 
       // Get conversation scene
       const conversationScene = this.scene.get('ConversationScene') as any;

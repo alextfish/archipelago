@@ -15,9 +15,12 @@ export class ConversationState {
     constructor(spec: ConversationSpec) {
         this.spec = spec;
         this.currentNodeId = spec.start;
-        this.npcExpression = 'neutral';  // Default expression
         this.ended = false;
         this.effectsApplied = [];
+
+        // Set initial expression from starting node, or default to neutral
+        const startNode = this.getCurrentNode();
+        this.npcExpression = startNode.npc?.expression || 'neutral';
     }
 
     /**

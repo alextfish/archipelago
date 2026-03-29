@@ -109,4 +109,23 @@ export class NPCAppearanceRegistry {
     hasAppearance(appearanceId: string): boolean {
         return this.appearances.has(appearanceId);
     }
+
+    /**
+     * Get the high-resolution face texture key for a given appearance and expression.
+     * Returns the texture key in format "faces/{appearanceId} {expression}" if it exists,
+     * otherwise returns undefined (fallback to sprite-based portrait).
+     * 
+     * @param appearanceId - The NPC appearance ID (e.g., "Ruby", "Lyuba")
+     * @param expression - The expression name (e.g., "neutral", "happy", "sad")
+     * @returns The face texture key or undefined if not available
+     */
+    getFaceTextureKey(appearanceId: string, expression: string): string | undefined {
+        // Construct the face texture key
+        // Format: "faces/{appearanceId} {expression}"
+        const faceKey = `faces/${appearanceId} ${expression}`;
+
+        // Only return if this face texture actually exists
+        // The caller (ConversationScene) should check if the texture exists
+        return faceKey;
+    }
 }

@@ -6,8 +6,7 @@
     "intro": {
       "npc": {
         "expression": "neutral",
-        "glyphs": "you build bridge question",
-        "frame": "faces/Lyuba neutral"
+        "glyphs": "you build bridge question"
       },
       "choices": [
         {
@@ -23,8 +22,7 @@
     "helpAccepted": {
       "npc": {
         "expression": "happy",
-        "glyphs": "good happy",
-        "frame": "faces/Lyuba happy"
+        "glyphs": "good happy"
       },
       "choices": [
         {
