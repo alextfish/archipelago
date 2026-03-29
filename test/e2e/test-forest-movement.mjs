@@ -147,7 +147,7 @@ async function runTest() {
 
         // Press E to interact
         console.log('[TEST] Pressing E to interact with constraint NPC...');
-        
+
         // Set up event listener BEFORE pressing E so we don't miss the event
         const conversationStartedPromise = page.evaluate(() => {
             return new Promise((resolve) => {
@@ -161,10 +161,10 @@ async function runTest() {
                 }, { once: true });
             });
         });
-        
+
         // Now press E
         await page.keyboard.press('e');
-        
+
         // Wait for conversation to start
         console.log('[TEST] Waiting for conversation to start...');
         const conversationStarted = await conversationStartedPromise;

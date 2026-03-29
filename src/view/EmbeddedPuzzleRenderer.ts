@@ -28,6 +28,8 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     // Graphics objects for embedded rendering
     private islandGraphics: Map<string, Phaser.GameObjects.Sprite> = new Map();
     private islandLabels: Map<string, Phaser.GameObjects.Text> = new Map();
+    private constraintNPCs: Map<string, Phaser.GameObjects.Sprite> = new Map();
+    private constraintNumbers: Map<string, Phaser.GameObjects.Sprite> = new Map();
     private bridgeGraphics: Map<string, Phaser.GameObjects.Container> = new Map();
     private bridgeHitZones: Phaser.GameObjects.Zone[] = [];
     private previewGraphics: Phaser.GameObjects.Container | null = null;
@@ -141,6 +143,18 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
         }
         this.islandLabels.clear();
 
+        // Destroy all constraint NPCs
+        for (const npc of this.constraintNPCs.values()) {
+            npc.destroy();
+        }
+        this.constraintNPCs.clear();
+
+        // Destroy all constraint number sprites
+        for (const num of this.constraintNumbers.values()) {
+            num.destroy();
+        }
+        this.constraintNumbers.clear();
+
         // Destroy all bridge graphics
         this.destroyBridges();
 
@@ -172,14 +186,28 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
         this.puzzleContainer.add(sprite);
         this.islandGraphics.set(island.id, sprite);
 
-        // Add island label showing num_bridges constraint if present
+        // For IslandBridgeCountConstraint, create Ruby NPC with bridge count number sprite
         const num = parseNumBridgesConstraint(island);
-        if (num !== null) {
-            const label = this.scene.add.text(worldPos.x + 12, worldPos.y + 6, String(num), { color: '#000', fontSize: '12px' });
-            label.setOrigin(0, 0);
-            label.setDepth(102); // Above islands
-            this.puzzleContainer.add(label);
-            this.islandLabels.set(island.id, label);
+        if (num !== null && num >= 1 && num <= 8) {
+            // Create Ruby NPC sprite
+            const npcSprite = this.scene.add.sprite(worldPos.x, worldPos.y, 'Ruby', 0);
+            npcSprite.setOrigin(0, 0);
+            npcSprite.setDepth(101);
+            this.puzzleContainer.add(npcSprite);
+            this.constraintNPCs.set(island.id, npcSprite);
+
+            // Create bridge count number sprite (frame index is num-1 for numbers 1-8)
+            const cellSize = this.gridMapper.getCellSize();
+            const numberSprite = this.scene.add.sprite(
+                worldPos.x + cellSize / 2,
+                worldPos.y + cellSize / 2,
+                'bridge counts',
+                num - 1
+            );
+            numberSprite.setOrigin(0.5, 0.5);
+            numberSprite.setDepth(103);
+            this.puzzleContainer.add(numberSprite);
+            this.constraintNumbers.set(island.id, numberSprite);
         }
     }
 

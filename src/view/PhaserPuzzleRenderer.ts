@@ -29,6 +29,8 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
   // Graphics objects
   private islandGraphics: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private islandLabels: Map<string, Phaser.GameObjects.Text> = new Map();
+  private constraintNPCs: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  private constraintNumbers: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private bridgeGraphics: Map<string, Phaser.GameObjects.Container> = new Map();
   private previewGraphics: Phaser.GameObjects.Container | Phaser.GameObjects.RenderTexture | null = null;
   private highlightGraphics: Phaser.GameObjects.Container | null = null;
@@ -72,12 +74,28 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
       // Scale sprite to match cell size (sprites are 32px)
       const scale = this.gridMapper.getCellSize() / 32;
       sprite.setScale(scale, scale);
-      // Island label on top: show num_bridges if the island has that constraint
+
+      // For IslandBridgeCountConstraint, create Ruby NPC with bridge count number sprite
       const num = parseNumBridgesConstraint(island);
-      if (num !== null) {
-        const label = this.scene.add.text(worldPos.x + 12, worldPos.y + 6, String(num), { color: '#000', fontSize: '12px' }).setOrigin(0, 0);
-        this.islandLabels.set(island.id, label);
+      if (num !== null && num >= 1 && num <= 8) {
+        // Create Ruby NPC sprite
+        const npcSprite = this.scene.add.sprite(worldPos.x, worldPos.y, 'Ruby', 0)
+          .setOrigin(0, 0)
+          .setScale(scale, scale);
+        this.constraintNPCs.set(island.id, npcSprite);
+
+        // Create bridge count number sprite (frame index is num-1 for numbers 1-8)
+        const numberSprite = this.scene.add.sprite(
+          worldPos.x + (this.gridMapper.getCellSize() / 2),
+          worldPos.y + (this.gridMapper.getCellSize() / 2),
+          'bridge counts',
+          num - 1
+        )
+          .setOrigin(0.5, 0.5)
+          .setScale(scale, scale);
+        this.constraintNumbers.set(island.id, numberSprite);
       }
+
       this.islandGraphics.set(island.id, sprite);
     }
   }
@@ -551,6 +569,14 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
       lbl.destroy();
     }
     this.islandLabels.clear();
+    for (const npc of this.constraintNPCs.values()) {
+      npc.destroy();
+    }
+    this.constraintNPCs.clear();
+    for (const num of this.constraintNumbers.values()) {
+      num.destroy();
+    }
+    this.constraintNumbers.clear();
 
     for (const bridge of this.bridgeGraphics.values()) {
       bridge.destroy();

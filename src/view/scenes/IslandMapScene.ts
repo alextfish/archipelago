@@ -27,6 +27,11 @@ export class IslandMapScene extends Phaser.Scene {
             frameWidth: 32,
             frameHeight: 32
         });
+        // Load bridge counts spritesheet for constraint NPCs
+        this.load.spritesheet('bridge counts', 'resources/sprites/bridge counts.png', {
+            frameWidth: 32,
+            frameHeight: 32
+        });
         // Load NPC sprite used for constraint feedback display
         this.load.spritesheet('sailorNS', 'resources/sprites/sailorNS.png', {
             frameWidth: 32,

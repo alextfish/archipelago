@@ -31,6 +31,7 @@ export class ConstraintFeedbackDisplay {
   private depth: number;
 
   private npcSprites: Phaser.GameObjects.Sprite[] = [];
+  private numberSprites: Phaser.GameObjects.Sprite[] = [];
   private speechBubbles: SpeechBubble[] = [];
 
   constructor(
@@ -87,6 +88,22 @@ export class ConstraintFeedbackDisplay {
       npc.setDepth(this.depth);
       this.npcSprites.push(npc);
 
+      // Add bridge count number sprite if this is IslandBridgeCountConstraint
+      if (item.constraintType === 'IslandBridgeCountConstraint' && item.requiredCount) {
+        const count = item.requiredCount;
+        if (count >= 1 && count <= 8) {
+          const numberSprite = this.scene.add.sprite(
+            worldPos.x + cellSize / 2,
+            worldPos.y + cellSize / 2,
+            'bridge counts',
+            count - 1 // Frame index is count-1 for numbers 1-8
+          );
+          numberSprite.setOrigin(0.5, 0.5);
+          numberSprite.setDepth(this.depth + 2);
+          this.numberSprites.push(numberSprite);
+        }
+      }
+
       // Speech bubble — aligned with island horizontally, offset up by bubble height + extra spacing
       const bubble = new SpeechBubble(this.scene, this.tilesetKey);
       const glyphFrames = this.glyphRegistry.parseGlyphs(this.language, item.glyphMessage);
@@ -102,6 +119,9 @@ export class ConstraintFeedbackDisplay {
     for (const npc of this.npcSprites) {
       npc.setVisible(visible);
     }
+    for (const num of this.numberSprites) {
+      num.setVisible(visible);
+    }
     for (const bubble of this.speechBubbles) {
       bubble.setVisible(visible);
     }
@@ -113,6 +133,11 @@ export class ConstraintFeedbackDisplay {
       npc.destroy();
     }
     this.npcSprites = [];
+
+    for (const num of this.numberSprites) {
+      num.destroy();
+    }
+    this.numberSprites = [];
 
     for (const bubble of this.speechBubbles) {
       bubble.destroy();

@@ -10,4 +10,6 @@ export interface ConstraintDisplayItem {
   glyphMessage: string;
   /** Type of constraint that generated this item (for choosing NPC sprite) */
   constraintType?: string;
+  /** Required count for IslandBridgeCountConstraint (1-8) */
+  requiredCount?: number;
 }

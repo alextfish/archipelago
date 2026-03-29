@@ -173,6 +173,12 @@ export class OverworldScene extends Phaser.Scene {
       frameHeight: 32
     });
 
+    // Load bridge counts spritesheet for constraint NPCs
+    this.load.spritesheet('bridge counts', 'resources/sprites/bridge counts.png', {
+      frameWidth: 32,
+      frameHeight: 32
+    });
+
     // Load NPC icon sprites (user will provide these files)
     this.load.image(NPCIconConfig.INCOMPLETE, 'resources/sprites/icon-incomplete.png');
     this.load.image(NPCIconConfig.COMPLETE, 'resources/sprites/icon-complete.png');
@@ -877,6 +883,21 @@ export class OverworldScene extends Phaser.Scene {
           sprite.setOrigin(0, 1);
           sprite.setDepth(worldY);
           this.npcSprites.set(npc.id, sprite);
+
+          // Add bridge count number sprite for IslandBridgeCountConstraint
+          if (item.constraintType === 'IslandBridgeCountConstraint' && item.requiredCount) {
+            const count = item.requiredCount;
+            if (count >= 1 && count <= 8) {
+              const numberSprite = this.add.sprite(
+                worldX + this.tiledMapData.tilewidth / 2,
+                worldY - this.tiledMapData.tileheight / 2,
+                'bridge counts',
+                count - 1 // Frame index is count-1 for numbers 1-8
+              );
+              numberSprite.setOrigin(0.5, 0.5);
+              numberSprite.setDepth(worldY + 1);
+            }
+          }
 
           // Add test marker for automated testing
           if (isTestMode()) {
