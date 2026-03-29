@@ -115,6 +115,9 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         this.speechBubble = new SpeechBubble(this, this.TILESET_KEY);
         this.speechBubble.setDepth(10);
 
+        // Set up keyboard navigation for choices
+        this.setupKeyboardNavigation();
+
         // Initially hidden
         this.setVisible(false);
     }
@@ -376,6 +379,56 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     forceEndConversation(): void {
         if (this.controller) {
             this.controller.forceEnd();
+        }
+    }
+
+    /**
+     * Set up keyboard listeners for navigating and selecting conversation choices.
+     * LEFT/RIGHT arrows cycle focus; E or SPACE confirms the focused choice.
+     */
+    private setupKeyboardNavigation(): void {
+        if (!this.input.keyboard) return;
+
+        this.input.keyboard.on('keydown-LEFT', () => {
+            if (!this.controller?.isActive()) return;
+            this.controller.focusPreviousChoice();
+            this.updateChoiceFocus();
+        });
+
+        this.input.keyboard.on('keydown-RIGHT', () => {
+            if (!this.controller?.isActive()) return;
+            this.controller.focusNextChoice();
+            this.updateChoiceFocus();
+        });
+
+        for (const key of ['keydown-E', 'keydown-SPACE']) {
+            this.input.keyboard.on(key, () => this.onConfirmKey());
+        }
+    }
+
+    /**
+     * Handle E or SPACE key press: select focused choice, or trigger leave if only
+     * the leave button is showing.
+     */
+    private onConfirmKey(): void {
+        const focusedIndex = this.controller?.isActive()
+            ? this.controller.getFocusedChoiceIndex()
+            : null;
+
+        if (focusedIndex !== null) {
+            this.onChoiceSelected(focusedIndex);
+        } else if (this.choiceButtons.length === 1) {
+            this.onContinueClicked();
+        }
+    }
+
+    /**
+     * Update choice button highlight colours to reflect the current keyboard focus.
+     */
+    private updateChoiceFocus(): void {
+        const focusedIndex = this.controller?.getFocusedChoiceIndex() ?? null;
+        for (let i = 0; i < this.choiceButtons.length; i++) {
+            this.choiceButtons[i].setFocused(i === focusedIndex);
         }
     }
 
