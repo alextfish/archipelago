@@ -72,6 +72,14 @@ export class CollisionManager {
     }
 
     /**
+     * Set collision type at a specific tile position.
+     * Updates both the collision array and the appropriate collision layers.
+     */
+    setCollisionAt(tileX: number, tileY: number, collisionType: CollisionType): void {
+        this.overworldScene.setCollisionAt(tileX, tileY, collisionType);
+    }
+
+    /**
      * Add collision for a single bridge (used when bridge is placed)
      */
     addBridgeCollision(bridge: Bridge, puzzleBounds: Phaser.Geom.Rectangle): void {

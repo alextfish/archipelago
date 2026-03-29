@@ -29,7 +29,8 @@ export class OverworldBridgeManager {
         private bridgesLayer: Phaser.Tilemaps.TilemapLayer,
         private collisionLayers: Phaser.Tilemaps.TilemapLayer[],
         private collisionArray: number[][],
-        private tiledMapData: any
+        private tiledMapData: any,
+        private collisionManager: any // OverworldScene that has setCollisionAt method
     ) {
         // Find the bridge tileset by searching for the image filename
         this.bridgeTilesetFirstGid = this.findBridgeTilesetFirstGid();
@@ -134,11 +135,9 @@ export class OverworldBridgeManager {
                 }
             }
 
-            // Make walkable by updating collision array (bridges are upper layer)
-            if (tileY >= 0 && tileY < this.collisionArray.length &&
-                tileX >= 0 && tileX < this.collisionArray[tileY].length) {
-                this.collisionArray[tileY][tileX] = CollisionType.WALKABLE;
-            }
+            // Make walkable by updating collision through collision manager
+            // This updates both the collision array and the Phaser collision layers
+            this.collisionManager.setCollisionAt(tileX, tileY, CollisionType.WALKABLE);
         }
 
         console.log(`OverworldBridgeManager: Baked ${bridges.length} bridges (${tilesPlaced} tiles placed) for puzzle ${puzzleId}`);

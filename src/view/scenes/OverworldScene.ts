@@ -437,7 +437,8 @@ export class OverworldScene extends Phaser.Scene {
           this.bridgesLayer,
           this.collisionLayers, // Pass all collision layers
           this.collisionArray,
-          this.tiledMapData
+          this.tiledMapData,
+          this // Pass scene for setCollisionAt calls
         );
         console.log('Bridge manager created');
 
