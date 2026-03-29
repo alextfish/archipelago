@@ -228,6 +228,19 @@ describe('EmbeddedPuzzleRenderer Bridge Removal', () => {
         });
     });
 
+    describe('Island Sprite Rendering', () => {
+        it('should not create island graphic sprites during init for overworld puzzles', () => {
+            // island graphic sprites must not be created – the overworld already shows
+            // biome-specific island art beneath the puzzle overlay
+            const spriteCallsAfterInit = scene.add.sprite.mock.calls;
+            const islandFrameIndex = 36; // BridgeSpriteFrames.FRAME_ISLAND
+            const islandSpriteCreated = spriteCallsAfterInit.some(
+                (args: any[]) => args[3] === islandFrameIndex
+            );
+            expect(islandSpriteCreated).toBe(false);
+        });
+    });
+
     describe('Preview Bridge Rendering', () => {
         it('should render preview bridge with pixel-accurate endpoints', () => {
             const bridge: Bridge = {
