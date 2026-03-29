@@ -38,6 +38,10 @@ export class IslandMapScene extends Phaser.Scene {
         this.load.image('Ruby happy', 'resources/sprites/Ruby happy.png');
         this.load.image('Ruby frown', 'resources/sprites/Ruby frown.png');
         this.load.image('Ruby neutral', 'resources/sprites/Ruby neutral.png');
+        this.load.spritesheet('Ruby', 'resources/sprites/Ruby neutral.png', {
+            frameWidth: 32,
+            frameHeight: 32
+        });
         console.log('IslandMapScene: preload() finished');
     }
 

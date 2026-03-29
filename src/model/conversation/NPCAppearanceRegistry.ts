@@ -63,6 +63,16 @@ export class NPCAppearanceRegistry {
                 sad: 2,
             },
         });
+
+        // Ruby appearance
+        this.appearances.set('Ruby', {
+            spriteKey: 'Ruby',
+            expressions: {
+                neutral: 0,
+                happy: 1,
+                sad: 2,
+            },
+        });
     }
 
     /**

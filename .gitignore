@@ -8,8 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Test output
-test-output.txt
-test-output-*.txt
+test-*.txt
 
 node_modules
 dist

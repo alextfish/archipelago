@@ -132,6 +132,10 @@ export class OverworldScene extends Phaser.Scene {
     this.load.image('Ruby happy', 'resources/sprites/Ruby happy.png');
     this.load.image('Ruby frown', 'resources/sprites/Ruby frown.png');
     this.load.image('Ruby neutral', 'resources/sprites/Ruby neutral.png');
+    this.load.spritesheet('Ruby', 'resources/sprites/Ruby neutral.png', {
+      frameWidth: 32,
+      frameHeight: 32
+    });
     this.load.spritesheet('Lyuba', 'resources/sprites/Lyuba neutral.png', {
       frameWidth: 32,
       frameHeight: 32
@@ -583,6 +587,9 @@ export class OverworldScene extends Phaser.Scene {
     // Load series for NPCs and create icons (once after all NPCs loaded)
     this.loadNPCSeries();
 
+    // Load constraint NPCs from overworld puzzles
+    this.loadConstraintNPCs();
+
     // Load doors from object layers (once after all NPCs loaded)
     this.loadDoors();
   }
@@ -777,6 +784,119 @@ export class OverworldScene extends Phaser.Scene {
       icon.setDepth(npcSprite.depth + NPCIconConfig.ICON_DEPTH_OFFSET);
       this.npcIcons.set(npc.id, icon);
     }
+  }
+
+  /**
+   * Load constraint NPCs from overworld puzzles
+   * For each personified constraint, create an NPC that the player can interact with
+   */
+  private loadConstraintNPCs(): void {
+    if (!this.puzzleManager || !this.tiledMapData) return;
+
+    console.log('Loading constraint NPCs from overworld puzzles...');
+
+    const puzzles = this.puzzleManager.getAllPuzzles();
+    let constraintNPCCount = 0;
+
+    for (const [puzzleId, puzzle] of puzzles) {
+      // Skip puzzles with no constraints
+      if (!puzzle.constraints || puzzle.constraints.length === 0) continue;
+
+      for (const constraint of puzzle.constraints) {
+        // Skip non-personified constraints
+        if (!constraint.personified) continue;
+
+        // Get display items to find which islands this constraint applies to
+        const displayItems = constraint.getDisplayItems(puzzle);
+
+        for (const item of displayItems) {
+          // Find the island that this constraint applies to
+          const island = puzzle.islands.find(i => i.id === item.elementID);
+          if (!island) {
+            console.warn(`Could not find island ${item.elementID} in puzzle ${puzzleId}`);
+            continue;
+          }
+
+          // Get puzzle definition to convert puzzle coordinates to overworld coordinates
+          const puzzleDefinition = this.puzzleManager.getPuzzleDefinitionById(puzzleId);
+          if (!puzzleDefinition) {
+            console.warn(`Could not find puzzle definition for ${puzzleId}`);
+            continue;
+          }
+
+          // Convert puzzle coordinates to overworld tile coordinates
+          // Puzzle bounds are in pixels, so convert to tiles first
+          const puzzleTileX = Math.floor(puzzleDefinition.bounds.x / this.tiledMapData.tilewidth);
+          const puzzleTileY = Math.floor(puzzleDefinition.bounds.y / this.tiledMapData.tileheight);
+          const overworldTileX = puzzleTileX + island.x;
+          const overworldTileY = puzzleTileY + island.y;
+
+          // Generate a unique NPC ID from the constraint and island
+          const npcId = `constraint-${puzzleId}-${constraint.constructor.name}-${island.id}`;
+
+          // Check if this NPC already exists (avoid duplicates)
+          if (this.npcs.find(n => n.id === npcId)) {
+            continue;
+          }
+
+          // Get conversation files from the constraint
+          const conversationFile = constraint.conversationFile;
+          const conversationFileSolved = constraint.conversationFileSolved;
+
+          // Default appearance for constraint NPCs
+          const appearanceId = item.constraintType === 'IslandBridgeCountConstraint' ? 'Ruby' : 'sailorNS';
+          const language = 'grass'; // Default language for constraint NPCs
+
+          // Create NPC instance
+          const npc = new NPC(
+            npcId,
+            island.id, // Use island ID as NPC name for easier debugging
+            overworldTileX,
+            overworldTileY,
+            language,
+            appearanceId,
+            conversationFile,
+            conversationFileSolved,
+            undefined // No series for constraint NPCs
+          );
+
+          this.npcs.push(npc);
+
+          // Add NPC to interactables list
+          this.interactables.push({
+            type: 'npc',
+            tileX: overworldTileX,
+            tileY: overworldTileY,
+            data: { npc }
+          });
+
+          // Create NPC sprite at world coordinates
+          const worldX = overworldTileX * this.tiledMapData.tilewidth;
+          const worldY = (overworldTileY + 1) * this.tiledMapData.tileheight;
+          const sprite = this.add.sprite(worldX, worldY, appearanceId);
+          sprite.setOrigin(0, 1);
+          sprite.setDepth(worldY);
+          this.npcSprites.set(npc.id, sprite);
+
+          // Add test marker for automated testing
+          if (isTestMode()) {
+            attachTestMarker(this, sprite, {
+              id: `npc-${npc.id}`,
+              testId: `npc-${npc.id}`,
+              width: this.tiledMapData.tilewidth,
+              height: this.tiledMapData.tileheight,
+              showBorder: true
+            });
+            console.log(`[TEST] Added test marker for constraint NPC: ${npc.id} at tile (${overworldTileX}, ${overworldTileY}), world (${worldX}, ${worldY})`);
+          }
+
+          constraintNPCCount++;
+          console.log(`Loaded constraint NPC: ${npcId} at (${overworldTileX}, ${overworldTileY}), appearance: ${appearanceId}, conversation: ${conversationFile || 'none'}`);
+        }
+      }
+    }
+
+    console.log(`✓ Created ${constraintNPCCount} constraint NPCs from overworld puzzles`);
   }
 
   /**
