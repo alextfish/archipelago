@@ -211,6 +211,36 @@ export async function pressInteractKey(page) {
 }
 
 /**
+ * Press an arrow key to navigate conversation choices
+ * @param {Object} page - Playwright page
+ * @param {'left'|'right'} direction - Which arrow key to press
+ */
+export async function pressArrowKey(page, direction) {
+    const key = direction === 'right' ? 'ArrowRight' : 'ArrowLeft';
+    console.log(`[TEST] Pressing ${key} to navigate choices...`);
+    await page.keyboard.press(key);
+    await page.waitForTimeout(200);
+}
+
+/**
+ * Navigate to a conversation choice using keyboard and confirm it.
+ * Presses the arrow key `steps` times (positive = right, negative = left)
+ * then presses E to confirm the focused choice.
+ * @param {Object} page - Playwright page
+ * @param {number} steps - Number of right-arrow presses (use negative for left)
+ */
+export async function selectChoiceWithKeyboard(page, steps = 1) {
+    const direction = steps >= 0 ? 'right' : 'left';
+    const count = Math.abs(steps);
+    for (let i = 0; i < count; i++) {
+        await pressArrowKey(page, direction);
+    }
+    console.log('[TEST] Pressing E to confirm focused choice...');
+    await page.keyboard.press('e');
+    await page.waitForTimeout(200);
+}
+
+/**
  * Click a conversation choice button
  * @param {Object} page - Playwright page
  * @param {string} choiceID - The choice testid (e.g., "choice-ok", "choice-leave")

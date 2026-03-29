@@ -250,4 +250,132 @@ describe('ConversationState', () => {
             expect(state.isEnded()).toBe(true);
         });
     });
+
+    describe('keyboard focus', () => {
+        it('should have no focused choice initially', () => {
+            const state = new ConversationState(sampleSpec);
+
+            expect(state.getFocusedChoiceIndex()).toBeNull();
+        });
+
+        describe('focusNextChoice', () => {
+            it('should focus the first choice when starting from null', () => {
+                const state = new ConversationState(sampleSpec);
+
+                state.focusNextChoice();
+
+                expect(state.getFocusedChoiceIndex()).toBe(0);
+            });
+
+            it('should advance focus to the next choice', () => {
+                const state = new ConversationState(sampleSpec);
+
+                state.focusNextChoice(); // 0
+                state.focusNextChoice(); // 1
+
+                expect(state.getFocusedChoiceIndex()).toBe(1);
+            });
+
+            it('should wrap from the last choice back to the first', () => {
+                const state = new ConversationState(sampleSpec);
+
+                state.focusNextChoice(); // 0
+                state.focusNextChoice(); // 1
+                state.focusNextChoice(); // wraps back to 0
+
+                expect(state.getFocusedChoiceIndex()).toBe(0);
+            });
+
+            it('should do nothing when there are no choices', () => {
+                const spec: ConversationSpec = {
+                    id: 'test',
+                    npcId: 'npc1',
+                    start: 'node1',
+                    nodes: {
+                        node1: {
+                            npc: { expression: 'neutral', glyphs: 'hello' },
+                            end: true,
+                        },
+                    },
+                };
+
+                const state = new ConversationState(spec);
+                state.focusNextChoice();
+
+                expect(state.getFocusedChoiceIndex()).toBeNull();
+            });
+        });
+
+        describe('focusPreviousChoice', () => {
+            it('should focus the last choice when starting from null', () => {
+                const state = new ConversationState(sampleSpec); // 2 choices
+
+                state.focusPreviousChoice();
+
+                expect(state.getFocusedChoiceIndex()).toBe(1);
+            });
+
+            it('should move focus to the previous choice', () => {
+                const state = new ConversationState(sampleSpec);
+
+                state.focusNextChoice(); // 0
+                state.focusNextChoice(); // 1
+                state.focusPreviousChoice(); // back to 0
+
+                expect(state.getFocusedChoiceIndex()).toBe(0);
+            });
+
+            it('should wrap from the first choice back to the last', () => {
+                const state = new ConversationState(sampleSpec);
+
+                state.focusNextChoice(); // 0
+                state.focusPreviousChoice(); // wraps to 1
+
+                expect(state.getFocusedChoiceIndex()).toBe(1);
+            });
+
+            it('should do nothing when there are no choices', () => {
+                const spec: ConversationSpec = {
+                    id: 'test',
+                    npcId: 'npc1',
+                    start: 'node1',
+                    nodes: {
+                        node1: {
+                            npc: { expression: 'neutral', glyphs: 'hello' },
+                            end: true,
+                        },
+                    },
+                };
+
+                const state = new ConversationState(spec);
+                state.focusPreviousChoice();
+
+                expect(state.getFocusedChoiceIndex()).toBeNull();
+            });
+        });
+
+        describe('clearFocus', () => {
+            it('should reset focus to null', () => {
+                const state = new ConversationState(sampleSpec);
+
+                state.focusNextChoice();
+                expect(state.getFocusedChoiceIndex()).toBe(0);
+
+                state.clearFocus();
+
+                expect(state.getFocusedChoiceIndex()).toBeNull();
+            });
+        });
+
+        it('should clear focus when a choice is selected', () => {
+            const state = new ConversationState(sampleSpec);
+
+            state.focusNextChoice(); // focus on choice 0
+            expect(state.getFocusedChoiceIndex()).toBe(0);
+
+            state.selectChoice(1); // choose "No" → ends conversation
+
+            expect(state.getFocusedChoiceIndex()).toBeNull();
+        });
+    });
 });
