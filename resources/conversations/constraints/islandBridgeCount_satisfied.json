@@ -1,0 +1,18 @@
+{
+  "id": "islandBridgeCount_satisfied",
+  "start": "main",
+  "nodes": {
+    "main": {
+      "npc": {
+        "expression": "happy",
+        "glyphs": "good bridge"
+      },
+      "choices": [
+        {
+          "text": "Leave",
+          "end": true
+        }
+      ]
+    }
+  }
+}
