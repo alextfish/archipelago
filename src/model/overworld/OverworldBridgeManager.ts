@@ -255,18 +255,6 @@ export class OverworldBridgeManager {
     }
 
     /**
-     * Convert connections to a readable string for debugging
-     */
-    private connectionsToString(connections: TileConnections): string {
-        const dirs: string[] = [];
-        if (connections.north) dirs.push('N');
-        if (connections.east) dirs.push('E');
-        if (connections.south) dirs.push('S');
-        if (connections.west) dirs.push('W');
-        return dirs.join('');
-    }
-
-    /**
      * Clear all bridge tiles from a puzzle region and restore original collision.
      * Used when entering a puzzle (completed or incomplete) for editing.
      */

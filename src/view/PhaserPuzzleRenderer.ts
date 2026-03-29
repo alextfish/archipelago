@@ -546,6 +546,7 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
         this.glyphRegistry,
         this.languageTilesetKey,
         this.npcSpriteKey,
+        this.constraintNPCs,
       );
     }
     this.feedbackDisplay.update(items, puzzle);

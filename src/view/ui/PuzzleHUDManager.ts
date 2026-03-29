@@ -48,7 +48,7 @@ export class PuzzleHUDManager {
         // Wait for scene to be ready, then hide it
         scene.time.delayedCall(10, () => {
             if (this.hudScene) {
-                this.hudScene.setVisible(false);
+                this.hudScene.setVisible(false, 'bridge');
                 console.log('PuzzleHUDManager: HUD initialized and hidden');
             }
         });
@@ -91,7 +91,7 @@ export class PuzzleHUDManager {
 
         // Setup HUD for this puzzle
         this.hudScene.setupForPuzzle(controller, puzzleType);
-        this.hudScene.setVisible(true);
+        this.hudScene.setVisible(true, puzzleType);
 
         console.log('PuzzleHUDManager: HUD visible and connected to controller');
     }
@@ -117,7 +117,7 @@ export class PuzzleHUDManager {
         }
 
         // Hide and cleanup HUD
-        this.hudScene.setVisible(false);
+        this.hudScene.setVisible(false, this.currentPuzzleType || 'bridge');
         this.hudScene.cleanup();
 
         // Clear references
@@ -156,7 +156,7 @@ export class PuzzleHUDManager {
         console.log('PuzzleHUDManager: Resetting manager');
 
         if (this.hudScene) {
-            this.hudScene.setVisible(false);
+            this.hudScene.setVisible(false, 'bridge');
             this.hudScene.cleanup();
         }
 

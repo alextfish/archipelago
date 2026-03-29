@@ -591,6 +591,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
                 this.glyphRegistry,
                 this.languageTilesetKey,
                 this.npcSpriteKey,
+                this.constraintNPCs,
             );
         }
         this.feedbackDisplay.update(items, puzzle);

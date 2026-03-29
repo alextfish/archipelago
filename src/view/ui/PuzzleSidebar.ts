@@ -26,7 +26,6 @@ export class PuzzleSidebar {
   private nextBg: Phaser.GameObjects.Rectangle | null = null;
   private prevBg: Phaser.GameObjects.Rectangle | null = null;
   private seriesNavigationContainer: Phaser.GameObjects.Container | null = null;
-  private isInSeries: boolean = false;
 
   // Debug panel
   private debugPanel: Phaser.GameObjects.Container | null = null;
@@ -229,7 +228,6 @@ export class PuzzleSidebar {
   }
 
   setSeriesNavigationVisible(visible: boolean): void {
-    this.isInSeries = visible;
     if (this.seriesNavigationContainer) {
       this.seriesNavigationContainer.setVisible(visible);
     }

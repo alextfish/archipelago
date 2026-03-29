@@ -64,6 +64,7 @@ export class OverworldScene extends Phaser.Scene {
   private npcSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private npcIcons: Map<string, Phaser.GameObjects.Image> = new Map();
   private npcSeriesStates: Map<string, NPCSeriesState> = new Map();
+  private constraintNumberSprites: Map<string, Phaser.GameObjects.Sprite> = new Map(); // Bridge count numbers for constraint NPCs
   private seriesManager?: SeriesManager;
 
   // Roof hiding system
@@ -896,6 +897,7 @@ export class OverworldScene extends Phaser.Scene {
               );
               numberSprite.setOrigin(0.5, 0.5);
               numberSprite.setDepth(worldY + 1);
+              this.constraintNumberSprites.set(npc.id, numberSprite);
             }
           }
 
@@ -918,6 +920,50 @@ export class OverworldScene extends Phaser.Scene {
     }
 
     console.log(`✓ Created ${constraintNPCCount} constraint NPCs from overworld puzzles`);
+  }
+
+  /**
+   * Hide constraint NPCs (and their number sprites) for a specific puzzle.
+   * Called when entering puzzle mode so EmbeddedPuzzleRenderer's NPCs are visible.
+   */
+  private hideConstraintNPCsForPuzzle(puzzleId: string): void {
+    const prefix = `constraint-${puzzleId}-`;
+
+    for (const [npcId, sprite] of this.npcSprites) {
+      if (npcId.startsWith(prefix)) {
+        sprite.setVisible(false);
+      }
+    }
+
+    for (const [npcId, numberSprite] of this.constraintNumberSprites) {
+      if (npcId.startsWith(prefix)) {
+        numberSprite.setVisible(false);
+      }
+    }
+
+    console.log(`Hidden constraint NPCs for puzzle: ${puzzleId}`);
+  }
+
+  /**
+   * Show constraint NPCs (and their number sprites) for a specific puzzle.
+   * Called when exiting puzzle mode to restore overworld NPCs.
+   */
+  private showConstraintNPCsForPuzzle(puzzleId: string): void {
+    const prefix = `constraint-${puzzleId}-`;
+
+    for (const [npcId, sprite] of this.npcSprites) {
+      if (npcId.startsWith(prefix)) {
+        sprite.setVisible(true);
+      }
+    }
+
+    for (const [npcId, numberSprite] of this.constraintNumberSprites) {
+      if (npcId.startsWith(prefix)) {
+        numberSprite.setVisible(true);
+      }
+    }
+
+    console.log(`Shown constraint NPCs for puzzle: ${puzzleId}`);
   }
 
   /**
@@ -1963,7 +2009,7 @@ export class OverworldScene extends Phaser.Scene {
     // Find the series entry that contains this puzzle data ID
     // The puzzle data has an ID (e.g., "forest-1") but the series entries have their own IDs
     const allEntries = this.currentSeries.getAllPuzzleEntries();
-    const matchingEntry = allEntries.find(entry => {
+    const matchingEntry = allEntries.find((entry: any) => {
       // Check if this entry's puzzle data is in our series puzzle data map
       const puzzleData = this.currentSeriesPuzzleData.get(entry.id);
       return puzzleData && puzzleData.id === data.puzzleId;
@@ -2109,6 +2155,9 @@ export class OverworldScene extends Phaser.Scene {
         this.cameras.main.stopFollow();
       });
 
+      // Hide overworld constraint NPCs after camera transition completes
+      this.hideConstraintNPCsForPuzzle(puzzleId);
+
       // Emit test event for automation
       emitTestEvent('puzzle_entered', { puzzleId });
 
@@ -2155,6 +2204,13 @@ export class OverworldScene extends Phaser.Scene {
 
       // Delegate to controller for puzzle exit
       console.log('[DIAGNOSTIC] About to call puzzleController.exitPuzzle, success:', success);
+      const activePuzzleId = this.puzzleController.getCurrentPuzzleId();
+
+      // Show overworld constraint NPCs before camera transition starts
+      if (activePuzzleId) {
+        this.showConstraintNPCsForPuzzle(activePuzzleId);
+      }
+
       await this.puzzleController.exitPuzzle(success, (mode: 'exploration') => {
         console.log('[DIAGNOSTIC] onModeChange callback called, setting mode to:', mode);
         this.gameMode = mode;

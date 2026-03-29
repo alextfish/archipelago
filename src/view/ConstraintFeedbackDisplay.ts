@@ -17,21 +17,16 @@ import type { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphReg
 import { SpeechBubble } from './conversation/SpeechBubble';
 import type { GridToWorldMapper } from './GridToWorldMapper';
 
-/** Height of a speech bubble in pixels at 1x zoom (3 tile rows × 32 px). */
-const BUBBLE_TILE_HEIGHT = 3;
-const TILE_SIZE = 32;
-
 export class ConstraintFeedbackDisplay {
   private scene: Phaser.Scene;
   private gridMapper: GridToWorldMapper;
   private glyphRegistry: LanguageGlyphRegistry;
   private tilesetKey: string;
-  private npcSpriteKey: string;
   private language: string;
   private depth: number;
+  private existingNPCSprites: Map<string, Phaser.GameObjects.Sprite>;
 
-  private npcSprites: Phaser.GameObjects.Sprite[] = [];
-  private numberSprites: Phaser.GameObjects.Sprite[] = [];
+  private originalNPCTextures: Map<string, string> = new Map();
   private speechBubbles: SpeechBubble[] = [];
 
   constructor(
@@ -39,7 +34,8 @@ export class ConstraintFeedbackDisplay {
     gridMapper: GridToWorldMapper,
     glyphRegistry: LanguageGlyphRegistry,
     tilesetKey: string,
-    npcSpriteKey: string,
+    _npcSpriteKey: string,
+    existingNPCSprites: Map<string, Phaser.GameObjects.Sprite>,
     language: string = 'grass',
     depth: number = 200,
   ) {
@@ -47,20 +43,19 @@ export class ConstraintFeedbackDisplay {
     this.gridMapper = gridMapper;
     this.glyphRegistry = glyphRegistry;
     this.tilesetKey = tilesetKey;
-    this.npcSpriteKey = npcSpriteKey;
+    this.existingNPCSprites = existingNPCSprites;
     this.language = language;
     this.depth = depth;
   }
 
   /**
    * Show or update the feedback for the given display items.
-   * Previous sprites and bubbles are cleared first.
+   * Updates existing NPC sprite expressions and creates speech bubbles.
    */
   update(items: ConstraintDisplayItem[], puzzle: BridgePuzzle): void {
     this.clear();
 
     const cellSize = this.gridMapper.getCellSize();
-    const bubbleHeightPx = BUBBLE_TILE_HEIGHT * TILE_SIZE;
 
     for (const item of items) {
       const island = puzzle.islands.find(i => i.id === item.elementID);
@@ -71,37 +66,22 @@ export class ConstraintFeedbackDisplay {
       // Determine if constraint is satisfied (glyphMessage is "good" when satisfied)
       const isSatisfied = item.glyphMessage.trim() === 'good';
       
-      // Choose NPC sprite based on constraint type
-      const baseSprite = item.constraintType === 'IslandBridgeCountConstraint' ? 'Ruby' : 'sailorNS';
-      
-      // Choose expression based on satisfaction: happy if satisfied, frown if not
-      const spriteKey = isSatisfied ? `${baseSprite} happy` : `${baseSprite} frown`;
-
-      // NPC sprite — aligned with the island horizontally, offset down by half a cell
-      const npc = this.scene.add.sprite(
-        worldPos.x,
-        worldPos.y + cellSize / 2,
-        spriteKey,
-        0,
-      );
-      npc.setOrigin(0, 0);
-      npc.setDepth(this.depth);
-      this.npcSprites.push(npc);
-
-      // Add bridge count number sprite if this is IslandBridgeCountConstraint
-      if (item.constraintType === 'IslandBridgeCountConstraint' && item.requiredCount) {
-        const count = item.requiredCount;
-        if (count >= 1 && count <= 8) {
-          const numberSprite = this.scene.add.sprite(
-            worldPos.x + cellSize / 2,
-            worldPos.y + cellSize / 2,
-            'bridge counts',
-            count - 1 // Frame index is count-1 for numbers 1-8
-          );
-          numberSprite.setOrigin(0.5, 0.5);
-          numberSprite.setDepth(this.depth + 2);
-          this.numberSprites.push(numberSprite);
+      // Update existing NPC sprite texture to show appropriate expression
+      const existingNPC = this.existingNPCSprites.get(island.id);
+      if (existingNPC) {
+        // Save original texture if not already saved
+        if (!this.originalNPCTextures.has(island.id)) {
+          this.originalNPCTextures.set(island.id, existingNPC.texture.key);
         }
+        
+        // Choose NPC sprite based on constraint type
+        const baseSprite = item.constraintType === 'IslandBridgeCountConstraint' ? 'Ruby' : 'sailorNS';
+        
+        // Choose expression based on satisfaction: happy if satisfied, frown if not
+        const spriteKey = isSatisfied ? `${baseSprite} happy` : `${baseSprite} frown`;
+        
+        // Update the texture of the existing sprite
+        existingNPC.setTexture(spriteKey, 0);
       }
 
       // Speech bubble — aligned with island horizontally, offset up by bubble height + extra spacing
@@ -114,31 +94,36 @@ export class ConstraintFeedbackDisplay {
     }
   }
 
-  /** Hide all sprites and bubbles without destroying them. */
+  /** Hide speech bubbles and restore original NPC textures. */
   setVisible(visible: boolean): void {
-    for (const npc of this.npcSprites) {
-      npc.setVisible(visible);
+    if (!visible) {
+      // Restore original NPC textures when hiding
+      for (const [islandId, originalTexture] of this.originalNPCTextures) {
+        const npc = this.existingNPCSprites.get(islandId);
+        if (npc) {
+          npc.setTexture(originalTexture, 0);
+        }
+      }
+      this.originalNPCTextures.clear();
     }
-    for (const num of this.numberSprites) {
-      num.setVisible(visible);
-    }
+    
     for (const bubble of this.speechBubbles) {
       bubble.setVisible(visible);
     }
   }
 
-  /** Destroy and remove all sprites and bubbles. */
+  /** Destroy speech bubbles and restore original NPC textures. */
   clear(): void {
-    for (const npc of this.npcSprites) {
-      npc.destroy();
+    // Restore original NPC textures
+    for (const [islandId, originalTexture] of this.originalNPCTextures) {
+      const npc = this.existingNPCSprites.get(islandId);
+      if (npc) {
+        npc.setTexture(originalTexture, 0);
+      }
     }
-    this.npcSprites = [];
+    this.originalNPCTextures.clear();
 
-    for (const num of this.numberSprites) {
-      num.destroy();
-    }
-    this.numberSprites = [];
-
+    // Destroy speech bubbles
     for (const bubble of this.speechBubbles) {
       bubble.destroy();
     }
