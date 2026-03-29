@@ -512,16 +512,18 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     }
 
     /**
-     * Highlight islands for interaction feedback
+     * Highlight islands for interaction feedback.
+     * Tints the NPC sprite on each island because the island graphic sprite is
+     * not rendered in overworld puzzles (the biome-specific art is already
+     * visible in the overworld map beneath the puzzle overlay).
      */
     highlightIslands(islandIds: string[], color: number = 0x00ff00): void {
         console.log(`EmbeddedPuzzleRenderer: Highlighting islands:`, islandIds);
 
-        // Simple highlight implementation
         for (const islandId of islandIds) {
-            const sprite = this.islandGraphics.get(islandId);
-            if (sprite) {
-                sprite.setTint(color);
+            const npcSprite = this.constraintNPCs.get(islandId);
+            if (npcSprite) {
+                npcSprite.setTint(color);
             }
         }
     }
@@ -530,8 +532,8 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
      * Clear all highlights
      */
     clearHighlights(): void {
-        for (const sprite of this.islandGraphics.values()) {
-            sprite.clearTint();
+        for (const npcSprite of this.constraintNPCs.values()) {
+            npcSprite.clearTint();
         }
         for (const container of this.bridgeGraphics.values()) {
             container.list.forEach((child: any) => {

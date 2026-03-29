@@ -241,6 +241,95 @@ describe('EmbeddedPuzzleRenderer Bridge Removal', () => {
         });
     });
 
+    describe('highlightIslands and clearHighlights with NPC sprites', () => {
+        let rendererWithNPC: EmbeddedPuzzleRenderer;
+        let puzzleWithNPC: BridgePuzzle;
+        let mockNPCSprite: any;
+
+        beforeEach(() => {
+            // Reset spy so we can track only calls made during this block's init
+            scene.add.sprite.mockClear();
+
+            mockNPCSprite = {
+                setOrigin: vi.fn().mockReturnThis(),
+                setDepth: vi.fn().mockReturnThis(),
+                setScale: vi.fn().mockReturnThis(),
+                setRotation: vi.fn().mockReturnThis(),
+                destroy: vi.fn(),
+                setTint: vi.fn(),
+                clearTint: vi.fn(),
+                visible: true,
+                alpha: 1,
+                depth: 101,
+                texture: { key: 'Ruby' },
+                frame: { name: '0' },
+                x: 0,
+                y: 0,
+                originX: 0,
+                originY: 0,
+            };
+
+            // Return the NPC mock for 'Ruby' sprite calls; use default for others
+            scene.add.sprite.mockImplementation((_x: number, _y: number, key: string) => {
+                if (key === 'Ruby') return mockNPCSprite;
+                return {
+                    setOrigin: vi.fn().mockReturnThis(),
+                    setDepth: vi.fn().mockReturnThis(),
+                    setScale: vi.fn().mockReturnThis(),
+                    setRotation: vi.fn().mockReturnThis(),
+                    destroy: vi.fn(),
+                    setTint: vi.fn(),
+                    clearTint: vi.fn(),
+                    visible: true,
+                    alpha: 1,
+                    depth: 101,
+                    texture: { key },
+                    frame: { name: '0' },
+                    x: 0,
+                    y: 0,
+                    originX: 0,
+                    originY: 0,
+                };
+            });
+
+            const puzzleBounds = new Phaser.Geom.Rectangle(100, 100, 200, 200);
+            rendererWithNPC = new EmbeddedPuzzleRenderer(scene, puzzleBounds, 'test-tiles');
+
+            // Island with a bridge-count constraint so the NPC sprite is created
+            puzzleWithNPC = new BridgePuzzle({
+                id: 'npc-puzzle',
+                size: { width: 5, height: 5 },
+                islands: [
+                    { id: 'npc-island', x: 1, y: 1, constraints: ['num_bridges=3'] },
+                    { id: 'plain-island', x: 3, y: 1, constraints: [] },
+                ],
+                bridgeTypes: [{ id: 'single', colour: 'black', count: 5 }],
+                constraints: [],
+                maxNumBridges: 3
+            });
+
+            rendererWithNPC.init(puzzleWithNPC);
+        });
+
+        it('should tint the NPC sprite when highlightIslands is called', () => {
+            rendererWithNPC.highlightIslands(['npc-island'], 0xff0000);
+
+            expect(mockNPCSprite.setTint).toHaveBeenCalledWith(0xff0000);
+        });
+
+        it('should do nothing for islands without an NPC sprite', () => {
+            // plain-island has no num_bridges constraint so no NPC was created
+            expect(() => rendererWithNPC.highlightIslands(['plain-island'], 0xff0000)).not.toThrow();
+        });
+
+        it('should clear tint from NPC sprite when clearHighlights is called', () => {
+            rendererWithNPC.highlightIslands(['npc-island'], 0xff0000);
+            rendererWithNPC.clearHighlights();
+
+            expect(mockNPCSprite.clearTint).toHaveBeenCalled();
+        });
+    });
+
     describe('Preview Bridge Rendering', () => {
         it('should render preview bridge with pixel-accurate endpoints', () => {
             const bridge: Bridge = {
