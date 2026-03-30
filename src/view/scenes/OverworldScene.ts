@@ -22,6 +22,8 @@ import { NPCIconConfig } from '@view/NPCIconConfig';
 import { Door } from '@model/overworld/Door';
 import { PlayerStartManager } from '@model/overworld/PlayerStartManager';
 import { getDoorSpriteFrame } from '@view/DoorSpriteRegistry';
+import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
+import { CollisionTileClassifier } from '@model/overworld/CollisionTileClassifier';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -565,8 +567,7 @@ export class OverworldScene extends Phaser.Scene {
     if (!this.map || !this.tiledMapData) return;
 
     // Find all npcs object layers (including nested) in tiledMapData
-    const npcsLayers: Array<{ name: string; fullPath: string; data: any }> = [];
-    this.findObjectLayersByName(this.tiledMapData.layers, 'npcs', npcsLayers, '');
+    const npcsLayers = TiledLayerUtils.findObjectLayersByName(this.tiledMapData.layers, 'npcs');
 
     if (npcsLayers.length === 0) {
       console.log('No NPCs layers found in map');
@@ -602,37 +603,6 @@ export class OverworldScene extends Phaser.Scene {
     this.loadDoors();
   }
 
-  /**
-   * Recursively find object layers by name suffix
-   * @param layers - Array of layer data to search
-   * @param suffix - The suffix to match (e.g., "npcs")
-   * @param results - Array to accumulate results
-   * @param parentPath - Path of parent groups (e.g., "Beach/")
-   */
-  private findObjectLayersByName(
-    layers: any[],
-    suffix: string,
-    results: Array<{ name: string; fullPath: string; data: any }>,
-    parentPath: string
-  ): void {
-    for (const layer of layers) {
-      const fullPath = parentPath ? `${parentPath}/${layer.name}` : layer.name;
-
-      // Check if this layer name matches the suffix
-      if (layer.name && this.getLayerSuffix(layer.name) === suffix && layer.type === 'objectgroup') {
-        results.push({
-          name: layer.name,
-          fullPath: fullPath,
-          data: layer
-        });
-      }
-
-      // Recursively search nested layers if this is a group
-      if (layer.type === 'group' && layer.layers) {
-        this.findObjectLayersByName(layer.layers, suffix, results, layer.name);
-      }
-    }
-  }
 
   /**
    * Load NPCs from a specific object layer
@@ -974,8 +944,7 @@ export class OverworldScene extends Phaser.Scene {
     if (!this.map || !this.tiledMapData) return;
 
     // Find all doors object layers (including nested) in tiledMapData
-    const doorsLayers: Array<{ name: string; fullPath: string; data: any }> = [];
-    this.findObjectLayersByName(this.tiledMapData.layers, 'doors', doorsLayers, '');
+    const doorsLayers = TiledLayerUtils.findObjectLayersByName(this.tiledMapData.layers, 'doors');
 
     if (doorsLayers.length === 0) {
       console.log('No doors layers found in map');
@@ -1142,7 +1111,7 @@ export class OverworldScene extends Phaser.Scene {
    * Helper: Find all layers matching a suffix pattern (e.g., "collision" matches "Beach/collision", "Forest/collision")
    */
   private findLayersBySuffix(suffix: string): Phaser.Tilemaps.LayerData[] {
-    return this.map.layers.filter(layer => this.getLayerSuffix(layer.name) === suffix);
+    return this.map.layers.filter(layer => TiledLayerUtils.getLayerSuffix(layer.name) === suffix);
   }
 
   /**
@@ -1190,14 +1159,6 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   /**
-   * Helper: Get the layer suffix (everything after the last '/')
-   */
-  private getLayerSuffix(layerName: string): string {
-    const lastSlash = layerName.lastIndexOf('/');
-    return lastSlash >= 0 ? layerName.substring(lastSlash + 1) : layerName;
-  }
-
-  /**
    * Setup visual tile layers that should be automatically rendered
    * Looks for layers with the custom property "autoRender: true" or layers with common visual suffixes
    */
@@ -1210,7 +1171,7 @@ export class OverworldScene extends Phaser.Scene {
     // Check all layers in the map
     for (const layerData of this.map.layers) {
       const layerName = layerData.name;
-      const layerSuffix = this.getLayerSuffix(layerName);
+      const layerSuffix = TiledLayerUtils.getLayerSuffix(layerName);
 
       // Skip special layers that are handled elsewhere
       if (layerSuffix === 'collision' ||
@@ -1387,73 +1348,21 @@ export class OverworldScene extends Phaser.Scene {
       blockedData[y] = [];
 
       for (let x = 0; x < mapWidth; x++) {
-        let collisionType: CollisionType = CollisionType.WALKABLE;
-        let hasWalkable = false;
-        let hasWalkableLow = false;
-        let hasTile = false; // Track if we found any tile in collision layers
-
-        // Check all source collision layers from Tiled
-        for (const collisionLayer of this.collisionLayers) {
+        // Collect tile data from all collision layers at this position
+        const layerTiles = this.collisionLayers.map(collisionLayer => {
           const tile = collisionLayer.getTileAt(x, y);
-          if (tile && tile.index !== -1) {
-            hasTile = true;
+          return (tile && tile.index !== -1) ? { properties: tile.properties } : null;
+        });
 
-            if (tile.properties) {
-              // Check for walkable property (upper ground)
-              if ('walkable' in tile.properties && tile.properties.walkable === true) {
-                hasWalkable = true;
-                collisionType = CollisionType.WALKABLE;
-              }
-              // Check for walkable_low property (lower ground)
-              if ('walkable_low' in tile.properties && tile.properties.walkable_low === true) {
-                hasWalkableLow = true;
-                collisionType = CollisionType.WALKABLE_LOW;
-              }
-              // Check for stairs (always passable)
-              if ('stairs' in tile.properties && tile.properties.stairs === true) {
-                collisionType = CollisionType.STAIRS;
-              }
-            }
+        // Classify tile type using pure logic
+        const classification = CollisionTileClassifier.classifyTile(layerTiles);
+        this.collisionArray[y][x] = classification.collisionType;
 
-            // If tile has no walkable properties, it's blocked
-            if (!hasWalkable && !hasWalkableLow && collisionType !== CollisionType.STAIRS) {
-              collisionType = CollisionType.BLOCKED;
-            }
-          }
-        }
-
-        this.collisionArray[y][x] = collisionType;
-
-        // Place tile in appropriate layer(s)
-        // Only create collision if there's actually a tile in the collision layer
-        if (!hasTile) {
-          // No collision tile means walkable (normal ground)
-          upperGroundData[y][x] = 0;
-          lowerGroundData[y][x] = 0;
-          blockedData[y][x] = 0;
-        } else if (collisionType === CollisionType.STAIRS) {
-          // Stairs: walkable on all layers
-          upperGroundData[y][x] = 0;
-          lowerGroundData[y][x] = 0;
-          blockedData[y][x] = 0;
-        } else if (hasWalkableLow) {
-          // Lower ground: walkable on lower layer, blocked on upper layer
-          // Put in lowerGroundLayer which collides when player on upper
-          upperGroundData[y][x] = 0;
-          lowerGroundData[y][x] = 1; // Collision when player on upper layer
-          blockedData[y][x] = 0;
-        } else if (hasWalkable) {
-          // Upper ground: walkable on upper layer, blocked on lower layer
-          // Put in upperGroundLayer which collides when player on lower
-          upperGroundData[y][x] = 1; // Collision when player on lower layer
-          lowerGroundData[y][x] = 0;
-          blockedData[y][x] = 0;
-        } else {
-          // Tile exists but has no walkable properties = always blocked (walls, obstacles)
-          upperGroundData[y][x] = 0;
-          lowerGroundData[y][x] = 0;
-          blockedData[y][x] = 1; // Always has collision
-        }
+        // Assign tile to the appropriate sub-layer(s)
+        const subLayers = CollisionTileClassifier.toSubLayerValues(classification);
+        upperGroundData[y][x] = subLayers.upperGround;
+        lowerGroundData[y][x] = subLayers.lowerGround;
+        blockedData[y][x] = subLayers.blocked;
       }
     }
 
