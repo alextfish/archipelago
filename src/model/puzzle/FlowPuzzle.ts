@@ -1,7 +1,14 @@
 import { BridgePuzzle, type PuzzleSpec } from "@model/puzzle/BridgePuzzle";
-import type { FlowPuzzleSpec, FlowSquareSpec, GridKey } from "./FlowTypes";
+import type { FlowPuzzleSpec, FlowSquareSpec, GridKey, WaterChangeWaves } from "./FlowTypes";
 import { gridKey, parseGridKey } from "./FlowTypes";
 import { ConnectivityManager } from "@model/ConnectivityManager";
+
+const DIR_DELTA: Record<string, { dx: number; dy: number }> = {
+  N: { dx: 0, dy: -1 },
+  S: { dx: 0, dy: 1 },
+  E: { dx: 1, dy: 0 },
+  W: { dx: -1, dy: 0 }
+};
 
 /**
  * FlowPuzzle extends BridgePuzzle with water propagation state.
@@ -158,12 +165,7 @@ export class FlowPuzzle extends BridgePuzzle {
       }
     }
 
-    const dirDelta: Record<string, { dx: number; dy: number }> = {
-      N: { dx: 0, dy: -1 },
-      S: { dx: 0, dy: 1 },
-      E: { dx: 1, dy: 0 },
-      W: { dx: -1, dy: 0 }
-    };
+    const dirDelta = DIR_DELTA;
 
     while (queue.length > 0) {
       const curKey = queue.shift()!;
@@ -203,6 +205,120 @@ export class FlowPuzzle extends BridgePuzzle {
         this.edgeOutputCache.add(k);
       }
     }
+  }
+
+  /**
+   * Places a bridge and returns the ordered sequence of cells that dry up.
+   * Wave 0 contains the cells directly blocked by the bridge that had water.
+   * Each subsequent wave contains cells that lose water downstream of the previous wave.
+   * Cells that retain water via an alternative path are excluded from all waves.
+   */
+  placeBridgeWithWaterChanges(
+    bridgeID: string,
+    start: { x: number; y: number },
+    end: { x: number; y: number }
+  ): { success: boolean; dryingSequence: WaterChangeWaves } {
+    const oldWater = new Set(this.hasWater);
+    const bridgedCells = this.getBridgeCoveredCells(start, end);
+
+    const ok = this.placeBridge(bridgeID, start, end);
+    if (!ok) return { success: false, dryingSequence: [] };
+
+    const driedUp = new Set<GridKey>();
+    for (const k of oldWater) {
+      if (!this.hasWater.has(k)) driedUp.add(k);
+    }
+
+    return { success: true, dryingSequence: this.computeWaterChangeWaves(bridgedCells, driedUp) };
+  }
+
+  /**
+   * Removes a bridge and returns the ordered sequence of cells that gain water.
+   * Wave 0 contains the cells directly unblocked by the bridge that now receive water.
+   * Each subsequent wave contains cells that gain water downstream of the previous wave.
+   */
+  removeBridgeWithWaterChanges(bridgeID: string): WaterChangeWaves {
+    const bridge = this.placedBridges.find(b => b.id === bridgeID);
+    const bridgedCells: GridKey[] =
+      bridge?.start && bridge?.end
+        ? this.getBridgeCoveredCells(bridge.start, bridge.end)
+        : [];
+
+    const oldWater = new Set(this.hasWater);
+    this.removeBridge(bridgeID);
+
+    const gained = new Set<GridKey>();
+    for (const k of this.hasWater) {
+      if (!oldWater.has(k)) gained.add(k);
+    }
+
+    return this.computeWaterChangeWaves(bridgedCells, gained);
+  }
+
+  /**
+   * Returns the GridKeys of the intermediate cells covered by a bridge between start and end.
+   * Island endpoints are excluded; only the cells strictly between them are returned.
+   */
+  private getBridgeCoveredCells(
+    start: { x: number; y: number },
+    end: { x: number; y: number }
+  ): GridKey[] {
+    const cells: GridKey[] = [];
+    if (start.x === end.x) {
+      const minY = Math.min(start.y, end.y);
+      const maxY = Math.max(start.y, end.y);
+      for (let y = minY + 1; y < maxY; y++) cells.push(gridKey(start.x, y));
+    } else if (start.y === end.y) {
+      const minX = Math.min(start.x, end.x);
+      const maxX = Math.max(start.x, end.x);
+      for (let x = minX + 1; x < maxX; x++) cells.push(gridKey(x, start.y));
+    }
+    return cells;
+  }
+
+  /**
+   * Performs a BFS from startingKeys through the outgoing flow directions,
+   * restricted to cells in changedCells, and returns the result as an ordered
+   * array of waves. Each wave is an array of {x, y} coordinates that change
+   * state at the same propagation step.
+   */
+  private computeWaterChangeWaves(
+    startingKeys: GridKey[],
+    changedCells: Set<GridKey>
+  ): WaterChangeWaves {
+    const waves: WaterChangeWaves = [];
+    const visited = new Set<GridKey>();
+
+    const wave0Keys = startingKeys.filter(k => changedCells.has(k));
+    if (wave0Keys.length === 0) return [];
+
+    for (const k of wave0Keys) visited.add(k);
+    waves.push(wave0Keys.map(k => parseGridKey(k)));
+
+    let currentWaveKeys = wave0Keys;
+    while (currentWaveKeys.length > 0) {
+      const nextWaveKeys: GridKey[] = [];
+      for (const k of currentWaveKeys) {
+        const pos = parseGridKey(k);
+        const fs = this.flowSquares.get(k);
+        if (!fs) continue;
+        for (const d of fs.outgoing ?? []) {
+          const delta = DIR_DELTA[d];
+          if (!delta) continue;
+          const nk = gridKey(pos.x + delta.dx, pos.y + delta.dy);
+          if (!visited.has(nk) && changedCells.has(nk)) {
+            nextWaveKeys.push(nk);
+            visited.add(nk);
+          }
+        }
+      }
+      if (nextWaveKeys.length > 0) {
+        waves.push(nextWaveKeys.map(k => parseGridKey(k)));
+      }
+      currentWaveKeys = nextWaveKeys;
+    }
+
+    return waves;
   }
 
   getBakedConnectivity() {
