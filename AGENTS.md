@@ -86,7 +86,7 @@ When the player solves an overworld puzzle, the bridges are added to the Overwor
 
 ### Source Control
 
-We use git. **AI agents NEVER COMMIT TO GIT directly.** The human developer makes git commits and pushes. You can use git to revert or stash changes if needed, but never commit.
+We use git. **AI agents NEVER COMMIT TO GIT directly.** The human developer makes git commits and pushes. You can use git to revert or stash changes if needed, but never commit. However you are encouraged to read git logs to understand recent commits.
 
 ## Testing Best Practices
 

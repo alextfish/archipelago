@@ -128,14 +128,35 @@ export class FlowPuzzleRenderer extends EmbeddedPuzzleRenderer {
     }
   }
   
-  // Override updateFromPuzzle to refresh water state
+  // Override updateFromPuzzle for instant (non-animated) snapshot — used by undo/redo
   override updateFromPuzzle(puzzle: BridgePuzzle): void {
     super.updateFromPuzzle(puzzle);
     
     if (this.flowPuzzle) {
-      this.updateWaterTiles();
+      this.snapWaterTilesToCurrentState();
       this.updateFlowArrows();
+      this.emitWaterChangedEvent();
     }
+  }
+  
+  /**
+   * Animate cells drying up wave by wave after a bridge is placed.
+   * Wave 0 = cells directly blocked by the bridge that had water.
+   * Each subsequent wave = cells that lose water downstream.
+   * Called by the controller after executing FlowBuildBridgeCommand.
+   */
+  animateDryingWaves(waves: WaterChangeWaves): void {
+    this.playWavesSequentially(waves, false);
+  }
+  
+  /**
+   * Animate cells flooding wave by wave after a bridge is removed.
+   * Wave 0 = cells directly unblocked by the bridge that gain water.
+   * Each subsequent wave = cells that gain water downstream.
+   * Called by the controller after executing FlowRemoveBridgeCommand.
+   */
+  animateFloodingWaves(waves: WaterChangeWaves): void {
+    this.playWavesSequentially(waves, true);
   }
   
   private initializeFlowGraphics(): void {
@@ -143,14 +164,22 @@ export class FlowPuzzleRenderer extends EmbeddedPuzzleRenderer {
     // Position using gridMapper inherited from parent
   }
   
-  private updateWaterTiles(): void {
-    // Update water tile sprites based on hasWater state
-    // Animate transitions if water state changed
+  private snapWaterTilesToCurrentState(): void {
+    // Instantly update water tile sprites to match flowPuzzle.tileHasWater()
+    // No animation — used for undo/redo and initial render
   }
   
   private updateFlowArrows(): void {
-    // Update flow arrow visibility and animation based on water state
+    // Update flow arrow visibility based on water state
     // Show arrows only on tiles with water
+  }
+  
+  private playWavesSequentially(waves: WaterChangeWaves, flooding: boolean): void {
+    // Animate each wave in turn; after all waves, emit water changed event
+  }
+  
+  private emitWaterChangedEvent(): void {
+    // Emit 'flow-puzzle-water-changed' with current edge outputs for overworld sync
   }
   
   override destroy(): void {
@@ -164,76 +193,74 @@ export class FlowPuzzleRenderer extends EmbeddedPuzzleRenderer {
 }
 ```
 
-### 1.3 Real-Time Water State Updates
+### 1.3 Wave-Based Water Animation
 
-**Important**: The FlowPuzzleRenderer needs to emit events when water state changes so the overworld view can update in real-time while the player is solving the puzzle. This allows visible river tiles outside the puzzle bounds to update as bridges are placed/removed.
+`FlowPuzzle.placeBridgeWithWaterChanges()` and `removeBridgeWithWaterChanges()` return a `WaterChangeWaves` value: an ordered array of waves, each listing the `{x, y}` cells that gain or lose water at that propagation step. The renderer uses these waves to animate cells changing state one wave at a time, giving the visual impression of water draining away downstream or rushing back in.
+
+**Wave animation**: Each wave is animated as a group (all cells in the wave transition simultaneously). When the group finishes, the next wave begins after a short delay (e.g. 200 ms). This creates a ripple effect propagating downstream.
 
 ```typescript
-export class FlowPuzzleRenderer extends EmbeddedPuzzleRenderer {
-  // ... existing fields
+private playWavesSequentially(waves: WaterChangeWaves, flooding: boolean): void {
+  if (waves.length === 0) {
+    this.emitWaterChangedEvent();
+    return;
+  }
   
-  override updateFromPuzzle(puzzle: BridgePuzzle): void {
-    super.updateFromPuzzle(puzzle);
-    
-    if (this.flowPuzzle) {
-      const previousWaterState = this.getCurrentWaterState();
-      
-      // Update water visuals
-      this.updateWaterTiles();
+  let waveIndex = 0;
+  
+  const playNextWave = () => {
+    if (waveIndex >= waves.length) {
+      // All waves done — update arrows and notify overworld
       this.updateFlowArrows();
-      
-      // Emit event with water state changes for overworld to update
-      const currentWaterState = this.getCurrentWaterState();
-      const changes = this.computeWaterStateChanges(previousWaterState, currentWaterState);
-      
-      if (changes.flooded.size > 0 || changes.drained.size > 0) {
-        this.scene.events.emit('flow-puzzle-water-changed', {
-          puzzleID: this.flowPuzzle.id,
-          flooded: Array.from(changes.flooded),
-          drained: Array.from(changes.drained)
-        });
+      this.emitWaterChangedEvent();
+      return;
+    }
+    
+    const wave = waves[waveIndex++];
+    const targets: Phaser.GameObjects.Sprite[] = [];
+    
+    for (const { x, y } of wave) {
+      const sprite = this.waterTiles.get(gridKey(x, y));
+      if (sprite) {
+        // Swap texture immediately — tween fades in/out for polish
+        sprite.setTexture(flooding
+          ? this.SPRITE_KEYS.WATER_FILLED
+          : this.SPRITE_KEYS.WATER_DRAINED
+        );
+        targets.push(sprite);
       }
     }
-  }
+    
+    if (targets.length > 0) {
+      this.scene.tweens.add({
+        targets,
+        alpha: { from: 0.3, to: 1 },
+        duration: 220,
+        ease: 'Sine.easeOut',
+        onComplete: () => {
+          this.scene.time.delayedCall(200, playNextWave);
+        }
+      });
+    } else {
+      // No sprites visible for this wave — move on immediately
+      this.scene.time.delayedCall(0, playNextWave);
+    }
+  };
   
-  private getCurrentWaterState(): Set<string> {
-    const state = new Set<string>();
-    if (!this.flowPuzzle) return state;
-    
-    const waterGrid = this.flowPuzzle.getHasWaterGrid();
-    for (const [key, hasWater] of waterGrid) {
-      if (hasWater) {
-        state.add(key);
-      }
-    }
-    return state;
-  }
-  
-  private computeWaterStateChanges(
-    previous: Set<string>,
-    current: Set<string>
-  ): { flooded: Set<string>; drained: Set<string> } {
-    const flooded = new Set<string>();
-    const drained = new Set<string>();
-    
-    // Find newly flooded tiles
-    for (const tile of current) {
-      if (!previous.has(tile)) {
-        flooded.add(tile);
-      }
-    }
-    
-    // Find newly drained tiles
-    for (const tile of previous) {
-      if (!current.has(tile)) {
-        drained.add(tile);
-      }
-    }
-    
-    return { flooded, drained };
-  }
+  playNextWave();
+}
+
+private emitWaterChangedEvent(): void {
+  if (!this.flowPuzzle) return;
+  // Derive flooded/drained by reading current edge outputs from puzzle
+  this.scene.events.emit('flow-puzzle-water-changed', {
+    puzzleID: this.flowPuzzle.id,
+    edgeOutputs: this.flowPuzzle.getEdgeOutput()
+  });
 }
 ```
+
+**Undo/redo** uses the instant `updateFromPuzzle()` path (no waves) — snapping the visual to the model state without animation. This is fast and avoids confusing reversed animations.
 
 **Water Tiles**: Each flow square gets a base sprite that switches between:
 - `water-filled`: When `flowPuzzle.tileHasWater(x, y)` is true
@@ -257,27 +284,7 @@ export class FlowPuzzleRenderer extends EmbeddedPuzzleRenderer {
 
 ### 1.4 Rendering Details
 
-```typescript
-private animateWaterStateChange(gridKey: string, nowHasWater: boolean): void {
-  const sprite = this.waterTiles.get(gridKey);
-  if (!sprite) return;
-  
-  // Fade transition or splash effect
-  this.scene.tweens.add({
-    targets: sprite,
-    alpha: nowHasWater ? 1 : 0.5,
-    duration: 300,
-    ease: 'Sine.easeInOut',
-    onComplete: () => {
-      // Switch sprite frame after fade
-      sprite.setFrame(nowHasWater ? 
-        this.SPRITE_KEYS.WATER_FILLED : 
-        this.SPRITE_KEYS.WATER_DRAINED
-      );
-    }
-  });
-}
-```
+**Water Tiles**: Each flow square gets a base sprite whose texture key switches between `water-filled` and `drained-riverbed`. For wave animation the texture is swapped immediately (so it's correct if skipped) then a brief alpha fade tween adds visual polish.
 
 ### 1.5 Animation Support
 
@@ -300,6 +307,82 @@ export class FlowRenderingUtils {
   }
 }
 ```
+
+### 1.6 Command Variants for Wave Animation
+
+The existing `BuildBridgeCommand` and `RemoveBridgeCommand` call `puzzle.placeBridge()` / `puzzle.removeBridge()`, which do not return `WaterChangeWaves`. To use the wave API from `FlowPuzzle`, create thin command subclasses that call the `WithWaterChanges` variants instead and expose the result.
+
+**Location**: `src/model/commands/FlowBuildBridgeCommand.ts`, `src/model/commands/FlowRemoveBridgeCommand.ts`
+
+```typescript
+/**
+ * Variant of BuildBridgeCommand for FlowPuzzle.
+ * Calls placeBridgeWithWaterChanges() and stores the drying wave sequence
+ * so the controller can hand it to the renderer for animation.
+ */
+export class FlowBuildBridgeCommand extends BuildBridgeCommand {
+  private dryingSequence: WaterChangeWaves = [];
+
+  constructor(
+    puzzle: FlowPuzzle,
+    bridgeTypeID: string,
+    start: Point,
+    end: Point,
+    preallocatedBridgeID?: string
+  ) {
+    super(puzzle, bridgeTypeID, start, end, preallocatedBridgeID);
+  }
+
+  override execute(): void {
+    // Use the wave variant instead of plain placeBridge
+    const result = (this.puzzle as FlowPuzzle).placeBridgeWithWaterChanges(
+      this.bridgeIDToUse!, this.start, this.end
+    );
+    if (!result.success) throw new Error('Bridge placement failed');
+    this.dryingSequence = result.dryingSequence;
+    this.executed = true;
+  }
+
+  getDryingSequence(): WaterChangeWaves {
+    return this.dryingSequence;
+  }
+}
+
+/**
+ * Variant of RemoveBridgeCommand for FlowPuzzle.
+ * Calls removeBridgeWithWaterChanges() and stores the flooding wave sequence.
+ */
+export class FlowRemoveBridgeCommand extends RemoveBridgeCommand {
+  private floodingSequence: WaterChangeWaves = [];
+
+  override execute(): void {
+    this.floodingSequence = (this.puzzle as FlowPuzzle).removeBridgeWithWaterChanges(
+      this.bridgeId
+    );
+    this.executed = true;
+  }
+
+  getFloodingSequence(): WaterChangeWaves {
+    return this.floodingSequence;
+  }
+}
+```
+
+After executing either command, the controller retrieves the wave sequence and passes it to the renderer:
+
+```typescript
+// In FlowPuzzleController or a FlowPuzzleInputHandler adapter:
+const cmd = new FlowBuildBridgeCommand(flowPuzzle, typeID, start, end, preallocatedID);
+undoManager.executeCommand(cmd);
+flowRenderer.animateDryingWaves(cmd.getDryingSequence());
+
+// On removal:
+const cmd = new FlowRemoveBridgeCommand(flowPuzzle, bridgeID);
+undoManager.executeCommand(cmd);
+flowRenderer.animateFloodingWaves(cmd.getFloodingSequence());
+```
+
+**Undo/redo**: When undo/redo replays a command, the controller calls `renderer.updateFromPuzzle(puzzle)` (instant snap, no waves). This avoids confusing reversed animations.
 
 ---
 
@@ -1094,7 +1177,9 @@ export class FlowPuzzleController extends OverworldPuzzleController {
   }
   
   /**
-   * Override puzzle host to add water propagation on solve
+   * Override puzzle host to add water propagation on solve.
+   * Also supplies FlowBuild/RemoveBridgeCommand factories so that the
+   * PuzzleController uses wave-aware commands for FlowPuzzle.
    */
   protected override createPuzzleHost(
     puzzleId: string,
@@ -1104,13 +1189,25 @@ export class FlowPuzzleController extends OverworldPuzzleController {
     const baseHost = super.createPuzzleHost(puzzleId, puzzle, boundsRect);
     
     if (puzzle instanceof FlowPuzzle) {
+      const flowPuzzle = puzzle;
+      const renderer = this.puzzleRenderer as FlowPuzzleRenderer;
       return {
         ...baseHost,
+        // Supply wave-aware command factories so PuzzleController uses them
+        createBuildBridgeCommand: (typeID, start, end, preallocatedID) => {
+          const cmd = new FlowBuildBridgeCommand(flowPuzzle, typeID, start, end, preallocatedID);
+          // Wire up post-execute hook to animate via renderer
+          cmd.onExecuted = () => renderer.animateDryingWaves(cmd.getDryingSequence());
+          return cmd;
+        },
+        createRemoveBridgeCommand: (bridgeID) => {
+          const cmd = new FlowRemoveBridgeCommand(flowPuzzle, bridgeID);
+          cmd.onExecuted = () => renderer.animateFloodingWaves(cmd.getFloodingSequence());
+          return cmd;
+        },
         onPuzzleSolved: () => {
-          // Update water propagation before calling parent
-          this.updateWaterPropagation(puzzleId, puzzle as FlowPuzzle);
-          
-          // Call parent's onPuzzleSolved
+          // Ensure propagation is current before exiting
+          this.updateWaterPropagation(puzzleId, flowPuzzle);
           baseHost.onPuzzleSolved?.();
         }
       };
@@ -1120,26 +1217,24 @@ export class FlowPuzzleController extends OverworldPuzzleController {
   }
   
   /**
-   * Handle real-time water state changes while solving.
-   * Called when player places/removes bridges.
+   * Handle water changed event emitted by the renderer after each animation.
+   * The event fires once per bridge action (after the last wave completes).
+   * It carries the current edge outputs of the puzzle so propagation can be
+   * recomputed without needing to pass WaterChangeWaves here.
    */
   private onWaterStateChanged(event: {
     puzzleID: string;
-    flooded: string[];
-    drained: string[];
+    edgeOutputs: { x: number; y: number }[];
   }): void {
     if (event.puzzleID !== this.currentPuzzleId) return;
     
     const puzzle = this.getActivePuzzle();
     if (!(puzzle instanceof FlowPuzzle)) return;
     
-    // Update water propagation in real-time
-    const changes = this.gameState.updateFlowPuzzleWaterState(
-      event.puzzleID,
-      puzzle
-    );
+    // Update water propagation in real-time using current puzzle state
+    const changes = this.gameState.updateFlowPuzzleWaterState(event.puzzleID, puzzle);
     
-    // Update overworld visuals for changed tiles
+    // Update overworld visuals for changed tiles (instant swap for river tiles)
     this.updateOverworldWaterTiles(changes.flooded, changes.drained);
   }
   
@@ -1148,13 +1243,9 @@ export class FlowPuzzleController extends OverworldPuzzleController {
    * Extracted as separate method for unit testing.
    */
   private updateWaterPropagation(puzzleID: string, puzzle: FlowPuzzle): void {
-    // Update game state with new water connectivity
     const changes = this.gameState.updateFlowPuzzleWaterState(puzzleID, puzzle);
-    
-    // Update overworld visuals
     this.updateOverworldWaterTiles(changes.flooded, changes.drained);
     
-    // Update edge inputs for affected downstream puzzles
     for (const [targetPuzzleID, inputs] of changes.affectedPuzzles) {
       const targetPuzzle = this.puzzleManager.getPuzzleById(targetPuzzleID);
       if (targetPuzzle instanceof FlowPuzzle) {
@@ -1168,8 +1259,6 @@ export class FlowPuzzleController extends OverworldPuzzleController {
    * Extracted for testing.
    */
   private updateOverworldWaterTiles(flooded: Set<string>, drained: Set<string>): void {
-    // Call OverworldScene method to update tile visuals
-    // This would be implemented in OverworldScene
     if (this.scene && typeof (this.scene as any).updateWaterTiles === 'function') {
       (this.scene as any).updateWaterTiles(
         Array.from(flooded).map(key => {
@@ -1464,28 +1553,36 @@ describe('CollisionManager walkability', () => {
 ### 5.3 Solving a FlowPuzzle (Real-Time Updates)
 
 ```
-1. Player places or removes a bridge
-2. FlowPuzzle.placeBridge() / removeBridge() automatically calls recomputeWater()
-3. FlowPuzzleRenderer.updateFromPuzzle() detects water state changes:
-   - Computes diff: which tiles newly flooded/drained
-   - Emits 'flow-puzzle-water-changed' event with diff
-4. FlowPuzzleController.onWaterStateChanged() event handler:
+1. Player places a bridge
+2. PuzzleController executes FlowBuildBridgeCommand (not the base BuildBridgeCommand):
+   - Command calls FlowPuzzle.placeBridgeWithWaterChanges(id, start, end)
+   - Puzzle internally calls recomputeWater() and computes WaterChangeWaves
+   - Command stores dryingSequence: WaterChangeWaves
+3. Controller retrieves dryingSequence from command:
+   - Calls flowRenderer.animateDryingWaves(dryingSequence)
+4. FlowPuzzleRenderer.animateDryingWaves() plays wave animation:
+   - Wave 0: tiles directly under the bridge that lose water — texture swapped, alpha tween
+   - Wave 1: tiles downstream of wave 0 that dry up — animated
+   - Further waves: continue propagating...
+   - After final wave: updateFlowArrows(), emits 'flow-puzzle-water-changed' with current edge outputs
+5. FlowPuzzleController.onWaterStateChanged() event handler:
    a. Calls gameState.updateFlowPuzzleWaterState(puzzleID, puzzle)
    b. WaterPropagationEngine.computePropagation() traces water through channels
    c. Returns { flooded, drained, affectedPuzzles }
-   d. Calls updateOverworldWaterTiles(flooded, drained)
-5. OverworldScene.updateWaterTiles() updates visible river sprites:
+   d. Calls updateOverworldWaterTiles(flooded, drained) [instant swap for river tiles]
+6. OverworldScene.updateWaterTiles() updates visible river sprites:
    - Flooded tiles → switch to "water-filled" sprite
    - Drained tiles → switch to "drained-riverbed" sprite
-   - Changes are visible IMMEDIATELY outside puzzle bounds
-6. Downstream FlowPuzzles receive updated edge inputs
-7. PuzzleController validates constraints continuously
-8. When all constraints satisfied → onPuzzleSolved() callback
-9. FlowPuzzleController.updateWaterPropagation() (final update):
-   - Ensures water state is current
-   - Gets baked connectivity from all affected puzzles
-   - Updates CollisionManager (only on exit, not during solving)
-10. Exit puzzle, player sees updated overworld with correct collision
+   - Changes are visible as puzzle animation plays
+7. Player removes a bridge: same flow using FlowRemoveBridgeCommand + animateFloodingWaves()
+8. Undo/redo: base commands used, renderer.updateFromPuzzle() called (instant snap, no waves)
+9. PuzzleController validates constraints continuously
+10. When all constraints satisfied → onPuzzleSolved() callback
+11. FlowPuzzleController.updateWaterPropagation() (final update):
+    - Ensures water state is current
+    - Gets baked connectivity from all affected puzzles
+    - Updates CollisionManager (only on exit, not during solving)
+12. Exit puzzle, player sees updated overworld with correct collision
 ```
 
 ### 5.4 Returning to a Previously Solved FlowPuzzle
@@ -1577,13 +1674,19 @@ preload() {
 
 ### Phase 2: View Layer (Week 2)
 
+- [ ] Implement `FlowBuildBridgeCommand` and `FlowRemoveBridgeCommand`
+  - [ ] Call `placeBridgeWithWaterChanges` / `removeBridgeWithWaterChanges` variants
+  - [ ] Expose `getDryingSequence()` / `getFloodingSequence()` for renderer
 - [ ] Implement `FlowPuzzleRenderer` extending `EmbeddedPuzzleRenderer`
   - [ ] Water tile rendering (filled/drained states)
+  - [ ] `animateDryingWaves(WaterChangeWaves)` — wave-by-wave drying animation
+  - [ ] `animateFloodingWaves(WaterChangeWaves)` — wave-by-wave flooding animation
+  - [ ] `updateFromPuzzle()` instant snap (no animation — used for undo/redo)
   - [ ] Flow arrow rendering (N/S/E/W overlays)
   - [ ] Pontoon, rocky, obstacle tile rendering
-  - [ ] Real-time event emission: `'flow-puzzle-water-changed'`
+  - [ ] Event emission: `'flow-puzzle-water-changed'` after last wave completes
 - [ ] Add `OverworldScene.updateWaterTiles()` method
-  - [ ] Update river tile sprites based on flooded/drained sets
+  - [ ] Update river tile sprites based on flooded/drained sets (instant swap)
   - [ ] Handle real-time updates during puzzle solving
 - [ ] Manual testing of visuals
 - [ ] Extract and unit test helper functions
@@ -1593,13 +1696,13 @@ preload() {
 - [ ] Refactor `OverworldPuzzleController` for extensibility
   - [ ] Add `createPuzzleRenderer()` extension point
   - [ ] Add `beforeEnterPuzzle()` extension point
-  - [ ] Add `createPuzzleHost()` with boundsRect parameter
+  - [ ] Add `createPuzzleHost()` with boundsRect parameter and optional command factories
   - [ ] Template method pattern: no code duplication
 - [ ] Implement `FlowPuzzleController` extending parent
   - [ ] Override extension points only
-  - [ ] Listen for `'flow-puzzle-water-changed'` event
-  - [ ] Call `updateFlowPuzzleWaterState()` on event
-  - [ ] Update overworld water tiles in real-time
+  - [ ] Supply `FlowBuildBridgeCommand` / `FlowRemoveBridgeCommand` factories via `createPuzzleHost`
+  - [ ] Call `renderer.animateDryingWaves()` / `animateFloodingWaves()` after each command
+  - [ ] Handle `'flow-puzzle-water-changed'` event → update overworld tiles in real-time
 - [ ] Add tests for controller logic (extracted methods)
 - [ ] Enhance `CollisionManager` with walkability states
   - [ ] Work in tile coordinates internally

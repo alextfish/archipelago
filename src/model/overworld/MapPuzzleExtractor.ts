@@ -1,6 +1,9 @@
 import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import type { PuzzleSpec } from '@model/puzzle/BridgePuzzle';
 import type { Island } from '@model/puzzle/Island';
+import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
+import type { FlowPuzzleSpec, FlowSquareSpec } from '@model/puzzle/FlowTypes';
+import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 
 /**
  * Represents a puzzle definition extracted from a Tiled map
@@ -10,6 +13,7 @@ export interface MapPuzzleDefinition {
     readonly bounds: { x: number; y: number; width: number; height: number };
     readonly metadata: Record<string, string>; // Custom properties from Tiled object
     readonly regionGroup?: string; // The region group this puzzle belongs to (e.g., "Beach", "Forest")
+    readonly puzzleClass?: string; // The Tiled object's "Class" field (e.g. "FlowPuzzle")
 }
 
 /**
@@ -132,6 +136,7 @@ export class MapPuzzleExtractor {
 
             const definitions = puzzleLayer.objects
                 ?.filter(obj => obj.type === 'puzzle' ||
+                    obj.type === 'FlowPuzzle' ||
                     obj.name?.startsWith('puzzle_') ||
                     obj.name?.toLowerCase().includes('puzzle'))
                 .map(obj => this.createPuzzleDefinition(obj, regionGroup)) || [];
@@ -225,18 +230,9 @@ export class MapPuzzleExtractor {
         const puzzleHeightInTiles = Math.ceil(definition.bounds.height / tiledMap.tileheight);
 
         const islands = this.extractIslands(definition, tiledMap);
-        const constraints = this.extractConstraints(definition, tiledMap);
+        const constraints = this.extractConstraints(definition, tiledMap, islands);
         const bridgeTypes = this.extractBridgeTypes(definition);
         const maxNumBridges = this.calculateMaxBridges(definition);
-
-        // Auto-add IslandBridgeCountConstraint if any islands have num_bridges constraints
-        const hasIslandBridgeConstraints = islands.some(island =>
-            island.constraints?.some(c => c.startsWith('num_bridges='))
-        );
-        if (hasIslandBridgeConstraints && !constraints.some(c => c.type === 'IslandBridgeCountConstraint')) {
-            constraints.push({ type: 'IslandBridgeCountConstraint' });
-            console.log(`Auto-added IslandBridgeCountConstraint to puzzle ${definition.id} (islands have num_bridges constraints)`);
-        }
 
         const puzzleSpec: PuzzleSpec = {
             id: definition.id,
@@ -255,14 +251,107 @@ export class MapPuzzleExtractor {
     }
 
     /**
-     * Create a puzzle definition from a Tiled map object
+     * Convert a map puzzle definition to a FlowPuzzle by reading the water tile layer
+     * in the puzzle's region group.
      */
+    createFlowPuzzle(
+        definition: MapPuzzleDefinition,
+        tiledMap: TiledMapData
+    ): FlowPuzzle {
+        const puzzleWidthInTiles = Math.ceil(definition.bounds.width / tiledMap.tilewidth);
+        const puzzleHeightInTiles = Math.ceil(definition.bounds.height / tiledMap.tileheight);
+
+        const islands = this.extractIslands(definition, tiledMap);
+        const constraints = this.extractConstraints(definition, tiledMap, islands);
+        const bridgeTypes = this.extractBridgeTypes(definition);
+        const maxNumBridges = this.calculateMaxBridges(definition);
+
+        const flowSquares = this.extractFlowSquares(definition, tiledMap);
+
+        const spec: FlowPuzzleSpec = {
+            id: definition.id,
+            type: definition.metadata.type || 'overworld',
+            size: { width: puzzleWidthInTiles, height: puzzleHeightInTiles },
+            islands,
+            bridgeTypes,
+            constraints,
+            maxNumBridges,
+            flowSquares
+        };
+
+        return new FlowPuzzle(spec);
+    }
+
+    /**
+     * Extract flow square data from the "water" tile layer within the puzzle's bounds.
+     * Returns local (puzzle-relative) coordinates and direction flags.
+     */
+    private extractFlowSquares(
+        definition: MapPuzzleDefinition,
+        tiledMap: TiledMapData
+    ): FlowSquareSpec[] {
+        const waterLayers = TiledLayerUtils.findTileLayersByName(
+            tiledMap.layers as any[],
+            'water'
+        );
+        if (waterLayers.length === 0) {
+            console.warn(`No water layer found for FlowPuzzle ${definition.id}`);
+            return [];
+        }
+
+        // Prefer the water layer in the same region group if available
+        const regionWater = definition.regionGroup
+            ? waterLayers.find(l => l.fullPath.startsWith(definition.regionGroup!))
+            : undefined;
+        const waterLayer = regionWater ?? waterLayers[0];
+
+        const tileData: number[] = waterLayer.data.data as number[];
+        const tilesets: any[] = (tiledMap.tilesets ?? []) as any[];
+
+        const puzzleOriginTileX = Math.floor(definition.bounds.x / tiledMap.tilewidth);
+        const puzzleOriginTileY = Math.floor(definition.bounds.y / tiledMap.tileheight);
+        const puzzleWidthInTiles = Math.ceil(definition.bounds.width / tiledMap.tilewidth);
+        const puzzleHeightInTiles = Math.ceil(definition.bounds.height / tiledMap.tileheight);
+
+        const flowSquares: FlowSquareSpec[] = [];
+
+        for (let ty = puzzleOriginTileY; ty < puzzleOriginTileY + puzzleHeightInTiles; ty++) {
+            for (let tx = puzzleOriginTileX; tx < puzzleOriginTileX + puzzleWidthInTiles; tx++) {
+                const gid = TiledLayerUtils.getGIDAt(tileData, tiledMap.width, tx, ty);
+                if (gid === 0) continue;
+
+                const props = TiledLayerUtils.getTileProperties(tilesets, gid);
+                const localX = tx - puzzleOriginTileX;
+                const localY = ty - puzzleOriginTileY;
+
+                const outgoing: Array<'N' | 'S' | 'E' | 'W'> = [];
+                if (props.flowNorth) outgoing.push('N');
+                if (props.flowSouth) outgoing.push('S');
+                if (props.flowEast) outgoing.push('E');
+                if (props.flowWest) outgoing.push('W');
+
+                flowSquares.push({
+                    x: localX,
+                    y: localY,
+                    outgoing,
+                    isSource: !!props.source,
+                    rocky: false,
+                    obstacle: false,
+                    pontoon: false
+                });
+            }
+        }
+
+        console.log(`Extracted ${flowSquares.length} flow squares for puzzle ${definition.id}`);
+        return flowSquares;
+    }
     private createPuzzleDefinition(obj: MapObject, regionGroup?: string): MapPuzzleDefinition {
         const metadata = this.extractObjectProperties(obj);
 
         return {
             id: obj.name || `puzzle_${obj.id}`,
             regionGroup,
+            puzzleClass: obj.type || undefined,
             bounds: {
                 x: obj.x,
                 y: obj.y,
@@ -384,7 +473,7 @@ export class MapPuzzleExtractor {
     /**
      * Extract constraints from puzzle metadata and special tiles
      */
-    private extractConstraints(definition: MapPuzzleDefinition, tiledMap: TiledMapData): Array<{ type: string; params?: any }> {
+    private extractConstraints(definition: MapPuzzleDefinition, tiledMap: TiledMapData, islands: Island[]): Array<{ type: string; params?: any }> {
         const constraints: Array<{ type: string; params?: any }> = [];
 
         // Parse constraints from object metadata
@@ -396,6 +485,15 @@ export class MapPuzzleExtractor {
         // Add default constraints if none specified
         if (constraints.length === 0) {
             constraints.push({ type: 'AllBridgesPlacedConstraint' });
+        }
+
+        // Auto-add IslandBridgeCountConstraint if any islands have num_bridges constraints
+        const hasIslandBridgeConstraints = islands.some(island =>
+            island.constraints?.some(c => c.startsWith('num_bridges='))
+        );
+        if (hasIslandBridgeConstraints && !constraints.some(c => c.type === 'IslandBridgeCountConstraint')) {
+            constraints.push({ type: 'IslandBridgeCountConstraint' });
+            console.log(`Auto-added IslandBridgeCountConstraint to puzzle ${definition.id} (islands have num_bridges constraints)`);
         }
 
         return constraints;

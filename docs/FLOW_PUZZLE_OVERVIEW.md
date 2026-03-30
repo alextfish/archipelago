@@ -20,6 +20,7 @@ Key concepts
   - Overrides placeBridge/removeBridge to call recomputeWater() automatically.
   - Prevents bridge placement if the bridge path would cross any obstacle tile.
   - Exposes getHasWaterGrid(), tileHasWater(x,y), getEdgeOutput(), and getBakedConnectivity() which delegates to ConnectivityManager.
+  - Provides placeBridgeWithWaterChanges() and removeBridgeWithWaterChanges() variants that place/remove a bridge and additionally return a WaterChangeWaves value: an ordered sequence of waves, each listing the {x,y} cells that gain or lose water at that propagation step. These are intended for use by the view layer to drive staged animation — drying or flooding cells wave by wave rather than snapping instantly to the new water state.
 - MustHaveWaterConstraint:
   - Constraint class that checks that a tile at (x,y) currently has water (validated continuously during solving).
   - Registered in createConstraintsFromSpec as "MustHaveWaterConstraint".
@@ -38,6 +39,7 @@ Design notes
 - GridKey is a branded type (runtime string of "x,y") to make coordinate keys explicit in the type system.
 - recomputeWater precomputes a blockedCells set (including obstacles and tiles covered by placed bridges) to improve performance.
 - Edge outputs are coordinates on the puzzle perimeter that currently have water. The overworld/series integration will read these outputs from solved FlowPuzzles to drive edge inputs of other puzzles.
+- WaterChangeWaves is an ordered array of waves (each an array of {x,y}). Wave 0 contains cells directly blocked/unblocked by the bridge; subsequent waves contain cells that lose/gain water downstream. Cells that retain water via an alternative path are excluded from drying waves.
 - Tests are included for propagation, rocky tiles, bridge-dam behaviour, obstacle placement prevention, MustHaveWaterConstraint and ConnectivityManager bake behaviour.
 
 Next steps (future work)

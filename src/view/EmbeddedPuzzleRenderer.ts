@@ -18,12 +18,12 @@ import { parseNumBridgesConstraint } from '@model/puzzle/Island';
  * Uses overworld coordinates and draws puzzle elements on top of the existing map
  */
 export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
-    private scene: Phaser.Scene;
-    private gridMapper: GridToWorldMapper;
+    protected scene: Phaser.Scene;
+    protected gridMapper: GridToWorldMapper;
     private textureKey: string;
     private languageTilesetKey: string;
     private npcSpriteKey: string;
-    private puzzleBounds: Phaser.Geom.Rectangle;
+    protected puzzleBounds: Phaser.Geom.Rectangle;
 
     // Graphics objects for embedded rendering
     private islandGraphics: Map<string, Phaser.GameObjects.Sprite> = new Map();
@@ -33,7 +33,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     private bridgeGraphics: Map<string, Phaser.GameObjects.Container> = new Map();
     private bridgeHitZones: Phaser.GameObjects.Zone[] = [];
     private previewGraphics: Phaser.GameObjects.Container | null = null;
-    private puzzleContainer: Phaser.GameObjects.Container;
+    protected puzzleContainer: Phaser.GameObjects.Container;
     private isPlacing: boolean = false;
     private feedbackDisplay: ConstraintFeedbackDisplay | null = null;
     private glyphRegistry: LanguageGlyphRegistry = new LanguageGlyphRegistry();

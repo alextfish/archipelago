@@ -1334,6 +1334,37 @@ export class OverworldScene extends Phaser.Scene {
     const mapWidth = this.map.width;
     const mapHeight = this.map.height;
 
+    // Pre-build lookup maps from raw tiledMapData for ground/lowground visual layers.
+    // These layers carry stairs=true and lowground=true tile properties that the
+    // dedicated collision layer may not cover.
+    const stairsTiles = new Set<number>(); // flat index = y * mapWidth + x
+    const lowgroundTiles = new Set<number>();
+
+    if (this.tiledMapData) {
+      const tilesets = this.tiledMapData.tilesets ?? [];
+
+      const groundLayers = TiledLayerUtils.findTileLayersByName(this.tiledMapData.layers, 'ground');
+      for (const layer of groundLayers) {
+        const data: number[] = layer.data.data ?? [];
+        for (let i = 0; i < data.length; i++) {
+          const props = TiledLayerUtils.getTileProperties(tilesets, data[i]);
+          if (props['stairs'] === true) stairsTiles.add(i);
+        }
+      }
+
+      const lowgroundLayers = TiledLayerUtils.findTileLayersByName(this.tiledMapData.layers, 'lowground');
+      for (const layer of lowgroundLayers) {
+        const data: number[] = layer.data.data ?? [];
+        for (let i = 0; i < data.length; i++) {
+          const props = TiledLayerUtils.getTileProperties(tilesets, data[i]);
+          if (props['lowground'] === true) lowgroundTiles.add(i);
+          // Stairs can also appear on the lowground layer
+          if (props['stairs'] === true) stairsTiles.add(i);
+        }
+      }
+      console.log(`Visual layer scan: ${stairsTiles.size} stairs tiles, ${lowgroundTiles.size} lowground tiles`);
+    }
+
     // Create blank tilemaps for our three collision categories
     const upperGroundData: number[][] = [];
     const lowerGroundData: number[][] = [];
@@ -1357,6 +1388,17 @@ export class OverworldScene extends Phaser.Scene {
           if (!tile || tile.index === -1) return null;
           return { properties: tile.properties ?? undefined };
         });
+
+        // Augment with visual-layer properties (stairs / lowground).
+        // These are injected as synthetic tile entries so the classifier can
+        // apply its existing priority rules without modification.
+        const flatIdx = y * mapWidth + x;
+        if (stairsTiles.has(flatIdx)) {
+          layerTiles.push({ properties: { stairs: true } });
+        } else if (lowgroundTiles.has(flatIdx)) {
+          // Only set walkable_low if not already overridden to STAIRS
+          layerTiles.push({ properties: { walkable_low: true } });
+        }
 
         // Classify tile type using pure logic
         const classification = CollisionTileClassifier.classifyTile(layerTiles);

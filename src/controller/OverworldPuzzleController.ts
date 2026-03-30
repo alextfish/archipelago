@@ -5,11 +5,13 @@ import { CollisionManager } from '@model/overworld/CollisionManager';
 import { OverworldBridgeManager } from '@model/overworld/OverworldBridgeManager';
 import { CameraManager } from '@view/CameraManager';
 import { EmbeddedPuzzleRenderer } from '@view/EmbeddedPuzzleRenderer';
+import { FlowPuzzleRenderer } from '@view/FlowPuzzleRenderer';
 import { PuzzleController } from '@controller/PuzzleController';
 import { PuzzleInputHandler } from '@controller/PuzzleInputHandler';
 import type { PuzzleHost } from '@controller/PuzzleHost';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
+import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
 
 /**
  * Coordinates the lifecycle of overworld puzzle solving:
@@ -102,12 +104,10 @@ export class OverworldPuzzleController {
             this.cameraManager.storeCameraState();
             await this.cameraManager.transitionToPuzzle(boundsRect);
 
-            // Create embedded puzzle renderer
-            this.puzzleRenderer = new EmbeddedPuzzleRenderer(
-                this.scene,
-                boundsRect,
-                'sprout-tiles'
-            );
+            // Create embedded puzzle renderer — use FlowPuzzleRenderer for FlowPuzzle instances
+            this.puzzleRenderer = puzzle instanceof FlowPuzzle
+                ? new FlowPuzzleRenderer(this.scene, boundsRect, 'sprout-tiles')
+                : new EmbeddedPuzzleRenderer(this.scene, boundsRect, 'sprout-tiles');
 
             // Create puzzle controller with host callbacks
             this.activePuzzleController = new PuzzleController(
