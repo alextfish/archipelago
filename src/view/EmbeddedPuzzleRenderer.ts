@@ -179,12 +179,8 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     private createIsland(island: any): void {
         const worldPos = this.gridMapper.gridToWorld(island.x, island.y);
 
-        const sprite = this.scene.add.sprite(worldPos.x, worldPos.y, this.textureKey, BridgeSpriteFrames.FRAME_ISLAND);
-        sprite.setOrigin(0, 0);
-        sprite.setDepth(101); // Above overworld, below bridges
-
-        this.puzzleContainer.add(sprite);
-        this.islandGraphics.set(island.id, sprite);
+        // No island graphic sprite is added here: overworld puzzles are overlaid on
+        // biome-specific islands that are already visible in the overworld map.
 
         // For IslandBridgeCountConstraint, create Ruby NPC with bridge count number sprite
         const num = parseNumBridgesConstraint(island);
@@ -516,16 +512,18 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     }
 
     /**
-     * Highlight islands for interaction feedback
+     * Highlight islands for interaction feedback.
+     * Tints the NPC sprite on each island because the island graphic sprite is
+     * not rendered in overworld puzzles (the biome-specific art is already
+     * visible in the overworld map beneath the puzzle overlay).
      */
     highlightIslands(islandIds: string[], color: number = 0x00ff00): void {
         console.log(`EmbeddedPuzzleRenderer: Highlighting islands:`, islandIds);
 
-        // Simple highlight implementation
         for (const islandId of islandIds) {
-            const sprite = this.islandGraphics.get(islandId);
-            if (sprite) {
-                sprite.setTint(color);
+            const npcSprite = this.constraintNPCs.get(islandId);
+            if (npcSprite) {
+                npcSprite.setTint(color);
             }
         }
     }
@@ -534,8 +532,8 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
      * Clear all highlights
      */
     clearHighlights(): void {
-        for (const sprite of this.islandGraphics.values()) {
-            sprite.clearTint();
+        for (const npcSprite of this.constraintNPCs.values()) {
+            npcSprite.clearTint();
         }
         for (const container of this.bridgeGraphics.values()) {
             container.list.forEach((child: any) => {
