@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CollisionManager } from '@model/overworld/CollisionManager';
+import { CollisionManager, CollisionType } from '@model/overworld/CollisionManager';
 import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import type { Bridge } from '@model/puzzle/Bridge';
 
@@ -11,7 +11,7 @@ describe('CollisionManager', () => {
 
     beforeEach(() => {
         mockOverworldScene = {
-            hasCollisionAt: vi.fn().mockReturnValue(false),
+            getCollisionAt: vi.fn().mockReturnValue(CollisionType.BLOCKED),
             setCollisionAt: vi.fn()
         };
 
@@ -40,7 +40,7 @@ describe('CollisionManager', () => {
 
             // Should check collision for all tiles in puzzle area
             const expectedCalls = Math.ceil(puzzleBounds.width / 32) * Math.ceil(puzzleBounds.height / 32);
-            expect(mockOverworldScene.hasCollisionAt).toHaveBeenCalledTimes(expectedCalls);
+            expect(mockOverworldScene.getCollisionAt).toHaveBeenCalledTimes(expectedCalls);
         });
 
         it('should apply collision for bridges', () => {
@@ -54,7 +54,7 @@ describe('CollisionManager', () => {
             expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(
                 expect.any(Number),
                 expect.any(Number),
-                true
+                CollisionType.WALKABLE
             );
         });
     });
@@ -75,7 +75,7 @@ describe('CollisionManager', () => {
             expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(
                 expect.any(Number),
                 expect.any(Number),
-                false // Original value from mock
+                CollisionType.BLOCKED // Original value from mock
             );
         });
 
@@ -104,7 +104,7 @@ describe('CollisionManager', () => {
             expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(
                 expect.any(Number),
                 expect.any(Number),
-                true
+                CollisionType.WALKABLE
             );
         });
 
@@ -147,7 +147,7 @@ describe('CollisionManager', () => {
             expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(
                 expect.any(Number),
                 expect.any(Number),
-                false // Original collision value
+                CollisionType.BLOCKED // Original collision value
             );
         });
 
@@ -182,17 +182,17 @@ describe('CollisionManager', () => {
             expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(
                 Math.floor((puzzleBounds.x + 1 * 32) / 32),
                 expectedTileY,
-                true
+                CollisionType.WALKABLE
             );
             expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(
                 Math.floor((puzzleBounds.x + 2 * 32) / 32),
                 expectedTileY,
-                true
+                CollisionType.WALKABLE
             );
             expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(
                 Math.floor((puzzleBounds.x + 3 * 32) / 32),
                 expectedTileY,
-                true
+                CollisionType.WALKABLE
             );
         });
 
@@ -213,17 +213,17 @@ describe('CollisionManager', () => {
             expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(
                 expectedTileX,
                 Math.floor((puzzleBounds.y + 1 * 32) / 32),
-                true
+                CollisionType.WALKABLE
             );
             expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(
                 expectedTileX,
                 Math.floor((puzzleBounds.y + 2 * 32) / 32),
-                true
+                CollisionType.WALKABLE
             );
             expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(
                 expectedTileX,
                 Math.floor((puzzleBounds.y + 3 * 32) / 32),
-                true
+                CollisionType.WALKABLE
             );
         });
     });

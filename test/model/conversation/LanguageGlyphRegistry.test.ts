@@ -214,10 +214,10 @@ describe('LanguageGlyphRegistry', () => {
         it('should have color glyphs registered', () => {
             const registry = new LanguageGlyphRegistry();
 
-            expect(registry.getGlyphFrame('grass', 'red')).toBe(60);
-            expect(registry.getGlyphFrame('grass', 'blue')).toBe(61);
-            expect(registry.getGlyphFrame('grass', 'green')).toBe(62);
-            expect(registry.getGlyphFrame('grass', 'yellow')).toBe(63);
+            expect(registry.getGlyphFrame('grass', 'red')).toBe(56);
+            expect(registry.getGlyphFrame('grass', 'blue')).toBe(57);
+            expect(registry.getGlyphFrame('grass', 'green')).toBe(58);
+            expect(registry.getGlyphFrame('grass', 'yellow')).toBe(59);
         });
 
         it('should parse constraint validation glyph messages', () => {
@@ -227,7 +227,7 @@ describe('LanguageGlyphRegistry', () => {
             expect(frames1).toEqual([41, 32]);
 
             const frames2 = registry.parseGlyphs('grass', 'red island must-not connected blue island');
-            expect(frames2).toEqual([60, 46, 43, 47, 61, 46]);
+            expect(frames2).toEqual([56, 46, 43, 47, 57, 46]);
 
             const frames3 = registry.parseGlyphs('grass', 'no adjacent bridge');
             expect(frames3).toEqual([40, 35, 32]);

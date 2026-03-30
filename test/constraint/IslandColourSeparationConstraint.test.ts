@@ -80,9 +80,9 @@ describe("IslandColourSeparationConstraint.getDisplayItems", () => {
 
     // D has no colour so is not included; A, B, C all get "good"
     expect(items).toHaveLength(3);
-    expect(items).toContainEqual({ elementID: "A", glyphMessage: "good" });
-    expect(items).toContainEqual({ elementID: "B", glyphMessage: "good" });
-    expect(items).toContainEqual({ elementID: "C", glyphMessage: "good" });
+    expect(items).toContainEqual({ elementID: "A", glyphMessage: "good", constraintType: "IslandColourSeparationConstraint" });
+    expect(items).toContainEqual({ elementID: "B", glyphMessage: "good", constraintType: "IslandColourSeparationConstraint" });
+    expect(items).toContainEqual({ elementID: "C", glyphMessage: "good", constraintType: "IslandColourSeparationConstraint" });
   });
 
   it("returns violation glyph for islands in a mixed-colour component", () => {
@@ -97,8 +97,8 @@ describe("IslandColourSeparationConstraint.getDisplayItems", () => {
     const items = constraint.getDisplayItems(puzzle as any);
 
     expect(items).toHaveLength(2);
-    expect(items).toContainEqual({ elementID: "A", glyphMessage: "red island must-not connected blue island" });
-    expect(items).toContainEqual({ elementID: "B", glyphMessage: "red island must-not connected blue island" });
+    expect(items).toContainEqual({ elementID: "A", glyphMessage: "red island must-not connected blue island", constraintType: "IslandColourSeparationConstraint" });
+    expect(items).toContainEqual({ elementID: "B", glyphMessage: "red island must-not connected blue island", constraintType: "IslandColourSeparationConstraint" });
   });
 
   it("shows 'good' for unviolated islands and violation glyph for violated ones", () => {

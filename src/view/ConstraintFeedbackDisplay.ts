@@ -22,6 +22,7 @@ export class ConstraintFeedbackDisplay {
   private gridMapper: GridToWorldMapper;
   private glyphRegistry: LanguageGlyphRegistry;
   private tilesetKey: string;
+  private npcSpriteKey: string;
   private language: string;
   private depth: number;
   private existingNPCSprites: Map<string, Phaser.GameObjects.Sprite>;
@@ -34,8 +35,8 @@ export class ConstraintFeedbackDisplay {
     gridMapper: GridToWorldMapper,
     glyphRegistry: LanguageGlyphRegistry,
     tilesetKey: string,
-    _npcSpriteKey: string,
-    existingNPCSprites: Map<string, Phaser.GameObjects.Sprite>,
+    npcSpriteKey: string,
+    existingNPCSprites: Map<string, Phaser.GameObjects.Sprite> = new Map(),
     language: string = 'grass',
     depth: number = 200,
   ) {
@@ -43,6 +44,7 @@ export class ConstraintFeedbackDisplay {
     this.gridMapper = gridMapper;
     this.glyphRegistry = glyphRegistry;
     this.tilesetKey = tilesetKey;
+    this.npcSpriteKey = npcSpriteKey;
     this.existingNPCSprites = existingNPCSprites;
     this.language = language;
     this.depth = depth;
@@ -106,7 +108,7 @@ export class ConstraintFeedbackDisplay {
       }
       this.originalNPCTextures.clear();
     }
-    
+
     for (const bubble of this.speechBubbles) {
       bubble.setVisible(visible);
     }

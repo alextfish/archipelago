@@ -104,7 +104,7 @@ export class CollisionManager {
         // Restore original collision for each tile
         for (const { tileX, tileY } of bridgeTiles) {
             const key = `${tileX},${tileY}`;
-            const originalCollisionType = this.originalCollision.get(key) || CollisionType.WALKABLE;
+            const originalCollisionType = this.originalCollision.get(key) ?? CollisionType.WALKABLE;
             this.overworldScene.setCollisionAt(tileX, tileY, originalCollisionType);
         }
     }

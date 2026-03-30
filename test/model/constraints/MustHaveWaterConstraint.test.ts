@@ -74,7 +74,7 @@ describe("MustHaveWaterConstraint.getDisplayItems", () => {
     const c = new MustHaveWaterConstraint(1, 0);
     const items = c.getDisplayItems(puzzle);
 
-    expect(items).toEqual([{ elementID: "1,0", glyphMessage: "good" }]);
+    expect(items).toEqual([{ elementID: "1,0", glyphMessage: "good", constraintType: "MustHaveWaterConstraint" }]);
   });
 
   it("returns 'no water' when cell has no water", () => {
@@ -97,6 +97,6 @@ describe("MustHaveWaterConstraint.getDisplayItems", () => {
     const c = new MustHaveWaterConstraint(1, 0);
     const items = c.getDisplayItems(puzzle);
 
-    expect(items).toEqual([{ elementID: "1,0", glyphMessage: "no water" }]);
+    expect(items).toEqual([{ elementID: "1,0", glyphMessage: "no water", constraintType: "MustHaveWaterConstraint" }]);
   });
 });

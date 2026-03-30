@@ -164,7 +164,7 @@ describe("EnclosedAreaSizeConstraint.getDisplayItems", () => {
     const constraint = new EnclosedAreaSizeConstraint(2, 2, 1);
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "good" }]);
+    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "good", constraintType: "EnclosedAreaSizeConstraint" }]);
   });
 
   it("returns 'area not enclosed' glyph message when cell is not enclosed", () => {
@@ -173,7 +173,7 @@ describe("EnclosedAreaSizeConstraint.getDisplayItems", () => {
     const constraint = new EnclosedAreaSizeConstraint(2, 2, 2);
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "area not enclosed" }]);
+    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "area not enclosed", constraintType: "EnclosedAreaSizeConstraint" }]);
   });
 
   it("returns 'not-enough enclosed area' when enclosed area is too small", () => {
@@ -192,7 +192,7 @@ describe("EnclosedAreaSizeConstraint.getDisplayItems", () => {
     const constraint = new EnclosedAreaSizeConstraint(2, 2, 5); // expects 5 but area is 1
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "not-enough enclosed area" }]);
+    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "not-enough enclosed area", constraintType: "EnclosedAreaSizeConstraint" }]);
   });
 
   it("returns 'too-many enclosed area' when enclosed area is too large", () => {
@@ -213,6 +213,6 @@ describe("EnclosedAreaSizeConstraint.getDisplayItems", () => {
     const constraint = new EnclosedAreaSizeConstraint(3, 3, 1); // area is 9, expects 1
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "3,3", glyphMessage: "too-many enclosed area" }]);
+    expect(items).toEqual([{ elementID: "3,3", glyphMessage: "too-many enclosed area", constraintType: "EnclosedAreaSizeConstraint" }]);
   });
 });
