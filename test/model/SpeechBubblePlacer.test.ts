@@ -6,8 +6,12 @@ import type { BubbleRequest, BubblePlacement, PuzzleForBubblePlacement } from '@
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makePuzzle(placedBridges: PuzzleForBubblePlacement['placedBridges'] = []): PuzzleForBubblePlacement {
-    return { placedBridges };
+function makePuzzle(
+    placedBridges: PuzzleForBubblePlacement['placedBridges'] = [],
+    width = 10,
+    height = 10,
+): PuzzleForBubblePlacement {
+    return { placedBridges, width, height };
 }
 
 function place(puzzle: PuzzleForBubblePlacement, requests: BubbleRequest[]): BubblePlacement[] {
@@ -221,27 +225,58 @@ describe('SpeechBubblePlacer', () => {
     // -----------------------------------------------------------------------
 
     it('prefers avoiding NPCs over avoiding bubbles over avoiding bridges', () => {
-        // Set up a situation where:
-        //   Right → covers an NPC (cost 1000)
-        //   Left  → overlaps a previous bubble (cost 100)
-        //   Above → covers a bridge cell (cost 10)
-        //   Below → clear (cost 0)
+        // NPC at (5,5) sits exactly at the centre of an 11×11 puzzle (centre = (5,5)).
+        // The centre-first algorithm processes it first.
         //
-        // NPC0 at (3,5) placed first so its bubble goes right to (4,5).
-        // Main NPC at (5,5). NPC at (6,5) blocks right.
-        // Short vertical bridge from (5,3) to (5,5): only intermediate cell is (5,4).
-        // That makes "above" (topLeft=(5,4)) cost 10 but "below" (topLeft=(5,6)) cost 0.
-        const puzzle = makePuzzle([
-            { start: { x: 5, y: 3 }, end: { x: 5, y: 5 } },
-        ]);
+        // Situation for the main NPC at (5,5):
+        //   Right → (6,5) = another NPC  → cost 1000
+        //   Left  → (4,5) = another NPC  → cost 1000
+        //   Above → (5,4) = bridge cell  → cost 10
+        //   Below → (5,6) = clear        → cost 0  ← wins
+        //
+        // A vertical bridge runs from (5,3) to (5,5); (5,4) is its only intermediate cell.
+        const puzzle = makePuzzle(
+            [{ start: { x: 5, y: 3 }, end: { x: 5, y: 5 } }],
+            11, 11,
+        );
         const requests: BubbleRequest[] = [
-            { npcPosition: { x: 3, y: 5 }, width: 1 },   // Bubble goes right to (4,5)
-            { npcPosition: { x: 5, y: 5 }, width: 1 },   // Main NPC under test
-            { npcPosition: { x: 6, y: 5 }, width: 1 },   // NPC to the right of main
+            { npcPosition: { x: 4, y: 5 }, width: 1 },  // blocks left of main
+            { npcPosition: { x: 5, y: 5 }, width: 1 },  // main NPC — exactly at puzzle centre
+            { npcPosition: { x: 6, y: 5 }, width: 1 },  // blocks right of main
         ];
 
         const [, main] = place(puzzle, requests);
 
         expect(main.topLeft).toEqual({ x: 5, y: 6 }); // Below — cheapest option
+    });
+
+    // -----------------------------------------------------------------------
+    // Centre-first processing order
+    // -----------------------------------------------------------------------
+
+    it('processes NPCs centre-first, allowing outer NPCs to place bubbles further out', () => {
+        // 10×8 puzzle — centre at (4.5, 3.5).
+        // Distances:
+        //   NPC_B at (5,4): sqrt(0.5) ≈ 0.71  — most central, processed first
+        //   NPC_C at (6,4): sqrt(2.5) ≈ 1.58  — mid
+        //   NPC_A at (2,4): sqrt(6.5) ≈ 2.55  — most outer, processed last
+        //
+        // NPC_B's right direction lands on NPC_C (cost 1000), so it claims the left
+        // cells (3,4)+(4,4) first.  When NPC_A is finally processed, its right
+        // direction would overlap that bubble (cost 200), so it is pushed further
+        // left to (0,4).  If the input order were used instead, NPC_A would claim
+        // (3,4)+(4,4) first, forcing NPC_B above.
+        const puzzle = makePuzzle([], 10, 8);
+        const requests: BubbleRequest[] = [
+            { npcPosition: { x: 2, y: 4 }, width: 2 },  // NPC_A — outer
+            { npcPosition: { x: 5, y: 4 }, width: 2 },  // NPC_B — inner
+            { npcPosition: { x: 6, y: 4 }, width: 1 },  // NPC_C — blocks B's right
+        ];
+
+        const placements = place(puzzle, requests);
+
+        expect(placements[0].topLeft).toEqual({ x: 0, y: 4 }); // A pushed to far left
+        expect(placements[1].topLeft).toEqual({ x: 3, y: 4 }); // B claims central left cells
+        expect(placements[2].topLeft).toEqual({ x: 7, y: 4 }); // C goes right unobstructed
     });
 });

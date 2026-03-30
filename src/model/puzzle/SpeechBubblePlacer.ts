@@ -27,7 +27,18 @@ export interface BubblePlacement {
  * makes it straightforward to unit-test.
  */
 export interface PuzzleForBubblePlacement {
+    /** Grid width in squares — used to calculate the puzzle centre. */
+    width: number;
+    /** Grid height in squares — used to calculate the puzzle centre. */
+    height: number;
     placedBridges: Array<{ start?: Point; end?: Point }>;
+}
+
+/** Squared Euclidean distance between two points (avoids a sqrt for comparison). */
+function distanceSq(a: Point, b: Point): number {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return dx * dx + dy * dy;
 }
 
 const COST_COVERS_NPC = 1000;
@@ -48,8 +59,15 @@ const COST_COVERS_BRIDGE = 10;
  *  2. Avoid overlapping any already-placed speech bubble.
  *  3. Avoid covering squares that contain bridge segments.
  *
- * Bubbles are processed in the order they are supplied. The first candidate
- * direction in case of equal cost is "right", matching the existing convention.
+ * Requests are processed in ascending distance from the puzzle centre so that
+ * central NPCs claim the most sheltered spots first, leaving outer NPCs to
+ * place their bubbles beyond the edges of the puzzle where space is ample.
+ * Placements are returned in the same order as the input requests regardless
+ * of the processing order.
+ *
+ * Ties in distance are broken by the original input order (stable sort).
+ * The first candidate direction in case of equal cost is "right", matching
+ * the existing convention.
  */
 export class SpeechBubblePlacer {
     private readonly npcPositions: Point[];
@@ -66,13 +84,27 @@ export class SpeechBubblePlacer {
     /**
      * Place all bubbles, returning one BubblePlacement per request in the same
      * order as the input requests.
+     *
+     * Internally, requests are processed in ascending distance from the puzzle
+     * centre so that the most central NPCs claim space first.
      */
     place(): BubblePlacement[] {
-        const placements: BubblePlacement[] = [];
+        const centre: Point = {
+            x: (this.puzzle.width - 1) / 2,
+            y: (this.puzzle.height - 1) / 2,
+        };
+
+        // Build a sorted list of indices (stable sort preserves input order for ties).
+        const sortedIndices = this.requests
+            .map((r, i) => ({ i, dist: distanceSq(r.npcPosition, centre) }))
+            .sort((a, b) => a.dist - b.dist)
+            .map(entry => entry.i);
+
+        const results: BubblePlacement[] = new Array(this.requests.length);
         const placedBubbleCells: Point[] = [];
 
-        for (const request of this.requests) {
-            const { npcPosition, width } = request;
+        for (const idx of sortedIndices) {
+            const { npcPosition, width } = this.requests[idx];
             const candidates = this.getCandidates(npcPosition, width);
 
             let bestTopLeft = candidates[0];
@@ -87,11 +119,11 @@ export class SpeechBubblePlacer {
                 }
             }
 
-            placements.push({ npcPosition, topLeft: bestTopLeft, width });
+            results[idx] = { npcPosition, topLeft: bestTopLeft, width };
             placedBubbleCells.push(...this.getBubbleCells(bestTopLeft, width));
         }
 
-        return placements;
+        return results;
     }
 
     /**
