@@ -9,13 +9,6 @@ import type { ConstraintDisplayItem } from '@model/puzzle/constraints/Constraint
  * Build a minimal Phaser scene mock adequate for ConstraintFeedbackDisplay tests.
  */
 function makeMockScene() {
-  const sprite = {
-    setOrigin: vi.fn().mockReturnThis(),
-    setDepth: vi.fn().mockReturnThis(),
-    setVisible: vi.fn().mockReturnThis(),
-    destroy: vi.fn(),
-  };
-
   const container = {
     setDepth: vi.fn().mockReturnThis(),
     setScale: vi.fn().mockReturnThis(),
@@ -34,12 +27,25 @@ function makeMockScene() {
 
   return {
     add: {
-      sprite: vi.fn(() => ({ ...sprite })),
+      sprite: vi.fn(),
       container: vi.fn(() => ({ ...container })),
       image: vi.fn(() => ({ ...image })),
     },
-    _sprite: sprite,
     _container: container,
+  };
+}
+
+/** Build a mock NPC sprite with the given initial texture key. */
+function makeMockNPCSprite(initialTextureKey: string) {
+  return {
+    texture: { key: initialTextureKey },
+    setTexture: vi.fn().mockImplementation(function (this: { texture: { key: string } }, key: string) {
+      this.texture.key = key;
+      return this;
+    }),
+    setDepth: vi.fn().mockReturnThis(),
+    setVisible: vi.fn().mockReturnThis(),
+    destroy: vi.fn(),
   };
 }
 
@@ -56,29 +62,33 @@ describe('ConstraintFeedbackDisplay', () => {
   let mockScene: ReturnType<typeof makeMockScene>;
   let gridMapper: GridToWorldMapper;
   let glyphRegistry: LanguageGlyphRegistry;
-  let display: ConstraintFeedbackDisplay;
 
   beforeEach(() => {
     mockScene = makeMockScene();
     gridMapper = new GridToWorldMapper(32);
     glyphRegistry = new LanguageGlyphRegistry();
-    display = new ConstraintFeedbackDisplay(
+  });
+
+  function makeDisplay(existingNPCSprites?: Map<string, ReturnType<typeof makeMockNPCSprite>>) {
+    return new ConstraintFeedbackDisplay(
       mockScene as any,
       gridMapper,
       glyphRegistry,
       'language',
       'sailorNS',
+      existingNPCSprites as unknown as Map<string, Phaser.GameObjects.Sprite>,
     );
-  });
+  }
 
-  it('creates no sprites when items list is empty', () => {
-    const puzzle = makeMockPuzzle([]);
-    display.update([], puzzle);
+  it('does not create any NPC sprites when items list is empty', () => {
+    const display = makeDisplay();
+    display.update([], makeMockPuzzle([]));
 
     expect(mockScene.add.sprite).not.toHaveBeenCalled();
   });
 
-  it('creates one NPC sprite per display item', () => {
+  it('does not create new NPC sprites even when items have matching islands', () => {
+    const display = makeDisplay();
     const puzzle = makeMockPuzzle([
       { id: 'A', x: 1, y: 1 },
       { id: 'B', x: 3, y: 1 },
@@ -90,39 +100,21 @@ describe('ConstraintFeedbackDisplay', () => {
 
     display.update(items, puzzle);
 
-    expect(mockScene.add.sprite).toHaveBeenCalledTimes(2);
-  });
-
-  it('positions the NPC sprite just to the right of the island', () => {
-    const cellSize = 32;
-    const islandX = 2;
-    const islandY = 3;
-    const puzzle = makeMockPuzzle([{ id: 'A', x: islandX, y: islandY }]);
-    const items: ConstraintDisplayItem[] = [{ elementID: 'A', glyphMessage: 'good' }];
-
-    display.update(items, puzzle);
-
-    const worldX = islandX * cellSize; // gridToWorld
-    const worldY = islandY * cellSize;
-    expect(mockScene.add.sprite).toHaveBeenCalledWith(
-      worldX + cellSize,
-      worldY,
-      'sailorNS',
-      0,
-    );
+    expect(mockScene.add.sprite).not.toHaveBeenCalled();
   });
 
   it('creates a speech bubble container for each display item', () => {
+    const display = makeDisplay();
     const puzzle = makeMockPuzzle([{ id: 'A', x: 1, y: 1 }]);
     const items: ConstraintDisplayItem[] = [{ elementID: 'A', glyphMessage: 'good' }];
 
     display.update(items, puzzle);
 
-    // SpeechBubble creates a container internally
     expect(mockScene.add.container).toHaveBeenCalled();
   });
 
   it('skips items whose elementID does not match any island', () => {
+    const display = makeDisplay();
     const puzzle = makeMockPuzzle([{ id: 'A', x: 1, y: 1 }]);
     const items: ConstraintDisplayItem[] = [
       { elementID: 'MISSING', glyphMessage: 'good' },
@@ -131,49 +123,92 @@ describe('ConstraintFeedbackDisplay', () => {
     display.update(items, puzzle);
 
     expect(mockScene.add.sprite).not.toHaveBeenCalled();
+    expect(mockScene.add.container).not.toHaveBeenCalled();
   });
 
-  it('clears previous sprites when update is called again', () => {
+  it('changes existing NPC sprite texture to happy when constraint is satisfied', () => {
+    const npc = makeMockNPCSprite('Ruby');
+    const sprites = new Map([['A', npc]]);
+    const display = makeDisplay(sprites);
     const puzzle = makeMockPuzzle([{ id: 'A', x: 1, y: 1 }]);
-    const items: ConstraintDisplayItem[] = [{ elementID: 'A', glyphMessage: 'good' }];
+    const items: ConstraintDisplayItem[] = [
+      { elementID: 'A', glyphMessage: 'good', constraintType: 'IslandBridgeCountConstraint' },
+    ];
 
     display.update(items, puzzle);
 
-    // Capture the sprites created in the first update
-    const firstSprites = mockScene.add.sprite.mock.results.map((r: any) => r.value);
-    expect(firstSprites).toHaveLength(1);
+    expect(npc.setTexture).toHaveBeenCalledWith('Ruby happy', 0);
+  });
+
+  it('changes existing NPC sprite texture to frown when constraint is not satisfied', () => {
+    const npc = makeMockNPCSprite('Ruby');
+    const sprites = new Map([['A', npc]]);
+    const display = makeDisplay(sprites);
+    const puzzle = makeMockPuzzle([{ id: 'A', x: 1, y: 1 }]);
+    const items: ConstraintDisplayItem[] = [
+      { elementID: 'A', glyphMessage: 'not-enough bridge', constraintType: 'IslandBridgeCountConstraint' },
+    ];
 
     display.update(items, puzzle);
 
-    // The first sprite should have been destroyed before new ones were created
-    expect(firstSprites[0].destroy).toHaveBeenCalled();
-
-    // A new sprite should have been created for the second update
-    expect(mockScene.add.sprite).toHaveBeenCalledTimes(2);
+    expect(npc.setTexture).toHaveBeenCalledWith('Ruby frown', 0);
   });
 
-  it('hides all sprites and bubbles when setVisible(false) is called', () => {
+  it('restores original NPC texture when clear() is called', () => {
+    const npc = makeMockNPCSprite('Ruby');
+    const sprites = new Map([['A', npc]]);
+    const display = makeDisplay(sprites);
     const puzzle = makeMockPuzzle([{ id: 'A', x: 1, y: 1 }]);
-    display.update([{ elementID: 'A', glyphMessage: 'good' }], puzzle);
 
-    display.setVisible(false);
-
-    // All created sprites should have had setVisible(false) called
-    const spriteMocks = mockScene.add.sprite.mock.results.map((r: any) => r.value);
-    for (const s of spriteMocks) {
-      expect(s.setVisible).toHaveBeenCalledWith(false);
-    }
-  });
-
-  it('destroys all sprites when clear() is called', () => {
-    const puzzle = makeMockPuzzle([{ id: 'A', x: 1, y: 1 }]);
-    display.update([{ elementID: 'A', glyphMessage: 'good' }], puzzle);
+    display.update([{ elementID: 'A', glyphMessage: 'good', constraintType: 'IslandBridgeCountConstraint' }], puzzle);
+    expect(npc.setTexture).toHaveBeenCalledWith('Ruby happy', 0);
 
     display.clear();
 
-    const spriteMocks = mockScene.add.sprite.mock.results.map((r: any) => r.value);
-    for (const s of spriteMocks) {
-      expect(s.destroy).toHaveBeenCalled();
+    expect(npc.setTexture).toHaveBeenCalledWith('Ruby', 0);
+  });
+
+  it('restores original NPC texture when setVisible(false) is called', () => {
+    const npc = makeMockNPCSprite('Ruby');
+    const sprites = new Map([['A', npc]]);
+    const display = makeDisplay(sprites);
+    const puzzle = makeMockPuzzle([{ id: 'A', x: 1, y: 1 }]);
+
+    display.update([{ elementID: 'A', glyphMessage: 'good', constraintType: 'IslandBridgeCountConstraint' }], puzzle);
+
+    display.setVisible(false);
+
+    expect(npc.setTexture).toHaveBeenCalledWith('Ruby', 0);
+  });
+
+  it('hides speech bubbles when setVisible(false) is called', () => {
+    const display = makeDisplay();
+    const puzzle = makeMockPuzzle([{ id: 'A', x: 1, y: 1 }]);
+    display.update([{ elementID: 'A', glyphMessage: 'good' }], puzzle);
+
+    const containers = mockScene.add.container.mock.results.map((r: any) => r.value);
+    expect(containers.length).toBeGreaterThan(0);
+
+    display.setVisible(false);
+
+    for (const c of containers) {
+      expect(c.setVisible).toHaveBeenCalledWith(false);
+    }
+  });
+
+  it('destroys speech bubbles when clear() is called', () => {
+    const display = makeDisplay();
+    const puzzle = makeMockPuzzle([{ id: 'A', x: 1, y: 1 }]);
+    display.update([{ elementID: 'A', glyphMessage: 'good' }], puzzle);
+
+    const containers = mockScene.add.container.mock.results.map((r: any) => r.value);
+    expect(containers.length).toBeGreaterThan(0);
+
+    display.clear();
+
+    for (const c of containers) {
+      expect(c.destroy).toHaveBeenCalled();
     }
   });
 });
+
