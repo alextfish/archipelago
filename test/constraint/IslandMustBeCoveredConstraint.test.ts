@@ -91,7 +91,7 @@ describe("IslandMustBeCoveredConstraint.getDisplayItems", () => {
     const constraint = new IslandMustBeCoveredConstraint("B");
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "B", glyphMessage: "good" }]);
+    expect(items).toEqual([{ elementID: "B", glyphMessage: "good", constraintType: "IslandMustBeCoveredConstraint" }]);
   });
 
   it("returns 'no bridge over island' when island is not covered", () => {
@@ -101,6 +101,6 @@ describe("IslandMustBeCoveredConstraint.getDisplayItems", () => {
     const constraint = new IslandMustBeCoveredConstraint("B");
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "B", glyphMessage: "no bridge over island" }]);
+    expect(items).toEqual([{ elementID: "B", glyphMessage: "no bridge over island", constraintType: "IslandMustBeCoveredConstraint" }]);
   });
 });

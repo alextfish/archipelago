@@ -195,7 +195,7 @@ describe("IslandBridgeCountConstraint.getDisplayItems", () => {
     const constraint = new IslandBridgeCountConstraint();
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "good", constraintType: "IslandBridgeCountConstraint" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "good", constraintType: "IslandBridgeCountConstraint", requiredCount: 1 }]);
   });
 
   it("returns 'not-enough bridge' when island has too few bridges", () => {
@@ -214,7 +214,7 @@ describe("IslandBridgeCountConstraint.getDisplayItems", () => {
     const constraint = new IslandBridgeCountConstraint();
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge", constraintType: "IslandBridgeCountConstraint" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge", constraintType: "IslandBridgeCountConstraint", requiredCount: 2 }]);
   });
 
   it("returns 'too-many bridge' when island has too many bridges", () => {
@@ -234,7 +234,7 @@ describe("IslandBridgeCountConstraint.getDisplayItems", () => {
     const constraint = new IslandBridgeCountConstraint();
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "too-many bridge", constraintType: "IslandBridgeCountConstraint" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "too-many bridge", constraintType: "IslandBridgeCountConstraint", requiredCount: 1 }]);
   });
 
   it("returns one item per constrained island with mixed satisfaction", () => {
@@ -256,8 +256,8 @@ describe("IslandBridgeCountConstraint.getDisplayItems", () => {
     const items = constraint.getDisplayItems(puzzle as any);
 
     expect(items).toHaveLength(2);
-    expect(items).toContainEqual({ elementID: "A", glyphMessage: "good", constraintType: "IslandBridgeCountConstraint" });
-    expect(items).toContainEqual({ elementID: "B", glyphMessage: "not-enough bridge", constraintType: "IslandBridgeCountConstraint" });
+    expect(items).toContainEqual({ elementID: "A", glyphMessage: "good", constraintType: "IslandBridgeCountConstraint", requiredCount: 1 });
+    expect(items).toContainEqual({ elementID: "B", glyphMessage: "not-enough bridge", constraintType: "IslandBridgeCountConstraint", requiredCount: 2 });
   });
 });
 

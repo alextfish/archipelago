@@ -135,7 +135,7 @@ describe("IslandDirectionalBridgeConstraint.getDisplayItems", () => {
 
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "good" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "good", constraintType: "IslandDirectionalBridgeConstraint" }]);
   });
 
   it("returns 'not-enough horizontal bridge' when double_horizontal is violated", () => {
@@ -147,7 +147,7 @@ describe("IslandDirectionalBridgeConstraint.getDisplayItems", () => {
 
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough horizontal bridge" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough horizontal bridge", constraintType: "IslandDirectionalBridgeConstraint" }]);
   });
 
   it("returns 'not-enough vertical bridge' when double_vertical is violated", () => {
@@ -157,7 +157,7 @@ describe("IslandDirectionalBridgeConstraint.getDisplayItems", () => {
 
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough vertical bridge" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough vertical bridge", constraintType: "IslandDirectionalBridgeConstraint" }]);
   });
 
   it("returns 'not-enough bridge' when double_any_direction is violated", () => {
@@ -167,7 +167,7 @@ describe("IslandDirectionalBridgeConstraint.getDisplayItems", () => {
 
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge", constraintType: "IslandDirectionalBridgeConstraint" }]);
   });
 
   it("returns 'too-many bridge' when no_double_any_direction is violated", () => {
@@ -182,6 +182,6 @@ describe("IslandDirectionalBridgeConstraint.getDisplayItems", () => {
 
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "too-many bridge" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "too-many bridge", constraintType: "IslandDirectionalBridgeConstraint" }]);
   });
 });

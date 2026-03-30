@@ -78,7 +78,7 @@ describe("GridCellConstraints.getDisplayItems", () => {
       const c = new MustTouchAHorizontalBridge(2, 1);
       const items = c.getDisplayItems(puzzle);
 
-      expect(items).toEqual([{ elementID: "2,1", glyphMessage: "good" }]);
+      expect(items).toEqual([{ elementID: "2,1", glyphMessage: "good", constraintType: "MustTouchAHorizontalBridge" }]);
     });
 
     it("returns 'no adjacent horizontal bridge' when none is adjacent", () => {
@@ -86,7 +86,7 @@ describe("GridCellConstraints.getDisplayItems", () => {
       const c = new MustTouchAHorizontalBridge(2, 2);
       const items = c.getDisplayItems(puzzle);
 
-      expect(items).toEqual([{ elementID: "2,2", glyphMessage: "no adjacent horizontal bridge" }]);
+      expect(items).toEqual([{ elementID: "2,2", glyphMessage: "no adjacent horizontal bridge", constraintType: "MustTouchAHorizontalBridge" }]);
     });
   });
 
@@ -98,7 +98,7 @@ describe("GridCellConstraints.getDisplayItems", () => {
       const c = new MustTouchAVerticalBridge(2, 3);
       const items = c.getDisplayItems(puzzle);
 
-      expect(items).toEqual([{ elementID: "2,3", glyphMessage: "good" }]);
+      expect(items).toEqual([{ elementID: "2,3", glyphMessage: "good", constraintType: "MustTouchAVerticalBridge" }]);
     });
 
     it("returns 'no adjacent vertical bridge' when none is adjacent", () => {
@@ -106,7 +106,7 @@ describe("GridCellConstraints.getDisplayItems", () => {
       const c = new MustTouchAVerticalBridge(2, 2);
       const items = c.getDisplayItems(puzzle);
 
-      expect(items).toEqual([{ elementID: "2,2", glyphMessage: "no adjacent vertical bridge" }]);
+      expect(items).toEqual([{ elementID: "2,2", glyphMessage: "no adjacent vertical bridge", constraintType: "MustTouchAVerticalBridge" }]);
     });
   });
 });
