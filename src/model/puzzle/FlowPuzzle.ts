@@ -19,6 +19,7 @@ export class FlowPuzzle extends BridgePuzzle {
   private hasWater: Set<GridKey> = new Set();
   private edgeInputs: Set<GridKey> = new Set();
   private edgeOutputCache: Set<GridKey> = new Set();
+  private pendingWaterChange: { waves: WaterChangeWaves; flooding: boolean } | null = null;
 
   constructor(spec: FlowPuzzleSpec) {
     // Convert FlowPuzzleSpec to PuzzleSpec for base class
@@ -80,16 +81,49 @@ export class FlowPuzzle extends BridgePuzzle {
     this.recomputeWater();
   }
 
-  // Override place/remove to recompute water
+  /**
+   * Consume and return the pending water change recorded by the last
+   * placeBridge / removeBridge call. Returns null if no change is pending
+   * (e.g. the bridge could not be placed, or the change was already consumed).
+   * Called by FlowPuzzleRenderer.updateFromPuzzle to drive wave animation.
+   */
+  consumePendingWaterChange(): { waves: WaterChangeWaves; flooding: boolean } | null {
+    const pending = this.pendingWaterChange;
+    this.pendingWaterChange = null;
+    return pending;
+  }
+
+  // Override place/remove to recompute water and record pending wave data
   placeBridge(bridgeID: string, start: { x: number; y: number }, end: { x: number; y: number }): boolean {
+    const oldWater = new Set(this.hasWater);
     const ok = super.placeBridge(bridgeID, start, end);
-    if (ok) this.recomputeWater();
+    if (ok) {
+      this.recomputeWater();
+      const bridgedCells = this.getBridgeCoveredCells(start, end);
+      const driedUp = new Set<GridKey>();
+      for (const k of oldWater) if (!this.hasWater.has(k)) driedUp.add(k);
+      this.pendingWaterChange = {
+        waves: this.computeWaterChangeWaves(bridgedCells, driedUp),
+        flooding: false
+      };
+    }
     return ok;
   }
 
   removeBridge(bridgeID: string) {
+    const bridge = this.placedBridges.find(b => b.id === bridgeID);
+    const bridgedCells = bridge?.start && bridge?.end
+      ? this.getBridgeCoveredCells(bridge.start, bridge.end)
+      : [];
+    const oldWater = new Set(this.hasWater);
     super.removeBridge(bridgeID);
     this.recomputeWater();
+    const gained = new Set<GridKey>();
+    for (const k of this.hasWater) if (!oldWater.has(k)) gained.add(k);
+    this.pendingWaterChange = {
+      waves: this.computeWaterChangeWaves(bridgedCells, gained),
+      flooding: true
+    };
   }
 
   // Optimised placement check prevents bridges over obstacle tiles.
@@ -224,6 +258,9 @@ export class FlowPuzzle extends BridgePuzzle {
     const ok = this.placeBridge(bridgeID, start, end);
     if (!ok) return { success: false, dryingSequence: [] };
 
+    // placeBridge stored its own pending change; clear it — this caller handles waves directly.
+    this.pendingWaterChange = null;
+
     const driedUp = new Set<GridKey>();
     for (const k of oldWater) {
       if (!this.hasWater.has(k)) driedUp.add(k);
@@ -246,6 +283,9 @@ export class FlowPuzzle extends BridgePuzzle {
 
     const oldWater = new Set(this.hasWater);
     this.removeBridge(bridgeID);
+
+    // removeBridge stored its own pending change; clear it — this caller handles waves directly.
+    this.pendingWaterChange = null;
 
     const gained = new Set<GridKey>();
     for (const k of this.hasWater) {
