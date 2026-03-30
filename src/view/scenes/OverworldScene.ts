@@ -1348,10 +1348,14 @@ export class OverworldScene extends Phaser.Scene {
       blockedData[y] = [];
 
       for (let x = 0; x < mapWidth; x++) {
-        // Collect tile data from all collision layers at this position
+        // Collect tile data from all collision layers at this position.
+        // Return null for absent tiles (getTileAt returns null, or index === -1).
+        // Return a data object whose properties may be undefined (tile exists but
+        // carries no custom properties); CollisionTileClassifier handles that case.
         const layerTiles = this.collisionLayers.map(collisionLayer => {
           const tile = collisionLayer.getTileAt(x, y);
-          return (tile && tile.index !== -1) ? { properties: tile.properties } : null;
+          if (!tile || tile.index === -1) return null;
+          return { properties: tile.properties ?? undefined };
         });
 
         // Classify tile type using pure logic

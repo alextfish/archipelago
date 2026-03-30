@@ -76,6 +76,16 @@ describe('CollisionTileClassifier', () => {
             ]);
             expect(result.collisionType).toBe(CollisionType.STAIRS);
         });
+
+        it('STAIRS type is preserved when a later tile has no walkable properties', () => {
+            // The collisionType !== STAIRS guard must prevent a subsequent property-less
+            // tile from overriding an earlier stairs tile back to BLOCKED.
+            const result = CollisionTileClassifier.classifyTile([
+                { properties: { stairs: true } }, // sets STAIRS
+                {} // no properties – would naively set BLOCKED
+            ]);
+            expect(result.collisionType).toBe(CollisionType.STAIRS);
+        });
     });
 
     describe('toSubLayerValues', () => {

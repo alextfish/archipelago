@@ -70,7 +70,9 @@ export class CollisionTileClassifier {
                 }
             }
 
-            // A tile present with no walkable properties is blocked
+            // A tile present with no walkable properties is blocked.
+            // The `collisionType !== STAIRS` guard ensures that a stairs tile processed
+            // earlier in the loop cannot be overridden to BLOCKED by a later property-less tile.
             if (!hasWalkable && !hasWalkableLow && collisionType !== CollisionType.STAIRS) {
                 collisionType = CollisionType.BLOCKED;
             }
