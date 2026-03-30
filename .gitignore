@@ -9,6 +9,7 @@ lerna-debug.log*
 
 # Test output
 test-*.txt
+temp/
 
 node_modules
 dist
