@@ -2,26 +2,23 @@ import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import type { Bridge } from '@model/puzzle/Bridge';
 import type { OverworldScene } from '@view/scenes/OverworldScene';
 import type { Door } from '@model/overworld/Door';
+import { CollisionType } from '@model/overworld/CollisionTypes';
+
+// Re-export CollisionType so existing callers that import it from this module continue to work.
+export { CollisionType } from '@model/overworld/CollisionTypes';
 
 /**
- * Collision type constants for multi-layer collision system
- * - BLOCKED: Impassable terrain (value: 0)
- * - WALKABLE: Normal walkable ground on upper layer (value: 1)
- * - WALKABLE_LOW: Walkable ground on lower layer, like riverbeds (value: 2)
- * - STAIRS: Layer-neutral stairs connecting upper and lower layers (value: 3)
- */
-export const CollisionType = {
-    BLOCKED: 0,
-    WALKABLE: 1,
-    WALKABLE_LOW: 2,
-    STAIRS: 3,
-} as const;
-
-export type CollisionType = typeof CollisionType[keyof typeof CollisionType];
-
-/**
- * Manages dynamic collision updates for overworld puzzles
- * Converts puzzle bridges to overworld collision tiles and restores original state
+ * Manages **runtime** collision state for the overworld during gameplay.
+ *
+ * Responsibilities:
+ * - Storing and restoring the original collision state when the player enters / exits a puzzle
+ * - Applying WALKABLE collision for newly placed bridges; restoring it when bridges are removed
+ * - Updating collision for doors when they are locked or unlocked
+ *
+ * This is a stateful object with a live reference to OverworldScene.
+ * It is distinct from CollisionTileClassifier, which is a pure, stateless helper used
+ * once at map-load time to read tile properties from Tiled and build the initial
+ * collision arrays.
  */
 export class CollisionManager {
     private overworldScene: OverworldScene;

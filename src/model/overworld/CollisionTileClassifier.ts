@@ -1,4 +1,4 @@
-import { CollisionType } from '@model/overworld/CollisionManager';
+import { CollisionType } from '@model/overworld/CollisionTypes';
 
 /**
  * The properties a Tiled collision tile can carry.
@@ -29,8 +29,15 @@ export interface CollisionClassification {
 }
 
 /**
- * Pure logic for classifying a map tile's collision type from its Tiled properties.
- * Has no Phaser dependency and is fully unit-testable.
+ * Pure, **stateless** helper for translating Tiled tile properties into CollisionType values.
+ * Used **once at map-load time** by OverworldScene.setupCollisionDetection() to build the
+ * initial collision arrays from the Tiled map.
+ *
+ * All methods are static; this class holds no state and has no Phaser dependency.
+ *
+ * This is distinct from CollisionManager, which is a stateful runtime service that tracks
+ * dynamic collision changes (bridge placement/removal, door lock state, puzzle entry/exit)
+ * during an active gameplay session.
  */
 export class CollisionTileClassifier {
     /**

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { CollisionTileClassifier } from '@model/overworld/CollisionTileClassifier';
-import { CollisionType } from '@model/overworld/CollisionManager';
+import { CollisionType } from '@model/overworld/CollisionTypes';
 
 describe('CollisionTileClassifier', () => {
     describe('classifyTile', () => {
