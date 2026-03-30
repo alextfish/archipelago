@@ -39,3 +39,14 @@ export interface FlowPuzzleSpec {
   flowSquares?: FlowSquareSpec[]; // per-tile flow metadata
   edgeInputs?: { x: number; y: number }[]; // coordinates that supply water in from the edge
 }
+
+/**
+ * A sequence of cell waves describing how water state changes propagate across the flow grid.
+ * Each entry is a set of cells that change state simultaneously at that step.
+ *
+ * On bridge placement: cells that dry up, starting from the newly blocked cells and
+ * progressing downstream following the outgoing flow directions.
+ * On bridge removal: cells that gain water, starting from the newly unblocked cells and
+ * progressing downstream.
+ */
+export type WaterChangeWaves = Array<Array<{ x: number; y: number }>>;
