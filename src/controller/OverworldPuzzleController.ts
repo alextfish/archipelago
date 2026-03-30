@@ -82,6 +82,13 @@ export class OverworldPuzzleController {
                 puzzleBounds.height
             );
 
+            // If the puzzle was previously solved, clear the exact baked tiles first.
+            // blankPuzzleRegion uses bounds arithmetic and may miss edge-of-bounds tiles;
+            // clearBakedTiles removes precisely the tiles that were placed at bake time.
+            if (this.gameState.isPuzzleCompleted(puzzleId) && this.bridgeManager) {
+                this.bridgeManager.clearBakedTiles(puzzleId);
+            }
+
             // Blank this puzzle's region from bridges layer (whether completed or not)
             // This allows editing and restores proper collision
             if (this.bridgeManager) {

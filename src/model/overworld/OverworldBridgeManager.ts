@@ -24,6 +24,10 @@ export class OverworldBridgeManager {
 
     private bridgeTilesetFirstGid: number = 0;
 
+    // Tile positions placed by bakePuzzleBridges, keyed by puzzleId.
+    // Used to reliably clear exactly the baked tiles on puzzle re-entry.
+    private bakedTilePositions: Map<string, Array<{ tileX: number; tileY: number }>> = new Map();
+
     constructor(
         private map: Phaser.Tilemaps.Tilemap,
         private bridgesLayer: Phaser.Tilemaps.TilemapLayer,
@@ -125,6 +129,11 @@ export class OverworldBridgeManager {
             const tile = this.bridgesLayer.putTileAt(gid, tileX, tileY);
             if (tile) {
                 tilesPlaced++;
+                // Record position so we can clear exactly these tiles on re-entry
+                if (!this.bakedTilePositions.has(puzzleId)) {
+                    this.bakedTilePositions.set(puzzleId, []);
+                }
+                this.bakedTilePositions.get(puzzleId)!.push({ tileX, tileY });
             }
 
             // Remove collision from all collision layers at this position
@@ -251,6 +260,35 @@ export class OverworldBridgeManager {
 
         // No connections (shouldn't happen, but default to single tile)
         return BridgeSpriteFrames.H_BRIDGE_SINGLE;
+    }
+
+    /**
+     * Remove exactly the tiles that were baked for this puzzle and reset their collision.
+     * Called when re-entering a previously-solved puzzle so no baked tiles linger
+     * underneath the dynamic puzzle renderer.
+     */
+    clearBakedTiles(puzzleId: string): void {
+        const positions = this.bakedTilePositions.get(puzzleId);
+        if (!positions || positions.length === 0) {
+            console.log(`OverworldBridgeManager: No baked tile positions recorded for puzzle ${puzzleId}`);
+            return;
+        }
+
+        console.log(`OverworldBridgeManager: Clearing ${positions.length} baked tiles for puzzle ${puzzleId}`);
+
+        for (const { tileX, tileY } of positions) {
+            this.bridgesLayer.removeTileAt(tileX, tileY);
+
+            // Re-enable Phaser collision on physics layers at this tile
+            for (const physicsCollisionLayer of this.collisionLayers) {
+                const physicsCollisionTile = physicsCollisionLayer.getTileAt(tileX, tileY);
+                if (physicsCollisionTile) {
+                    physicsCollisionTile.setCollision(true, true, true, true);
+                }
+            }
+        }
+
+        this.bakedTilePositions.delete(puzzleId);
     }
 
     /**
