@@ -4,6 +4,7 @@ This document describes the architectural structure, design principles, and orga
 
 > For AI agent-specific guidelines and instructions, see [AGENTS.md](AGENTS.md).
 > For specific documentation about the puzzle series system, see [PUZZLE_SERIES_ARCHITECTURE.md](PUZZLE_SERIES_ARCHITECTURE.md).
+> For the Translation Mode (player glyph-notebook) feature, see [TRANSLATION_MODE_ARCHITECTURE.md](TRANSLATION_MODE_ARCHITECTURE.md).
 
 ## Table of Contents
 
@@ -148,6 +149,7 @@ archipelago/
 │   │   │   └── SeriesLoaders.ts
 │   │   ├── commands/       # Command pattern for undo/redo
 │   │   ├── overworld/      # Overworld navigation logic
+│   │   ├── translation/    # Translation Mode model (PlayerTranslationDictionary, ActiveGlyphTracker)
 │   │   └── ...
 │   ├── view/               # Rendering and display (Phaser-dependent)
 │   │   ├── scenes/         # Phaser scene implementations
