@@ -4,6 +4,8 @@ import type { GridKey } from '@model/puzzle/FlowTypes';
 import { gridKey } from '@model/puzzle/FlowTypes';
 import type { WaterPropagationEngine } from './WaterPropagationEngine';
 import type { OverworldPuzzleManager } from './OverworldPuzzleManager';
+import { PlayerTranslationDictionary } from '@model/translation/PlayerTranslationDictionary';
+import { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
 
 /**
  * Manages state persistence for overworld puzzles
@@ -32,6 +34,12 @@ export class OverworldGameState {
     
     /** Reference to overworld puzzle manager (for bounds lookup) */
     private puzzleManager?: OverworldPuzzleManager;
+
+    /** Player-managed dictionary of glyph translations (shared across all scenes). */
+    readonly translationDictionary: PlayerTranslationDictionary = new PlayerTranslationDictionary();
+
+    /** Tracks all currently-displayed glyph sets for Translation Mode. */
+    readonly glyphTracker: ActiveGlyphTracker = new ActiveGlyphTracker();
 
     /**
      * Set the currently active overworld puzzle
@@ -329,6 +337,7 @@ export class OverworldGameState {
         flowPuzzleOutputs: Record<string, { x: number; y: number }[]>;
         flowPuzzleInputs: Record<string, { x: number; y: number }[]>;
         overworldWaterState: string[];
+        translationDictionary: Record<string, string>;
     } {
         const puzzleProgressObj: Record<string, any> = {};
         for (const [id, puzzle] of this.puzzleProgress) {
@@ -350,7 +359,12 @@ export class OverworldGameState {
             unlockedDoors: Array.from(this.unlockedDoors),
             flowPuzzleOutputs: Object.fromEntries(this.flowPuzzleOutputs),
             flowPuzzleInputs: Object.fromEntries(this.flowPuzzleInputs),
-            overworldWaterState: Array.from(this.overworldWaterState) as string[]
+            overworldWaterState: Array.from(this.overworldWaterState) as string[],
+            translationDictionary: Object.fromEntries(
+                Array.from(this.translationDictionary.getAllTranslations()).map(
+                    ([frame, text]) => [String(frame), text]
+                )
+            ),
         };
     }
 
@@ -366,6 +380,7 @@ export class OverworldGameState {
         flowPuzzleOutputs?: Record<string, { x: number; y: number }[]>;
         flowPuzzleInputs?: Record<string, { x: number; y: number }[]>;
         overworldWaterState?: string[];
+        translationDictionary?: Record<string, string>;
     }): void {
         console.log('OverworldGameState: Importing state');
 
@@ -383,6 +398,14 @@ export class OverworldGameState {
         if (state.overworldWaterState) {
             // Import GridKeys from saved strings
             this.overworldWaterState = new Set(state.overworldWaterState as GridKey[]);
+        }
+
+        // Import player translation dictionary
+        if (state.translationDictionary) {
+            this.translationDictionary.clearAll();
+            for (const [frameStr, text] of Object.entries(state.translationDictionary)) {
+                this.translationDictionary.setTranslation(Number(frameStr), text);
+            }
         }
 
         // Note: puzzleProgress would need to be reconstructed as BridgePuzzle objects
