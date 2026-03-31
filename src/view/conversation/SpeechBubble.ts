@@ -5,18 +5,41 @@
 
 import Phaser from 'phaser';
 import type { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
+import type { ActiveGlyphTracker, GlyphScreenBounds } from '@model/translation/ActiveGlyphTracker';
 
 export class SpeechBubble {
     private scene: Phaser.Scene;
     private container: Phaser.GameObjects.Container;
     private backgroundTiles: Phaser.GameObjects.Image[] = [];
     private glyphSprites: Phaser.GameObjects.Image[] = [];
+    /** Frame index for each entry in glyphSprites (same order). */
+    private glyphFrameIndices: number[] = [];
     private tilesetKey: string;
+
+    /** Unique ID used when registering with ActiveGlyphTracker. */
+    private readonly registrationID: string;
+    /** Tracker to register/unregister with, if provided. */
+    private glyphTracker: ActiveGlyphTracker | null = null;
+    /** Tile size (unscaled pixels) recorded at last create() call. */
+    private currentTileSize: number = 32;
+
+    /** Counter used to generate unique registration IDs per bubble instance. */
+    private static nextID = 0;
 
     constructor(scene: Phaser.Scene, tilesetKey: string) {
         this.scene = scene;
         this.tilesetKey = tilesetKey;
         this.container = scene.add.container(0, 0);
+        this.registrationID = `speech-bubble-${SpeechBubble.nextID++}`;
+    }
+
+    /**
+     * Attach an ActiveGlyphTracker so that this bubble registers its glyphs
+     * whenever create() is called and unregisters them on clear()/destroy().
+     * Should be called once immediately after construction.
+     */
+    setGlyphTracker(tracker: ActiveGlyphTracker): void {
+        this.glyphTracker = tracker;
     }
 
     /**
@@ -27,7 +50,7 @@ export class SpeechBubble {
      * @param scale Scale factor for the bubble (default 1)
      */
     create(glyphFrames: number[], language: string, registry: LanguageGlyphRegistry, scale: number = 1): void {
-        // Clear existing content
+        // Clear existing content (also unregisters from tracker)
         this.clear();
 
         if (glyphFrames.length === 0) {
@@ -53,6 +76,19 @@ export class SpeechBubble {
 
         // Center the container's pivot
         this.container.setSize(bubbleWidth * tileSize, bubbleHeight * tileSize);
+
+        // Record tile size for screen-bounds calculation
+        this.currentTileSize = tileSize;
+
+        // Register with tracker if one has been provided
+        if (this.glyphTracker) {
+            this.glyphTracker.registerGlyphSet({
+                id: this.registrationID,
+                language,
+                glyphs: glyphFrames.map((f, i) => ({ frameIndex: f, indexInBubble: i })),
+                getBounds: () => this.getGlyphScreenBounds(),
+            });
+        }
     }
 
     /**
@@ -125,6 +161,7 @@ export class SpeechBubble {
             glyph.setOrigin(0, 0);
             this.container.add(glyph);
             this.glyphSprites.push(glyph);
+            this.glyphFrameIndices.push(glyphFrames[i]);
         }
     }
 
@@ -157,9 +194,39 @@ export class SpeechBubble {
     }
 
     /**
+     * Compute the current screen bounds for each glyph sprite.
+     * Returns null if no glyphs are displayed.
+     */
+    getGlyphScreenBounds(): GlyphScreenBounds[] | null {
+        if (this.glyphSprites.length === 0) {
+            return null;
+        }
+        const scale = this.container.scaleX;
+        const scaledTile = this.currentTileSize * scale;
+        const matrix = this.container.getWorldTransformMatrix();
+        return this.glyphSprites.map((sprite, i) => {
+            // Compute screen position of the sprite's top-left corner
+            const screenX = matrix.tx + sprite.x * matrix.a + sprite.y * matrix.c;
+            const screenY = matrix.ty + sprite.x * matrix.b + sprite.y * matrix.d;
+            return {
+                frameIndex: this.glyphFrameIndices[i],
+                indexInBubble: i,
+                screenX,
+                screenY,
+                tileSize: scaledTile,
+            };
+        });
+    }
+
+    /**
      * Clear all content
      */
     clear(): void {
+        // Unregister from tracker first
+        if (this.glyphTracker) {
+            this.glyphTracker.unregisterGlyphSet(this.registrationID);
+        }
+
         // Destroy all background tiles
         for (const tile of this.backgroundTiles) {
             tile.destroy();
@@ -171,6 +238,7 @@ export class SpeechBubble {
             glyph.destroy();
         }
         this.glyphSprites = [];
+        this.glyphFrameIndices = [];
     }
 
     /**
@@ -181,3 +249,4 @@ export class SpeechBubble {
         this.container.destroy();
     }
 }
+

@@ -13,11 +13,14 @@ import type { NPC } from '@model/conversation/NPC';
 import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
 import { NPCAppearanceRegistry } from '@model/conversation/NPCAppearanceRegistry';
 import { attachTestMarker, isTestMode } from '@helpers/TestMarkers';
+import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
 
 export class ConversationScene extends Phaser.Scene implements ConversationHost {
     private controller: ConversationController | null = null;
     private glyphRegistry: LanguageGlyphRegistry;
     private appearanceRegistry: NPCAppearanceRegistry;
+    /** Optional glyph tracker injected by OverworldScene for Translation Mode. */
+    private glyphTracker: ActiveGlyphTracker | null = null;
 
     // Debounce for confirm key to prevent rapid-fire advancement
     private lastConfirmTime = 0;
@@ -46,6 +49,20 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         super({ key: 'ConversationScene' });
         this.glyphRegistry = new LanguageGlyphRegistry();
         this.appearanceRegistry = new NPCAppearanceRegistry();
+    }
+
+    /**
+     * Wire up an ActiveGlyphTracker so that speech bubbles register their
+     * glyphs for Translation Mode.  Call this from OverworldScene before
+     * (or when) launching a conversation.
+     */
+    setGlyphTracker(tracker: ActiveGlyphTracker): void {
+        this.glyphTracker = tracker;
+        // If the speech bubble already exists (scene was already created),
+        // pass the tracker to it immediately.
+        if (this.speechBubble) {
+            this.speechBubble.setGlyphTracker(tracker);
+        }
     }
 
     /**
@@ -118,6 +135,10 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         // Create speech bubble
         this.speechBubble = new SpeechBubble(this, this.TILESET_KEY);
         this.speechBubble.setDepth(10);
+        // If a tracker was provided before create() was called, wire it up now
+        if (this.glyphTracker) {
+            this.speechBubble.setGlyphTracker(this.glyphTracker);
+        }
 
         // Set up keyboard navigation for choices
         this.setupKeyboardNavigation();
