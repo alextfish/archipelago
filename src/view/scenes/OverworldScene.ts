@@ -24,6 +24,8 @@ import { PlayerStartManager } from '@model/overworld/PlayerStartManager';
 import { getDoorSpriteFrame } from '@view/DoorSpriteRegistry';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import { CollisionTileClassifier } from '@model/overworld/CollisionTileClassifier';
+import type { TranslationModeScene } from '@view/scenes/TranslationModeScene';
+import type { ConversationScene } from '@view/scenes/ConversationScene';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -481,8 +483,28 @@ export class OverworldScene extends Phaser.Scene {
         this.roofManager.initialize(this.map, this.roofsLayers, this.tiledMapData);
       }
 
+      // Launch Translation Mode overlay and connect to shared game-state services
+      this.launchTranslationMode();
+
     } catch (error) {
       console.error('Failed to initialize overworld puzzles:', error);
+    }
+  }
+
+  /**
+   * Launch the Translation Mode overlay scene and inject the shared
+   * game-state services (glyph tracker + translation dictionary).
+   */
+  private launchTranslationMode(): void {
+    if (!this.scene.isActive('TranslationModeScene')) {
+      this.scene.launch('TranslationModeScene');
+    }
+    const translationScene = this.scene.get('TranslationModeScene') as TranslationModeScene | null;
+    if (translationScene) {
+      translationScene.setServices(
+        this.gameState.glyphTracker,
+        this.gameState.translationDictionary
+      );
     }
   }
 
@@ -1723,11 +1745,14 @@ export class OverworldScene extends Phaser.Scene {
       console.log(`Switching to conversation mode with NPC: ${npc.name} (solved: ${useSolvedConversation})`);
 
       // Get conversation scene
-      const conversationScene = this.scene.get('ConversationScene') as any;
+      const conversationScene = this.scene.get('ConversationScene') as (ConversationScene & { startConversation: Function; events: Phaser.Events.EventEmitter }) | null;
       if (!conversationScene) {
         console.error('ConversationScene not found');
         return;
       }
+
+      // Inject glyph tracker so speech bubbles register for Translation Mode
+      conversationScene.setGlyphTracker(this.gameState.glyphTracker);
 
       // Listen for conversation end
       conversationScene.events.once('conversationEnded', () => {
