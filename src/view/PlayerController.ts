@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CollisionType } from '@model/overworld/CollisionManager';
+import { isTestMode } from '@helpers/TestMarkers';
 
 /**
  * Movement constants for player character
@@ -7,6 +8,7 @@ import { CollisionType } from '@model/overworld/CollisionManager';
 const PLAYER_SPEED = 200; // Doubled from 100
 const CORNER_NUDGE = 4; // Pixels to nudge in perpendicular direction when hitting a corner
 const TARGET_REACHED_THRESHOLD = 5; // Pixels - how close is "close enough" to target
+const TILE_SIZE = 32; // Must match the map's tilewidth/tileheight
 
 /**
  * PlayerController manages the player character in the overworld.
@@ -21,6 +23,7 @@ export class PlayerController {
     private scene: Phaser.Scene;
     private enabled: boolean = true;
     private collisionLayer?: Phaser.Tilemaps.TilemapLayer;
+    private getCollisionAt?: (tileX: number, tileY: number) => CollisionType;
 
     // Tap-to-move state
     private targetPosition?: { x: number; y: number };
@@ -33,19 +36,22 @@ export class PlayerController {
 
     // Player layer tracking for multi-layer collision system
     // 'upper' = normal ground level, 'lower' = riverbeds and lower areas
-    // Stairs are layer-neutral; layer changes only when exiting stairs
-    private playerLayer: 'upper' | 'lower' = 'upper';
+    // 'stairs' = in transition; both upper and lower collision layers are disabled,
+    //            allowing free movement onto whichever level the stairs lead to.
+    private playerLayer: 'upper' | 'lower' | 'stairs' = 'upper';
 
     constructor(
         scene: Phaser.Scene,
         player: Phaser.Physics.Arcade.Sprite,
         cursors: Phaser.Types.Input.Keyboard.CursorKeys,
-        collisionLayer?: Phaser.Tilemaps.TilemapLayer
+        collisionLayer?: Phaser.Tilemaps.TilemapLayer,
+        getCollisionAt?: (tileX: number, tileY: number) => CollisionType
     ) {
         this.scene = scene;
         this.player = player;
         this.cursors = cursors;
         this.collisionLayer = collisionLayer;
+        this.getCollisionAt = getCollisionAt;
         this.setupCollisionBody();
         this.createPlayerAnimations();
     }
@@ -122,6 +128,10 @@ export class PlayerController {
             return;
         }
 
+        // Update player layer from current tile position BEFORE physics step,
+        // so the collision callbacks (upperGround/lowerGround) see the correct layer.
+        this.updatePlayerLayerFromTile();
+
         // Check if any keyboard input is being used
         const hasKeyboardInput =
             this.cursors.left!.isDown ||
@@ -142,6 +152,71 @@ export class PlayerController {
 
         // Handle animations based on final velocity
         this.updateAnimations();
+    }
+
+    /**
+     * Update the player's ground layer ('upper' or 'lower') from the tile they currently occupy.
+     * Must be called before the physics step so collision callbacks see the right layer.
+     *
+     * Rules (fully symmetrical):
+     * - WALKABLE     → 'upper'
+     * - WALKABLE_LOW → 'lower'
+     * - STAIRS       → 'stairs'  (disables both upper and lower collision layers,
+     *                             so the player can freely cross onto either ground type)
+     * - BLOCKED / unknown → keep current layer
+     *
+     * The 'stairs' state is the key to avoiding look-ahead: when the player body is
+     * on a STAIRS tile both collider process-callbacks return false (neither
+     * `=== 'lower'` nor `=== 'upper'` matches), so the physics step can move onto
+     * whichever adjacent tile the stairs connect to.  The following frame the player
+     * body is on WALKABLE or WALKABLE_LOW and the layer snaps to the correct value.
+     */
+    private updatePlayerLayerFromTile(): void {
+        if (!this.getCollisionAt) return;
+
+        // Use centre of physics body (feet position) for tile lookup
+        const body = this.player.body as Phaser.Physics.Arcade.Body;
+        const bodyX = body.x + body.width / 2;
+        const bodyY = body.y + body.height / 2;
+        const tileX = Math.floor(bodyX / TILE_SIZE);
+        const tileY = Math.floor(bodyY / TILE_SIZE);
+
+        const currentType = this.getCollisionAt(tileX, tileY);
+
+        const previousLayer = this.playerLayer;
+        if (currentType === CollisionType.WALKABLE) {
+            this.playerLayer = 'upper';
+        } else if (currentType === CollisionType.WALKABLE_LOW) {
+            this.playerLayer = 'lower';
+        } else if (currentType === CollisionType.STAIRS) {
+            this.playerLayer = 'stairs';
+        }
+        // BLOCKED or unknown: leave playerLayer unchanged
+
+        if (isTestMode()) {
+            if (this.playerLayer !== previousLayer) {
+                const typeNames: Record<number, string> = { 0: 'BLOCKED', 1: 'WALKABLE', 2: 'WALKABLE_LOW', 3: 'STAIRS' };
+                console.log(`[PlayerLayer] ${previousLayer} -> ${this.playerLayer} (tile ${tileX},${tileY} type=${typeNames[currentType] ?? currentType})`);
+            }
+            this.updateLayerDebugDisplay(tileX, tileY);
+        }
+    }
+
+    private updateLayerDebugDisplay(tileX: number, tileY: number): void {
+        let el = document.getElementById('debug-player-layer') as HTMLElement | null;
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'debug-player-layer';
+            el.style.cssText = [
+                'position:fixed', 'top:10px', 'left:10px',
+                'background:rgba(0,0,0,0.7)', 'color:#0f0',
+                'padding:6px 10px', 'border-radius:4px',
+                'font:bold 13px monospace', 'z-index:10001',
+                'pointer-events:none'
+            ].join(';');
+            document.body.appendChild(el);
+        }
+        el.textContent = `layer: ${this.playerLayer}  tile:(${tileX},${tileY})`;
     }
 
     /**
@@ -463,14 +538,14 @@ export class PlayerController {
     /**
      * Get the player's current layer
      */
-    getPlayerLayer(): 'upper' | 'lower' {
+    getPlayerLayer(): 'upper' | 'lower' | 'stairs' {
         return this.playerLayer;
     }
 
     /**
      * Set the player's layer (used when transitioning via stairs)
      */
-    setPlayerLayer(layer: 'upper' | 'lower'): void {
+    setPlayerLayer(layer: 'upper' | 'lower' | 'stairs'): void {
         if (this.playerLayer !== layer) {
             console.log(`Player layer changed: ${this.playerLayer} -> ${layer}`);
             this.playerLayer = layer;

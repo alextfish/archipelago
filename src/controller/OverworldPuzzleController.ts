@@ -9,9 +9,9 @@ import { FlowPuzzleRenderer } from '@view/FlowPuzzleRenderer';
 import { PuzzleController } from '@controller/PuzzleController';
 import { PuzzleInputHandler } from '@controller/PuzzleInputHandler';
 import type { PuzzleHost } from '@controller/PuzzleHost';
+import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
-import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
 
 /**
  * Coordinates the lifecycle of overworld puzzle solving:
@@ -268,6 +268,24 @@ export class OverworldPuzzleController {
                 if (this.bridgeManager && boundsRect) {
                     const bridges = activeData.puzzle.bridges;
                     this.bridgeManager.bakePuzzleBridges(activeData.id, boundsRect, bridges);
+                }
+                // For FlowPuzzles: block tiles where water is still flowing after the solution.
+                // Tiles that dried up remain WALKABLE_LOW (their restored original state).
+                if (activeData.puzzle instanceof FlowPuzzle && puzzleBounds) {
+                    const tileW = this.tiledMapData?.tilewidth ?? 32;
+                    const tileH = this.tiledMapData?.tileheight ?? 32;
+                    const originTileX = Math.floor(puzzleBounds.x / tileW);
+                    const originTileY = Math.floor(puzzleBounds.y / tileH);
+                    const flowPuzzle = activeData.puzzle;
+                    const wetWorldTiles: { tileX: number; tileY: number }[] = [];
+                    for (let ly = 0; ly < flowPuzzle.height; ly++) {
+                        for (let lx = 0; lx < flowPuzzle.width; lx++) {
+                            if (flowPuzzle.tileHasWater(lx, ly)) {
+                                wetWorldTiles.push({ tileX: originTileX + lx, tileY: originTileY + ly });
+                            }
+                        }
+                    }
+                    this.collisionManager.applyFlowWaterCollision(wetWorldTiles);
                 }
                 this.gameState.markPuzzleCompleted(activeData.id);
             } else if (action === 'blank') {

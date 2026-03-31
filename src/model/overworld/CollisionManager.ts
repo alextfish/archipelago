@@ -218,6 +218,21 @@ export class CollisionManager {
     }
 
     /**
+     * Apply collision overrides for a solved FlowPuzzle.
+     * Tiles where water is still flowing become BLOCKED (impassable).
+     * Tiles that have dried up are left at their restored original state (WALKABLE_LOW).
+     * Call AFTER restoreOriginalCollision() so the base state is correct.
+     *
+     * @param wetWorldTiles - World tile coordinates where water is still actively flowing
+     */
+    applyFlowWaterCollision(wetWorldTiles: ReadonlyArray<{ tileX: number; tileY: number }>): void {
+        for (const { tileX, tileY } of wetWorldTiles) {
+            this.overworldScene.setCollisionAt(tileX, tileY, CollisionType.BLOCKED);
+        }
+        console.log(`CollisionManager: Blocked ${wetWorldTiles.length} wet flow tiles`);
+    }
+
+    /**
      * Get all registered doors
      */
     getDoors(): readonly Door[] {

@@ -370,7 +370,7 @@ export class OverworldScene extends Phaser.Scene {
 
     // Set up input and player controller (pass first collision layer for corner forgiveness)
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.playerController = new PlayerController(this, this.player, this.cursors, this.collisionLayers[0]);
+    this.playerController = new PlayerController(this, this.player, this.cursors, this.collisionLayers[0], (x, y) => this.getCollisionAt(x, y));
 
     // Enable layer-based collision with callbacks
     // Blocked layer always collides
