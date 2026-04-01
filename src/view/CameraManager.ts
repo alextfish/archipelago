@@ -114,8 +114,10 @@ export class CameraManager {
     }
 
     /**
-     * Return camera to original overworld view
-     * Note: The caller should resume camera follow after this completes
+     * Return camera to original overworld view.
+     * Tweens scrollX/scrollY directly to the stored position (independent of
+     * current zoom) while simultaneously restoring the zoom level.
+     * Note: The caller should resume camera follow after this completes.
      */
     async transitionToOverworld(duration: number = 1000): Promise<void> {
         if (!this.originalBounds) {
@@ -125,15 +127,23 @@ export class CameraManager {
 
         const camera = this.scene.cameras.main;
 
-        console.log(`CameraManager: Returning to overworld at zoom ${this.originalZoom}`);
+        console.log(`CameraManager: Returning to overworld at zoom ${this.originalZoom}, centre (${this.originalCenterX}, ${this.originalCenterY})`);
 
         return new Promise<void>((resolve) => {
-            // Just zoom back - the caller will resume camera follow which will handle positioning
-            camera.zoomTo(this.originalZoom, duration, 'Power2', false, (_camera, progress) => {
-                if (progress === 1) {
-                    resolve();
-                }
+            // Tween scrollX/scrollY directly rather than using camera.pan().
+            // camera.pan() bakes its target scroll using the zoom at call-time, so
+            // calling it while the zoom is still at the (potentially very different)
+            // puzzle zoom would land at the wrong position.  Direct scroll tweening
+            // is zoom-independent and always arrives at exactly the stored position.
+            this.scene.tweens.add({
+                targets: camera,
+                scrollX: this.originalX,
+                scrollY: this.originalY,
+                duration,
+                ease: 'Power2',
+                onComplete: () => resolve()
             });
+            camera.zoomTo(this.originalZoom, duration, 'Power2');
         });
     }
 
