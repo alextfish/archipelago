@@ -119,9 +119,17 @@ const worldPoint = this.cameras.main.getWorldPoint(screenX, screenY);
 
 ### Converting World → Tile
 
+`OverworldScene` owns a `GridToWorldMapper` (no offset; origin at `(0, 0)`) initialised in `create()`:
+
 ```typescript
-const tileX = Math.floor(worldX / this.tiledMapData.tilewidth);
-const tileY = Math.floor(worldY / this.tiledMapData.tileheight);
+this.gridMapper = new GridToWorldMapper(this.tiledMapData?.tilewidth ?? 32);
+```
+
+Use the mapper's conversions in preference to explicit arithmetic:
+
+```typescript
+const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(worldX, worldY);
+const { x: worldX, y: worldY } = this.gridMapper.gridToWorld(tileX, tileY);
 ```
 
 ---
@@ -391,16 +399,15 @@ screenY = (worldY - scrollY) * z
 
 Always prefer Phaser's built-in helper `camera.getWorldPoint` over computing the screen divided by the zoom manually.
 
-### World ↔ Grid (Overworld)
+### World ↔ Grid (Overworld – via GridToWorldMapper)
 
-```
-tileX = Math.floor(worldX / tileWidth)    // tileWidth  = 32
-tileY = Math.floor(worldY / tileHeight)   // tileHeight = 32
+```typescript
+// No offset; origin at (0, 0):
+gridToWorld(gx, gy)  →  { x: gx * 32,        y: gy * 32 }   // top-left of tile
+worldToGrid(wx, wy)  →  { x: floor(wx / 32),  y: floor(wy / 32) }
 
-worldX = tileX * tileWidth
-worldY = tileY * tileHeight               // top-left of the tile
-// NPC sprite positioned at bottom-left:
-worldY = (tileY + 1) * tileHeight
+// NPC sprite uses bottom-left origin (+1 tile on Y):
+const { x: worldX, y: worldY } = this.gridMapper.gridToWorld(tileX, tileY + 1);
 ```
 
 ### World ↔ Grid (Puzzle – via GridToWorldMapper)

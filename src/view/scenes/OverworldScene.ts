@@ -26,6 +26,7 @@ import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import { CollisionTileClassifier } from '@model/overworld/CollisionTileClassifier';
 import type { TranslationModeScene } from '@view/scenes/TranslationModeScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
+import { GridToWorldMapper } from '@view/GridToWorldMapper';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -53,6 +54,7 @@ export class OverworldScene extends Phaser.Scene {
   private cameraManager: CameraManager;
   private puzzleController?: OverworldPuzzleController; // New: replaces direct puzzle management
   private tiledMapData?: any;
+  private gridMapper!: GridToWorldMapper;
 
   // Store pointer handlers so we can restore them after puzzle mode
   private puzzleEntryPointerHandler?: (pointer: Phaser.Input.Pointer) => void;
@@ -324,6 +326,7 @@ export class OverworldScene extends Phaser.Scene {
 
     // Create the tilemap
     this.map = this.make.tilemap({ key: 'overworldMap' });
+    this.gridMapper = new GridToWorldMapper(this.tiledMapData?.tilewidth ?? 32);
 
     // Add all tilesets (both external and embedded)
     const tilesets = this.loadAllTilesets();
@@ -555,8 +558,7 @@ export class OverworldScene extends Phaser.Scene {
       const bounds = this.puzzleManager.getPuzzleBounds(puzzleId);
       if (!bounds) continue;
 
-      const tileX = Math.floor(bounds.x / this.tiledMapData.tilewidth);
-      const tileY = Math.floor(bounds.y / this.tiledMapData.tileheight);
+      const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(bounds.x, bounds.y);
       const width = Math.ceil(bounds.width / this.tiledMapData.tilewidth);
       const height = Math.ceil(bounds.height / this.tiledMapData.tileheight);
 
@@ -646,8 +648,7 @@ export class OverworldScene extends Phaser.Scene {
       }
 
       // Convert pixel coordinates to tile coordinates
-      const tileX = Math.floor(obj.x / this.tiledMapData.tilewidth);
-      const tileY = Math.floor(obj.y / this.tiledMapData.tileheight);
+      const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(obj.x, obj.y);
 
       // Get properties from Tiled object
       const properties = obj.properties as any[] | undefined;
@@ -683,8 +684,7 @@ export class OverworldScene extends Phaser.Scene {
 
       // Create NPC sprite at world coordinates
       // Tiled uses top-left for objects, so we need to add tileheight to get bottom position
-      const worldX = tileX * this.tiledMapData.tilewidth;
-      const worldY = (tileY + 1) * this.tiledMapData.tileheight; // Add 1 tile to match Tiled's top-left origin
+      const { x: worldX, y: worldY } = this.gridMapper.gridToWorld(tileX, tileY + 1); // Add 1 tile to match Tiled's top-left origin
       const sprite = this.add.sprite(worldX, worldY, appearanceId);
       sprite.setOrigin(0, 1); // Bottom-left origin to align with tile coordinates
       sprite.setDepth(worldY); // Use Y-sorting for depth
@@ -830,8 +830,7 @@ export class OverworldScene extends Phaser.Scene {
 
           // Convert puzzle coordinates to overworld tile coordinates
           // Puzzle bounds are in pixels, so convert to tiles first
-          const puzzleTileX = Math.floor(puzzleDefinition.bounds.x / this.tiledMapData.tilewidth);
-          const puzzleTileY = Math.floor(puzzleDefinition.bounds.y / this.tiledMapData.tileheight);
+          const { x: puzzleTileX, y: puzzleTileY } = this.gridMapper.worldToGrid(puzzleDefinition.bounds.x, puzzleDefinition.bounds.y);
           const overworldTileX = puzzleTileX + island.x;
           const overworldTileY = puzzleTileY + island.y;
 
@@ -875,8 +874,7 @@ export class OverworldScene extends Phaser.Scene {
           });
 
           // Create NPC sprite at world coordinates
-          const worldX = overworldTileX * this.tiledMapData.tilewidth;
-          const worldY = (overworldTileY + 1) * this.tiledMapData.tileheight;
+          const { x: worldX, y: worldY } = this.gridMapper.gridToWorld(overworldTileX, overworldTileY + 1);
           const sprite = this.add.sprite(worldX, worldY, appearanceId);
           sprite.setOrigin(0, 1);
           sprite.setDepth(worldY);
@@ -1525,8 +1523,7 @@ export class OverworldScene extends Phaser.Scene {
 
       // Update interaction cursor based on player position
       if (this.interactionCursor && this.tiledMapData && this.player) {
-        const playerTileX = Math.floor(this.player.x / this.tiledMapData.tilewidth);
-        const playerTileY = Math.floor(this.player.y / this.tiledMapData.tileheight);
+        const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
 
         // Update cursor's facing direction
         this.interactionCursor.setFacing(this.playerController.getFacingDirection());
@@ -1649,10 +1646,8 @@ export class OverworldScene extends Phaser.Scene {
       const playerY = this.player.y;
 
       // Convert both positions to tile coordinates
-      const clickTileX = Math.floor(worldX / this.tiledMapData.tilewidth);
-      const clickTileY = Math.floor(worldY / this.tiledMapData.tileheight);
-      const playerTileX = Math.floor(playerX / this.tiledMapData.tilewidth);
-      const playerTileY = Math.floor(playerY / this.tiledMapData.tileheight);
+      const { x: clickTileX, y: clickTileY } = this.gridMapper.worldToGrid(worldX, worldY);
+      const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(playerX, playerY);
 
       // Check if there's a focused target
       const focusedTarget = this.interactionCursor.getCurrentTarget();
@@ -2063,8 +2058,7 @@ export class OverworldScene extends Phaser.Scene {
     const playerY = this.player.y;
 
     // Convert player position to tile coordinates
-    const tileX = Math.floor(playerX / this.tiledMapData.tilewidth);
-    const tileY = Math.floor(playerY / this.tiledMapData.tileheight);
+    const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(playerX, playerY);
 
     console.log(`Checking for puzzle at player position (${playerX}, ${playerY}) - tile (${tileX}, ${tileY})`);
 
@@ -2405,11 +2399,12 @@ export class OverworldScene extends Phaser.Scene {
    */
   public getPlayerPosition(): { x: number; y: number; tileX: number; tileY: number } | null {
     if (!this.player || !this.tiledMapData) return null;
+    const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
     return {
       x: this.player.x,
       y: this.player.y,
-      tileX: Math.floor(this.player.x / this.tiledMapData.tilewidth),
-      tileY: Math.floor(this.player.y / this.tiledMapData.tileheight)
+      tileX,
+      tileY
     };
   }
 }
