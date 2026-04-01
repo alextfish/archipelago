@@ -52,7 +52,7 @@ The codebase uses three distinct coordinate spaces.  Understanding which space i
 |---|---|---|---|---|---|
 | **Overworld navigation** | `OverworldScene` | **2×** (fixed) | World | 32 px | bottom-left `(0, 1)` for NPCs |
 | **Overworld conversation** | `ConversationScene` | N/A (no camera) | Screen | 32 px base / 64 px scaled | varies by element |
-| **Embedded overworld puzzle** | `OverworldScene` (same) | **2×** base, zooms to fit puzzle | World + puzzle offset | 32 px | top-left `(0, 0)` |
+| **Embedded overworld puzzle** | `OverworldScene` (same) | **Dynamic** (zooms from overworld's 2× to fit puzzle) | World + puzzle offset | 32 px | top-left `(0, 0)` |
 | **Standalone series puzzle** | `IslandMapScene` | **Dynamic** (fit-to-islands) | World (no offset) | 32 px | top-left `(0, 0)` |
 | **Translation mode** | `TranslationModeScene` | N/A (no camera) | Screen | 64 px (32 × 2× scale) | top-left `(0, 0)` |
 
@@ -132,19 +132,6 @@ const tileY = Math.floor(worldY / this.tiledMapData.tileheight);
 
 ConversationScene is a separate Phaser scene that runs **on top of** OverworldScene.  It has no camera and no scrolling – it renders entirely in **screen / viewport coordinates**.
 
-### Layout Constants
-
-```typescript
-private readonly SPEECH_BUBBLE_Y    = 150;   // px from top of screen
-private readonly SPEECH_BUBBLE_SCALE = 2;    // glyphs scaled 2× (32 → 64 px)
-private readonly CHOICES_START_Y    = 400;   // px from top of screen
-private readonly CHOICE_HEIGHT      = 60;
-private readonly CHOICE_SPACING     = 20;
-private readonly CHOICE_WIDTH       = 280;
-private readonly PORTRAIT_SCALE     = 4;     // 32 × 4 = 128 px per tile
-private readonly PORTRAIT_PADDING   = 20;
-```
-
 ### Placing the Speech Bubble
 
 The speech bubble is **horizontally centred** in the viewport:
@@ -197,9 +184,10 @@ this.gridMapper = new GridToWorldMapper(32, {
 });
 ```
 
+Use the GridToWorldMapper's conversions in preference to explicit conversions:
 ```
-gridToWorld(gx, gy) = { x: gx * 32 + offsetX,  y: gy * 32 + offsetY }
-worldToGrid(wx, wy) = { x: floor((wx - offsetX) / 32),  y: floor((wy - offsetY) / 32) }
+gridToWorld(gx, gy) rather than { wx = gx * 32 + offsetX, wy: gy * 32 + offsetY }
+worldToGrid(wx, wy) rather than { gx = floor((wx - offsetX) / 32), gy = floor((wy - offsetY) / 32) }
 ```
 
 ### Sprite Placement
@@ -249,9 +237,10 @@ Standalone puzzles use a **dedicated `IslandMapScene`** that has its own camera.
 this.gridMapper = new GridToWorldMapper(32); // no offset; origin at (0, 0)
 ```
 
+Use the GridToWorldMapper's conversions in preference to explicit conversions:
 ```
-gridToWorld(gx, gy) = { x: gx * 32,  y: gy * 32 }
-worldToGrid(wx, wy) = { x: floor(wx / 32),  y: floor(wy / 32) }
+gridToWorld(gx, gy) rather than { wx = gx * 32 + offsetX, wy = gy * 32 + offsetY }
+worldToGrid(wx, wy) rather than { gx = floor((wx - offsetX) / 32), gy = floor((wy - offsetY) / 32) }
 ```
 
 ### Camera Zoom (Dynamic)
@@ -268,7 +257,7 @@ this.cameras.main.setZoom(zoom);
 this.cameras.main.centerOn(worldCentre.x, worldCentre.y);
 ```
 
-The zoom is typically in the range **0.5× – 2×** and changes with every different puzzle.  **Never assume a fixed zoom**.
+The zoom is typically in the range **0.5× – 3×** and changes with every different puzzle.  **Never assume a fixed zoom**.
 
 The resulting camera info is exposed for test automation:
 
@@ -394,22 +383,13 @@ this.overlay.setOrigin(0, 0);
 At zoom level `z`, with camera scroll `(scrollX, scrollY)`:
 
 ```
-worldX = screenX / z + scrollX
-worldY = screenY / z + scrollY
+const worldPoint = camera.getWorldPoint(screenX, screenY);
 
 screenX = (worldX - scrollX) * z
 screenY = (worldY - scrollY) * z
 ```
 
-Always prefer Phaser's built-in helpers over computing these manually:
-
-```typescript
-// screen → world:
-const worldPoint = camera.getWorldPoint(screenX, screenY);
-
-// pointer events: Phaser provides worldX/worldY automatically
-const worldX = pointer.worldX;
-```
+Always prefer Phaser's built-in helper `camera.getWorldPoint` over computing the screen divided by the zoom manually.
 
 ### World ↔ Grid (Overworld)
 
