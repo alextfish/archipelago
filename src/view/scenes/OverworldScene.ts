@@ -115,9 +115,13 @@ export class OverworldScene extends Phaser.Scene {
     });
 
     // Load player sprite
-    this.load.spritesheet('builder', 'resources/builder.png', {
+    this.load.spritesheet('player', 'resources/sprites/Vasily.png', {
       frameWidth: 32,
       frameHeight: 32
+    });
+    this.load.spritesheet('player_face', 'resources/sprites/faces/Vasily neutral.png', {
+      frameWidth: 96,
+      frameHeight: 96
     });
 
     // Load NPC sprites
@@ -349,7 +353,7 @@ export class OverworldScene extends Phaser.Scene {
     const playerStart = this.findPlayerStartPosition();
 
     // Create player sprite
-    this.player = this.physics.add.sprite(playerStart.x, playerStart.y, 'builder', 0);
+    this.player = this.physics.add.sprite(playerStart.x, playerStart.y, 'player', 0);
     this.player.setCollideWorldBounds(true);
 
     // Add test marker for player

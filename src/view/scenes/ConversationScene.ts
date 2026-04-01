@@ -503,7 +503,7 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         // Create player portrait (top right)
         // TODO: Get player sprite key from game state
         this.playerPortrait = this.createPortrait(
-            'builder', // Player sprite key
+            'player_face', // Player sprite key
             0, // neutral frame
             this.scale.width - this.PORTRAIT_PADDING - (32 * this.PORTRAIT_SCALE),
             this.PORTRAIT_PADDING

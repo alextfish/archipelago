@@ -75,46 +75,60 @@ export class PlayerController {
      * Create animations for player character
      */
     private createPlayerAnimations(): void {
-        // Walking down animations (frames 1-3, but Phaser is 0-indexed so 0-2)
-        this.scene.anims.create({
-            key: 'walk-down',
-            frames: this.scene.anims.generateFrameNumbers('builder', { start: 0, end: 2 }),
-            frameRate: 8,
-            repeat: -1
-        });
-
-        // Walking right animations (frames 4-6, so 3-5 in 0-indexed)
-        this.scene.anims.create({
-            key: 'walk-right',
-            frames: this.scene.anims.generateFrameNumbers('builder', { start: 3, end: 5 }),
-            frameRate: 8,
-            repeat: -1
-        });
-
-        // Walking up animations (frames 7-9, so 6-8 in 0-indexed)
+        // Walking up animations (frames 0-2)
         this.scene.anims.create({
             key: 'walk-up',
-            frames: this.scene.anims.generateFrameNumbers('builder', { start: 6, end: 8 }),
+            frames: this.scene.anims.generateFrameNumbers('player', { start: 0, end: 2 }),
+            frameRate: 8,
+            repeat: -1
+        });
+
+        // Walking right animations (frames 3-5)
+        this.scene.anims.create({
+            key: 'walk-right',
+            frames: this.scene.anims.generateFrameNumbers('player', { start: 3, end: 5 }),
+            frameRate: 8,
+            repeat: -1
+        });
+
+        // Walking down animations (frames 6-8)
+        this.scene.anims.create({
+            key: 'walk-down',
+            frames: this.scene.anims.generateFrameNumbers('player', { start: 6, end: 8 }),
+            frameRate: 8,
+            repeat: -1
+        });
+
+        // Walking left animations (frames 9-11)
+        this.scene.anims.create({
+            key: 'walk-left',
+            frames: this.scene.anims.generateFrameNumbers('player', { start: 9, end: 11 }),
             frameRate: 8,
             repeat: -1
         });
 
         // Idle frames (first frame of each direction)
         this.scene.anims.create({
-            key: 'idle-down',
-            frames: [{ key: 'builder', frame: 0 }],
+            key: 'idle-up',
+            frames: [{ key: 'player', frame: 0 }],
             frameRate: 1
         });
 
         this.scene.anims.create({
             key: 'idle-right',
-            frames: [{ key: 'builder', frame: 3 }],
+            frames: [{ key: 'player', frame: 3 }],
             frameRate: 1
         });
 
         this.scene.anims.create({
-            key: 'idle-up',
-            frames: [{ key: 'builder', frame: 6 }],
+            key: 'idle-down',
+            frames: [{ key: 'player', frame: 6 }],
+            frameRate: 1
+        });
+
+        this.scene.anims.create({
+            key: 'idle-left',
+            frames: [{ key: 'player', frame: 9 }],
             frameRate: 1
         });
     }
@@ -452,11 +466,9 @@ export class PlayerController {
 
         // Horizontal movement animations
         if (velX < 0) {
-            this.player.setFlipX(true);
-            this.player.anims.play('walk-right', true);
+            this.player.anims.play('walk-left', true);
             this.facingDirection = 'left';
         } else if (velX > 0) {
-            this.player.setFlipX(false);
             this.player.anims.play('walk-right', true);
             this.facingDirection = 'right';
         }
@@ -477,6 +489,8 @@ export class PlayerController {
                 const currentAnim = this.player.anims.currentAnim.key;
                 if (currentAnim.includes('up')) {
                     this.player.anims.play('idle-up', true);
+                } else if (currentAnim.includes('left')) {
+                    this.player.anims.play('idle-left', true);
                 } else if (currentAnim.includes('right')) {
                     this.player.anims.play('idle-right', true);
                 } else {
