@@ -5,6 +5,7 @@ This document describes the architectural structure, design principles, and orga
 > For AI agent-specific guidelines and instructions, see [AGENTS.md](AGENTS.md).
 > For specific documentation about the puzzle series system, see [PUZZLE_SERIES_ARCHITECTURE.md](PUZZLE_SERIES_ARCHITECTURE.md).
 > For the Translation Mode (player glyph-notebook) feature, see [TRANSLATION_MODE_ARCHITECTURE.md](TRANSLATION_MODE_ARCHITECTURE.md).
+> For coordinate systems, camera zoom levels, and screen/world coordinate mappings, see [COORDINATES.md](COORDINATES.md).
 
 ## Table of Contents
 
