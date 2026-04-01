@@ -14,6 +14,7 @@ This document contains specific instructions and guidelines for AI coding agents
 **Documentation**:
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Comprehensive architecture guide
 - [PUZZLE_SERIES_ARCHITECTURE.md](PUZZLE_SERIES_ARCHITECTURE.md) - Puzzle series system details
+- [COORDINATES.md](COORDINATES.md) - Coordinate systems, camera zoom levels, and screen/world mappings
 
 ## Essential Architectural Constraints
 
