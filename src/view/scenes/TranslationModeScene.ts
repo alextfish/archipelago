@@ -166,6 +166,7 @@ export class TranslationModeScene extends Phaser.Scene {
         if (!this.glyphTracker || !this.translationDict) return;
 
         const allBounds = this.glyphTracker.getAllGlyphBounds();
+        console.log(`TranslationModeScene building highlights for ${allBounds.length} glyph(s)`);
 
         for (const bounds of allBounds) {
             const { screenX, screenY, tileSize, frameIndex } = bounds;
@@ -173,6 +174,7 @@ export class TranslationModeScene extends Phaser.Scene {
             const y = screenY - HIGHLIGHT_PADDING;
             const w = tileSize + HIGHLIGHT_PADDING * 2;
             const h = tileSize + HIGHLIGHT_PADDING * 2;
+            console.log(` - Glyph frame ${frameIndex} at (${screenX.toFixed(1)}, ${screenY.toFixed(1)}), highlight rect (${x.toFixed(1)}, ${y.toFixed(1)}, ${w.toFixed(1)}, ${h.toFixed(1)})`);
 
             // Yellow highlight rectangle around the glyph
             const rect = this.add.rectangle(x, y, w, h);

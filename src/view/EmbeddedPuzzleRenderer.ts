@@ -12,6 +12,7 @@ import { ConstraintFeedbackDisplay } from './ConstraintFeedbackDisplay';
 import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
 import type { ConstraintDisplayItem } from '@model/puzzle/constraints/ConstraintDisplayItem';
 import { parseNumBridgesConstraint } from '@model/puzzle/Island';
+import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
 
 /**
  * Puzzle renderer that works embedded within the overworld scene
@@ -37,6 +38,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     private isPlacing: boolean = false;
     private feedbackDisplay: ConstraintFeedbackDisplay | null = null;
     private glyphRegistry: LanguageGlyphRegistry = new LanguageGlyphRegistry();
+    private glyphTracker: ActiveGlyphTracker | null = null;
 
     constructor(
         scene: Phaser.Scene,
@@ -60,6 +62,13 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
         // Create container for all puzzle graphics
         this.puzzleContainer = scene.add.container(0, 0);
         this.puzzleContainer.setDepth(100); // Above overworld graphics
+    }
+
+    setGlyphTracker(tracker: ActiveGlyphTracker): void {
+        this.glyphTracker = tracker;
+        if (this.feedbackDisplay) {
+            this.feedbackDisplay.setGlyphTracker(tracker);
+        }
     }
 
     init(puzzle: BridgePuzzle): void {
@@ -591,6 +600,9 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
                 this.npcSpriteKey,
                 this.constraintNPCs,
             );
+            if (this.glyphTracker) {
+                this.feedbackDisplay.setGlyphTracker(this.glyphTracker);
+            }
         }
         this.feedbackDisplay.update(items, puzzle);
     }

@@ -109,6 +109,9 @@ export class OverworldPuzzleController {
                 ? new FlowPuzzleRenderer(this.scene, boundsRect, 'sprout-tiles')
                 : new EmbeddedPuzzleRenderer(this.scene, boundsRect, 'sprout-tiles');
 
+            // Inject glyph tracker so constraint speech bubbles register for Translation Mode
+            this.puzzleRenderer.setGlyphTracker(this.gameState.glyphTracker);
+
             // Create puzzle controller with host callbacks
             this.activePuzzleController = new PuzzleController(
                 puzzle,

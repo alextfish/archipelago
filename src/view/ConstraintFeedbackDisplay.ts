@@ -16,6 +16,7 @@ import type { ConstraintDisplayItem } from '@model/puzzle/constraints/Constraint
 import type { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
 import { SpeechBubble } from './conversation/SpeechBubble';
 import type { GridToWorldMapper } from './GridToWorldMapper';
+import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
 
 export class ConstraintFeedbackDisplay {
   private scene: Phaser.Scene;
@@ -29,6 +30,7 @@ export class ConstraintFeedbackDisplay {
 
   private originalNPCTextures: Map<string, string> = new Map();
   private speechBubbles: SpeechBubble[] = [];
+  private glyphTracker: ActiveGlyphTracker | null = null;
 
   constructor(
     scene: Phaser.Scene,
@@ -50,6 +52,10 @@ export class ConstraintFeedbackDisplay {
     this.depth = depth;
   }
 
+  setGlyphTracker(tracker: ActiveGlyphTracker): void {
+    this.glyphTracker = tracker;
+  }
+
   /**
    * Show or update the feedback for the given display items.
    * Updates existing NPC sprite expressions and creates speech bubbles.
@@ -67,7 +73,7 @@ export class ConstraintFeedbackDisplay {
 
       // Determine if constraint is satisfied (glyphMessage is "good" when satisfied)
       const isSatisfied = item.glyphMessage.trim() === 'good';
-      
+
       // Update existing NPC sprite texture to show appropriate expression
       const existingNPC = this.existingNPCSprites.get(island.id);
       if (existingNPC) {
@@ -75,19 +81,22 @@ export class ConstraintFeedbackDisplay {
         if (!this.originalNPCTextures.has(island.id)) {
           this.originalNPCTextures.set(island.id, existingNPC.texture.key);
         }
-        
+
         // Choose NPC sprite based on constraint type
         const baseSprite = item.constraintType === 'IslandBridgeCountConstraint' ? 'Ruby' : 'sailorNS';
-        
+
         // Choose expression based on satisfaction: happy if satisfied, frown if not
         const spriteKey = isSatisfied ? `${baseSprite} happy` : `${baseSprite} frown`;
-        
+
         // Update the texture of the existing sprite
         existingNPC.setTexture(spriteKey, 0);
       }
 
       // Speech bubble — aligned with island horizontally, offset up by bubble height + extra spacing
       const bubble = new SpeechBubble(this.scene, this.tilesetKey);
+      if (this.glyphTracker) {
+        bubble.setGlyphTracker(this.glyphTracker);
+      }
       const glyphFrames = this.glyphRegistry.parseGlyphs(this.language, item.glyphMessage);
       bubble.create(glyphFrames, this.language, this.glyphRegistry, 1);
       bubble.setPosition(worldPos.x + cellSize, worldPos.y - cellSize / 2);

@@ -101,7 +101,10 @@ export class CameraManager {
 
         // Create transition promise
         return new Promise<void>((resolve) => {
-            // Pan to center of puzzle
+            // Pan to center of puzzle.
+            // camera.pan() tracks the world centre dynamically each frame as
+            // zoom changes, so it correctly centres on the target point even
+            // while zoomTo() is animating simultaneously.
             camera.pan(centerX, centerY, duration, 'Power2', false, (_camera, progress) => {
                 if (progress === 1) {
                     resolve();

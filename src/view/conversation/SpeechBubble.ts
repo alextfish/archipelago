@@ -201,19 +201,37 @@ export class SpeechBubble {
         if (this.glyphSprites.length === 0) {
             return null;
         }
-        const scale = this.container.scaleX;
-        const scaledTile = this.currentTileSize * scale;
         const matrix = this.container.getWorldTransformMatrix();
+        const camera = this.scene.cameras.main;
+
+        // Diagnostics: log camera state once per call
+        console.log(
+            `[SpeechBubble.getGlyphScreenBounds] scene=${this.scene.sys.settings.key}` +
+            ` zoom=${camera.zoom.toFixed(3)}` +
+            ` scroll=(${camera.scrollX.toFixed(1)},${camera.scrollY.toFixed(1)})` +
+            ` cam.xy=(${camera.x},${camera.y})` +
+            ` matrix.a=${matrix.a.toFixed(3)} tx=${matrix.tx.toFixed(1)}`
+        );
+
+        // Tile size in screen pixels: base size × world-space scale × camera zoom
+        const screenTileSize = this.currentTileSize * matrix.a * camera.zoom;
+
         return this.glyphSprites.map((sprite, i) => {
-            // Compute screen position of the sprite's top-left corner
-            const screenX = matrix.tx + sprite.x * matrix.a + sprite.y * matrix.c;
-            const screenY = matrix.ty + sprite.x * matrix.b + sprite.y * matrix.d;
+            // World position of the sprite's top-left corner
+            const worldX = matrix.tx + sprite.x * matrix.a + sprite.y * matrix.c;
+            const worldY = matrix.ty + sprite.x * matrix.b + sprite.y * matrix.d;
+            // Project world coordinates to viewport (screen) coordinates
+            const screenX = (worldX - camera.scrollX) * camera.zoom + camera.x;
+            const screenY = (worldY - camera.scrollY) * camera.zoom + camera.y;
+            if (i === 0) {
+                console.log(`  sprite[0] world=(${worldX.toFixed(1)},${worldY.toFixed(1)}) screen=(${screenX.toFixed(1)},${screenY.toFixed(1)})`);
+            }
             return {
                 frameIndex: this.glyphFrameIndices[i],
                 indexInBubble: i,
                 screenX,
                 screenY,
-                tileSize: scaledTile,
+                tileSize: screenTileSize,
             };
         });
     }

@@ -79,7 +79,7 @@ async function runTest() {
 
         // Wait for choice button to appear and click "I'll help"
         console.log('[TEST] Waiting for choice button: I\'ll help');
-        await page.waitForTimeout(1000); // Brief pause for UI
+        await page.waitForTimeout(100); // Brief pause for UI
 
         const choiceButton = await page.$('[data-testid="choice-i-ll-help"]');
         if (!choiceButton) {
@@ -91,7 +91,7 @@ async function runTest() {
 
         // Wait for next conversation node (helpAccepted)
         console.log('[TEST] Waiting for second conversation node...');
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
 
         // Click "Build" choice to start the series
         console.log('[TEST] Waiting for choice button: Build');

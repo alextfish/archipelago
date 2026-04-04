@@ -182,6 +182,10 @@ export class IslandMapScene extends Phaser.Scene {
         bridgeScene.events.emit('islandMapReadyForCamera');
     }
 
+    getGridMapper(): GridToWorldMapper | null {
+        return this.gridMapper;
+    }
+
     private initializeRenderer() {
         if (!this.puzzle) return;
 

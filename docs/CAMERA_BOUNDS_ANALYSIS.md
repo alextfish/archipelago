@@ -176,14 +176,8 @@ The variables are identical, so `worldDeltaX = worldDeltaY = 0`. The nudge is de
 **⚠︎ Zoom uses full `scale.width/height`, ignoring HUD overlay.**  
 `PuzzleHUDScene` overlays the bottom/side of the screen. `adjustCameraForIslands()` uses full canvas dimensions, so the computed zoom factor and centering do not account for HUD-occupied area. Puzzles may be partially occluded.
 
-**⚠︎ `BridgePuzzleScene.gridMapperProxy` duplicates IslandMapScene's mapping.**  
-```ts
-gridMapperProxy = {
-    gridToWorld: (gridX, gridY) => ({ x: gridX * 32, y: gridY * 32 }),
-    worldToGrid: (worldX, worldY) => ({ x: Math.floor(worldX / 32), y: Math.floor(worldY / 32) })
-};
-```
-This hardcodes `cellSize=32` and `offset=(0,0)`, mirroring `IslandMapScene`'s `new GridToWorldMapper(32)`. If IslandMapScene ever changes its offset (e.g., to account for HUD or centering), the proxy would silently diverge, breaking coordinate round-trips.
+**✓ `BridgePuzzleScene.gridMapperProxy` — fixed.**  
+The proxy previously hardcoded `cellSize=32` in plain arithmetic lambdas, silently duplicating `IslandMapScene`'s `GridToWorldMapper`. Fixed by adding a `getGridMapper()` public getter to `IslandMapScene` and having the proxy delegate all three methods (`gridToWorld`, `worldToGrid`, `getCellSize`) to the real mapper instance, with a `?? 32` fallback for the brief window before the mapper is initialised. The cell size now lives in exactly one place.
 
 **⚠︎ Input events can be lost if `IslandMapScene` is not yet ready.**  
 `BridgePuzzleScene` fires `screenToWorld` / `worldToGrid` events before `islandMapReady` is guaranteed. Early pointer events find no listener and are silently dropped.
@@ -209,6 +203,6 @@ This hardcodes `cellSize=32` and `offset=(0,0)`, mirroring `IslandMapScene`'s `n
 3. **Account for HUD space in zoom calculations.** Both `CameraManager.calculatePuzzleView()` and `IslandMapScene.adjustCameraForIslands()` should subtract the HUD's on-screen rectangle from the available canvas area before computing zoom and centre.
 4. **Set camera bounds in `IslandMapScene`** after computing the island extent, with some padding.
 5. **Fix or remove the dead nudge code** in `IslandMapScene.adjustCameraForIslands()`.
-6. **Replace `BridgePuzzleScene.gridMapperProxy`** with a proper reference to IslandMapScene's `GridToWorldMapper` instance (passed through an event or direct scene reference).
+6. ✓ **`BridgePuzzleScene.gridMapperProxy`** now delegates to `IslandMapScene.getGridMapper()` so the cell size lives in one place.
 7. **Swap order in `enterPuzzle`**: call `storeCameraState()` before `onModeChange('puzzle')` (before `stopFollow()`) to honour the documented contract.
 8. **`originalBounds` dead code**: replace the `Phaser.Geom.Rectangle` sentinel with a `private hasStoredState: boolean` field to clarify intent.

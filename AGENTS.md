@@ -82,18 +82,19 @@ The player's state can be:
 - Solving an overworld puzzle on a puzzle version of the overworld view
 - Talking to an NPC
 - Solving a BridgePuzzle on a separate screen
+- Translating in-game language on the translation mode overlay
 
 When the player solves an overworld puzzle, the bridges are added to the OverworldScene's collisionArray to make them walkable. The map read from Tiled contains a "collision" layer which we **NEVER CHANGE**.
 
 ### Source Control
 
-We use git. **AI agents NEVER COMMIT TO GIT directly.** The human developer makes git commits and pushes. You can use git to revert or stash changes if needed, but never commit. However you are encouraged to read git logs to understand recent commits.
+We use git. **AI agents ONLY commit to git when explicitly instructed.** The human developer makes git commits and pushes. You can use git to revert or stash changes if needed, but never commit unless specifically explicitly told to. However you are encouraged to read git logs to understand recent commits.
 
 ## Testing Best Practices
 
 ### Playwright E2E Tests
 
-**CRITICAL: Playwright tests are slow and synchronous. Optimise for efficiency:**
+CRITICAL: Playwright tests are slow and synchronous. Optimise for efficiency:
 
 1. **Run once, grep multiple times**: Playwright tests take 15-60+ seconds to complete
    - Run the test ONCE, save output to a file, and search that file: `node test/e2e/test-name.mjs 2>&1 | Out-File test-output.txt -Encoding utf8; Get-Content test-output.txt | Select-String -Pattern "bridge"`

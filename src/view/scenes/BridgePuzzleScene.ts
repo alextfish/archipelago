@@ -5,6 +5,7 @@ import type { PuzzleHost } from '@controller/PuzzleHost';
 import { Environment } from '@helpers/Environment';
 import { emitTestEvent } from '@helpers/TestEvents';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
+import type { IslandMapScene } from '@view/scenes/IslandMapScene';
 
 export class BridgePuzzleScene extends Phaser.Scene {
     private puzzle: BridgePuzzle | null = null;
@@ -182,21 +183,20 @@ export class BridgePuzzleScene extends Phaser.Scene {
     }
 
     private createRendererProxy() {
-        const mapScene = this.scene.get('IslandMapScene');
+        const mapScene = this.scene.get('IslandMapScene') as IslandMapScene;
 
-        // Create a mock gridMapper that forwards coordinate conversion to IslandMapScene
+        // Delegate grid-to-world mapping to IslandMapScene's own GridToWorldMapper so
+        // the cell size and any offset are never duplicated here.
         const gridMapperProxy = {
             gridToWorld: (gridX: number, gridY: number) => {
-                // This needs to be synchronous, so we'll use a temporary solution
-                // For now, let's use the 32px cell size directly (matching IslandMapScene)
-                const cellSize = 32;
-                return { x: gridX * cellSize, y: gridY * cellSize };
+                return mapScene.getGridMapper()?.gridToWorld(gridX, gridY)
+                    ?? { x: gridX * 32, y: gridY * 32 };
             },
             worldToGrid: (worldX: number, worldY: number) => {
-                const cellSize = 32;
-                return { x: Math.floor(worldX / cellSize), y: Math.floor(worldY / cellSize) };
+                return mapScene.getGridMapper()?.worldToGrid(worldX, worldY)
+                    ?? { x: Math.floor(worldX / 32), y: Math.floor(worldY / 32) };
             },
-            getCellSize: () => 32
+            getCellSize: () => mapScene.getGridMapper()?.getCellSize() ?? 32
         };
 
         return {
