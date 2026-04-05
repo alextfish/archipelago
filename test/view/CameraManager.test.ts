@@ -35,6 +35,11 @@ describe('CameraManager', () => {
         mockScene = {
             cameras: {
                 main: mockCamera
+            },
+            tweens: {
+                add: vi.fn(({ onComplete }: { onComplete?: () => void }) => {
+                    if (onComplete) onComplete();
+                })
             }
         };
 
@@ -115,7 +120,7 @@ describe('CameraManager', () => {
             await cameraManager.transitionToOverworld();
 
             // Should zoom back to original zoom (panning is handled by camera follow, not by CameraManager)
-            expect(mockCamera.zoomTo).toHaveBeenCalledWith(1, 1000, 'Power2', false, expect.any(Function));
+            expect(mockCamera.zoomTo).toHaveBeenCalledWith(1, 1000, 'Power2');
         });
     });
 

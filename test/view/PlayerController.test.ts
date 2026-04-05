@@ -124,9 +124,8 @@ describe('PlayerController', () => {
             expect(mockPlayer.setVelocity).toHaveBeenCalled();
             // Velocity should be negative X
             expect(mockPlayer.body.velocity.x).toBeLessThan(0);
-            // Should flip sprite and play walking animation
-            expect(mockPlayer.setFlipX).toHaveBeenCalledWith(true);
-            expect(mockPlayer.anims.play).toHaveBeenCalledWith('walk-right', true);
+            // Should play left walking animation
+            expect(mockPlayer.anims.play).toHaveBeenCalledWith('walk-left', true);
         });
 
         it('should move player right when right cursor is pressed', () => {
@@ -135,8 +134,7 @@ describe('PlayerController', () => {
             expect(mockPlayer.setVelocity).toHaveBeenCalled();
             // Velocity should be positive X
             expect(mockPlayer.body.velocity.x).toBeGreaterThan(0);
-            // Should not flip sprite and play walking animation
-            expect(mockPlayer.setFlipX).toHaveBeenCalledWith(false);
+            // Should play right walking animation
             expect(mockPlayer.anims.play).toHaveBeenCalledWith('walk-right', true);
         });
 
