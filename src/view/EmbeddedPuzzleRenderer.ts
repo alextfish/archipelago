@@ -120,7 +120,6 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
                     npc.setDepth(101);
                     this.puzzleContainer.add(npc);
                     this.strutBridgeNPCs.set(bridge.id, npc);
-                    this.constraintNPCs.set(bridge.id, npc);
                 } else {
                     npc.setPosition(worldPos.x, worldPos.y);
                 }
@@ -129,7 +128,6 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
                 const npc = this.strutBridgeNPCs.get(bridge.id);
                 if (npc) {
                     npc.setVisible(false);
-                    this.constraintNPCs.delete(bridge.id);
                 }
             }
         }
@@ -193,7 +191,10 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
             npc.destroy();
         }
         this.constraintNPCs.clear();
-        // strutBridgeNPCs sprites are also in constraintNPCs and destroyed above
+        // Destroy strut bridge NPCs (managed separately from constraintNPCs)
+        for (const npc of this.strutBridgeNPCs.values()) {
+            npc.destroy();
+        }
         this.strutBridgeNPCs.clear();
 
         // Destroy all constraint number sprites

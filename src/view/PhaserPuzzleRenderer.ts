@@ -149,9 +149,9 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
         if (!npc) {
           npc = this.scene.add.sprite(worldPos.x, worldPos.y, 'sailorNS', 0)
             .setOrigin(0, 0)
+            .setDepth(101)
             .setScale(scale, scale);
           this.strutBridgeNPCs.set(bridge.id, npc);
-          this.constraintNPCs.set(bridge.id, npc);
         } else {
           npc.setPosition(worldPos.x, worldPos.y);
         }
@@ -160,7 +160,6 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
         const npc = this.strutBridgeNPCs.get(bridge.id);
         if (npc) {
           npc.setVisible(false);
-          this.constraintNPCs.delete(bridge.id);
         }
       }
     }
@@ -611,7 +610,9 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
       npc.destroy();
     }
     this.constraintNPCs.clear();
-    // strutBridgeNPCs sprites are also in constraintNPCs and destroyed above
+    for (const npc of this.strutBridgeNPCs.values()) {
+      npc.destroy();
+    }
     this.strutBridgeNPCs.clear();
     for (const num of this.constraintNumbers.values()) {
       num.destroy();
