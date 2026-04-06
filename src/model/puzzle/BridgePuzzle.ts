@@ -4,7 +4,9 @@ import type { Island } from "./Island";
 import type { Constraint } from "./constraints/Constraint";
 import { createConstraintsFromSpec } from './constraints/createConstraintsFromSpec';
 import { BridgeLengthConstraint } from './constraints/BridgeLengthConstraint';
+import { BridgeMustCoverIslandConstraint } from './constraints/BridgeMustCoverIslandConstraint';
 import { createBridgeType, type BridgeType } from "./BridgeType";
+import { StrutBridge } from './StrutBridge';
 
 export interface BridgeTypeSpec {
   id: string;
@@ -13,6 +15,7 @@ export interface BridgeTypeSpec {
   count?: number;
   width?: number;
   style?: string;
+  mustCoverIsland?: boolean;
 }
 
 export interface PuzzleSpec { // can be loaded from JSON
@@ -47,7 +50,8 @@ export class BridgePuzzle {
           colour: spec.colour,
           length: spec.length,
           width: spec.width,
-          style: spec.style
+          style: spec.style,
+          mustCoverIsland: spec.mustCoverIsland,
         }),
         count: spec.count ?? 1
       }));
@@ -63,11 +67,18 @@ export class BridgePuzzle {
       const hasSpecConstraints = Array.isArray(spec.constraints) && spec.constraints.length > 0;
       if (!hasSpecConstraints) {
         for (const bt of bridgeTypes) {
+          if (bt.mustCoverIsland) continue; // strut bridges get per-bridge constraint, not length constraint
           const len = (bt.length === undefined) ? -1 : bt.length ?? -1;
           if (len !== -1) {
             // add a constraint enforcing this bridge type's fixed length
             this.constraints.push(BridgeLengthConstraint.fromSpec({ typeId: bt.id, length: len }));
           }
+        }
+      }
+      // Always add one BridgeMustCoverIslandConstraint per StrutBridge instance
+      for (const bridge of this.inventory.bridges) {
+        if (bridge instanceof StrutBridge) {
+          this.constraints.push(new BridgeMustCoverIslandConstraint(bridge.id));
         }
       }
   }
@@ -255,7 +266,56 @@ export class BridgePuzzle {
     }
     return foundBridges;
   }
-}
 
+  /**
+   * Parse a Tiled "bridges" property string into BridgeTypeSpecs.
+   *
+   * Each entry is a length optionally followed by '+' to denote a StrutBridge
+   * (e.g. "3,2,3+,4+"). Duplicate lengths are counted and collapsed into a
+   * single spec with the appropriate count.  StrutBridge entries receive
+   * `mustCoverIsland: true` and use an id prefixed with "strut_".
+   *
+   * @param bridges - Comma-separated bridge entries, e.g. "3,2,3+,4+"
+   * @param colour  - Colour to apply to all created bridge types
+   */
+  static parseBridgesString(bridges: string, colour: string = '#8B4513'): BridgeTypeSpec[] {
+    const normalCounts = new Map<number, number>();
+    const strutCounts = new Map<number, number>();
+
+    for (const raw of bridges.split(',')) {
+      const part = raw.trim();
+      if (!part) continue;
+
+      if (part.endsWith('+')) {
+        const len = parseInt(part.slice(0, -1), 10);
+        if (!Number.isFinite(len)) continue;
+        strutCounts.set(len, (strutCounts.get(len) ?? 0) + 1);
+      } else {
+        const len = parseInt(part, 10);
+        if (!Number.isFinite(len)) continue;
+        normalCounts.set(len, (normalCounts.get(len) ?? 0) + 1);
+      }
+    }
+
+    const result: BridgeTypeSpec[] = [];
+
+    for (const [length, count] of normalCounts) {
+      result.push({ id: `fixed_${length}`, colour, length, count, width: 1, style: 'wooden' });
+    }
+    for (const [length, count] of strutCounts) {
+      result.push({
+        id: `strut_${length}`,
+        colour,
+        length,
+        count,
+        width: 1,
+        style: 'wooden',
+        mustCoverIsland: true,
+      });
+    }
+
+    return result;
+  }
+}
 
 

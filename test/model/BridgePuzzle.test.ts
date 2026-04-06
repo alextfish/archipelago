@@ -2,6 +2,8 @@ import { describe, expect, it, beforeEach } from "vitest";
 import type { Island } from "@model/puzzle/Island";
 import type { BridgeTypeSpec, PuzzleSpec } from "@model/puzzle/BridgePuzzle";
 import { BridgePuzzle } from "@model/puzzle/BridgePuzzle";
+import { StrutBridge } from "@model/puzzle/StrutBridge";
+import { BridgeMustCoverIslandConstraint } from "@model/puzzle/constraints/BridgeMustCoverIslandConstraint";
 
 describe("BridgePuzzle", () => {
   let mockIslands: Island[];
@@ -150,6 +152,126 @@ describe("BridgePuzzle", () => {
 
       expect(puzzle.couldPlaceBridgeAt("island1", "island2")).toBe(true);
       expect(puzzle.couldPlaceBridgeAt("island1", "nonexistent")).toBe(false);
+    });
+  });
+
+  describe("parseBridgesString", () => {
+    it("should parse plain lengths into normal bridge type specs", () => {
+      const specs = BridgePuzzle.parseBridgesString("3,2,4");
+      expect(specs).toHaveLength(3);
+      expect(specs.find(s => s.id === "fixed_3")).toMatchObject({ length: 3, count: 1 });
+      expect(specs.find(s => s.id === "fixed_2")).toMatchObject({ length: 2, count: 1 });
+      expect(specs.find(s => s.id === "fixed_4")).toMatchObject({ length: 4, count: 1 });
+    });
+
+    it("should group duplicate lengths into a single spec with the combined count", () => {
+      const specs = BridgePuzzle.parseBridgesString("3,3,3");
+      expect(specs).toHaveLength(1);
+      expect(specs[0]).toMatchObject({ id: "fixed_3", length: 3, count: 3 });
+    });
+
+    it("should parse '+' entries as strut bridge specs with mustCoverIsland:true", () => {
+      const specs = BridgePuzzle.parseBridgesString("3+,4+");
+      expect(specs).toHaveLength(2);
+      expect(specs.find(s => s.id === "strut_3")).toMatchObject({
+        length: 3,
+        count: 1,
+        mustCoverIsland: true,
+      });
+      expect(specs.find(s => s.id === "strut_4")).toMatchObject({
+        length: 4,
+        count: 1,
+        mustCoverIsland: true,
+      });
+    });
+
+    it("should group duplicate strut lengths into a single spec", () => {
+      const specs = BridgePuzzle.parseBridgesString("3+,3+");
+      expect(specs).toHaveLength(1);
+      expect(specs[0]).toMatchObject({ id: "strut_3", length: 3, count: 2, mustCoverIsland: true });
+    });
+
+    it("should handle mixed normal and strut bridges", () => {
+      const specs = BridgePuzzle.parseBridgesString("3,2,3+,4+");
+      const ids = specs.map(s => s.id).sort();
+      expect(ids).toEqual(["fixed_2", "fixed_3", "strut_3", "strut_4"]);
+      expect(specs.find(s => s.id === "fixed_3")).not.toHaveProperty("mustCoverIsland", true);
+      expect(specs.find(s => s.id === "strut_3")).toMatchObject({ mustCoverIsland: true });
+    });
+
+    it("should apply the supplied colour to all specs", () => {
+      const specs = BridgePuzzle.parseBridgesString("3,4+", "#ff0000");
+      for (const spec of specs) {
+        expect(spec.colour).toBe("#ff0000");
+      }
+    });
+
+    it("should use default colour when none is supplied", () => {
+      const specs = BridgePuzzle.parseBridgesString("3");
+      expect(specs[0].colour).toBe("#8B4513");
+    });
+
+    it("should ignore blank segments", () => {
+      const specs = BridgePuzzle.parseBridgesString("3, ,2");
+      expect(specs).toHaveLength(2);
+    });
+  });
+
+  describe("StrutBridge construction", () => {
+    it("should create StrutBridge instances for bridge types with mustCoverIsland", () => {
+      const spec: PuzzleSpec = {
+        id: "strut-test",
+        size: { width: 10, height: 5 },
+        islands: [],
+        bridgeTypes: [{ id: "strut_3", length: 3, count: 2, mustCoverIsland: true }],
+        constraints: [],
+        maxNumBridges: 2,
+      };
+      const puzzle = new BridgePuzzle(spec);
+      const strutBridges = puzzle.bridges.filter(b => b instanceof StrutBridge);
+      expect(strutBridges).toHaveLength(2);
+    });
+
+    it("should not create StrutBridge instances for normal bridge types", () => {
+      const puzzle = new BridgePuzzle(puzzleSpec);
+      const strutBridges = puzzle.bridges.filter(b => b instanceof StrutBridge);
+      expect(strutBridges).toHaveLength(0);
+    });
+
+    it("should add a BridgeMustCoverIslandConstraint for each StrutBridge", () => {
+      const spec: PuzzleSpec = {
+        id: "strut-test",
+        size: { width: 10, height: 5 },
+        islands: [],
+        bridgeTypes: [{ id: "strut_3", length: 3, count: 2, mustCoverIsland: true }],
+        constraints: [],
+        maxNumBridges: 2,
+      };
+      const puzzle = new BridgePuzzle(spec);
+      const strutConstraints = puzzle.constraints.filter(
+        c => c instanceof BridgeMustCoverIslandConstraint
+      );
+      expect(strutConstraints).toHaveLength(2);
+    });
+
+    it("should create puzzle with mixed normal and strut bridges from parseBridgesString", () => {
+      const bridgeTypes = BridgePuzzle.parseBridgesString("3,2,3+,4+");
+      const spec: PuzzleSpec = {
+        id: "mixed-test",
+        size: { width: 10, height: 10 },
+        islands: [],
+        bridgeTypes,
+        constraints: [],
+        maxNumBridges: 2,
+      };
+      const puzzle = new BridgePuzzle(spec);
+      expect(puzzle.bridges).toHaveLength(4);
+      const strutBridges = puzzle.bridges.filter(b => b instanceof StrutBridge);
+      expect(strutBridges).toHaveLength(2);
+      const strutConstraints = puzzle.constraints.filter(
+        c => c instanceof BridgeMustCoverIslandConstraint
+      );
+      expect(strutConstraints).toHaveLength(2);
     });
   });
 });

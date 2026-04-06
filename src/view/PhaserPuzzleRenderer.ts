@@ -13,6 +13,7 @@ import { BridgeSpriteFrames, BridgeVisualConstants } from "./BridgeSpriteFrameRe
 import { ConstraintFeedbackDisplay } from "./ConstraintFeedbackDisplay";
 import { LanguageGlyphRegistry } from "@model/conversation/LanguageGlyphRegistry";
 import type { ConstraintDisplayItem } from "@model/puzzle/constraints/ConstraintDisplayItem";
+import { StrutBridge } from "@model/puzzle/StrutBridge";
 
 export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
   private scene: Phaser.Scene;
@@ -30,6 +31,7 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
   private islandGraphics: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private islandLabels: Map<string, Phaser.GameObjects.Text> = new Map();
   private constraintNPCs: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  private strutBridgeNPCs: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private constraintNumbers: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private bridgeGraphics: Map<string, Phaser.GameObjects.Container> = new Map();
   private previewGraphics: Phaser.GameObjects.Container | Phaser.GameObjects.RenderTexture | null = null;
@@ -126,6 +128,41 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
     for (const g of bridgeGroups.values()) {
       // Render grouped placed bridges using the unified renderTiledBridge API
       this.renderTiledBridge({ start: g.start, end: g.end, target: 'placed', useEdges: true, bridgeIds: g.ids });
+    }
+
+    // Manage StrutBridge NPCs: show when placed, hide when not
+    this.updateStrutBridgeNPCs(puzzle);
+  }
+
+  private updateStrutBridgeNPCs(puzzle: BridgePuzzle): void {
+    const scale = this.gridMapper.getCellSize() / 32;
+
+    for (const bridge of puzzle.bridges) {
+      if (!(bridge instanceof StrutBridge)) continue;
+
+      if (bridge.start && bridge.end) {
+        const strutLoc = bridge.getStrutLocation(puzzle);
+        if (!strutLoc) continue;
+        const worldPos = this.gridMapper.gridToWorld(strutLoc.x, strutLoc.y);
+
+        let npc = this.strutBridgeNPCs.get(bridge.id);
+        if (!npc) {
+          npc = this.scene.add.sprite(worldPos.x, worldPos.y, 'sailorNS', 0)
+            .setOrigin(0, 0)
+            .setScale(scale, scale);
+          this.strutBridgeNPCs.set(bridge.id, npc);
+          this.constraintNPCs.set(bridge.id, npc);
+        } else {
+          npc.setPosition(worldPos.x, worldPos.y);
+        }
+        npc.setVisible(true);
+      } else {
+        const npc = this.strutBridgeNPCs.get(bridge.id);
+        if (npc) {
+          npc.setVisible(false);
+          this.constraintNPCs.delete(bridge.id);
+        }
+      }
     }
   }
 
@@ -574,6 +611,8 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
       npc.destroy();
     }
     this.constraintNPCs.clear();
+    // strutBridgeNPCs sprites are also in constraintNPCs and destroyed above
+    this.strutBridgeNPCs.clear();
     for (const num of this.constraintNumbers.values()) {
       num.destroy();
     }

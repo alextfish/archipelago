@@ -66,20 +66,26 @@ export class ConstraintFeedbackDisplay {
     const cellSize = this.gridMapper.getCellSize();
 
     for (const item of items) {
-      const island = puzzle.islands.find(i => i.id === item.elementID);
-      if (!island) continue;
+      let worldPos: { x: number; y: number };
 
-      const worldPos = this.gridMapper.gridToWorld(island.x, island.y);
+      if (item.position) {
+        // Bridge-based constraint: use the supplied grid position directly
+        worldPos = this.gridMapper.gridToWorld(item.position.x, item.position.y);
+      } else {
+        const island = puzzle.islands.find(i => i.id === item.elementID);
+        if (!island) continue;
+        worldPos = this.gridMapper.gridToWorld(island.x, island.y);
+      }
 
       // Determine if constraint is satisfied (glyphMessage is "good" when satisfied)
       const isSatisfied = item.glyphMessage.trim() === 'good';
 
       // Update existing NPC sprite texture to show appropriate expression
-      const existingNPC = this.existingNPCSprites.get(island.id);
+      const existingNPC = this.existingNPCSprites.get(item.elementID);
       if (existingNPC) {
         // Save original texture if not already saved
-        if (!this.originalNPCTextures.has(island.id)) {
-          this.originalNPCTextures.set(island.id, existingNPC.texture.key);
+        if (!this.originalNPCTextures.has(item.elementID)) {
+          this.originalNPCTextures.set(item.elementID, existingNPC.texture.key);
         }
 
         // Choose NPC sprite based on constraint type
@@ -92,7 +98,7 @@ export class ConstraintFeedbackDisplay {
         existingNPC.setTexture(spriteKey, 0);
       }
 
-      // Speech bubble — aligned with island horizontally, offset up by bubble height + extra spacing
+      // Speech bubble — aligned with element horizontally, offset up by bubble height + extra spacing
       const bubble = new SpeechBubble(this.scene, this.tilesetKey);
       if (this.glyphTracker) {
         bubble.setGlyphTracker(this.glyphTracker);

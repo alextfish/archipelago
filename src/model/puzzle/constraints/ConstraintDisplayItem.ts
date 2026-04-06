@@ -4,7 +4,7 @@
  * with the glyph message that should appear in its speech bubble.
  */
 export interface ConstraintDisplayItem {
-  /** ID of the element this display is for (e.g. island ID) */
+  /** ID of the element this display is for (e.g. island ID or bridge ID) */
   elementID: string;
   /** Space-separated glyph words — "good" when satisfied, violation message otherwise */
   glyphMessage: string;
@@ -12,4 +12,12 @@ export interface ConstraintDisplayItem {
   constraintType?: string;
   /** Required count for IslandBridgeCountConstraint (1-8) */
   requiredCount?: number;
+  /**
+   * Optional grid position for the NPC and speech bubble.
+   * When provided, this position is used instead of looking up the element
+   * by ID in the puzzle's island list.  Used for bridge-based constraints
+   * such as BridgeMustCoverIslandConstraint where the NPC sits at the
+   * bridge's strut location rather than at an island.
+   */
+  position?: { x: number; y: number };
 }

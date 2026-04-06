@@ -13,6 +13,7 @@ import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry
 import type { ConstraintDisplayItem } from '@model/puzzle/constraints/ConstraintDisplayItem';
 import { parseNumBridgesConstraint } from '@model/puzzle/Island';
 import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
+import { StrutBridge } from '@model/puzzle/StrutBridge';
 
 /**
  * Puzzle renderer that works embedded within the overworld scene
@@ -30,6 +31,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     private islandGraphics: Map<string, Phaser.GameObjects.Sprite> = new Map();
     private islandLabels: Map<string, Phaser.GameObjects.Text> = new Map();
     private constraintNPCs: Map<string, Phaser.GameObjects.Sprite> = new Map();
+    private strutBridgeNPCs: Map<string, Phaser.GameObjects.Sprite> = new Map();
     private constraintNumbers: Map<string, Phaser.GameObjects.Sprite> = new Map();
     private bridgeGraphics: Map<string, Phaser.GameObjects.Container> = new Map();
     private bridgeHitZones: Phaser.GameObjects.Zone[] = [];
@@ -97,6 +99,40 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
                 this.createBridge(bridge);
             }
         }
+
+        // Manage StrutBridge NPCs: show when placed, hide when not
+        this.updateStrutBridgeNPCs(puzzle);
+    }
+
+    private updateStrutBridgeNPCs(puzzle: BridgePuzzle): void {
+        for (const bridge of puzzle.bridges) {
+            if (!(bridge instanceof StrutBridge)) continue;
+
+            if (bridge.start && bridge.end) {
+                const strutLoc = bridge.getStrutLocation(puzzle);
+                if (!strutLoc) continue;
+                const worldPos = this.gridMapper.gridToWorld(strutLoc.x, strutLoc.y);
+
+                let npc = this.strutBridgeNPCs.get(bridge.id);
+                if (!npc) {
+                    npc = this.scene.add.sprite(worldPos.x, worldPos.y, 'sailorNS', 0);
+                    npc.setOrigin(0, 0);
+                    npc.setDepth(101);
+                    this.puzzleContainer.add(npc);
+                    this.strutBridgeNPCs.set(bridge.id, npc);
+                    this.constraintNPCs.set(bridge.id, npc);
+                } else {
+                    npc.setPosition(worldPos.x, worldPos.y);
+                }
+                npc.setVisible(true);
+            } else {
+                const npc = this.strutBridgeNPCs.get(bridge.id);
+                if (npc) {
+                    npc.setVisible(false);
+                    this.constraintNPCs.delete(bridge.id);
+                }
+            }
+        }
     }
 
     showPreview(start: Point, end: Point, bridgeType: BridgeType): void {
@@ -157,6 +193,8 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
             npc.destroy();
         }
         this.constraintNPCs.clear();
+        // strutBridgeNPCs sprites are also in constraintNPCs and destroyed above
+        this.strutBridgeNPCs.clear();
 
         // Destroy all constraint number sprites
         for (const num of this.constraintNumbers.values()) {
