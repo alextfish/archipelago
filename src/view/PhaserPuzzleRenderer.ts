@@ -13,6 +13,7 @@ import { BridgeSpriteFrames, BridgeVisualConstants } from "./BridgeSpriteFrameRe
 import { ConstraintFeedbackDisplay } from "./ConstraintFeedbackDisplay";
 import { LanguageGlyphRegistry } from "@model/conversation/LanguageGlyphRegistry";
 import type { ConstraintDisplayItem } from "@model/puzzle/constraints/ConstraintDisplayItem";
+import { getNPCSpriteKey, updateStrutBridgeNPCSprites } from "./NPCSpriteHelper";
 
 export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
   private scene: Phaser.Scene;
@@ -30,6 +31,7 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
   private islandGraphics: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private islandLabels: Map<string, Phaser.GameObjects.Text> = new Map();
   private constraintNPCs: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  private strutBridgeNPCs: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private constraintNumbers: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private bridgeGraphics: Map<string, Phaser.GameObjects.Container> = new Map();
   private previewGraphics: Phaser.GameObjects.Container | Phaser.GameObjects.RenderTexture | null = null;
@@ -127,6 +129,17 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
       // Render grouped placed bridges using the unified renderTiledBridge API
       this.renderTiledBridge({ start: g.start, end: g.end, target: 'placed', useEdges: true, bridgeIds: g.ids });
     }
+
+    // Manage StrutBridge NPCs: show when placed, hide when not
+    this.updateStrutBridgeNPCs(puzzle);
+  }
+
+  private updateStrutBridgeNPCs(puzzle: BridgePuzzle): void {
+    const scale = this.gridMapper.getCellSize() / 32;
+    updateStrutBridgeNPCSprites(puzzle, this.strutBridgeNPCs, this.gridMapper, (worldPos) =>
+      this.scene.add.sprite(worldPos.x, worldPos.y, getNPCSpriteKey('BridgeMustCoverIslandConstraint'), 0)
+        .setScale(scale, scale)
+    );
   }
 
   private destroyBridges(): void {
@@ -574,6 +587,10 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
       npc.destroy();
     }
     this.constraintNPCs.clear();
+    for (const npc of this.strutBridgeNPCs.values()) {
+      npc.destroy();
+    }
+    this.strutBridgeNPCs.clear();
     for (const num of this.constraintNumbers.values()) {
       num.destroy();
     }
