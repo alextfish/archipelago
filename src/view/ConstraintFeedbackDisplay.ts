@@ -23,6 +23,7 @@ export class ConstraintFeedbackDisplay {
   private gridMapper: GridToWorldMapper;
   private glyphRegistry: LanguageGlyphRegistry;
   private tilesetKey: string;
+  // @ts-expect-error TS6133: stored for future use, not yet read
   private npcSpriteKey: string;
   private language: string;
   private depth: number;
