@@ -13,7 +13,7 @@ import { BridgeSpriteFrames, BridgeVisualConstants } from "./BridgeSpriteFrameRe
 import { ConstraintFeedbackDisplay } from "./ConstraintFeedbackDisplay";
 import { LanguageGlyphRegistry } from "@model/conversation/LanguageGlyphRegistry";
 import type { ConstraintDisplayItem } from "@model/puzzle/constraints/ConstraintDisplayItem";
-import { StrutBridge } from "@model/puzzle/StrutBridge";
+import { getNPCSpriteKey, updateStrutBridgeNPCSprites } from "./NPCSpriteHelper";
 
 export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
   private scene: Phaser.Scene;
@@ -136,33 +136,12 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
 
   private updateStrutBridgeNPCs(puzzle: BridgePuzzle): void {
     const scale = this.gridMapper.getCellSize() / 32;
-
-    for (const bridge of puzzle.bridges) {
-      if (!(bridge instanceof StrutBridge)) continue;
-
-      if (bridge.start && bridge.end) {
-        const strutLoc = bridge.getStrutLocation(puzzle);
-        if (!strutLoc) continue;
-        const worldPos = this.gridMapper.gridToWorld(strutLoc.x, strutLoc.y);
-
-        let npc = this.strutBridgeNPCs.get(bridge.id);
-        if (!npc) {
-          npc = this.scene.add.sprite(worldPos.x, worldPos.y, 'sailorNS', 0)
-            .setOrigin(0, 0)
-            .setDepth(101)
-            .setScale(scale, scale);
-          this.strutBridgeNPCs.set(bridge.id, npc);
-        } else {
-          npc.setPosition(worldPos.x, worldPos.y);
-        }
-        npc.setVisible(true);
-      } else {
-        const npc = this.strutBridgeNPCs.get(bridge.id);
-        if (npc) {
-          npc.setVisible(false);
-        }
-      }
-    }
+    updateStrutBridgeNPCSprites(puzzle, this.strutBridgeNPCs, this.gridMapper, (worldPos) =>
+      this.scene.add.sprite(worldPos.x, worldPos.y, getNPCSpriteKey('BridgeMustCoverIslandConstraint'), 0)
+        .setOrigin(0, 0)
+        .setDepth(101)
+        .setScale(scale, scale)
+    );
   }
 
   private destroyBridges(): void {

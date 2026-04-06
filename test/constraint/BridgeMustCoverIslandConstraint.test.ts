@@ -102,12 +102,14 @@ describe("BridgeMustCoverIslandConstraint", () => {
 
   describe("per-bridge mode (with bridgeID)", () => {
     it("only checks the specified bridge", () => {
+      // b1 spans x=0..4 with no intermediate islands → does NOT cover an island
+      // b2 spans x=0..4 with an intermediate island at x=2 → DOES cover an island
       const islands = [
         { id: "A", x: 0, y: 0 },
+        { id: "mid", x: 2, y: 0 },
         { id: "B", x: 4, y: 0 },
       ];
 
-      // b1 does NOT cover an island; b2 DOES
       const bridges = [
         { id: "b1", start: { x: 0, y: 0 }, end: { x: 4, y: 0 }, type: { id: "t1", mustCoverIsland: true } },
         { id: "b2", start: { x: 0, y: 0 }, end: { x: 4, y: 0 }, type: { id: "t2", mustCoverIsland: true } },
@@ -115,13 +117,33 @@ describe("BridgeMustCoverIslandConstraint", () => {
 
       const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges });
 
-      // Constraint for b1 should fail
+      // Per-bridge constraint for b1 only checks b1 — both bridges are identical
+      // so both fail/pass together.  The key assertion is that c1 and c2 only
+      // ever report about their own bridge (different bridge IDs in
+      // affectedElements).
       const c1 = new BridgeMustCoverIslandConstraint("b1");
-      expect(c1.check(puzzle as any).satisfied).toBe(false);
-
-      // Constraint for b2 (same setup) also fails since there's no crossed island
       const c2 = new BridgeMustCoverIslandConstraint("b2");
-      expect(c2.check(puzzle as any).satisfied).toBe(false);
+
+      // Both bridges cover the mid island, so both constraints should pass.
+      expect(c1.check(puzzle as any).satisfied).toBe(true);
+      expect(c2.check(puzzle as any).satisfied).toBe(true);
+
+      // Now use a puzzle with no intermediate island so both must fail
+      const islandsNoMid = [
+        { id: "A", x: 0, y: 0 },
+        { id: "B", x: 4, y: 0 },
+      ];
+      const puzzleNoMid = makeMockPuzzle({ islands: islandsNoMid, bridges, placedBridges: bridges });
+      const c1fail = new BridgeMustCoverIslandConstraint("b1");
+      const c2fail = new BridgeMustCoverIslandConstraint("b2");
+      const res1 = c1fail.check(puzzleNoMid as any);
+      const res2 = c2fail.check(puzzleNoMid as any);
+      expect(res1.satisfied).toBe(false);
+      expect(res1.affectedElements).toContain("b1");
+      expect(res1.affectedElements).not.toContain("b2");
+      expect(res2.satisfied).toBe(false);
+      expect(res2.affectedElements).toContain("b2");
+      expect(res2.affectedElements).not.toContain("b1");
     });
 
     it("getDisplayItems returns empty array for unplaced bridge", () => {
@@ -135,9 +157,10 @@ describe("BridgeMustCoverIslandConstraint", () => {
     });
 
     it("getDisplayItems returns item with strut location for placed StrutBridge", () => {
+      // Island at x=1 (not the midpoint x=2) exercises the "strut != midpoint" path
       const islands = [
         { id: "A", x: 0, y: 0 },
-        { id: "mid", x: 2, y: 0 },
+        { id: "mid", x: 1, y: 0 },
         { id: "B", x: 4, y: 0 },
       ];
 
@@ -157,8 +180,8 @@ describe("BridgeMustCoverIslandConstraint", () => {
       expect(items).toHaveLength(1);
       expect(items[0].elementID).toBe("b1");
       expect(items[0].constraintType).toBe("BridgeMustCoverIslandConstraint");
-      // Strut is at the crossed island (x:2, y:0)
-      expect(items[0].position).toEqual({ x: 2, y: 0 });
+      // Strut is at the crossed island (x:1, y:0) — not the midpoint (x:2, y:0)
+      expect(items[0].position).toEqual({ x: 1, y: 0 });
     });
 
     it("getDisplayItems returns 'good' glyphMessage when bridge covers an island", () => {

@@ -67,7 +67,6 @@ export class BridgePuzzle {
       const hasSpecConstraints = Array.isArray(spec.constraints) && spec.constraints.length > 0;
       if (!hasSpecConstraints) {
         for (const bt of bridgeTypes) {
-          if (bt.mustCoverIsland) continue; // strut bridges get a per-bridge BridgeMustCoverIslandConstraint (added below), not a length constraint
           const len = (bt.length === undefined) ? -1 : bt.length ?? -1;
           if (len !== -1) {
             // add a constraint enforcing this bridge type's fixed length

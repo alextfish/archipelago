@@ -77,24 +77,27 @@ export class StrutBridge implements Bridge {
         const { start, end } = this;
         const result: Island[] = [];
 
+        const isHorizontal = start.y === end.y;
+        const isVertical = start.x === end.x;
+        const minX = Math.min(start.x, end.x);
+        const maxX = Math.max(start.x, end.x);
+        const minY = Math.min(start.y, end.y);
+        const maxY = Math.max(start.y, end.y);
+
         for (const island of islands) {
             // Exclude endpoint islands
             if (island.x === start.x && island.y === start.y) continue;
             if (island.x === end.x && island.y === end.y) continue;
 
             // Horizontal bridge
-            if (start.y === end.y && island.y === start.y) {
-                const minX = Math.min(start.x, end.x);
-                const maxX = Math.max(start.x, end.x);
+            if (isHorizontal && island.y === start.y) {
                 if (island.x > minX && island.x < maxX) {
                     result.push(island);
                 }
             }
 
             // Vertical bridge
-            if (start.x === end.x && island.x === start.x) {
-                const minY = Math.min(start.y, end.y);
-                const maxY = Math.max(start.y, end.y);
+            if (isVertical && island.x === start.x) {
                 if (island.y > minY && island.y < maxY) {
                     result.push(island);
                 }

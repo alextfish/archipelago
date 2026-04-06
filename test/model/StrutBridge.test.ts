@@ -42,14 +42,15 @@ describe('StrutBridge', () => {
         });
 
         it('returns the island location when exactly one island is crossed', () => {
+            // Island at x=1 (not midpoint x=2) — exercises that strut != midpoint
             const bridge = makePlacedStrutBridge({ x: 0, y: 0 }, { x: 4, y: 0 });
             const islands: Island[] = [
                 { id: 'A', x: 0, y: 0 },
-                { id: 'mid', x: 2, y: 0 },
+                { id: 'mid', x: 1, y: 0 },
                 { id: 'B', x: 4, y: 0 },
             ];
             const result = bridge.getStrutLocation({ islands });
-            expect(result).toEqual({ x: 2, y: 0 });
+            expect(result).toEqual({ x: 1, y: 0 });
         });
 
         it('returns island closest to midpoint when two islands are crossed', () => {

@@ -17,6 +17,7 @@ import type { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphReg
 import { SpeechBubble } from './conversation/SpeechBubble';
 import type { GridToWorldMapper } from './GridToWorldMapper';
 import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
+import { getNPCSpriteKey } from './NPCSpriteHelper';
 
 export class ConstraintFeedbackDisplay {
   private scene: Phaser.Scene;
@@ -89,7 +90,7 @@ export class ConstraintFeedbackDisplay {
         }
 
         // Choose NPC sprite based on constraint type
-        const baseSprite = item.constraintType === 'IslandBridgeCountConstraint' ? 'Ruby' : 'sailorNS';
+        const baseSprite = getNPCSpriteKey(item.constraintType);
 
         // Choose expression based on satisfaction: happy if satisfied, frown if not
         const spriteKey = isSatisfied ? `${baseSprite} happy` : `${baseSprite} frown`;

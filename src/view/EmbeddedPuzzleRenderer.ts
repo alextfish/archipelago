@@ -13,7 +13,7 @@ import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry
 import type { ConstraintDisplayItem } from '@model/puzzle/constraints/ConstraintDisplayItem';
 import { parseNumBridgesConstraint } from '@model/puzzle/Island';
 import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
-import { StrutBridge } from '@model/puzzle/StrutBridge';
+import { getNPCSpriteKey, updateStrutBridgeNPCSprites } from './NPCSpriteHelper';
 
 /**
  * Puzzle renderer that works embedded within the overworld scene
@@ -105,32 +105,13 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     }
 
     private updateStrutBridgeNPCs(puzzle: BridgePuzzle): void {
-        for (const bridge of puzzle.bridges) {
-            if (!(bridge instanceof StrutBridge)) continue;
-
-            if (bridge.start && bridge.end) {
-                const strutLoc = bridge.getStrutLocation(puzzle);
-                if (!strutLoc) continue;
-                const worldPos = this.gridMapper.gridToWorld(strutLoc.x, strutLoc.y);
-
-                let npc = this.strutBridgeNPCs.get(bridge.id);
-                if (!npc) {
-                    npc = this.scene.add.sprite(worldPos.x, worldPos.y, 'sailorNS', 0);
-                    npc.setOrigin(0, 0);
-                    npc.setDepth(101);
-                    this.puzzleContainer.add(npc);
-                    this.strutBridgeNPCs.set(bridge.id, npc);
-                } else {
-                    npc.setPosition(worldPos.x, worldPos.y);
-                }
-                npc.setVisible(true);
-            } else {
-                const npc = this.strutBridgeNPCs.get(bridge.id);
-                if (npc) {
-                    npc.setVisible(false);
-                }
-            }
-        }
+        updateStrutBridgeNPCSprites(puzzle, this.strutBridgeNPCs, this.gridMapper, (worldPos) => {
+            const npc = this.scene.add.sprite(worldPos.x, worldPos.y, getNPCSpriteKey('BridgeMustCoverIslandConstraint'), 0);
+            npc.setOrigin(0, 0);
+            npc.setDepth(101);
+            this.puzzleContainer.add(npc);
+            return npc;
+        });
     }
 
     showPreview(start: Point, end: Point, bridgeType: BridgeType): void {
