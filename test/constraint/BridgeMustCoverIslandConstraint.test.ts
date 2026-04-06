@@ -102,47 +102,32 @@ describe("BridgeMustCoverIslandConstraint", () => {
 
   describe("per-bridge mode (with bridgeID)", () => {
     it("only checks the specified bridge", () => {
-      // b1 spans x=0..4 with no intermediate islands → does NOT cover an island
-      // b2 spans x=0..4 with an intermediate island at x=2 → DOES cover an island
+      // Island at (2,0) sits between the endpoints of b2 (0→4) but IS an endpoint of b1 (0→2),
+      // so b1 does NOT cover any island and b2 DOES.
       const islands = [
         { id: "A", x: 0, y: 0 },
         { id: "mid", x: 2, y: 0 },
         { id: "B", x: 4, y: 0 },
       ];
 
-      const bridges = [
-        { id: "b1", start: { x: 0, y: 0 }, end: { x: 4, y: 0 }, type: { id: "t1", mustCoverIsland: true } },
-        { id: "b2", start: { x: 0, y: 0 }, end: { x: 4, y: 0 }, type: { id: "t2", mustCoverIsland: true } },
-      ];
+      const b1 = { id: "b1", start: { x: 0, y: 0 }, end: { x: 2, y: 0 }, type: { id: "t1", mustCoverIsland: true } };
+      const b2 = { id: "b2", start: { x: 0, y: 0 }, end: { x: 4, y: 0 }, type: { id: "t2", mustCoverIsland: true } };
+      const bridges = [b1, b2];
 
       const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges });
 
-      // Per-bridge constraint for b1 only checks b1 — both bridges are identical
-      // so both fail/pass together.  The key assertion is that c1 and c2 only
-      // ever report about their own bridge (different bridge IDs in
-      // affectedElements).
       const c1 = new BridgeMustCoverIslandConstraint("b1");
       const c2 = new BridgeMustCoverIslandConstraint("b2");
 
-      // Both bridges cover the mid island, so both constraints should pass.
-      expect(c1.check(puzzle as any).satisfied).toBe(true);
-      expect(c2.check(puzzle as any).satisfied).toBe(true);
-
-      // Now use a puzzle with no intermediate island so both must fail
-      const islandsNoMid = [
-        { id: "A", x: 0, y: 0 },
-        { id: "B", x: 4, y: 0 },
-      ];
-      const puzzleNoMid = makeMockPuzzle({ islands: islandsNoMid, bridges, placedBridges: bridges });
-      const c1fail = new BridgeMustCoverIslandConstraint("b1");
-      const c2fail = new BridgeMustCoverIslandConstraint("b2");
-      const res1 = c1fail.check(puzzleNoMid as any);
-      const res2 = c2fail.check(puzzleNoMid as any);
+      // b1 ends at (2,0) so that island is an endpoint, not crossed → fails
+      const res1 = c1.check(puzzle as any);
       expect(res1.satisfied).toBe(false);
       expect(res1.affectedElements).toContain("b1");
       expect(res1.affectedElements).not.toContain("b2");
-      expect(res2.satisfied).toBe(false);
-      expect(res2.affectedElements).toContain("b2");
+
+      // b2 passes over (2,0) which is strictly between its endpoints → passes
+      const res2 = c2.check(puzzle as any);
+      expect(res2.satisfied).toBe(true);
       expect(res2.affectedElements).not.toContain("b1");
     });
 

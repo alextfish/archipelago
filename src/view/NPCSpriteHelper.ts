@@ -25,14 +25,17 @@ export function getNPCSpriteKey(constraintType: string | undefined): string {
  *
  * Iterates over all bridges in the puzzle; for each StrutBridge:
  * - When placed: computes the strut location, creates the sprite via `createSprite`
- *   on first encounter (then stores it), repositions it, and makes it visible.
+ *   on first encounter (then stores it), applies common setup (origin, depth),
+ *   repositions it, and makes it visible.
  * - When not placed: hides the sprite if one exists.
  *
  * @param puzzle          The current puzzle state.
  * @param strutBridgeNPCs Renderer-owned map of bridge ID → NPC sprite (mutated in-place).
  * @param gridMapper      Converts grid coordinates to world coordinates.
  * @param createSprite    Renderer-specific factory; called once per StrutBridge to
- *                        create the Phaser sprite at the given world position.
+ *                        create and register the Phaser sprite at the given world
+ *                        position.  Should not set origin or depth — those are applied
+ *                        here after creation.
  */
 export function updateStrutBridgeNPCSprites(
     puzzle: BridgePuzzle,
@@ -51,6 +54,8 @@ export function updateStrutBridgeNPCSprites(
             let npc = strutBridgeNPCs.get(bridge.id);
             if (!npc) {
                 npc = createSprite(worldPos);
+                npc.setOrigin(0, 0);
+                npc.setDepth(101);
                 strutBridgeNPCs.set(bridge.id, npc);
             } else {
                 npc.setPosition(worldPos.x, worldPos.y);

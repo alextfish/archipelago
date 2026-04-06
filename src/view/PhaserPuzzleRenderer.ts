@@ -138,8 +138,6 @@ export class PhaserPuzzleRenderer implements PuzzleRenderer, IPuzzleView {
     const scale = this.gridMapper.getCellSize() / 32;
     updateStrutBridgeNPCSprites(puzzle, this.strutBridgeNPCs, this.gridMapper, (worldPos) =>
       this.scene.add.sprite(worldPos.x, worldPos.y, getNPCSpriteKey('BridgeMustCoverIslandConstraint'), 0)
-        .setOrigin(0, 0)
-        .setDepth(101)
         .setScale(scale, scale)
     );
   }

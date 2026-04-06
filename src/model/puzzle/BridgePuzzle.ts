@@ -74,7 +74,10 @@ export class BridgePuzzle {
           }
         }
       }
-      // Always add one BridgeMustCoverIslandConstraint per StrutBridge instance
+      // Always add one BridgeMustCoverIslandConstraint per StrutBridge instance.
+      // These are per-bridge constraints (keyed by bridge ID) rather than the
+      // type-level constraints above, so each bridge gets its own constraint
+      // that tracks whether that specific bridge covers an island.
       for (const bridge of this.inventory.bridges) {
         if (bridge instanceof StrutBridge) {
           this.constraints.push(new BridgeMustCoverIslandConstraint(bridge.id));

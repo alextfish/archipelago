@@ -107,8 +107,6 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     private updateStrutBridgeNPCs(puzzle: BridgePuzzle): void {
         updateStrutBridgeNPCSprites(puzzle, this.strutBridgeNPCs, this.gridMapper, (worldPos) => {
             const npc = this.scene.add.sprite(worldPos.x, worldPos.y, getNPCSpriteKey('BridgeMustCoverIslandConstraint'), 0);
-            npc.setOrigin(0, 0);
-            npc.setDepth(101);
             this.puzzleContainer.add(npc);
             return npc;
         });
