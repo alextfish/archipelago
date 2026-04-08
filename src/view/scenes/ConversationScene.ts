@@ -42,7 +42,8 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     private readonly CHOICE_HEIGHT = 60;
     private readonly CHOICE_SPACING = 20;
     private readonly CHOICE_WIDTH = 280; // Narrower for horizontal layout
-    private readonly PORTRAIT_SCALE = 4;
+    private readonly PORTRAIT_SIZE = 96;
+    private readonly PORTRAIT_SCALE = 2;
     private readonly PORTRAIT_PADDING = 20;
 
     constructor() {
@@ -505,7 +506,7 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         this.playerPortrait = this.createPortrait(
             'player_face', // Player sprite key
             0, // neutral frame
-            this.scale.width - this.PORTRAIT_PADDING - (32 * this.PORTRAIT_SCALE),
+            this.scale.width - this.PORTRAIT_PADDING - (this.PORTRAIT_SIZE * this.PORTRAIT_SCALE),
             this.PORTRAIT_PADDING
         );
     }
@@ -517,7 +518,7 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         const container = this.add.container(x, y);
 
         // Create border background (slightly larger than sprite)
-        const spriteSize = 32 * this.PORTRAIT_SCALE;
+        const spriteSize = this.PORTRAIT_SIZE * this.PORTRAIT_SCALE;
         const borderPadding = 4;
         const borderSize = spriteSize + (borderPadding * 2);
 
