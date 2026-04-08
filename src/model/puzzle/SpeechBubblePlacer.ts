@@ -127,16 +127,19 @@ export class SpeechBubblePlacer {
     }
 
     /**
-     * Return the four candidate top-left positions for a bubble adjacent to the NPC.
-     * The ordering (right, left, above, below) acts as a tiebreaker so that,
-     * when all options are equally good, the bubble is placed to the right.
+     * Return the four candidate top-left positions for a bubble placed 2 tiles
+     * away from the NPC in each direction.  The gap of 2 reflects the visual
+     * layout: 1 tile for the directional arrow tile, 1 tile for the bubble
+     * content itself.  The ordering (right, left, above, below) acts as a
+     * tiebreaker so that, when all options are equally good, the bubble is
+     * placed to the right.
      */
     private getCandidates(npc: Point, width: number): Point[] {
         return [
-            { x: npc.x + 1,     y: npc.y     },   // Right
-            { x: npc.x - width, y: npc.y     },   // Left
-            { x: npc.x,         y: npc.y - 1 },   // Above
-            { x: npc.x,         y: npc.y + 1 },   // Below
+            { x: npc.x + 2,         y: npc.y     },   // Right
+            { x: npc.x - width - 1, y: npc.y     },   // Left
+            { x: npc.x,             y: npc.y - 2 },   // Above
+            { x: npc.x,             y: npc.y + 2 },   // Below
         ];
     }
 
