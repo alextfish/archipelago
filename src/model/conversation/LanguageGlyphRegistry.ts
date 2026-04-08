@@ -19,6 +19,9 @@ export interface SpeechBubbleFrames {
     bottomEdge: number;
     bottomRight: number;
     arrow: number;
+    /** Diagonal arrow pointing down-left by default. Swap into the appropriate corner
+     *  (with flipping) when a diagonal pointer toward the speaker is needed. */
+    arrowDiagonal: number;
 }
 
 export interface LanguageDefinition {
@@ -94,6 +97,7 @@ export class LanguageGlyphRegistry {
                 bottomEdge: 21,
                 bottomRight: 22,
                 arrow: 16,
+                arrowDiagonal: 26,
             },
             glyphs: grassGlyphs,
             missingGlyphFrame: 6,
@@ -117,6 +121,7 @@ export class LanguageGlyphRegistry {
                 bottomEdge: 24,
                 bottomRight: 25,
                 arrow: 17,
+                arrowDiagonal: 27,
             },
             glyphs: fireGlyphs,
             missingGlyphFrame: 7,

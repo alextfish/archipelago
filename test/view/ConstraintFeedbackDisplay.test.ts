@@ -22,6 +22,9 @@ function makeMockScene() {
 
   const image = {
     setOrigin: vi.fn().mockReturnThis(),
+    setFlipX: vi.fn().mockReturnThis(),
+    setFlipY: vi.fn().mockReturnThis(),
+    setRotation: vi.fn().mockReturnThis(),
     destroy: vi.fn(),
   };
 
@@ -52,7 +55,10 @@ function makeMockNPCSprite(initialTextureKey: string) {
 function makeMockPuzzle(islands: { id: string; x: number; y: number }[]): BridgePuzzle {
   return {
     islands,
+    width: 10,
+    height: 10,
     bridges: [],
+    placedBridges: [],
     bridgesFromIsland: () => [],
     allBridgesPlaced: () => true,
   } as unknown as BridgePuzzle;

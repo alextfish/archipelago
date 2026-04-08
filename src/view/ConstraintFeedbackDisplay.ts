@@ -14,9 +14,11 @@ import Phaser from 'phaser';
 import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import type { ConstraintDisplayItem } from '@model/puzzle/constraints/ConstraintDisplayItem';
 import type { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
-import { SpeechBubble } from './conversation/SpeechBubble';
+import { SpeechBubble, type BubbleDirection } from './conversation/SpeechBubble';
 import type { GridToWorldMapper } from './GridToWorldMapper';
 import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
+import { SpeechBubblePlacer, type BubbleRequest } from '@model/puzzle/SpeechBubblePlacer';
+import type { Point } from '@model/puzzle/Point';
 
 export class ConstraintFeedbackDisplay {
   private scene: Phaser.Scene;
@@ -59,47 +61,68 @@ export class ConstraintFeedbackDisplay {
   /**
    * Show or update the feedback for the given display items.
    * Updates existing NPC sprite expressions and creates speech bubbles.
+   * Uses SpeechBubblePlacer to find non-overlapping positions for the bubbles.
    */
   update(items: ConstraintDisplayItem[], puzzle: BridgePuzzle): void {
     this.clear();
 
-    const cellSize = this.gridMapper.getCellSize();
+    if (items.length === 0) return;
+
+    // First pass: resolve islands and parse glyphs so we can build placer requests.
+    type ItemData = {
+      item: ConstraintDisplayItem;
+      island: { id: string; x: number; y: number };
+      glyphFrames: number[];
+    };
+    const itemData: ItemData[] = [];
+    const requests: BubbleRequest[] = [];
 
     for (const item of items) {
       const island = puzzle.islands.find(i => i.id === item.elementID);
       if (!island) continue;
+      const glyphFrames = this.glyphRegistry.parseGlyphs(this.language, item.glyphMessage);
+      itemData.push({ item, island, glyphFrames });
+      requests.push({ npcPosition: { x: island.x, y: island.y }, width: glyphFrames.length });
+    }
 
-      const worldPos = this.gridMapper.gridToWorld(island.x, island.y);
+    if (itemData.length === 0) return;
 
-      // Determine if constraint is satisfied (glyphMessage is "good" when satisfied)
-      const isSatisfied = item.glyphMessage.trim() === 'good';
+    // Use SpeechBubblePlacer to find non-overlapping bubble positions.
+    const placements = new SpeechBubblePlacer(puzzle, requests).place();
+
+    // Second pass: create NPC expressions and positioned speech bubbles.
+    for (let i = 0; i < itemData.length; i++) {
+      const { item, island, glyphFrames } = itemData[i];
+      const placement = placements[i];
 
       // Update existing NPC sprite texture to show appropriate expression
+      const isSatisfied = item.glyphMessage.trim() === 'good';
       const existingNPC = this.existingNPCSprites.get(island.id);
       if (existingNPC) {
-        // Save original texture if not already saved
         if (!this.originalNPCTextures.has(island.id)) {
           this.originalNPCTextures.set(island.id, existingNPC.texture.key);
         }
-
-        // Choose NPC sprite based on constraint type
         const baseSprite = item.constraintType === 'IslandBridgeCountConstraint' ? 'Ruby' : 'sailorNS';
-
-        // Choose expression based on satisfaction: happy if satisfied, frown if not
         const spriteKey = isSatisfied ? `${baseSprite} happy` : `${baseSprite} frown`;
-
-        // Update the texture of the existing sprite
         existingNPC.setTexture(spriteKey, 0);
       }
 
-      // Speech bubble — aligned with island horizontally, offset up by bubble height + extra spacing
+      // Decide which side of the bubble has the arrow (i.e. faces the NPC).
+      const direction = bubbleDirection(placement.topLeft, placement.npcPosition);
+
+      // The placer's topLeft is the content (glyph) area; the rendered bubble has a
+      // 1-tile border on every side, so the container sits 1 tile up and left.
+      const containerWorld = this.gridMapper.gridToWorld(
+        placement.topLeft.x - 1,
+        placement.topLeft.y - 1,
+      );
+
       const bubble = new SpeechBubble(this.scene, this.tilesetKey);
       if (this.glyphTracker) {
         bubble.setGlyphTracker(this.glyphTracker);
       }
-      const glyphFrames = this.glyphRegistry.parseGlyphs(this.language, item.glyphMessage);
-      bubble.create(glyphFrames, this.language, this.glyphRegistry, 1);
-      bubble.setPosition(worldPos.x + cellSize, worldPos.y - cellSize / 2);
+      bubble.create(glyphFrames, this.language, this.glyphRegistry, 1, direction);
+      bubble.setPosition(containerWorld.x, containerWorld.y);
       bubble.setDepth(this.depth + 1);
       this.speechBubbles.push(bubble);
     }
@@ -145,4 +168,15 @@ export class ConstraintFeedbackDisplay {
   destroy(): void {
     this.clear();
   }
+}
+
+/**
+ * Derive which side of the speech bubble should show the directional arrow,
+ * based on the bubble's content top-left position relative to the NPC.
+ */
+function bubbleDirection(topLeft: Point, npcPosition: Point): BubbleDirection {
+  if (topLeft.y < npcPosition.y) return 'above';
+  if (topLeft.y > npcPosition.y) return 'below';
+  if (topLeft.x > npcPosition.x) return 'right';
+  return 'left';
 }

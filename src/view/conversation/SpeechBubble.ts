@@ -4,8 +4,14 @@
  */
 
 import Phaser from 'phaser';
-import type { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
+import type { LanguageGlyphRegistry, SpeechBubbleFrames } from '@model/conversation/LanguageGlyphRegistry';
 import type { ActiveGlyphTracker, GlyphScreenBounds } from '@model/translation/ActiveGlyphTracker';
+
+/**
+ * Which side of the speech bubble points toward the NPC speaker.
+ * Determines which border tile is replaced with a directional arrow.
+ */
+export type BubbleDirection = 'right' | 'left' | 'above' | 'below';
 
 export class SpeechBubble {
     private scene: Phaser.Scene;
@@ -48,8 +54,9 @@ export class SpeechBubble {
      * @param language Language ID (for getting speech bubble frames)
      * @param registry Glyph registry
      * @param scale Scale factor for the bubble (default 1)
+     * @param direction Which side of the bubble has the arrow pointing toward the NPC (default 'right')
      */
-    create(glyphFrames: number[], language: string, registry: LanguageGlyphRegistry, scale: number = 1): void {
+    create(glyphFrames: number[], language: string, registry: LanguageGlyphRegistry, scale: number = 1, direction: BubbleDirection = 'right'): void {
         // Clear existing content (also unregisters from tracker)
         this.clear();
 
@@ -66,7 +73,7 @@ export class SpeechBubble {
         const bubbleHeight = 3; // Top edge, middle (with glyphs), bottom edge
 
         // Build background
-        this.buildBackground(bubbleFrames, bubbleWidth, bubbleHeight, tileSize);
+        this.buildBackground(bubbleFrames, bubbleWidth, bubbleHeight, tileSize, direction);
 
         // Add glyphs
         this.addGlyphs(glyphFrames, tileSize);
@@ -92,41 +99,89 @@ export class SpeechBubble {
     }
 
     /**
-     * Build the speech bubble background using 9-patch tiles
+     * Build the speech bubble background using 9-patch tiles.
+     *
+     * The directional arrow tile is placed on the border facing the NPC:
+     *  - 'right':  left edge of the middle row  (NPC is to the left)
+     *  - 'left':   right edge of the middle row (NPC is to the right), flipped horizontally
+     *  - 'above':  first tile of the bottom row  (NPC is below), rotated 90° CCW → ↓
+     *  - 'below':  first tile of the top row     (NPC is above), rotated 90° CW  → ↑
      */
     private buildBackground(
-        frames: any,
+        frames: SpeechBubbleFrames,
         width: number,
         height: number,
-        tileSize: number
+        tileSize: number,
+        direction: BubbleDirection,
     ): void {
-        // Top row - use arrow for leftmost tile to point at speaker
+        // Top row
         this.addBackgroundTile(frames.topLeft, 0, 0, tileSize);
         for (let x = 1; x < width - 1; x++) {
-            this.addBackgroundTile(frames.topEdge, x, 0, tileSize);
+            if (direction === 'below' && x === 1) {
+                // Arrow pointing up (↑) toward NPC above
+                this.addArrowTile(frames.arrow, x, 0, tileSize, false, false, Math.PI / 2);
+            } else {
+                this.addBackgroundTile(frames.topEdge, x, 0, tileSize);
+            }
         }
         this.addBackgroundTile(frames.topRight, width - 1, 0, tileSize);
 
         // Middle rows (where glyphs go)
         for (let y = 1; y < height - 1; y++) {
-            // Middle row with glyphs
-            if (y === 1) {
-                this.addBackgroundTile(frames.arrow, 0, y, tileSize);
+            if (y === 1 && direction === 'right') {
+                this.addArrowTile(frames.arrow, 0, y, tileSize, false, false, 0);
             } else {
                 this.addBackgroundTile(frames.leftEdge, 0, y, tileSize);
             }
             for (let x = 1; x < width - 1; x++) {
                 this.addBackgroundTile(frames.centre, x, y, tileSize);
             }
-            this.addBackgroundTile(frames.rightEdge, width - 1, y, tileSize);
+            if (y === 1 && direction === 'left') {
+                // Arrow pointing right (→) toward NPC to the right, flipped horizontally
+                this.addArrowTile(frames.arrow, width - 1, y, tileSize, true, false, 0);
+            } else {
+                this.addBackgroundTile(frames.rightEdge, width - 1, y, tileSize);
+            }
         }
 
         // Bottom row
         this.addBackgroundTile(frames.bottomLeft, 0, height - 1, tileSize);
         for (let x = 1; x < width - 1; x++) {
-            this.addBackgroundTile(frames.bottomEdge, x, height - 1, tileSize);
+            if (direction === 'above' && x === 1) {
+                // Arrow pointing down (↓) toward NPC below
+                this.addArrowTile(frames.arrow, x, height - 1, tileSize, false, false, -Math.PI / 2);
+            } else {
+                this.addBackgroundTile(frames.bottomEdge, x, height - 1, tileSize);
+            }
         }
         this.addBackgroundTile(frames.bottomRight, width - 1, height - 1, tileSize);
+    }
+
+    /**
+     * Add the directional arrow tile at the specified grid position.
+     * Uses centre-origin so that rotation and flipping work in-place.
+     */
+    private addArrowTile(
+        frameIndex: number,
+        gridX: number,
+        gridY: number,
+        tileSize: number,
+        flipX: boolean,
+        flipY: boolean,
+        rotation: number,
+    ): void {
+        const tile = this.scene.add.image(
+            (gridX + 0.5) * tileSize,
+            (gridY + 0.5) * tileSize,
+            this.tilesetKey,
+            frameIndex,
+        );
+        tile.setOrigin(0.5, 0.5);
+        tile.setFlipX(flipX);
+        tile.setFlipY(flipY);
+        tile.setRotation(rotation);
+        this.container.add(tile);
+        this.backgroundTiles.push(tile);
     }
 
     /**
