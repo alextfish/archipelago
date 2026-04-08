@@ -35,5 +35,5 @@
       "@core/*": ["core/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "test"]
 }

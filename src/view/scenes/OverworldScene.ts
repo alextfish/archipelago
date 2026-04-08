@@ -444,7 +444,6 @@ export class OverworldScene extends Phaser.Scene {
       if (this.bridgesLayer && this.collisionLayers.length > 0 && !this.bridgeManager) {
         console.log('Creating bridge manager now that tiledMapData is loaded');
         this.bridgeManager = new OverworldBridgeManager(
-          this.map,
           this.bridgesLayer,
           this.collisionLayers, // Pass all collision layers
           this.collisionArray,

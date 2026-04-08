@@ -29,7 +29,6 @@ export class OverworldBridgeManager {
     private bakedTilePositions: Map<string, Array<{ tileX: number; tileY: number }>> = new Map();
 
     constructor(
-        private map: Phaser.Tilemaps.Tilemap,
         private bridgesLayer: Phaser.Tilemaps.TilemapLayer,
         private collisionLayers: Phaser.Tilemaps.TilemapLayer[],
         private collisionArray: number[][],
@@ -309,22 +308,15 @@ export class OverworldBridgeManager {
 
         console.log(`  Clearing tiles from (${minTileX},${minTileY}) to (${maxTileX},${maxTileY})`);
 
-        // Get the immutable collision layer to restore original values
-        const collisionLayer = this.map.getLayer('collision');
-        if (!collisionLayer) {
-            console.error('OverworldBridgeManager: No collision layer found in tilemap!');
-            return;
-        }
-
         // Clear bridge tiles and restore collision
         for (let tileY = minTileY; tileY <= maxTileY; tileY++) {
             for (let tileX = minTileX; tileX <= maxTileX; tileX++) {
                 // Remove bridge tile
                 this.bridgesLayer.removeTileAt(tileX, tileY);
 
-                // Restore original collision from Tiled map's collision layer
-                const collisionTile = collisionLayer.tilemapLayer.getTileAt(tileX, tileY);
-                const hasCollision = collisionTile !== null;
+                // Determine original blocked state by checking ALL collision layers.
+                // This mirrors how setupCollisionDetection builds the initial collisionArray.
+                const hasCollision = this.collisionLayers.some(layer => layer.getTileAt(tileX, tileY) !== null);
 
                 // Restore collision on all physics collision layers
                 for (const physicsCollisionLayer of this.collisionLayers) {
