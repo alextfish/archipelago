@@ -124,9 +124,12 @@ export class ConstraintFeedbackDisplay {
 
       // The placer's topLeft is the content (glyph) area; the rendered bubble has a
       // 1-tile border on every side, so the container sits 1 tile up and left.
+      // An extra tile of separation in the arrow direction keeps the bubble clear of
+      // the NPC sprite.
+      const off = directionGridOffset(direction);
       const containerWorld = this.gridMapper.gridToWorld(
-        placement.topLeft.x - 1,
-        placement.topLeft.y - 1,
+        placement.topLeft.x - 1 + off.dx,
+        placement.topLeft.y - 1 + off.dy,
       );
 
       const bubble = new SpeechBubble(this.scene, this.tilesetKey);
@@ -191,4 +194,19 @@ function bubbleDirection(topLeft: Point, npcPosition: Point): BubbleDirection {
   if (topLeft.y > npcPosition.y) return 'below';
   if (topLeft.x > npcPosition.x) return 'right';
   return 'left';
+}
+
+/**
+ * Returns the extra grid-cell offset to apply when converting the placer's
+ * topLeft into a container world position, so that the full bubble
+ * (including its 1-tile border) sits one tile away from the NPC in the
+ * arrow direction rather than directly adjacent.
+ */
+function directionGridOffset(direction: BubbleDirection): { dx: number; dy: number } {
+  switch (direction) {
+    case 'right': return { dx: 1, dy: 0 };
+    case 'left': return { dx: -1, dy: 0 };
+    case 'above': return { dx: 0, dy: -1 };
+    case 'below': return { dx: 0, dy: 1 };
+  }
 }
