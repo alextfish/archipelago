@@ -19,12 +19,14 @@ import type { GridToWorldMapper } from './GridToWorldMapper';
 import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
 import { SpeechBubblePlacer, type BubbleRequest } from '@model/puzzle/SpeechBubblePlacer';
 import type { Point } from '@model/puzzle/Point';
+import { getNPCSpriteKey } from './NPCSpriteHelper';
 
 export class ConstraintFeedbackDisplay {
   private scene: Phaser.Scene;
   private gridMapper: GridToWorldMapper;
   private glyphRegistry: LanguageGlyphRegistry;
   private tilesetKey: string;
+  // @ts-expect-error TS6133: stored for future use, not yet read
   private npcSpriteKey: string;
   private language: string;
   private depth: number;
@@ -71,18 +73,25 @@ export class ConstraintFeedbackDisplay {
     // First pass: resolve islands and parse glyphs so we can build placer requests.
     type ItemData = {
       item: ConstraintDisplayItem;
-      island: { id: string; x: number; y: number };
+      npcGridPos: { x: number; y: number };
       glyphFrames: number[];
     };
     const itemData: ItemData[] = [];
     const requests: BubbleRequest[] = [];
 
     for (const item of items) {
-      const island = puzzle.islands.find(i => i.id === item.elementID);
-      if (!island) continue;
+      let npcGridPos: { x: number; y: number };
+      if (item.position) {
+        // Bridge-based constraint: use the supplied grid position directly
+        npcGridPos = item.position;
+      } else {
+        const island = puzzle.islands.find(i => i.id === item.elementID);
+        if (!island) continue;
+        npcGridPos = { x: island.x, y: island.y };
+      }
       const glyphFrames = this.glyphRegistry.parseGlyphs(this.language, item.glyphMessage);
-      itemData.push({ item, island, glyphFrames });
-      requests.push({ npcPosition: { x: island.x, y: island.y }, width: glyphFrames.length });
+      itemData.push({ item, npcGridPos, glyphFrames });
+      requests.push({ npcPosition: npcGridPos, width: glyphFrames.length });
     }
 
     if (itemData.length === 0) return;
@@ -92,17 +101,20 @@ export class ConstraintFeedbackDisplay {
 
     // Second pass: create NPC expressions and positioned speech bubbles.
     for (let i = 0; i < itemData.length; i++) {
-      const { item, island, glyphFrames } = itemData[i];
+      const { item, glyphFrames } = itemData[i];
       const placement = placements[i];
 
       // Update existing NPC sprite texture to show appropriate expression
       const isSatisfied = item.glyphMessage.trim() === 'good';
-      const existingNPC = this.existingNPCSprites.get(island.id);
+      const existingNPC = this.existingNPCSprites.get(item.elementID);
       if (existingNPC) {
-        if (!this.originalNPCTextures.has(island.id)) {
-          this.originalNPCTextures.set(island.id, existingNPC.texture.key);
+        // Save original texture if not already saved
+        if (!this.originalNPCTextures.has(item.elementID)) {
+          this.originalNPCTextures.set(item.elementID, existingNPC.texture.key);
         }
-        const baseSprite = item.constraintType === 'IslandBridgeCountConstraint' ? 'Ruby' : 'sailorNS';
+
+        // Choose NPC sprite based on constraint type
+        const baseSprite = getNPCSpriteKey(item.constraintType);
         const spriteKey = isSatisfied ? `${baseSprite} happy` : `${baseSprite} frown`;
         existingNPC.setTexture(spriteKey, 0);
       }

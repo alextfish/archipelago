@@ -588,21 +588,14 @@ export class MapPuzzleExtractor {
         const bridgeTypes: Array<{ id: string; colour?: string; length?: number; count?: number; width?: number; style?: string }> = [];
         const metadata = definition.metadata;
 
-        // Parse bridges="3,3,3" or "3, 3, 3" format (common TMX format)
+        // Parse bridges="3,3,3" or "3, 3, 3" format (common TMX format),
+        // with optional "+" suffix for StrutBridges (e.g. "3,2,3+,4+")
         if (metadata.bridges) {
-            const lengths = metadata.bridges.split(',').map(s => parseInt(s.trim()));
-            const lengthCounts = this.countOccurrences(lengths);
-
-            for (const [length, count] of lengthCounts) {
-                bridgeTypes.push({
-                    id: `fixed_${length}`,
-                    colour: metadata.bridge_colour || '#8B4513',
-                    length,
-                    count,
-                    width: 1,
-                    style: 'wooden'
-                });
-            }
+            const parsed = BridgePuzzle.parseBridgesString(
+                metadata.bridges,
+                metadata.bridge_colour || '#8B4513'
+            );
+            bridgeTypes.push(...parsed);
         }
         // Fallback: Parse bridge_lengths="4,3,3,2,2,2" format (legacy)
         else if (metadata.bridge_lengths) {

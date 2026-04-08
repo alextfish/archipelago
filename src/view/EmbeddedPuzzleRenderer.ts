@@ -13,6 +13,7 @@ import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry
 import type { ConstraintDisplayItem } from '@model/puzzle/constraints/ConstraintDisplayItem';
 import { parseNumBridgesConstraint } from '@model/puzzle/Island';
 import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
+import { getNPCSpriteKey, updateStrutBridgeNPCSprites } from './NPCSpriteHelper';
 
 /**
  * Puzzle renderer that works embedded within the overworld scene
@@ -30,6 +31,7 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
     private islandGraphics: Map<string, Phaser.GameObjects.Sprite> = new Map();
     private islandLabels: Map<string, Phaser.GameObjects.Text> = new Map();
     private constraintNPCs: Map<string, Phaser.GameObjects.Sprite> = new Map();
+    private strutBridgeNPCs: Map<string, Phaser.GameObjects.Sprite> = new Map();
     private constraintNumbers: Map<string, Phaser.GameObjects.Sprite> = new Map();
     private bridgeGraphics: Map<string, Phaser.GameObjects.Container> = new Map();
     private bridgeHitZones: Phaser.GameObjects.Zone[] = [];
@@ -97,6 +99,17 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
                 this.createBridge(bridge);
             }
         }
+
+        // Manage StrutBridge NPCs: show when placed, hide when not
+        this.updateStrutBridgeNPCs(puzzle);
+    }
+
+    private updateStrutBridgeNPCs(puzzle: BridgePuzzle): void {
+        updateStrutBridgeNPCSprites(puzzle, this.strutBridgeNPCs, this.gridMapper, (worldPos) => {
+            const npc = this.scene.add.sprite(worldPos.x, worldPos.y, getNPCSpriteKey('BridgeMustCoverIslandConstraint'), 0);
+            this.puzzleContainer.add(npc);
+            return npc;
+        });
     }
 
     showPreview(start: Point, end: Point, bridgeType: BridgeType): void {
@@ -157,6 +170,11 @@ export class EmbeddedPuzzleRenderer implements IPuzzleView, PuzzleRenderer {
             npc.destroy();
         }
         this.constraintNPCs.clear();
+        // Destroy strut bridge NPCs (managed separately from constraintNPCs)
+        for (const npc of this.strutBridgeNPCs.values()) {
+            npc.destroy();
+        }
+        this.strutBridgeNPCs.clear();
 
         // Destroy all constraint number sprites
         for (const num of this.constraintNumbers.values()) {
