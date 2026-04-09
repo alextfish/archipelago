@@ -25,6 +25,8 @@ import { getDoorSpriteFrame } from '@view/DoorSpriteRegistry';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import { CollisionTileClassifier } from '@model/overworld/CollisionTileClassifier';
 import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
+import { RiverChannelExtractor } from '@model/overworld/RiverChannelExtractor';
+import { WaterPropagationEngine } from '@model/overworld/WaterPropagationEngine';
 import type { TranslationModeScene } from '@view/scenes/TranslationModeScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { GridToWorldMapper } from '@view/GridToWorldMapper';
@@ -79,6 +81,26 @@ export class OverworldScene extends Phaser.Scene {
   // tiles look dry in the overworld. Keyed by "tileX,tileY". Stored so the tile can be
   // restored if the player re-enters and re-floods those squares.
   private waterTileGidCache: Map<string, { gid: number; layerName: string }> = new Map();
+
+  /** Merged tile data from all Tiled `water` layers — built once at load time and used by
+   * RiverChannelExtractor to trace inter-puzzle river channels. */
+  private mergedWaterLayerData?: number[];
+
+  /** Registry of pontoon tiles found on "pontoons" layers at map-load time.
+   * Keyed by "tileX,tileY". Each entry carries enough data to swap the tile and
+   * update its collision when the water level at that position changes. */
+  private pontoonTiles: Map<string, {
+    tileX: number;
+    tileY: number;
+    /** Current GID on the pontoons Tiled layer. */
+    currentGID: number;
+    /** Layer name the tile lives on (e.g. "Forest/pontoons"). */
+    layerName: string;
+    /** Whether the current tile variant is the high-water (raised) version. */
+    isHigh: boolean;
+    /** Signed offset to add to currentGID to produce the alternate variant. */
+    toggleOffset: number;
+  }> = new Map();
 
   // Door system
   private doors: Door[] = [];
@@ -442,6 +464,12 @@ export class OverworldScene extends Phaser.Scene {
       // flowing water before solving the puzzle.
       this.applyInitialFlowPuzzleCollision(puzzles);
 
+      // Merge all `water` Tiled layers into a single master grid, then wire up
+      // RiverChannelExtractor / WaterPropagationEngine so that downstream puzzles
+      // (e.g. flowPuzzle2) receive edge inputs from upstream sources (e.g. flowPuzzle1).
+      this.mergedWaterLayerData = this.buildMergedWaterLayer();
+      this.wireRiverChannels(puzzles);
+
       // Create puzzle controller now that we have all dependencies
       this.puzzleController = new OverworldPuzzleController(
         this,
@@ -506,6 +534,283 @@ export class OverworldScene extends Phaser.Scene {
         this.collisionManager.applyFlowWaterCollision(wetWorldTiles);
         console.log(`Applied initial water blocking for FlowPuzzle "${puzzleId}": ${wetWorldTiles.length} tiles blocked`);
       }
+
+      // Set initial pontoon states to match water level
+      this.updatePontoonVisuals(puzzle, puzzleBounds);
+    }
+  }
+
+  /**
+   * Build a single flat tile-data array by OR-merging all Tiled `water` layers.
+   * Any position that is non-zero in any water layer is non-zero in the result.
+   * Stored on the scene so the merged grid is only computed once at load time.
+   */
+  private buildMergedWaterLayer(): number[] | undefined {
+    if (!this.tiledMapData) return undefined;
+
+    const mapWidth: number = this.tiledMapData.width ?? 0;
+    const mapHeight: number = this.tiledMapData.height ?? 0;
+    const merged = new Array<number>(mapWidth * mapHeight).fill(0);
+
+    const waterLayers = TiledLayerUtils.findTileLayersByName(this.tiledMapData.layers, 'water');
+    console.log(`[MergedWater] Merging ${waterLayers.length} water layer(s) into master grid`);
+
+    for (const layer of waterLayers) {
+      const data: number[] = layer.data.data ?? [];
+      for (let i = 0; i < data.length; i++) {
+        if (data[i] && data[i] > 0) {
+          merged[i] = data[i]; // last-writer-wins; any non-zero value marks a water tile
+        }
+      }
+    }
+
+    const waterTileCount = merged.filter(v => v > 0).length;
+    console.log(`[MergedWater] Master grid has ${waterTileCount} water tiles`);
+    return merged;
+  }
+
+  /** Infer the edge direction of a flow-square that sits on the border of a puzzle region. */
+  private static inferEdgeDirection(
+    lx: number, ly: number, width: number, height: number
+  ): 'N' | 'S' | 'E' | 'W' {
+    if (ly === 0) return 'N';
+    if (ly === height - 1) return 'S';
+    if (lx === 0) return 'W';
+    if (lx === width - 1) return 'E';
+    // Fallback for interior edge outputs — treat as East (shouldn't occur for valid edge outputs)
+    return 'E';
+  }
+
+  /**
+   * Wire up RiverChannelExtractor → WaterPropagationEngine → OverworldGameState for
+   * inter-puzzle water propagation.  Called once after all puzzles are loaded.
+   *
+   * Builds a `puzzleRegions` map from every FlowPuzzle's tile bounds and edge outputs,
+   * runs channel extraction on the merged water grid, initialises the propagation engine,
+   * then performs an initial BFS propagation so downstream puzzles (e.g. flowPuzzle2)
+   * receive their edge inputs from upstream sources (e.g. flowPuzzle1) right at game start.
+   */
+  private wireRiverChannels(
+    puzzles: Map<string, import('@model/puzzle/BridgePuzzle').BridgePuzzle>
+  ): void {
+    if (!this.tiledMapData || !this.mergedWaterLayerData) {
+      console.warn('[RiverChannels] tiledMapData or merged water layer unavailable — skipping');
+      return;
+    }
+
+    const tileW: number = this.tiledMapData.tilewidth ?? 32;
+    const tileH: number = this.tiledMapData.tileheight ?? 32;
+
+    // ── 1. Build puzzleRegions ───────────────────────────────────────────────
+    const puzzleRegions = new Map<string, {
+      bounds: { tileX: number; tileY: number; width: number; height: number };
+      edgeTiles: { x: number; y: number; edge: 'N' | 'S' | 'E' | 'W' }[];
+    }>();
+
+    for (const [puzzleId, puzzle] of puzzles) {
+      if (!(puzzle instanceof FlowPuzzle)) continue;
+
+      const pixelBounds = this.puzzleManager.getPuzzleBounds(puzzleId);
+      if (!pixelBounds) continue;
+
+      const tileX = Math.floor(pixelBounds.x / tileW);
+      const tileY = Math.floor(pixelBounds.y / tileH);
+      const width = Math.round(pixelBounds.width / tileW);
+      const height = Math.round(pixelBounds.height / tileH);
+
+      const edgeTiles: { x: number; y: number; edge: 'N' | 'S' | 'E' | 'W' }[] = [];
+      for (let ly = 0; ly < puzzle.height; ly++) {
+        for (let lx = 0; lx < puzzle.width; lx++) {
+          const isBorder = lx === 0 || lx === puzzle.width - 1 || ly === 0 || ly === puzzle.height - 1;
+          if (isBorder && puzzle.getFlowSquare(lx, ly)) {
+            edgeTiles.push({
+              x: lx,
+              y: ly,
+              edge: OverworldScene.inferEdgeDirection(lx, ly, width, height),
+            });
+          }
+        }
+      }
+
+      puzzleRegions.set(puzzleId, { bounds: { tileX, tileY, width, height }, edgeTiles });
+      console.log(
+        `[RiverChannels] Puzzle "${puzzleId}": tile origin (${tileX},${tileY}) ` +
+        `${width}×${height}, ${edgeTiles.length} edge output(s)`
+      );
+    }
+
+    if (puzzleRegions.size === 0) {
+      console.log('[RiverChannels] No FlowPuzzles found — skipping channel extraction');
+      return;
+    }
+
+    // ── 2. Extract channels via flood-fill on merged water grid ──────────────
+    // Pass a synthetic tiledMapData with the merged layer accessible by a known name at the
+    // top level so RiverChannelExtractor.extractChannels can find it with a flat .find().
+    const MERGED_LAYER_NAME = '__mergedWater__';
+    const syntheticMapData = {
+      ...this.tiledMapData,
+      layers: [
+        { name: MERGED_LAYER_NAME, type: 'tilelayer', data: this.mergedWaterLayerData },
+        ...(this.tiledMapData.layers ?? []),
+      ],
+    };
+
+    const channels = RiverChannelExtractor.extractChannels(syntheticMapData, MERGED_LAYER_NAME, puzzleRegions);
+
+    console.log(`[RiverChannels] Extracted ${channels.length} river channel(s):`);
+    for (const ch of channels) {
+      console.log(`  ${ch.id}: ${ch.sourcePuzzleID} → ${ch.targetPuzzleID}, ${ch.tiles.length} tile(s)`);
+    }
+
+    // ── 3. Initialise propagation engine ────────────────────────────────────
+    const waterEngine = new WaterPropagationEngine();
+    waterEngine.setRiverChannels(channels);
+    this.gameState.initializeWaterPropagation(waterEngine, this.puzzleManager);
+
+    // ── 4. BFS initial propagation ──────────────────────────────────────────
+    // Process each FlowPuzzle once; any downstream puzzle whose edge inputs change is
+    // queued for re-processing (handles chains: A → B → C).
+    const toProcess = new Set<string>(puzzleRegions.keys());
+    const processed = new Set<string>();
+    let rounds = 0;
+
+    while (toProcess.size > 0 && rounds < 10) {
+      rounds++;
+      for (const puzzleId of Array.from(toProcess)) {
+        const puzzle = puzzles.get(puzzleId);
+        if (!(puzzle instanceof FlowPuzzle)) {
+          toProcess.delete(puzzleId);
+          continue;
+        }
+
+        const result = this.gameState.updateFlowPuzzleWaterState(puzzleId, puzzle);
+        processed.add(puzzleId);
+        toProcess.delete(puzzleId);
+
+        // Apply edge inputs + re-derive water state for each affected downstream puzzle
+        for (const [targetId, inputs] of result.affectedPuzzles) {
+          const targetPuzzle = puzzles.get(targetId);
+          if (!(targetPuzzle instanceof FlowPuzzle)) continue;
+
+          console.log(
+            `[RiverChannels] Applying ${inputs.length} edge input(s) to "${targetId}" ` +
+            `from "${puzzleId}"`
+          );
+
+          // Recompute water in the downstream puzzle
+          targetPuzzle.setEdgeInputs(inputs);
+
+          // Apply collision blocking for newly-wet tiles
+          const targetBounds = this.puzzleManager.getPuzzleBounds(targetId);
+          if (targetBounds) {
+            const wetTiles: { tileX: number; tileY: number }[] = [];
+            const originTileX = Math.floor(targetBounds.x / tileW);
+            const originTileY = Math.floor(targetBounds.y / tileH);
+            for (let ly = 0; ly < targetPuzzle.height; ly++) {
+              for (let lx = 0; lx < targetPuzzle.width; lx++) {
+                if (targetPuzzle.tileHasWater(lx, ly)) {
+                  wetTiles.push({ tileX: originTileX + lx, tileY: originTileY + ly });
+                }
+              }
+            }
+            if (wetTiles.length > 0) {
+              this.collisionManager.applyFlowWaterCollision(wetTiles);
+            }
+            this.updatePontoonVisuals(targetPuzzle, targetBounds);
+            this.updateFlowWaterVisuals(targetPuzzle, targetBounds);
+          }
+
+          // Queue for propagation if not already done
+          if (!processed.has(targetId)) {
+            toProcess.add(targetId);
+          }
+        }
+      }
+    }
+
+    // ── 5. Diagnostics ──────────────────────────────────────────────────────
+    for (const [puzzleId] of puzzleRegions) {
+      const puzzle = puzzles.get(puzzleId);
+      if (!(puzzle instanceof FlowPuzzle)) continue;
+
+      const bounds = this.puzzleManager.getPuzzleBounds(puzzleId);
+      if (!bounds) continue;
+
+      let waterCount = 0;
+      let pontoonHighCount = 0;
+      let pontoonLowCount = 0;
+      const originTileX = Math.floor(bounds.x / tileW);
+      const originTileY = Math.floor(bounds.y / tileH);
+
+      for (let ly = 0; ly < puzzle.height; ly++) {
+        for (let lx = 0; lx < puzzle.width; lx++) {
+          if (puzzle.tileHasWater(lx, ly)) waterCount++;
+          const key = `${originTileX + lx},${originTileY + ly}`;
+          const pontoon = this.pontoonTiles.get(key);
+          if (pontoon) {
+            if (pontoon.isHigh) pontoonHighCount++;
+            else pontoonLowCount++;
+          }
+        }
+      }
+      console.log(
+        `[RiverChannels] "${puzzleId}" final state: ${waterCount} wet tile(s), ` +
+        `${pontoonHighCount} high pontoon(s), ${pontoonLowCount} low pontoon(s)`
+      );
+    }
+  }
+
+  /**
+   * Update pontoon tiles within a FlowPuzzle's bounds to match the current water state.
+   *
+   * When a pontoon tile's position has water: ensure it shows the high-water (isHigh) variant
+   * and is WALKABLE. When dry: ensure it shows the low-water (!isHigh) variant and is
+   * WALKABLE_LOW.
+   *
+   * The tile is swapped on the Tiled "pontoons" layer using the stored toggleOffset, and the
+   * pontoonTiles registry entry is updated to reflect the new state.
+   */
+  private updatePontoonVisuals(puzzle: FlowPuzzle, puzzleBounds: { x: number; y: number }): void {
+    if (!this.tiledMapData) return;
+
+    const tileW: number = this.tiledMapData.tilewidth ?? 32;
+    const tileH: number = this.tiledMapData.tileheight ?? 32;
+    const originTileX = Math.floor(puzzleBounds.x / tileW);
+    const originTileY = Math.floor(puzzleBounds.y / tileH);
+
+    for (let ly = 0; ly < puzzle.height; ly++) {
+      for (let lx = 0; lx < puzzle.width; lx++) {
+        const tileX = originTileX + lx;
+        const tileY = originTileY + ly;
+        const key = `${tileX},${tileY}`;
+
+        const pontoon = this.pontoonTiles.get(key);
+        if (!pontoon) continue;
+
+        const waterHere = puzzle.tileHasWater(lx, ly);
+        const shouldBeHigh = waterHere;
+
+        if (pontoon.isHigh === shouldBeHigh) continue; // already correct variant
+
+        // Swap to alternate variant
+        const newGID = pontoon.currentGID + pontoon.toggleOffset;
+
+        // Update the pontoons Phaser layer
+        const layerData = this.map.layers.find(l => l.name === pontoon.layerName);
+        if (layerData?.tilemapLayer) {
+          layerData.tilemapLayer.putTileAt(newGID, tileX, tileY);
+        }
+
+        // Update collision
+        const newCollisionType = shouldBeHigh ? CollisionType.WALKABLE : CollisionType.WALKABLE_LOW;
+        this.setCollisionAt(tileX, tileY, newCollisionType);
+
+        // Update registry to reflect new state. The next toggle is the inverse offset.
+        pontoon.currentGID = newGID;
+        pontoon.isHigh = shouldBeHigh;
+        pontoon.toggleOffset = -pontoon.toggleOffset;
+      }
     }
   }
 
@@ -561,6 +866,9 @@ export class OverworldScene extends Phaser.Scene {
         }
       }
     }
+
+    // Update pontoons to match the current water state
+    this.updatePontoonVisuals(puzzle, puzzleBounds);
   }
 
   /**
@@ -1253,7 +1561,7 @@ export class OverworldScene extends Phaser.Scene {
    */
   private setupVisualLayers(tilesets: Phaser.Tilemaps.Tileset[]) {
     // Visual layer suffixes to auto-render (e.g., "Beach/water", "Forest/ground")
-    const visualLayerSuffixes = ['beach', 'lowground', 'water', 'grass', 'ground', 'obstacles'];
+    const visualLayerSuffixes = ['beach', 'lowground', 'water', 'pontoons', 'grass', 'ground', 'obstacles'];
 
     console.log('Setting up visual layers...');
 
@@ -1452,6 +1760,36 @@ export class OverworldScene extends Phaser.Scene {
         }
       }
       console.log(`Visual layer scan: ${stairsTiles.size} stairs tiles, ${lowgroundTiles.size} lowground tiles`);
+
+      // Scan all "pontoons" layers and build the pontoonTiles registry.
+      // Pontoon tiles start in the state defined by their tileset (isHigh / !isHigh) and their
+      // collision is set here to match; it will be updated at runtime as water levels change.
+      const pontoonLayers = TiledLayerUtils.findTileLayersByName(this.tiledMapData.layers, 'pontoons');
+      for (const layer of pontoonLayers) {
+        const data: number[] = layer.data.data ?? [];
+        for (let i = 0; i < data.length; i++) {
+          const gid = data[i];
+          if (!gid) continue;
+          const props = TiledLayerUtils.getTileProperties(tilesets, gid);
+          if (props['isPontoon'] !== true) continue;
+
+          const tileX = i % mapWidth;
+          const tileY = Math.floor(i / mapWidth);
+          const key = `${tileX},${tileY}`;
+          const isHigh = props['isHigh'] === true;
+          const toggleOffset = typeof props['toggleOffset'] === 'number' ? props['toggleOffset'] as number : 0;
+
+          this.pontoonTiles.set(key, {
+            tileX,
+            tileY,
+            currentGID: gid,
+            layerName: layer.fullPath,
+            isHigh,
+            toggleOffset,
+          });
+        }
+      }
+      console.log(`Pontoon scan: ${this.pontoonTiles.size} pontoon tiles registered`);
     }
 
     this.collisionArray = [];
@@ -1506,6 +1844,15 @@ export class OverworldScene extends Phaser.Scene {
     }
 
     console.log(`Collision tiles: BLOCKED=${blockedCount}, WALKABLE=${walkableCount}, WALKABLE_LOW=${walkableLowCount}, STAIRS=${stairsCount}`);
+
+    // Post-pass: apply pontoon collision, overriding whatever the main loop computed.
+    // Pontoons are not on collision layers so their positions default to WALKABLE;
+    // this pass enforces the correct type based on each tile's initial isHigh state.
+    for (const { tileX, tileY, isHigh } of this.pontoonTiles.values()) {
+      if (tileY >= 0 && tileY < mapHeight && tileX >= 0 && tileX < mapWidth) {
+        this.collisionArray[tileY][tileX] = isHigh ? CollisionType.WALKABLE : CollisionType.WALKABLE_LOW;
+      }
+    }
   }
 
   update() {
