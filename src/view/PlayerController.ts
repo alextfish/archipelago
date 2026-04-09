@@ -10,12 +10,6 @@ const TARGET_REACHED_THRESHOLD = 5; // Pixels - how close is "close enough" to t
 const TILE_SIZE = 32; // Must match the map's tilewidth/tileheight
 
 /**
- * Vertical offset from the sprite centre to the player's feet, in pixels.
- * Matches the old physics-body offset so tile lookups remain consistent.
- */
-const FOOT_Y_OFFSET = 8;
-
-/**
  * PlayerController manages the player character in the overworld.
  * Handles player movement, animations, and collision setup.
  *
@@ -173,9 +167,8 @@ export class PlayerController {
     private updatePlayerLayerFromTile(): void {
         if (!this.getCollisionAt) return;
 
-        // Use the feet position (FOOT_Y_OFFSET below sprite centre) for tile lookup
         const tileX = Math.floor(this.player.x / TILE_SIZE);
-        const tileY = Math.floor((this.player.y + FOOT_Y_OFFSET) / TILE_SIZE);
+        const tileY = Math.floor(this.player.y / TILE_SIZE);
 
         const currentType = this.getCollisionAt(tileX, tileY);
 
@@ -369,9 +362,9 @@ export class PlayerController {
         const nextY = this.player.y + dy;
 
         const currentTileX = Math.floor(this.player.x / TILE_SIZE);
-        const currentTileY = Math.floor((this.player.y + FOOT_Y_OFFSET) / TILE_SIZE);
+        const currentTileY = Math.floor(this.player.y / TILE_SIZE);
         const nextTileX = Math.floor(nextX / TILE_SIZE);
-        const nextTileY = Math.floor((nextY + FOOT_Y_OFFSET) / TILE_SIZE);
+        const nextTileY = Math.floor(nextY / TILE_SIZE);
 
         // Sub-tile movement within the same tile is always allowed
         if (nextTileX === currentTileX && nextTileY === currentTileY) {
@@ -513,19 +506,11 @@ export class PlayerController {
     }
 
     /**
-     * Get the player's current position
+     * Get the player's current position. With origin (0.5, 0.75), player.y is
+     * the feet/ground position — no additional offset is needed for tile lookups.
      */
     getPosition(): { x: number; y: number } {
         return { x: this.player.x, y: this.player.y };
-    }
-
-    /**
-     * Get the player's feet position (sprite centre + FOOT_Y_OFFSET).
-     * This is the true position of the player on the map and should be used
-     * for all tile-based proximity and entry checks.
-     */
-    getFeetPosition(): { x: number; y: number } {
-        return { x: this.player.x, y: this.player.y + FOOT_Y_OFFSET };
     }
 
     /**
