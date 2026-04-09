@@ -610,8 +610,8 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
         hitZone.on('pointerdown', () => {
             if (this.isPlacing) return;
             const ids: string[] = (opts as { bridgeIds?: string[] }).bridgeIds ?? (opts.bridgeId ? [opts.bridgeId] : []);
-            const emitID = ids.length ? ids[ids.length - 1] : opts.bridgeId;
-            this.scene.events.emit('bridge-clicked', emitID);
+            const emitId = ids.length ? ids[ids.length - 1] : opts.bridgeId;
+            this.scene.events.emit('bridge-clicked', emitId);
         });
     }
 }
