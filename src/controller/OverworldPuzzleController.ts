@@ -48,7 +48,8 @@ export class OverworldPuzzleController {
      */
     public async enterPuzzle(
         puzzleId: string,
-        onModeChange: (mode: 'puzzle') => void
+        onModeChange: (mode: 'puzzle') => void,
+        onFlowTileChanged?: (lx: number, ly: number, hasWater: boolean) => void
     ): Promise<void> {
         console.log(`OverworldPuzzleController: Entering puzzle: ${puzzleId}`);
 
@@ -111,6 +112,11 @@ export class OverworldPuzzleController {
 
             // Inject glyph tracker so constraint speech bubbles register for Translation Mode
             this.puzzleRenderer.setGlyphTracker(this.gameState.glyphTracker);
+
+            // Wire the per-tile visual callback before init() so syncVisuals() fires correctly
+            if (this.puzzleRenderer instanceof FlowPuzzleRenderer && onFlowTileChanged) {
+                this.puzzleRenderer.setTileVisualCallback(onFlowTileChanged);
+            }
 
             // Create puzzle controller with host callbacks
             this.activePuzzleController = new PuzzleController(
@@ -249,7 +255,8 @@ export class OverworldPuzzleController {
      */
     public async exitPuzzle(
         success: boolean,
-        onModeChange: (mode: 'exploration') => void
+        onModeChange: (mode: 'exploration') => void,
+        onBeforeTransition?: () => void
     ): Promise<void> {
         // Guard against re-entrant calls (prevents infinite loop when puzzle is solved)
         if (this.isExitingPuzzle) {
@@ -347,6 +354,10 @@ export class OverworldPuzzleController {
                     );
                 }
             }
+
+            // Update visuals (water tiles, pontoons) before the camera pan so they
+            // are correct during the transition rather than only after it finishes.
+            onBeforeTransition?.();
 
             // Return camera to overworld
             await this.cameraManager.transitionToOverworld();

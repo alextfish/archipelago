@@ -394,6 +394,19 @@ export class PlayerController {
         const currentType = this.getCollisionAt(currentTileX, currentTileY);
         const targetType = this.getCollisionAt(nextTileX, nextTileY);
 
+        // For diagonal moves, also validate the two orthogonal intermediate tiles.
+        // If either intermediate is impassable, return false so tryMove's axis-separation
+        // can slide the player along the open axis instead (e.g. up+left → just left when
+        // there's a wall above). This also prevents squeezing through an infinitely thin
+        // corner gap where both intermediates are blocked.
+        if (nextTileX !== currentTileX && nextTileY !== currentTileY) {
+            const hType = this.getCollisionAt(nextTileX, currentTileY); // horizontal step
+            const vType = this.getCollisionAt(currentTileX, nextTileY); // vertical step
+            if (!this.canEnter(currentType, hType) || !this.canEnter(currentType, vType)) {
+                return false;
+            }
+        }
+
         if (this.canEnter(currentType, targetType)) {
             this.player.x = nextX;
             this.player.y = nextY;

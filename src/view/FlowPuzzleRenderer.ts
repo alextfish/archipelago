@@ -7,32 +7,44 @@ import type { FlowSquareSpec, WaterChangeWaves } from '@model/puzzle/FlowTypes';
 /**
  * Extends EmbeddedPuzzleRenderer with FlowPuzzle-specific rendering.
  *
- * Water tiles are represented as coloured overlays for now; switching to sprites
- * only requires changing createTileOverlay() and setTileState() — everything
- * else (wave timing, animation scheduling) is independent of the visual type.
+ * Rather than drawing coloured rectangle overlays, water state is communicated
+ * through a `tileVisualCallback` supplied by OverworldScene.  The callback
+ * manipulates the actual Tiled water/pontoon layers directly so the map tiles
+ * are the source of truth for both puzzle-solving and overworld views.
+ *
+ * Wave animation still staggers tile changes across time; only the mechanism
+ * for each individual tile change has changed.
  */
 export class FlowPuzzleRenderer extends EmbeddedPuzzleRenderer {
     private flowPuzzle: FlowPuzzle | null = null;
-    private waterOverlays: Map<string, Phaser.GameObjects.Rectangle> = new Map();
     private pendingTimers: Phaser.Time.TimerEvent[] = [];
 
-    // Colours for water tile states — change here when switching to sprites
-    private static readonly COLOUR_WATER = 0x3399ff;
-    private static readonly COLOUR_DRY = 0x8b6914;
-    private static readonly ALPHA_OVERLAY = 0.50;
+    /** Called whenever a flow tile's water state should change visually.
+     *  Supplied by OverworldScene so this renderer stays decoupled from Tiled logic. */
+    private tileVisualCallback?: (lx: number, ly: number, hasWater: boolean) => void;
+
     private static readonly WAVE_DELAY_MS = 120;
+
+    // -------------------------------------------------------------------------
+    // Public API
+    // -------------------------------------------------------------------------
+
+    /** Inject the callback that drives actual Tiled tile visuals per flow square. */
+    setTileVisualCallback(cb: (lx: number, ly: number, hasWater: boolean) => void): void {
+        this.tileVisualCallback = cb;
+    }
 
     // -------------------------------------------------------------------------
     // Overrides
     // -------------------------------------------------------------------------
 
     override init(puzzle: BridgePuzzle): void {
-        this.destroyFlowOverlays();
         super.init(puzzle);
 
         if (puzzle instanceof FlowPuzzle) {
             this.flowPuzzle = puzzle;
-            this.initFlowOverlays(puzzle);
+            // Immediately drive Tiled tiles to the puzzle's current water state
+            this.syncVisuals(puzzle);
             // Consume any pending change accumulated during construction
             puzzle.consumePendingWaterChange();
         }
@@ -54,35 +66,7 @@ export class FlowPuzzleRenderer extends EmbeddedPuzzleRenderer {
 
     override destroy(): void {
         this.cancelPendingAnimation();
-        this.destroyFlowOverlays();
         super.destroy();
-    }
-
-    // -------------------------------------------------------------------------
-    // Visual abstraction — only these two methods touch Phaser game objects.
-    // Replace with sprite logic here when the time comes.
-    // -------------------------------------------------------------------------
-
-    private createTileOverlay(key: string, sq: FlowSquareSpec, hasWater: boolean): void {
-        const worldPos = this.gridMapper.gridToWorld(sq.x, sq.y);
-        const cellSize = this.gridMapper.getCellSize();
-        const rect = this.scene.add.rectangle(
-            worldPos.x, worldPos.y,
-            cellSize, cellSize,
-            hasWater ? FlowPuzzleRenderer.COLOUR_WATER : FlowPuzzleRenderer.COLOUR_DRY,
-            FlowPuzzleRenderer.ALPHA_OVERLAY
-        );
-        rect.setOrigin(0, 0);
-        rect.setDepth(99); // Below island/bridge graphics (depth 100)
-        this.puzzleContainer.add(rect);
-        this.waterOverlays.set(key, rect);
-    }
-
-    private setTileState(key: string, hasWater: boolean): void {
-        this.waterOverlays.get(key)?.setFillStyle(
-            hasWater ? FlowPuzzleRenderer.COLOUR_WATER : FlowPuzzleRenderer.COLOUR_DRY,
-            FlowPuzzleRenderer.ALPHA_OVERLAY
-        );
     }
 
     // -------------------------------------------------------------------------
@@ -94,32 +78,32 @@ export class FlowPuzzleRenderer extends EmbeddedPuzzleRenderer {
      * Each wave instantly flips its tiles; only the TIMING is staggered.
      *
      * By the time this is called the puzzle is already in the final state, so
-     * we first reset all affected tiles to their PRE-change colour, then flip
-     * them forward wave-by-wave.
+     * we first reset all affected tiles to their PRE-change visual, then flip
+     * them forward wave-by-wave via tileVisualCallback.
      *
-     * flooding=false → drying:  tiles start WATER-coloured, flip to DRY
-     * flooding=true  → flooding: tiles start DRY-coloured,   flip to WATER
+     * flooding=false → drying:   tiles start wet, flip to dry
+     * flooding=true  → flooding:  tiles start dry, flip to wet
      */
     private playWavesSequentially(waves: WaterChangeWaves, flooding: boolean): void {
         this.cancelPendingAnimation();
 
-        const preState = !flooding; // drying: tiles were wet; flooding: tiles were dry
-        const postState = flooding; // drying: tiles become dry; flooding: tiles become wet
+        const preState = !flooding;
+        const postState = flooding;
 
-        // Reset all affected tiles to their pre-change colour
+        // Reset all affected tiles to their pre-change visual state
         for (const wave of waves) {
             for (const cell of wave) {
-                this.setTileState(`${cell.x},${cell.y}`, preState);
+                this.tileVisualCallback?.(cell.x, cell.y, preState);
             }
         }
 
-        // Flip each wave to post-change colour after its delay
+        // Flip each wave to post-change state after its delay
         waves.forEach((wave, index) => {
             const timer = this.scene.time.delayedCall(
                 index * FlowPuzzleRenderer.WAVE_DELAY_MS,
                 () => {
                     for (const cell of wave) {
-                        this.setTileState(`${cell.x},${cell.y}`, postState);
+                        this.tileVisualCallback?.(cell.x, cell.y, postState);
                     }
                 }
             );
@@ -136,27 +120,17 @@ export class FlowPuzzleRenderer extends EmbeddedPuzzleRenderer {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private initFlowOverlays(puzzle: FlowPuzzle): void {
+    /** Drive all flow tiles to match the puzzle's current water state immediately. */
+    private syncVisuals(puzzle: FlowPuzzle): void {
         for (const sq of this.allFlowSquares(puzzle)) {
-            const key = `${sq.x},${sq.y}`;
-            const hasWater = puzzle.tileHasWater(sq.x, sq.y);
-            this.createTileOverlay(key, sq, hasWater);
+            this.tileVisualCallback?.(sq.x, sq.y, puzzle.tileHasWater(sq.x, sq.y));
         }
     }
 
     private snapToCurrentState(): void {
         this.cancelPendingAnimation();
         if (!this.flowPuzzle) return;
-        for (const [key] of this.waterOverlays) {
-            const [x, y] = key.split(',').map(Number);
-            this.setTileState(key, this.flowPuzzle.tileHasWater(x, y));
-        }
-    }
-
-    private destroyFlowOverlays(): void {
-        this.cancelPendingAnimation();
-        for (const rect of this.waterOverlays.values()) rect.destroy();
-        this.waterOverlays.clear();
+        this.syncVisuals(this.flowPuzzle);
     }
 
     private allFlowSquares(puzzle: FlowPuzzle): FlowSquareSpec[] {

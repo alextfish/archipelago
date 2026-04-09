@@ -791,7 +791,12 @@ export class OverworldScene extends Phaser.Scene {
         const waterHere = puzzle.tileHasWater(lx, ly);
         const shouldBeHigh = waterHere;
 
-        if (pontoon.isHigh === shouldBeHigh) continue; // already correct variant
+        // Always enforce the correct collision type — applyFlowWaterCollision may have
+        // set this tile to BLOCKED even if the pontoon is already in the right visual state.
+        const correctCollisionType = shouldBeHigh ? CollisionType.WALKABLE : CollisionType.WALKABLE_LOW;
+        this.setCollisionAt(tileX, tileY, correctCollisionType);
+
+        if (pontoon.isHigh === shouldBeHigh) continue; // already correct variant, no visual swap needed
 
         // Swap to alternate variant
         const newGID = pontoon.currentGID + pontoon.toggleOffset;
@@ -801,10 +806,6 @@ export class OverworldScene extends Phaser.Scene {
         if (layerData?.tilemapLayer) {
           layerData.tilemapLayer.putTileAt(newGID, tileX, tileY);
         }
-
-        // Update collision
-        const newCollisionType = shouldBeHigh ? CollisionType.WALKABLE : CollisionType.WALKABLE_LOW;
-        this.setCollisionAt(tileX, tileY, newCollisionType);
 
         // Update registry to reflect new state. The next toggle is the inverse offset.
         pontoon.currentGID = newGID;
@@ -826,49 +827,71 @@ export class OverworldScene extends Phaser.Scene {
 
     const tileW: number = this.tiledMapData.tilewidth ?? 32;
     const tileH: number = this.tiledMapData.tileheight ?? 32;
-
-    // Collect all water Tiled layers (e.g. "Forest/water", "Beach/water")
-    const waterLayerData = this.findLayersBySuffix('water');
-
     const originTileX = Math.floor(puzzleBounds.x / tileW);
     const originTileY = Math.floor(puzzleBounds.y / tileH);
 
     for (let ly = 0; ly < puzzle.height; ly++) {
       for (let lx = 0; lx < puzzle.width; lx++) {
         if (!puzzle.getFlowSquare(lx, ly)) continue; // only flow squares have water tiles
+        this.updateSingleFlowTileVisual(originTileX + lx, originTileY + ly, puzzle.tileHasWater(lx, ly));
+      }
+    }
+  }
 
-        const tileX = originTileX + lx;
-        const tileY = originTileY + ly;
-        const key = `${tileX},${tileY}`;
+  /**
+   * Update the visual and collision state for a single flow tile on the overworld map.
+   * Handles both the Tiled water layer (removing/restoring the tile GID) and any
+   * pontoon at the same position.
+   *
+   * This is the per-tile building block used by both `updateFlowWaterVisuals` (bulk
+   * update after puzzle exit) and the `FlowPuzzleRenderer` tile-visual callback
+   * (per-tile wave animation during puzzle solving).
+   */
+  public updateSingleFlowTileVisual(tileX: number, tileY: number, hasWater: boolean): void {
+    const key = `${tileX},${tileY}`;
+    const waterLayerData = this.findLayersBySuffix('water');
 
-        if (puzzle.tileHasWater(lx, ly)) {
-          // Restore the water tile if we previously removed it
-          const cached = this.waterTileGidCache.get(key);
-          if (cached) {
-            const ld = waterLayerData.find(l => l.name === cached.layerName);
-            if (ld?.tilemapLayer) {
-              ld.tilemapLayer.putTileAt(cached.gid, tileX, tileY);
-            }
-            this.waterTileGidCache.delete(key);
-          }
-        } else {
-          // Remove the water tile so dried-up riverbed shows beneath it
-          if (!this.waterTileGidCache.has(key)) {
-            for (const ld of waterLayerData) {
-              const tile = ld.tilemapLayer?.getTileAt(tileX, tileY);
-              if (tile) {
-                this.waterTileGidCache.set(key, { gid: tile.index, layerName: ld.name });
-                ld.tilemapLayer!.removeTileAt(tileX, tileY);
-                break;
-              }
-            }
+    if (hasWater) {
+      // Restore the water tile if we previously removed it
+      const cached = this.waterTileGidCache.get(key);
+      if (cached) {
+        const ld = waterLayerData.find(l => l.name === cached.layerName);
+        if (ld?.tilemapLayer) {
+          ld.tilemapLayer.putTileAt(cached.gid, tileX, tileY);
+        }
+        this.waterTileGidCache.delete(key);
+      }
+    } else {
+      // Remove the water tile so the dried-up riverbed shows beneath it
+      if (!this.waterTileGidCache.has(key)) {
+        for (const ld of waterLayerData) {
+          const tile = ld.tilemapLayer?.getTileAt(tileX, tileY);
+          if (tile) {
+            this.waterTileGidCache.set(key, { gid: tile.index, layerName: ld.name });
+            ld.tilemapLayer!.removeTileAt(tileX, tileY);
+            break;
           }
         }
       }
     }
 
-    // Update pontoons to match the current water state
-    this.updatePontoonVisuals(puzzle, puzzleBounds);
+    // Pontoon at this position (if any): always enforce correct collision and swap
+    // visual variant when the high/low state has changed.
+    const pontoon = this.pontoonTiles.get(key);
+    if (pontoon) {
+      const correctCollision = hasWater ? CollisionType.WALKABLE : CollisionType.WALKABLE_LOW;
+      this.setCollisionAt(tileX, tileY, correctCollision);
+      if (pontoon.isHigh !== hasWater) {
+        const newGID = pontoon.currentGID + pontoon.toggleOffset;
+        const layerData = this.map.layers.find(l => l.name === pontoon.layerName);
+        if (layerData?.tilemapLayer) {
+          layerData.tilemapLayer.putTileAt(newGID, tileX, tileY);
+        }
+        pontoon.currentGID = newGID;
+        pontoon.isHigh = hasWater;
+        pontoon.toggleOffset = -pontoon.toggleOffset;
+      }
+    }
   }
 
   /**
@@ -2450,11 +2473,24 @@ export class OverworldScene extends Phaser.Scene {
       this.input.keyboard?.on('keydown-ESC', this.handleEscapeKey, this);
 
       // Delegate to controller for puzzle lifecycle
+      const puzzleBounds = this.puzzleManager.getPuzzleBounds(puzzleId);
+      const tileW = this.tiledMapData?.tilewidth ?? 32;
+      const tileH = this.tiledMapData?.tileheight ?? 32;
+
       await this.puzzleController.enterPuzzle(puzzleId, (mode: 'puzzle') => {
         this.gameMode = mode;
         // Stop camera follow so it doesn't snap back to player after zoom
         this.cameras.main.stopFollow();
-      });
+      }, puzzleBounds
+        ? (lx, ly, hasWater) => {
+          this.updateSingleFlowTileVisual(
+            Math.floor(puzzleBounds.x / tileW) + lx,
+            Math.floor(puzzleBounds.y / tileH) + ly,
+            hasWater
+          );
+        }
+        : undefined
+      );
 
       // Hide overworld constraint NPCs after camera transition completes
       this.hideConstraintNPCsForPuzzle(puzzleId);
@@ -2517,17 +2553,21 @@ export class OverworldScene extends Phaser.Scene {
         this.gameMode = mode;
         // Resume camera follow after returning to exploration
         this.cameras.main.startFollow(this.player);
+      }, () => {
+        // Called after collision is updated but before the camera pan begins —
+        // update water tile visuals and pontoon states so they are correct during
+        // the transition rather than snapping into place afterwards.
+        if (activePuzzleId) {
+          const exitedPuzzle = this.puzzleManager.getPuzzleById(activePuzzleId);
+          const exitedBounds = this.puzzleManager.getPuzzleBounds(activePuzzleId);
+          if (exitedPuzzle instanceof FlowPuzzle && exitedBounds) {
+            this.updateFlowWaterVisuals(exitedPuzzle, exitedBounds);
+          }
+        }
       });
       console.log('[DIAGNOSTIC] puzzleController.exitPuzzle completed');
 
-      // Update overworld water visuals if this was a FlowPuzzle
-      if (activePuzzleId) {
-        const exitedPuzzle = this.puzzleManager.getPuzzleById(activePuzzleId);
-        const exitedBounds = this.puzzleManager.getPuzzleBounds(activePuzzleId);
-        if (exitedPuzzle instanceof FlowPuzzle && exitedBounds) {
-          this.updateFlowWaterVisuals(exitedPuzzle, exitedBounds);
-        }
-      }
+      // (water visuals already updated in the onBeforeTransition callback above)
 
       // Re-enable player movement
       if (this.playerController) {
@@ -2536,26 +2576,19 @@ export class OverworldScene extends Phaser.Scene {
       }
 
       // Restore all pointer handlers (they were removed by PuzzleInputHandler.destroy())
-      console.log('[DIAGNOSTIC] Restoring input handlers after puzzle exit');
-      console.log('[DIAGNOSTIC] - puzzleEntryPointerHandler exists:', !!this.puzzleEntryPointerHandler);
-      console.log('[DIAGNOSTIC] - pointerMoveHandler exists:', !!this.pointerMoveHandler);
-      console.log('[DIAGNOSTIC] - pointerUpHandler exists:', !!this.pointerUpHandler);
-      console.log('[DIAGNOSTIC] - gameMode:', this.gameMode);
+      console.log('[DIAGNOSTIC] Restoring input handlers after puzzle exit - gameMode:', this.gameMode);
 
       if (this.puzzleEntryPointerHandler) {
         this.input.off('pointerdown', this.puzzleEntryPointerHandler); // Remove first to avoid duplicates
         this.input.on('pointerdown', this.puzzleEntryPointerHandler);
-        console.log('[DIAGNOSTIC] pointerdown handler restored');
       }
       if (this.pointerMoveHandler) {
         this.input.off('pointermove', this.pointerMoveHandler); // Remove first to avoid duplicates
         this.input.on('pointermove', this.pointerMoveHandler);
-        console.log('[DIAGNOSTIC] pointermove handler restored');
       }
       if (this.pointerUpHandler) {
         this.input.off('pointerup', this.pointerUpHandler); // Remove first to avoid duplicates
         this.input.on('pointerup', this.pointerUpHandler);
-        console.log('[DIAGNOSTIC] pointerup handler restored');
       }
 
       console.log('Successfully exited overworld puzzle');
