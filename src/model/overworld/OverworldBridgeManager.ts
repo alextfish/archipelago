@@ -292,10 +292,14 @@ export class OverworldBridgeManager {
 
         console.log(`  Clearing tiles from (${minTileX},${minTileY}) to (${maxTileX},${maxTileY})`);
 
-        // Get the immutable collision layer to restore original values
-        const collisionLayer = this.map.getLayer('collision');
-        if (!collisionLayer) {
-            console.error('OverworldBridgeManager: No collision layer found in tilemap!');
+        // Find all collision layers by suffix — they are named like 'Beach/collision',
+        // 'River/collision', etc., so an exact lookup for 'collision' always returns null.
+        const collisionLayers = this.map.layers
+            .filter(layer => (layer.name === 'collision' || layer.name.endsWith('/collision')) && layer.tilemapLayer)
+            .map(layer => layer.tilemapLayer!);
+
+        if (collisionLayers.length === 0) {
+            console.error('OverworldBridgeManager: No collision layers found in tilemap!');
             return;
         }
 
@@ -305,16 +309,11 @@ export class OverworldBridgeManager {
                 // Remove bridge tile
                 this.bridgesLayer.removeTileAt(tileX, tileY);
 
-                // Restore original collision from Tiled map's collision layer
-                const collisionTile = collisionLayer.tilemapLayer.getTileAt(tileX, tileY);
-                const hasCollision = collisionTile !== null;
+                // Restore original collision: blocked if any collision layer has a tile here
+                const hasCollision = collisionLayers.some(layer => layer.getTileAt(tileX, tileY) !== null);
 
-                // Restore collision type in collision array
-                if (tileY >= 0 && tileY < this.collisionArray.length &&
-                    tileX >= 0 && tileX < this.collisionArray[tileY].length) {
-                    // If original tile was blocked, restore as BLOCKED; otherwise WALKABLE
-                    this.collisionArray[tileY][tileX] = hasCollision ? CollisionType.BLOCKED : CollisionType.WALKABLE;
-                }
+                // Update collision through the collision manager (consistent with bakePuzzleBridges)
+                this.collisionManager.setCollisionAt(tileX, tileY, hasCollision ? CollisionType.BLOCKED : CollisionType.WALKABLE);
             }
         }
 
