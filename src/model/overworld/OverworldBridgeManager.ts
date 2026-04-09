@@ -30,7 +30,6 @@ export class OverworldBridgeManager {
 
     constructor(
         private bridgesLayer: Phaser.Tilemaps.TilemapLayer,
-        private collisionLayers: Phaser.Tilemaps.TilemapLayer[],
         private collisionArray: number[][],
         private tiledMapData: any,
         private collisionManager: any // OverworldScene that has setCollisionAt method
@@ -135,16 +134,8 @@ export class OverworldBridgeManager {
                 this.bakedTilePositions.get(puzzleId)!.push({ tileX, tileY });
             }
 
-            // Remove collision from all collision layers at this position
-            for (const collisionLayer of this.collisionLayers) {
-                const collisionTile = collisionLayer.getTileAt(tileX, tileY);
-                if (collisionTile) {
-                    collisionTile.setCollision(false, false, false, false);
-                }
-            }
-
             // Make walkable by updating collision through collision manager
-            // This updates both the collision array and the Phaser collision layers
+            // This updates the collision array so tryMove sees it as passable
             this.collisionManager.setCollisionAt(tileX, tileY, CollisionType.WALKABLE);
         }
 
@@ -277,14 +268,6 @@ export class OverworldBridgeManager {
 
         for (const { tileX, tileY } of positions) {
             this.bridgesLayer.removeTileAt(tileX, tileY);
-
-            // Re-enable Phaser collision on physics layers at this tile
-            for (const physicsCollisionLayer of this.collisionLayers) {
-                const physicsCollisionTile = physicsCollisionLayer.getTileAt(tileX, tileY);
-                if (physicsCollisionTile) {
-                    physicsCollisionTile.setCollision(true, true, true, true);
-                }
-            }
         }
 
         this.bakedTilePositions.delete(puzzleId);
@@ -317,15 +300,6 @@ export class OverworldBridgeManager {
                 // Determine original blocked state by checking ALL collision layers.
                 // This mirrors how setupCollisionDetection builds the initial collisionArray.
                 const hasCollision = this.collisionLayers.some(layer => layer.getTileAt(tileX, tileY) !== null);
-
-                // Restore collision on all physics collision layers
-                for (const physicsCollisionLayer of this.collisionLayers) {
-                    const physicsCollisionTile = physicsCollisionLayer.getTileAt(tileX, tileY);
-                    if (physicsCollisionTile && hasCollision) {
-                        physicsCollisionTile.setCollision(true, true, true, true);
-                        console.log(`    Restored collision at (${tileX}, ${tileY})`);
-                    }
-                }
 
                 // Restore collision type in collision array
                 if (tileY >= 0 && tileY < this.collisionArray.length &&
