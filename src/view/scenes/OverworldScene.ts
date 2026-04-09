@@ -381,6 +381,9 @@ export class OverworldScene extends Phaser.Scene {
 
     // Create player sprite (no physics body — movement is handled by PlayerController.tryMove)
     this.player = this.add.sprite(playerStart.x, playerStart.y, 'player', 0);
+    // Anchor at 3/4 down the sprite (origin.y = 0.75) so player.y is the feet/ground position,
+    // matching the collision tile lookups directly without any additional offset.
+    this.player.setOrigin(0.5, 0.75);
 
     // Add test marker for player
     if (isTestMode()) {
@@ -1885,7 +1888,8 @@ export class OverworldScene extends Phaser.Scene {
 
       // Update interaction cursor based on player position
       if (this.interactionCursor && this.tiledMapData && this.player) {
-        const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
+        const playerPos = this.playerController.getPosition();
+        const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(playerPos.x, playerPos.y);
 
         // Update cursor's facing direction
         this.interactionCursor.setFacing(this.playerController.getFacingDirection());
@@ -2388,13 +2392,10 @@ export class OverworldScene extends Phaser.Scene {
       return;
     }
 
-    const playerX = this.player.x;
-    const playerY = this.player.y;
+    // Convert player position to tile coordinates (player.y is the feet/ground position)
+    const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
 
-    // Convert player position to tile coordinates
-    const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(playerX, playerY);
-
-    console.log(`Checking for puzzle at player position (${playerX}, ${playerY}) - tile (${tileX}, ${tileY})`);
+    console.log(`Checking for puzzle at player position (${this.player.x.toFixed(0)}, ${this.player.y.toFixed(0)}) - tile (${tileX}, ${tileY})`);
 
     // Check if player is standing on a valid entry tile
     const isOnEntryTile = this.isPuzzleEntryTile(tileX, tileY);
@@ -2404,7 +2405,7 @@ export class OverworldScene extends Phaser.Scene {
     }
 
     // Check if there's a puzzle at the player's position
-    const puzzle = this.puzzleManager.getPuzzleAtPosition(playerX, playerY, this.tiledMapData);
+    const puzzle = this.puzzleManager.getPuzzleAtPosition(this.player.x, this.player.y, this.tiledMapData);
 
     if (puzzle) {
       console.log(`Found puzzle: ${puzzle.id}`);
