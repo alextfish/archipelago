@@ -43,6 +43,7 @@ describe('EmbeddedPuzzleRenderer Bridge Removal', () => {
                     originX: 0,
                     originY: 0,
                     setTint: vi.fn(),
+                    setTintFill: vi.fn(),
                     clearTint: vi.fn()
                 })),
                 zone: vi.fn(() => ({
@@ -257,6 +258,7 @@ describe('EmbeddedPuzzleRenderer Bridge Removal', () => {
                 setRotation: vi.fn().mockReturnThis(),
                 destroy: vi.fn(),
                 setTint: vi.fn(),
+                setTintFill: vi.fn(),
                 clearTint: vi.fn(),
                 visible: true,
                 alpha: 1,
@@ -279,6 +281,7 @@ describe('EmbeddedPuzzleRenderer Bridge Removal', () => {
                     setRotation: vi.fn().mockReturnThis(),
                     destroy: vi.fn(),
                     setTint: vi.fn(),
+                    setTintFill: vi.fn(),
                     clearTint: vi.fn(),
                     visible: true,
                     alpha: 1,
