@@ -24,6 +24,7 @@ import { PlayerStartManager } from '@model/overworld/PlayerStartManager';
 import { getDoorSpriteFrame } from '@view/DoorSpriteRegistry';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import { CollisionTileClassifier } from '@model/overworld/CollisionTileClassifier';
+import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
 import type { TranslationModeScene } from '@view/scenes/TranslationModeScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { GridToWorldMapper } from '@view/GridToWorldMapper';
@@ -411,7 +412,6 @@ export class OverworldScene extends Phaser.Scene {
         console.log('Creating bridge manager now that tiledMapData is loaded');
         this.bridgeManager = new OverworldBridgeManager(
           this.bridgesLayer,
-          this.collisionArray,
           this.tiledMapData,
           this // Pass scene for setCollisionAt calls
         );
@@ -430,6 +430,12 @@ export class OverworldScene extends Phaser.Scene {
       // Load all puzzles from the map
       const puzzles = this.puzzleManager.loadPuzzlesFromMap(this.tiledMapData);
       console.log(`Loaded ${puzzles.size} overworld puzzles`);
+
+      // Apply initial water blocking for FlowPuzzles.
+      // Each FlowPuzzle computes its water state on construction; those tiles must
+      // be blocked (both high and low ground) so the player cannot walk through
+      // flowing water before solving the puzzle.
+      this.applyInitialFlowPuzzleCollision(puzzles);
 
       // Create puzzle controller now that we have all dependencies
       this.puzzleController = new OverworldPuzzleController(
@@ -459,6 +465,42 @@ export class OverworldScene extends Phaser.Scene {
 
     } catch (error) {
       console.error('Failed to initialize overworld puzzles:', error);
+    }
+  }
+
+  /**
+   * Block overworld tiles occupied by flowing water for every unsolved FlowPuzzle.
+   * Called once at map load, after all puzzles are created (and their initial
+   * water state has been computed in each FlowPuzzle constructor).
+   */
+  private applyInitialFlowPuzzleCollision(puzzles: Map<string, import('@model/puzzle/BridgePuzzle').BridgePuzzle>): void {
+    if (!this.tiledMapData) return;
+
+    const tileW: number = this.tiledMapData.tilewidth ?? 32;
+    const tileH: number = this.tiledMapData.tileheight ?? 32;
+
+    for (const [puzzleId, puzzle] of puzzles) {
+      if (!(puzzle instanceof FlowPuzzle)) continue;
+
+      const puzzleBounds = this.puzzleManager.getPuzzleBounds(puzzleId);
+      if (!puzzleBounds) continue;
+
+      const originTileX = Math.floor(puzzleBounds.x / tileW);
+      const originTileY = Math.floor(puzzleBounds.y / tileH);
+      const wetWorldTiles: { tileX: number; tileY: number }[] = [];
+
+      for (let ly = 0; ly < puzzle.height; ly++) {
+        for (let lx = 0; lx < puzzle.width; lx++) {
+          if (puzzle.tileHasWater(lx, ly)) {
+            wetWorldTiles.push({ tileX: originTileX + lx, tileY: originTileY + ly });
+          }
+        }
+      }
+
+      if (wetWorldTiles.length > 0) {
+        this.collisionManager.applyFlowWaterCollision(wetWorldTiles);
+        console.log(`Applied initial water blocking for FlowPuzzle "${puzzleId}": ${wetWorldTiles.length} tiles blocked`);
+      }
     }
   }
 
@@ -534,7 +576,7 @@ export class OverworldScene extends Phaser.Scene {
           const entryTileY = tileY + dy;
 
           // Check if this is actually a valid entry tile
-          if (this.isPlayerOnEntryTile(entryTileX, entryTileY)) {
+          if (this.isPuzzleEntryTile(entryTileX, entryTileY)) {
             this.interactables.push({
               type: 'puzzle',
               tileX: entryTileX,
@@ -1926,7 +1968,7 @@ export class OverworldScene extends Phaser.Scene {
     console.log(`Checking for puzzle at player position (${playerX}, ${playerY}) - tile (${tileX}, ${tileY})`);
 
     // Check if player is standing on a valid entry tile
-    const isOnEntryTile = this.isPlayerOnEntryTile(tileX, tileY);
+    const isOnEntryTile = this.isPuzzleEntryTile(tileX, tileY);
     if (!isOnEntryTile) {
       console.log('Player not on a valid puzzle entry tile');
       return;
@@ -1943,10 +1985,7 @@ export class OverworldScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * Check if player is standing on a valid puzzle entry tile
-   */
-  private isPlayerOnEntryTile(tileX: number, tileY: number): boolean {
+  private isPuzzleEntryTile(tileX: number, tileY: number): boolean {
     if (!this.map) {
       return false;
     }
@@ -1956,7 +1995,6 @@ export class OverworldScene extends Phaser.Scene {
       if (layer.tilemapLayer) {
         const tile = layer.tilemapLayer.getTileAt(tileX, tileY);
         if (tile && tile.properties && tile.properties.puzzleStart === true) {
-          console.log(`Player on puzzle start tile at (${tileX}, ${tileY})`);
           return true;
         }
       }

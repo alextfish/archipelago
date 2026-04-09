@@ -233,6 +233,22 @@ export class CollisionManager {
     }
 
     /**
+     * Reset a set of flow square tiles to WALKABLE_LOW.
+     * Called on puzzle entry before storeOriginalCollision() snapshots the region, so that
+     * the snapshot captures the correct base state for riverbeds (WALKABLE_LOW when dry).
+     * Without this, if water was blocked at map load the snapshot would capture BLOCKED
+     * and restoreOriginalCollision() would leave dried-up riverbeds impassable after a solve.
+     *
+     * @param flowTiles - World tile coordinates of all flow squares in the puzzle
+     */
+    resetFlowTilesToWalkableLow(flowTiles: ReadonlyArray<{ tileX: number; tileY: number }>): void {
+        for (const { tileX, tileY } of flowTiles) {
+            this.overworldScene.setCollisionAt(tileX, tileY, CollisionType.WALKABLE_LOW);
+        }
+        console.log(`CollisionManager: Reset ${flowTiles.length} flow tiles to WALKABLE_LOW`);
+    }
+
+    /**
      * Get all registered doors
      */
     getDoors(): readonly Door[] {

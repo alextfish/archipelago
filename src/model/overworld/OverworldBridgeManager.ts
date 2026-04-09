@@ -30,7 +30,6 @@ export class OverworldBridgeManager {
 
     constructor(
         private bridgesLayer: Phaser.Tilemaps.TilemapLayer,
-        private collisionArray: number[][],
         private tiledMapData: any,
         private collisionManager: any // OverworldScene that has setCollisionAt method
     ) {
@@ -291,22 +290,13 @@ export class OverworldBridgeManager {
 
         console.log(`  Clearing tiles from (${minTileX},${minTileY}) to (${maxTileX},${maxTileY})`);
 
-        // Clear bridge tiles and restore collision
+        // Remove any bridge tiles from the visual layer.
+        // Collision restoration is handled separately by CollisionManager (restoreOriginalCollision
+        // and applyFlowWaterCollision) so that the puzzle entry/exit snapshot mechanism stays
+        // consistent and flow-tile walkability is correctly managed.
         for (let tileY = minTileY; tileY <= maxTileY; tileY++) {
             for (let tileX = minTileX; tileX <= maxTileX; tileX++) {
-                // Remove bridge tile
                 this.bridgesLayer.removeTileAt(tileX, tileY);
-
-                // Determine original blocked state by checking ALL collision layers.
-                // This mirrors how setupCollisionDetection builds the initial collisionArray.
-                const hasCollision = this.collisionLayers.some(layer => layer.getTileAt(tileX, tileY) !== null);
-
-                // Restore collision type in collision array
-                if (tileY >= 0 && tileY < this.collisionArray.length &&
-                    tileX >= 0 && tileX < this.collisionArray[tileY].length) {
-                    // If original tile was blocked, restore as BLOCKED; otherwise WALKABLE
-                    this.collisionArray[tileY][tileX] = hasCollision ? CollisionType.BLOCKED : CollisionType.WALKABLE;
-                }
             }
         }
 

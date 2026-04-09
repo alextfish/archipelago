@@ -131,7 +131,26 @@ export class OverworldPuzzleController {
             this.puzzleInputHandler.setupInputHandlers();
             this.activePuzzleController.enterPuzzle();
 
-            // Update collision for bridges
+            // Update collision for bridges.
+            // For FlowPuzzles: first reset all flow square tiles to WALKABLE_LOW so the snapshot
+            // captures the correct riverbed base state. Without this the snapshot would hold
+            // BLOCKED (from map-load water initialisation) and restoreOriginalCollision() would
+            // leave dried-up riverbeds impassable after a solve.
+            if (puzzle instanceof FlowPuzzle && this.tiledMapData) {
+                const tileW: number = this.tiledMapData.tilewidth ?? 32;
+                const tileH: number = this.tiledMapData.tileheight ?? 32;
+                const originTileX = Math.floor(boundsRect.x / tileW);
+                const originTileY = Math.floor(boundsRect.y / tileH);
+                const allFlowTiles: { tileX: number; tileY: number }[] = [];
+                for (let ly = 0; ly < puzzle.height; ly++) {
+                    for (let lx = 0; lx < puzzle.width; lx++) {
+                        if (puzzle.getFlowSquare(lx, ly)) {
+                            allFlowTiles.push({ tileX: originTileX + lx, tileY: originTileY + ly });
+                        }
+                    }
+                }
+                this.collisionManager.resetFlowTilesToWalkableLow(allFlowTiles);
+            }
             this.collisionManager.updateCollisionFromBridges(puzzle, boundsRect);
 
             // Show HUD using PuzzleHUDManager
@@ -196,6 +215,29 @@ export class OverworldPuzzleController {
         }
 
         return 'restore';
+    }
+
+    /**
+     * Compute world tile coordinates of all tiles that currently have water in a FlowPuzzle.
+     * Used by exit branches to correctly block still-flowing water in the overworld.
+     */
+    private getFlowWetWorldTiles(
+        flowPuzzle: FlowPuzzle,
+        puzzleBounds: { x: number; y: number }
+    ): { tileX: number; tileY: number }[] {
+        const tileW: number = this.tiledMapData?.tilewidth ?? 32;
+        const tileH: number = this.tiledMapData?.tileheight ?? 32;
+        const originTileX = Math.floor(puzzleBounds.x / tileW);
+        const originTileY = Math.floor(puzzleBounds.y / tileH);
+        const wetWorldTiles: { tileX: number; tileY: number }[] = [];
+        for (let ly = 0; ly < flowPuzzle.height; ly++) {
+            for (let lx = 0; lx < flowPuzzle.width; lx++) {
+                if (flowPuzzle.tileHasWater(lx, ly)) {
+                    wetWorldTiles.push({ tileX: originTileX + lx, tileY: originTileY + ly });
+                }
+            }
+        }
+        return wetWorldTiles;
     }
 
     /**
@@ -275,33 +317,35 @@ export class OverworldPuzzleController {
                 // For FlowPuzzles: block tiles where water is still flowing after the solution.
                 // Tiles that dried up remain WALKABLE_LOW (their restored original state).
                 if (activeData.puzzle instanceof FlowPuzzle && puzzleBounds) {
-                    const tileW = this.tiledMapData?.tilewidth ?? 32;
-                    const tileH = this.tiledMapData?.tileheight ?? 32;
-                    const originTileX = Math.floor(puzzleBounds.x / tileW);
-                    const originTileY = Math.floor(puzzleBounds.y / tileH);
-                    const flowPuzzle = activeData.puzzle;
-                    const wetWorldTiles: { tileX: number; tileY: number }[] = [];
-                    for (let ly = 0; ly < flowPuzzle.height; ly++) {
-                        for (let lx = 0; lx < flowPuzzle.width; lx++) {
-                            if (flowPuzzle.tileHasWater(lx, ly)) {
-                                wetWorldTiles.push({ tileX: originTileX + lx, tileY: originTileY + ly });
-                            }
-                        }
-                    }
-                    this.collisionManager.applyFlowWaterCollision(wetWorldTiles);
+                    this.collisionManager.applyFlowWaterCollision(
+                        this.getFlowWetWorldTiles(activeData.puzzle, puzzleBounds)
+                    );
                 }
                 this.gameState.markPuzzleCompleted(activeData.id);
             } else if (action === 'blank') {
-                // Previously completed puzzle cancelled: clear completion and blank region
+                // Previously completed puzzle cancelled: restore collision then re-apply current
+                // water state (player removed bridges so water reflowed).
                 console.log('Previously completed puzzle cancelled - clearing completion status');
                 this.gameState.clearPuzzleCompletion(activeData.id);
+                this.collisionManager.restoreOriginalCollision();
+                if (activeData.puzzle instanceof FlowPuzzle && puzzleBounds) {
+                    this.collisionManager.applyFlowWaterCollision(
+                        this.getFlowWetWorldTiles(activeData.puzzle, puzzleBounds)
+                    );
+                }
                 if (this.bridgeManager && boundsRect) {
                     this.bridgeManager.blankPuzzleRegion(activeData.id, boundsRect);
                 }
             } else {
-                // Never completed puzzle cancelled: restore collision
+                // Never completed puzzle cancelled: restore collision then re-apply water blocking
+                // so the overworld reflects the current (partially-solved) water state.
                 console.log('Incomplete puzzle cancelled - restoring collision');
                 this.collisionManager.restoreOriginalCollision();
+                if (activeData.puzzle instanceof FlowPuzzle && puzzleBounds) {
+                    this.collisionManager.applyFlowWaterCollision(
+                        this.getFlowWetWorldTiles(activeData.puzzle, puzzleBounds)
+                    );
+                }
             }
 
             // Return camera to overworld
