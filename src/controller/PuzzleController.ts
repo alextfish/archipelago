@@ -37,6 +37,8 @@ export class PuzzleController {
     // --- Pointer-driven placement API (for drag and mouseover preview flows)
     /** Pointer down at world coords + grid coords */
     onPointerDown(_worldX: number, _worldY: number, gridX: number, gridY: number) {
+        // Block all interactions while the puzzle-solved screen is visible
+        if (this.wasSolved) return;
         // If we've already got a pending bridge placement, this is click-and-click: ignore further pointer downs
         if (this.pendingStart) return;
         // If pointer down is on an island, begin placement (allocates a bridge)
@@ -51,6 +53,8 @@ export class PuzzleController {
 
     /** Pointer move: update preview if we have a pending start */
     onPointerMove(_worldX: number, _worldY: number, gridX: number, gridY: number) {
+        // Block all interactions while the puzzle-solved screen is visible
+        if (this.wasSolved) return;
         // Nothing to do on mouse move if we don't have a pending start
         if (!this.pendingStart || !this.currentBridgeType) return;
         // Compute preview end point depending on fixed/variable length and snapping
@@ -120,6 +124,8 @@ export class PuzzleController {
 
     /** Pointer up: attempt to finalize placement if pending start exists */
     onPointerUp(_worldX: number, _worldY: number, gridX: number, gridY: number) {
+        // Block all interactions while the puzzle-solved screen is visible
+        if (this.wasSolved) return;
         if (!this.pendingStart) return;
         // If pointer up is on an island, attempt to finish placement
         const island = this.puzzle.islands.find(i => i.x === gridX && i.y === gridY);
@@ -365,6 +371,8 @@ export class PuzzleController {
     }
 
     removeBridge(bridgeId: string) {
+        // Block bridge removal while the puzzle-solved screen is visible
+        if (this.wasSolved) return;
         this.cancelPlacement();
         const cmd = new RemoveBridgeCommand(this.puzzle, bridgeId);
         this.undoManager.executeCommand(cmd);
