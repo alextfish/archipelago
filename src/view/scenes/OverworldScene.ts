@@ -75,6 +75,11 @@ export class OverworldScene extends Phaser.Scene {
   private roofManager?: RoofManager;
   private roofsLayers: Phaser.Tilemaps.TilemapLayer[] = [];
 
+  // FlowPuzzle water visuals: GIDs removed from the water Tiled layer so that dried-up river
+  // tiles look dry in the overworld. Keyed by "tileX,tileY". Stored so the tile can be
+  // restored if the player re-enters and re-floods those squares.
+  private waterTileGidCache: Map<string, { gid: number; layerName: string }> = new Map();
+
   // Door system
   private doors: Door[] = [];
   private doorSprites: Map<string, Phaser.Tilemaps.Tile> = new Map();
@@ -500,6 +505,60 @@ export class OverworldScene extends Phaser.Scene {
       if (wetWorldTiles.length > 0) {
         this.collisionManager.applyFlowWaterCollision(wetWorldTiles);
         console.log(`Applied initial water blocking for FlowPuzzle "${puzzleId}": ${wetWorldTiles.length} tiles blocked`);
+      }
+    }
+  }
+
+  /**
+   * Update the overworld water-tile visuals for a FlowPuzzle after it is exited.
+   *
+   * Tiles that no longer have water are visually dried up by removing their tile
+   * from the Tiled water layer (the GID is cached for restoration). Tiles that
+   * have water again get their original tile GID restored.
+   */
+  public updateFlowWaterVisuals(puzzle: FlowPuzzle, puzzleBounds: { x: number; y: number }): void {
+    if (!this.tiledMapData) return;
+
+    const tileW: number = this.tiledMapData.tilewidth ?? 32;
+    const tileH: number = this.tiledMapData.tileheight ?? 32;
+
+    // Collect all water Tiled layers (e.g. "Forest/water", "Beach/water")
+    const waterLayerData = this.findLayersBySuffix('water');
+
+    const originTileX = Math.floor(puzzleBounds.x / tileW);
+    const originTileY = Math.floor(puzzleBounds.y / tileH);
+
+    for (let ly = 0; ly < puzzle.height; ly++) {
+      for (let lx = 0; lx < puzzle.width; lx++) {
+        if (!puzzle.getFlowSquare(lx, ly)) continue; // only flow squares have water tiles
+
+        const tileX = originTileX + lx;
+        const tileY = originTileY + ly;
+        const key = `${tileX},${tileY}`;
+
+        if (puzzle.tileHasWater(lx, ly)) {
+          // Restore the water tile if we previously removed it
+          const cached = this.waterTileGidCache.get(key);
+          if (cached) {
+            const ld = waterLayerData.find(l => l.name === cached.layerName);
+            if (ld?.tilemapLayer) {
+              ld.tilemapLayer.putTileAt(cached.gid, tileX, tileY);
+            }
+            this.waterTileGidCache.delete(key);
+          }
+        } else {
+          // Remove the water tile so dried-up riverbed shows beneath it
+          if (!this.waterTileGidCache.has(key)) {
+            for (const ld of waterLayerData) {
+              const tile = ld.tilemapLayer?.getTileAt(tileX, tileY);
+              if (tile) {
+                this.waterTileGidCache.set(key, { gid: tile.index, layerName: ld.name });
+                ld.tilemapLayer!.removeTileAt(tileX, tileY);
+                break;
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -1194,7 +1253,7 @@ export class OverworldScene extends Phaser.Scene {
    */
   private setupVisualLayers(tilesets: Phaser.Tilemaps.Tileset[]) {
     // Visual layer suffixes to auto-render (e.g., "Beach/water", "Forest/ground")
-    const visualLayerSuffixes = ['beach', 'water', 'grass', 'ground', 'obstacles'];
+    const visualLayerSuffixes = ['beach', 'lowground', 'water', 'grass', 'ground', 'obstacles'];
 
     console.log('Setting up visual layers...');
 
@@ -2113,6 +2172,15 @@ export class OverworldScene extends Phaser.Scene {
         this.cameras.main.startFollow(this.player);
       });
       console.log('[DIAGNOSTIC] puzzleController.exitPuzzle completed');
+
+      // Update overworld water visuals if this was a FlowPuzzle
+      if (activePuzzleId) {
+        const exitedPuzzle = this.puzzleManager.getPuzzleById(activePuzzleId);
+        const exitedBounds = this.puzzleManager.getPuzzleBounds(activePuzzleId);
+        if (exitedPuzzle instanceof FlowPuzzle && exitedBounds) {
+          this.updateFlowWaterVisuals(exitedPuzzle, exitedBounds);
+        }
+      }
 
       // Re-enable player movement
       if (this.playerController) {
