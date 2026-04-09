@@ -1885,7 +1885,8 @@ export class OverworldScene extends Phaser.Scene {
 
       // Update interaction cursor based on player position
       if (this.interactionCursor && this.tiledMapData && this.player) {
-        const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
+        const playerFeet = this.playerController.getFeetPosition();
+        const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(playerFeet.x, playerFeet.y);
 
         // Update cursor's facing direction
         this.interactionCursor.setFacing(this.playerController.getFacingDirection());
@@ -1981,7 +1982,8 @@ export class OverworldScene extends Phaser.Scene {
 
       // Convert both positions to tile coordinates
       const { x: clickTileX, y: clickTileY } = this.gridMapper.worldToGrid(worldX, worldY);
-      const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(playerX, playerY);
+      const playerFeet = this.playerController.getFeetPosition();
+      const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(playerFeet.x, playerFeet.y);
 
       // Check if there's a focused target
       const focusedTarget = this.interactionCursor.getCurrentTarget();
@@ -2388,13 +2390,11 @@ export class OverworldScene extends Phaser.Scene {
       return;
     }
 
-    const playerX = this.player.x;
-    const playerY = this.player.y;
+    // Convert player feet position to tile coordinates (feet are the true position on the map)
+    const playerFeet = this.playerController!.getFeetPosition();
+    const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(playerFeet.x, playerFeet.y);
 
-    // Convert player position to tile coordinates
-    const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(playerX, playerY);
-
-    console.log(`Checking for puzzle at player position (${playerX}, ${playerY}) - tile (${tileX}, ${tileY})`);
+    console.log(`Checking for puzzle at player feet (${playerFeet.x.toFixed(0)}, ${playerFeet.y.toFixed(0)}) - tile (${tileX}, ${tileY})`);
 
     // Check if player is standing on a valid entry tile
     const isOnEntryTile = this.isPuzzleEntryTile(tileX, tileY);
@@ -2403,8 +2403,8 @@ export class OverworldScene extends Phaser.Scene {
       return;
     }
 
-    // Check if there's a puzzle at the player's position
-    const puzzle = this.puzzleManager.getPuzzleAtPosition(playerX, playerY, this.tiledMapData);
+    // Check if there's a puzzle at the player's feet position
+    const puzzle = this.puzzleManager.getPuzzleAtPosition(playerFeet.x, playerFeet.y, this.tiledMapData);
 
     if (puzzle) {
       console.log(`Found puzzle: ${puzzle.id}`);

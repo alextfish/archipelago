@@ -520,6 +520,15 @@ export class PlayerController {
     }
 
     /**
+     * Get the player's feet position (sprite centre + FOOT_Y_OFFSET).
+     * This is the true position of the player on the map and should be used
+     * for all tile-based proximity and entry checks.
+     */
+    getFeetPosition(): { x: number; y: number } {
+        return { x: this.player.x, y: this.player.y + FOOT_Y_OFFSET };
+    }
+
+    /**
      * Set the player's position
      */
     setPosition(x: number, y: number): void {
