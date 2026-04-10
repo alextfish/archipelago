@@ -10,6 +10,13 @@ export interface PuzzleForStrutLocation {
     islands: Island[];
 }
 
+/** Names of the sprite frames used to render a strut bridge segment. */
+export type StrutBridgeFrameName =
+    | 'strut'
+    | 'l2s-single' | 'l2s-left' | 'l2s-right' | 'l2s-mid'
+    | 's2r-single' | 's2r-left' | 's2r-right' | 's2r-mid'
+    | 'l2r';
+
 /**
  * A bridge that is automatically created when the puzzle's bridge string
  * contains a '+' suffix on a length entry (e.g. "3,2,3+,4+").
@@ -37,10 +44,13 @@ export class StrutBridge implements Bridge {
      * - 1 island crossed  → that island's position
      * - 2+ islands crossed → island closest to the midpoint
      *
-     * Returns null when the bridge is not placed.
+     * Returns null when the bridge is not placed or has length less than 2.
      */
     getStrutLocation(puzzle: PuzzleForStrutLocation): { x: number; y: number } | null {
         if (!this.start || !this.end) return null;
+
+        const length = Math.abs(this.end.x - this.start.x) + Math.abs(this.end.y - this.start.y);
+        if (length < 2) return null;
 
         const { start, end } = this;
         const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
@@ -106,6 +116,60 @@ export class StrutBridge implements Bridge {
 
         return result;
     }
+
+    /**
+     * Returns the ordered list of sprite frame names for this bridge, from the
+     * start endpoint to the end endpoint, including endpoint tiles.
+     *
+     * Frame name semantics:
+     * - l2s-* : "left/top to strut" — the approach from the start endpoint
+     * - strut  : the strut tile itself
+     * - s2r-* : "strut to right/bottom" — the departure toward the end endpoint
+     *
+     * Returns null when the bridge is not placed.
+     */
+    getFrames(puzzle: PuzzleForStrutLocation): StrutBridgeFrameName[] | null {
+        if (!this.start || !this.end) return null;
+
+        const { start, end } = this;
+        const isHorizontal = start.y === end.y;
+        const length = isHorizontal
+            ? Math.abs(end.x - start.x)
+            : Math.abs(end.y - start.y);
+
+        if (length === 1) {
+            return ['l2s-single', 's2r-single'];
+        }
+
+        const strutLocation = this.getStrutLocation(puzzle);
+        // Defensive: getStrutLocation should always return a value for length >= 2;
+        // null here would indicate an unexpected state.
+        if (!strutLocation) return null;
+
+        const strutDist = isHorizontal
+            ? Math.abs(strutLocation.x - Math.min(start.x, end.x))
+            : Math.abs(strutLocation.y - Math.min(start.y, end.y));
+        const rightDist = length - strutDist;
+
+        return [
+            ...buildSectionFrames(strutDist, 'l2s'),
+            'strut',
+            ...buildSectionFrames(rightDist, 's2r'),
+        ];
+    }
+}
+
+function buildSectionFrames(
+    dist: number,
+    prefix: 'l2s' | 's2r'
+): StrutBridgeFrameName[] {
+    if (dist === 1) return [`${prefix}-single`];
+    if (dist === 2) return [`${prefix}-left`, `${prefix}-right`];
+    return [
+        `${prefix}-left`,
+        ...Array<StrutBridgeFrameName>(dist - 2).fill(`${prefix}-mid`),
+        `${prefix}-right`,
+    ];
 }
 
 function distSquared(a: { x: number; y: number }, b: { x: number; y: number }): number {

@@ -21,6 +21,12 @@ describe('StrutBridge', () => {
             expect(result).toBeNull();
         });
 
+        it('returns null when the bridge length is less than 2', () => {
+            const bridge = makePlacedStrutBridge({ x: 0, y: 0 }, { x: 1, y: 0 });
+            const result = bridge.getStrutLocation({ islands: [] });
+            expect(result).toBeNull();
+        });
+
         it('returns midpoint when no islands are crossed', () => {
             const bridge = makePlacedStrutBridge({ x: 0, y: 0 }, { x: 4, y: 0 });
             const islands: Island[] = [
@@ -123,6 +129,104 @@ describe('StrutBridge', () => {
             ];
             const crossed = bridge.getCrossedIslands(islands);
             expect(crossed.map(i => i.id)).toEqual(['mid']);
+        });
+    });
+
+    describe('getFrames', () => {
+        it('returns null when the bridge is not placed', () => {
+            const bridge = new StrutBridge('b1', { id: 'strut_3', mustCoverIsland: true });
+            expect(bridge.getFrames({ islands: [] })).toBeNull();
+        });
+
+        it('returns l2s-single and s2r-single for length 1', () => {
+            const bridge = makePlacedStrutBridge({ x: 0, y: 0 }, { x: 1, y: 0 });
+            expect(bridge.getFrames({ islands: [] })).toEqual(['l2s-single', 's2r-single']);
+        });
+
+        it('returns l2s-single, strut, s2r-single for length 2 with no crossed islands', () => {
+            const bridge = makePlacedStrutBridge({ x: 0, y: 0 }, { x: 2, y: 0 });
+            const islands: Island[] = [
+                { id: 'A', x: 0, y: 0 },
+                { id: 'B', x: 2, y: 0 },
+            ];
+            expect(bridge.getFrames({ islands })).toEqual(['l2s-single', 'strut', 's2r-single']);
+        });
+
+        it('length 3 with strut at distance 1 from start', () => {
+            // Bridge (0,0)→(3,0), island at x=1 → strutDist=1, rightDist=2
+            const bridge = makePlacedStrutBridge({ x: 0, y: 0 }, { x: 3, y: 0 });
+            const islands: Island[] = [
+                { id: 'A', x: 0, y: 0 },
+                { id: 'mid', x: 1, y: 0 },
+                { id: 'B', x: 3, y: 0 },
+            ];
+            expect(bridge.getFrames({ islands })).toEqual(
+                ['l2s-single', 'strut', 's2r-left', 's2r-right']
+            );
+        });
+
+        it('length 3 with strut at distance 2 from start', () => {
+            // Bridge (0,0)→(3,0), island at x=2 → strutDist=2, rightDist=1
+            const bridge = makePlacedStrutBridge({ x: 0, y: 0 }, { x: 3, y: 0 });
+            const islands: Island[] = [
+                { id: 'A', x: 0, y: 0 },
+                { id: 'mid', x: 2, y: 0 },
+                { id: 'B', x: 3, y: 0 },
+            ];
+            expect(bridge.getFrames({ islands })).toEqual(
+                ['l2s-left', 'l2s-right', 'strut', 's2r-single']
+            );
+        });
+
+        it('length 4 with strut at midpoint uses l2s-single and s2r-single', () => {
+            // Bridge (0,0)→(4,0), no crossed islands, strut at midpoint (2,0)
+            // strutDist=2, rightDist=2
+            const bridge = makePlacedStrutBridge({ x: 0, y: 0 }, { x: 4, y: 0 });
+            const islands: Island[] = [
+                { id: 'A', x: 0, y: 0 },
+                { id: 'B', x: 4, y: 0 },
+            ];
+            expect(bridge.getFrames({ islands })).toEqual(
+                ['l2s-left', 'l2s-right', 'strut', 's2r-left', 's2r-right']
+            );
+        });
+
+        it('length 5 with strutDist=1 produces l2s-mid in right section', () => {
+            // Bridge (0,0)→(5,0), island at x=1 → strutDist=1, rightDist=4
+            const bridge = makePlacedStrutBridge({ x: 0, y: 0 }, { x: 5, y: 0 });
+            const islands: Island[] = [
+                { id: 'A', x: 0, y: 0 },
+                { id: 'mid', x: 1, y: 0 },
+                { id: 'B', x: 5, y: 0 },
+            ];
+            expect(bridge.getFrames({ islands })).toEqual(
+                ['l2s-single', 'strut', 's2r-left', 's2r-mid', 's2r-mid', 's2r-right']
+            );
+        });
+
+        it('length 6 with strutDist=3 produces l2s-mid tiles in left section', () => {
+            // Bridge (0,0)→(6,0), no crossed islands, strut at midpoint (3,0)
+            // strutDist=3, rightDist=3
+            const bridge = makePlacedStrutBridge({ x: 0, y: 0 }, { x: 6, y: 0 });
+            const islands: Island[] = [
+                { id: 'A', x: 0, y: 0 },
+                { id: 'B', x: 6, y: 0 },
+            ];
+            expect(bridge.getFrames({ islands })).toEqual([
+                'l2s-left', 'l2s-mid', 'l2s-right',
+                'strut',
+                's2r-left', 's2r-mid', 's2r-right',
+            ]);
+        });
+
+        it('works correctly for a vertical bridge', () => {
+            // Bridge (0,0)→(0,2), no crossed islands, strut at midpoint (0,1)
+            const bridge = makePlacedStrutBridge({ x: 0, y: 0 }, { x: 0, y: 2 });
+            const islands: Island[] = [
+                { id: 'A', x: 0, y: 0 },
+                { id: 'B', x: 0, y: 2 },
+            ];
+            expect(bridge.getFrames({ islands })).toEqual(['l2s-single', 'strut', 's2r-single']);
         });
     });
 });
