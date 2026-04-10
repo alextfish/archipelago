@@ -142,8 +142,8 @@ export class StrutBridge implements Bridge {
         }
 
         const strutLocation = this.getStrutLocation(puzzle);
-        // getStrutLocation returns null for length < 2, but we already handled
-        // length 1 above; for length >= 2 it should always return a value.
+        // Defensive: getStrutLocation should always return a value for length >= 2;
+        // null here would indicate an unexpected state.
         if (!strutLocation) return null;
 
         const strutDist = isHorizontal
