@@ -32,6 +32,8 @@ export interface TileLayerConfig {
 export interface MapLayer {
     readonly name: string;
     readonly type: 'tilelayer' | 'objectgroup' | 'group';
+    readonly visible?: boolean;
+    readonly opacity?: number;
     readonly width?: number;
     readonly height?: number;
     readonly data?: number[];
@@ -50,6 +52,8 @@ export interface MapObject {
     readonly y: number;
     readonly width: number;
     readonly height: number;
+    readonly visible?: boolean;
+    readonly rotation?: number;
     readonly properties?: Array<{ name: string; value: any; type: string }>;
 }
 
