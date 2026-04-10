@@ -232,7 +232,7 @@ async function runTest() {
     const { page, cleanup } = await initTest({
         name: 'Translation Mode',
         playerStartID: 'forestPuzzle0',
-        headless: false,
+        headless: true,
         slowMo: 100
     });
 
