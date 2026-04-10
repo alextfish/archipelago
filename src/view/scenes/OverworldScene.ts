@@ -219,6 +219,10 @@ export class OverworldScene extends Phaser.Scene {
     this.load.image(NPCIconConfig.INCOMPLETE, 'resources/sprites/icon-incomplete.png');
     this.load.image(NPCIconConfig.COMPLETE, 'resources/sprites/icon-complete.png');
 
+    // Load interaction cursor sprites so InteractionCursor can use them synchronously
+    this.load.image('cursor-out', 'resources/square_cursor_out.png');
+    this.load.image('cursor-in', 'resources/square_cursor_in.png');
+
     // Load TMX file asynchronously, then load embedded tilesets
     this.loadTmxFile();
   }

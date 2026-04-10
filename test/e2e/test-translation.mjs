@@ -176,7 +176,7 @@ async function runViewportDiagnostics(page, label = '') {
  * inside the browser, then click there.
  */
 async function clickOverworldPuzzleGrid(page, gridX, gridY) {
-    const coords = await page.evaluate((gx, gy) => {
+    const coords = await page.evaluate(({ gx, gy }) => {
         const game = window.game;
         if (!game) return null;
         const scene = game.scene.getScene('OverworldScene');
@@ -198,7 +198,7 @@ async function clickOverworldPuzzleGrid(page, gridX, gridY) {
         const screenY = cam.y + (worldCentreY - cam.scrollY) * cam.zoom;
 
         return { screenX, screenY, worldX: worldCentreX, worldY: worldCentreY, zoom: cam.zoom };
-    }, gridX, gridY);
+    }, { gx: gridX, gy: gridY });
 
     if (!coords) {
         throw new Error(`Could not compute screen position for grid (${gridX}, ${gridY})`);
