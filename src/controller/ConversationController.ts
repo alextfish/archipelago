@@ -127,10 +127,7 @@ export class ConversationController {
 
             // No transition to new node, or no final NPC line - end immediately
             console.log('ConversationController: Ending conversation immediately');
-            // Call host cleanup but leave state accessible (marked as ended)
-            this.host.hideConversation();
-            this.host.onConversationEnd();
-            this.hostCleanupCalled = true;
+            this.endConversation();
         } else {
             // Display next node
             this.displayCurrentNode();

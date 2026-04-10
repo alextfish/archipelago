@@ -10,10 +10,10 @@ import {
 } from '../playwright/helpers.mjs';
 
 async function runTest() {
-    // Initialize test with forest-start position
+    // Initialize test with forest start position
     const { page, cleanup } = await initTest({
         name: 'Forest Movement Collision',
-        playerStartID: 'forest-start',
+        playerStartID: 'forest',
         headless: false,
         slowMo: 100
     });

@@ -222,8 +222,8 @@ describe('ConversationController', () => {
 
             controller.selectChoice(1); // Choose "No" with end: true
 
-            // Should mark as ended and notify host immediately
-            expect(controller.getCurrentState()?.isEnded()).toBe(true);
+            // Should fully clean up state and notify host immediately
+            expect(controller.getCurrentState()).toBeNull();
             expect(controller.isActive()).toBe(false);
 
             // Cleanup should have been called automatically
@@ -270,9 +270,9 @@ describe('ConversationController', () => {
 
         it('should throw error when conversation already ended', () => {
             controller.startConversation(sampleSpec, testNPC);
-            controller.selectChoice(1); // End conversation
+            controller.selectChoice(1); // End conversation immediately (state cleared)
 
-            expect(() => controller.selectChoice(0)).toThrow('Conversation has already ended');
+            expect(() => controller.selectChoice(0)).toThrow('No active conversation');
         });
     });
 
@@ -360,7 +360,7 @@ describe('ConversationController', () => {
             expect(controller.isActive()).toBe(true); // Conversation active after opening
 
             controller.selectChoice(0); // Ends immediately with cleanup
-            expect(controller.getCurrentState()?.isEnded()).toBe(true);
+            expect(controller.getCurrentState()).toBeNull();
             expect(controller.isActive()).toBe(false);
             expect(mockHost.onConversationEndCalls).toBe(1);
 
