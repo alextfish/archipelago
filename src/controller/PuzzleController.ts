@@ -188,7 +188,7 @@ export class PuzzleController {
         let bestDist = tolerance;
         for (const island of this.puzzle.islands) {
             const dist = Math.sqrt((island.x - x) ** 2 + (island.y - y) ** 2);
-            if (dist <= bestDist) {
+            if (dist < bestDist) {
                 bestDist = dist;
                 bestIsland = island;
             }
