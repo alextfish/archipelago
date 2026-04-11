@@ -1,0 +1,18 @@
+{
+  "id": "enclosedAreaSize_satisfied",
+  "start": "main",
+  "nodes": {
+    "main": {
+      "npc": {
+        "expression": "happy",
+        "glyphs": "good area"
+      },
+      "choices": [
+        {
+          "text": "Leave",
+          "end": true
+        }
+      ]
+    }
+  }
+}

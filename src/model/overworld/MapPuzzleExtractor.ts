@@ -500,6 +500,21 @@ export class MapPuzzleExtractor {
             console.log(`Auto-added IslandBridgeCountConstraint to puzzle ${definition.id} (islands have num_bridges constraints)`);
         }
 
+        // Auto-add one IslandDirectionalBridgeConstraint per island that has directional_constraint=
+        for (const island of islands) {
+            const rule = island.constraints?.find(c => c.startsWith('directional_constraint='));
+            if (!rule) continue;
+            const constraintType = rule.split('=')[1];
+            constraints.push({
+                type: 'IslandDirectionalBridgeConstraint',
+                params: { islandId: island.id, constraintType }
+            });
+            console.log(`Auto-added IslandDirectionalBridgeConstraint(${constraintType}) for island ${island.id} in puzzle ${definition.id}`);
+        }
+
+        // Add cell-level constraints (MustHaveWater, EnclosedAreaSize) from Tiled objects
+        constraints.push(...this.extractCellConstraintsFromObjects(definition, tiledMap));
+
         return constraints;
     }
 
@@ -742,6 +757,16 @@ export class MapPuzzleExtractor {
     }
 
     /**
+     * Returns true when the constraint_type property indicates a cell-level constraint
+     * (MustHaveWater, EnclosedAreaSize) that does not require a matching island.
+     * Used by applyIslandConstraintsFromObjects to suppress spurious "no island" warnings
+     * and by extractCellConstraintsFromObjects to identify objects to process.
+     */
+    private isCellLevelConstraintType(constraintType: string | undefined): boolean {
+        return constraintType === 'MustHaveWater' || constraintType === 'EnclosedAreaSize';
+    }
+
+    /**
      * Count occurrences of each value in an array
      */
     private countOccurrences<T>(array: T[]): Map<T, number> {
@@ -811,15 +836,22 @@ export class MapPuzzleExtractor {
                 const relativeTileX = objTileX - puzzleStartX;
                 const relativeTileY = objTileY - puzzleStartY;
 
+                // Parse constraint properties
+                const props = this.extractObjectProperties(constraintObj);
+
+                // Cell-level constraints (MustHaveWater, EnclosedAreaSize) don't need a
+                // matching island — they are handled by extractCellConstraintsFromObjects.
+                const cellLevel = this.isCellLevelConstraintType(props.constraint_type);
+
                 // Find island at this position
                 const island = islands.find(i => i.x === relativeTileX && i.y === relativeTileY);
                 if (!island) {
-                    console.warn(`Constraint object at puzzle-relative (${relativeTileX}, ${relativeTileY}) has no matching island`);
+                    if (!cellLevel) {
+                        console.warn(`Constraint object at puzzle-relative (${relativeTileX}, ${relativeTileY}) has no matching island`);
+                    }
                     continue;
                 }
 
-                // Parse constraint properties
-                const props = this.extractObjectProperties(constraintObj);
                 const constraints: string[] = [];
 
                 // Check for num_bridges property
@@ -831,6 +863,12 @@ export class MapPuzzleExtractor {
                     }
                 }
 
+                // Check for directional_constraint property
+                if (props.directional_constraint) {
+                    constraints.push(`directional_constraint=${props.directional_constraint}`);
+                    console.log(`Applied directional_constraint=${props.directional_constraint} constraint to island ${island.id}`);
+                }
+
                 // Add constraints to island
                 if (constraints.length > 0) {
                     island.constraints = island.constraints || [];
@@ -838,5 +876,73 @@ export class MapPuzzleExtractor {
                 }
             }
         }
+    }
+
+    /**
+     * Extract cell-level constraints (MustHaveWater, EnclosedAreaSize) from Tiled objects
+     * in the puzzles layer.  Unlike island constraints, these apply to arbitrary grid cells
+     * and are returned as constraint specs rather than being stored on islands.
+     */
+    private extractCellConstraintsFromObjects(
+        definition: MapPuzzleDefinition,
+        tiledMap: TiledMapData
+    ): Array<{ type: string; params?: any }> {
+        const constraints: Array<{ type: string; params?: any }> = [];
+
+        // Find the puzzles layer(s) for this puzzle's region
+        let puzzleLayers: MapLayer[];
+        if (definition.regionGroup) {
+            const puzzlesLayer = this.findLayerInRegion(tiledMap, definition.regionGroup, 'puzzles', 'objectgroup');
+            puzzleLayers = puzzlesLayer ? [puzzlesLayer] : [];
+        } else {
+            puzzleLayers = this.findAllLayersBySuffix(tiledMap.layers, 'puzzles');
+        }
+        puzzleLayers = puzzleLayers.filter(layer => layer.type === 'objectgroup');
+
+        if (puzzleLayers.length === 0) return constraints;
+
+        const { tilewidth, tileheight } = tiledMap;
+        const puzzleStartX = Math.floor(definition.bounds.x / tilewidth);
+        const puzzleStartY = Math.floor(definition.bounds.y / tileheight);
+        const puzzleWidthInTiles = Math.ceil(definition.bounds.width / tilewidth);
+        const puzzleHeightInTiles = Math.ceil(definition.bounds.height / tileheight);
+
+        for (const puzzleLayer of puzzleLayers) {
+            if (!puzzleLayer.objects) continue;
+
+            for (const obj of puzzleLayer.objects) {
+                const props = this.extractObjectProperties(obj);
+                if (props.constraint !== 'true') continue;
+
+                // Only handle cell-level constraint types here
+                if (!this.isCellLevelConstraintType(props.constraint_type)) continue;
+                const constraintType = props.constraint_type;
+
+                // Check whether the object lies within this puzzle's bounds
+                const objTileX = Math.floor(obj.x / tilewidth);
+                const objTileY = Math.floor(obj.y / tileheight);
+                const relX = objTileX - puzzleStartX;
+                const relY = objTileY - puzzleStartY;
+
+                if (relX < 0 || relX >= puzzleWidthInTiles || relY < 0 || relY >= puzzleHeightInTiles) continue;
+
+                if (constraintType === 'MustHaveWater') {
+                    constraints.push({
+                        type: 'MustHaveWaterConstraint',
+                        params: { x: relX, y: relY }
+                    });
+                    console.log(`Added MustHaveWaterConstraint at puzzle-relative (${relX}, ${relY}) in puzzle ${definition.id}`);
+                } else if (constraintType === 'EnclosedAreaSize') {
+                    const size = parseInt(props.size ?? '0');
+                    constraints.push({
+                        type: 'EnclosedAreaSizeConstraint',
+                        params: { x: relX, y: relY, size: isNaN(size) ? 0 : size }
+                    });
+                    console.log(`Added EnclosedAreaSizeConstraint(size=${size}) at puzzle-relative (${relX}, ${relY}) in puzzle ${definition.id}`);
+                }
+            }
+        }
+
+        return constraints;
     }
 }
