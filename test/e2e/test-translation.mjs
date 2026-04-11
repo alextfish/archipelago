@@ -4,7 +4,7 @@
  * This script will:
  * 1. Start the player at the "forestPuzzle0" player start (adjacent to forest puzzle 0)
  * 2. Press E to enter the overworld puzzle
- * 3. Click island at grid (2,3) then (5,3) to place a bridge that violates a constraint
+ * 3. Click island at grid (2,3) then (6,3) to place a bridge that violates a constraint
  * 4. Verify that the constraint violation registered glyphs via ActiveGlyphTracker
  * 5. Press Tab to enter Translation Mode
  * 6. Verify that TranslationModeScene built highlights from those glyphs
@@ -17,45 +17,30 @@ import {
 } from '../playwright/helpers.mjs';
 
 /**
- * Compute the screen coordinates of the centre of a puzzle grid cell by
- * reading the overworld camera and the active EmbeddedPuzzleRenderer from
- * inside the browser, then click there.
+ * Directly invoke tryPlaceAt on the active PuzzleController for the given
+ * overworld puzzle grid cell.  This bypasses screen-coordinate arithmetic
+ * entirely — the PuzzleController only needs grid coords to place a bridge.
  */
 async function clickOverworldPuzzleGrid(page, gridX, gridY) {
-    const coords = await page.evaluate((gx, gy) => {
+    const result = await page.evaluate(({ gx, gy }) => {
         const game = window.game;
-        if (!game) return null;
+        if (!game) return { error: 'no game' };
         const scene = game.scene.getScene('OverworldScene');
-        if (!scene) return null;
+        if (!scene) return { error: 'no OverworldScene' };
         const pc = scene.puzzleController;
-        if (!pc) return null;
-        const renderer = pc.puzzleRenderer;
-        if (!renderer) return null;
+        if (!pc) return { error: 'no puzzleController' };
+        const controller = pc.activePuzzleController;
+        if (!controller) return { error: 'no activePuzzleController' };
 
-        // gridToWorld returns top-left of the cell; add half cell size for centre
-        const cellSize = 32;
-        const worldPos = renderer.gridToWorld(gx, gy);
-        const worldCentreX = worldPos.x + cellSize / 2;
-        const worldCentreY = worldPos.y + cellSize / 2;
+        controller.tryPlaceAt(gx, gy);
+        return { ok: true };
+    }, { gx: gridX, gy: gridY });
 
-        const cam = scene.cameras.main;
-        // Phaser world-to-screen: screenX = cam.x + (worldX - cam.scrollX) * cam.zoom
-        const screenX = cam.x + (worldCentreX - cam.scrollX) * cam.zoom;
-        const screenY = cam.y + (worldCentreY - cam.scrollY) * cam.zoom;
-
-        return { screenX, screenY, worldX: worldCentreX, worldY: worldCentreY, zoom: cam.zoom };
-    }, gridX, gridY);
-
-    if (!coords) {
-        throw new Error(`Could not compute screen position for grid (${gridX}, ${gridY})`);
+    if (!result || result.error) {
+        throw new Error(`clickOverworldPuzzleGrid(${gridX},${gridY}) failed: ${result?.error}`);
     }
 
-    console.log(
-        `[TEST] Grid (${gridX},${gridY}) -> World (${coords.worldX.toFixed(0)},${coords.worldY.toFixed(0)}) ` +
-        `-> Screen (${coords.screenX.toFixed(0)},${coords.screenY.toFixed(0)}) [zoom=${coords.zoom.toFixed(2)}]`
-    );
-
-    await page.mouse.click(coords.screenX, coords.screenY);
+    console.log(`[TEST] Triggered island click at grid (${gridX},${gridY})`);
     await page.waitForTimeout(300);
 }
 
@@ -97,8 +82,22 @@ async function runTest() {
         console.log('[TEST] Clicking island at grid (2,3)...');
         await clickOverworldPuzzleGrid(page, 2, 3);
 
-        console.log('[TEST] Clicking island at grid (5,3)...');
-        await clickOverworldPuzzleGrid(page, 5, 3);
+        console.log('[TEST] Clicking island at grid (6,3)...');
+        await clickOverworldPuzzleGrid(page, 6, 3);
+
+        // Verify the bridge was actually placed before checking for constraint feedback
+        const bridgeCount = await page.evaluate(() => {
+            const scene = window.game?.scene.getScene('OverworldScene');
+            const pc = scene?.puzzleController;
+            const controller = pc?.activePuzzleController;
+            if (!controller) return -1;
+            return controller.puzzle.placedBridges.length;
+        });
+        console.log(`[TEST] Placed bridge count: ${bridgeCount}`);
+        if (bridgeCount <= 0) {
+            throw new Error(`Expected ≥1 placed bridge after clicking islands, but found ${bridgeCount}`);
+        }
+        console.log('[TEST] ✅ Bridge placed successfully');
 
         // Wait for constraint feedback
         await page.waitForTimeout(1000);
