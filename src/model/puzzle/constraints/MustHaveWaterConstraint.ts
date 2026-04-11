@@ -9,6 +9,9 @@ function hasTileHasWater(puzzle: BridgePuzzle): puzzle is BridgePuzzle & { tileH
 }
 
 export class MustHaveWaterConstraint extends Constraint {
+  override readonly conversationFile = 'constraints/mustHaveWater_unsatisfied.json';
+  override readonly conversationFileSolved = 'constraints/mustHaveWater_satisfied.json';
+
   x: number;
   y: number;
   constructor(x: number, y: number) {
@@ -39,6 +42,7 @@ export class MustHaveWaterConstraint extends Constraint {
       elementID: `${this.x},${this.y}`,
       glyphMessage: result.satisfied ? "good" : "no water",
       constraintType: 'MustHaveWaterConstraint',
+      position: { x: this.x, y: this.y },
     }];
   }
 }

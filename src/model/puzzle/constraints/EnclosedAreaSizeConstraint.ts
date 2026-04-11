@@ -12,6 +12,9 @@ import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
  * to the outside (not in a fully enclosed area).
  */
 export class EnclosedAreaSizeConstraint extends Constraint {
+  override readonly conversationFile: string;
+  override readonly conversationFileSolved: string;
+
   private x: number;
   private y: number;
   private expectedSize: number;
@@ -21,6 +24,12 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     this.x = x;
     this.y = y;
     this.expectedSize = expectedSize;
+    this.conversationFile = expectedSize === 0
+      ? 'constraints/enclosedAreaSizeZero_unsatisfied.json'
+      : 'constraints/enclosedAreaSize_unsatisfied.json';
+    this.conversationFileSolved = expectedSize === 0
+      ? 'constraints/enclosedAreaSizeZero_satisfied.json'
+      : 'constraints/enclosedAreaSize_satisfied.json';
   }
 
   static fromSpec(params: {
@@ -241,6 +250,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
       elementID: `${this.x},${this.y}`,
       glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "area not enclosed"),
       constraintType: 'EnclosedAreaSizeConstraint',
+      position: { x: this.x, y: this.y },
     }];
   }
 }

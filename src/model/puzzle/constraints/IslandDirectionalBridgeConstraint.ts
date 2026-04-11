@@ -19,6 +19,9 @@ import type { Bridge } from '../Bridge';
  *   (but can be unconnected, singly connected, or have mixed connections)
  */
 export class IslandDirectionalBridgeConstraint extends Constraint {
+  override readonly conversationFile = 'constraints/islandDirectionalBridge_unsatisfied.json';
+  override readonly conversationFileSolved = 'constraints/islandDirectionalBridge_satisfied.json';
+
   private islandId: string;
   private constraintType: 'double_horizontal' | 'double_vertical' | 'double_any_direction' | 'no_double_any_direction';
 

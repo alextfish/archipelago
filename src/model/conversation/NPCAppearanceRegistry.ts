@@ -73,6 +73,36 @@ export class NPCAppearanceRegistry {
                 sad: 2,
             },
         });
+
+        // Fisherman appearance (placeholder: uses sailorNS sprites until dedicated art is created)
+        this.appearances.set('Fisherman', {
+            spriteKey: 'Fisherman',
+            expressions: {
+                neutral: 0,
+                happy: 1,
+                sad: 2,
+            },
+        });
+
+        // Farmer appearance (placeholder: uses sailorEW sprites until dedicated art is created)
+        this.appearances.set('Farmer', {
+            spriteKey: 'Farmer',
+            expressions: {
+                neutral: 0,
+                happy: 1,
+                sad: 2,
+            },
+        });
+
+        // Pirate appearance (placeholder: uses Ruby sprites until dedicated art is created)
+        this.appearances.set('Pirate', {
+            spriteKey: 'Pirate',
+            expressions: {
+                neutral: 0,
+                happy: 1,
+                sad: 2,
+            },
+        });
     }
 
     /**

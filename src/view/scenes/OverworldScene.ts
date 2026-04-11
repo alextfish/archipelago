@@ -30,6 +30,7 @@ import { WaterPropagationEngine } from '@model/overworld/WaterPropagationEngine'
 import type { TranslationModeScene } from '@view/scenes/TranslationModeScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { GridToWorldMapper } from '@view/GridToWorldMapper';
+import { getNPCSpriteKey } from '@view/NPCSpriteHelper';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -172,6 +173,33 @@ export class OverworldScene extends Phaser.Scene {
       frameWidth: 32,
       frameHeight: 32
     });
+
+    // Fisherman — placeholder sprites using sailorNS art until dedicated art is created
+    this.load.spritesheet('Fisherman', 'resources/sprites/sailorNS.png', {
+      frameWidth: 32,
+      frameHeight: 32
+    });
+    this.load.image('Fisherman happy', 'resources/sprites/sailorNS happy.png');
+    this.load.image('Fisherman frown', 'resources/sprites/sailorNS frown.png');
+    this.load.image('Fisherman neutral', 'resources/sprites/sailorNS neutral.png');
+
+    // Farmer — placeholder sprites using sailorEW art until dedicated art is created
+    this.load.spritesheet('Farmer', 'resources/sprites/sailorEW.png', {
+      frameWidth: 32,
+      frameHeight: 32
+    });
+    this.load.image('Farmer happy', 'resources/sprites/sailorEW happy.png');
+    this.load.image('Farmer frown', 'resources/sprites/sailorEW sad.png');
+    this.load.image('Farmer neutral', 'resources/sprites/sailorEW neutral.png');
+
+    // Pirate — placeholder sprites using Ruby art until dedicated art is created
+    this.load.spritesheet('Pirate', 'resources/sprites/Ruby neutral.png', {
+      frameWidth: 32,
+      frameHeight: 32
+    });
+    this.load.image('Pirate happy', 'resources/sprites/Ruby happy.png');
+    this.load.image('Pirate frown', 'resources/sprites/Ruby frown.png');
+    this.load.image('Pirate neutral', 'resources/sprites/Ruby neutral.png');
     this.load.spritesheet('Lyuba', 'resources/sprites/Lyuba neutral.png', {
       frameWidth: 32,
       frameHeight: 32
@@ -1213,12 +1241,13 @@ export class OverworldScene extends Phaser.Scene {
         const displayItems = constraint.getDisplayItems(puzzle);
 
         for (const item of displayItems) {
-          // Find the island that this constraint applies to
-          const island = puzzle.islands.find(i => i.id === item.elementID);
-          if (!island) {
-            console.warn(`Could not find island ${item.elementID} in puzzle ${puzzleId}`);
-            continue;
-          }
+          // Resolve the overworld tile position for this constraint item.
+          // Items with an explicit position (e.g. MustHaveWaterConstraint,
+          // EnclosedAreaSizeConstraint) provide puzzle-relative coordinates directly.
+          // Island-based items (e.g. IslandBridgeCountConstraint) are looked up by ID.
+          let overworldTileX: number;
+          let overworldTileY: number;
+          let elementLabel: string;
 
           // Get puzzle definition to convert puzzle coordinates to overworld coordinates
           const puzzleDefinition = this.puzzleManager.getPuzzleDefinitionById(puzzleId);
@@ -1227,14 +1256,28 @@ export class OverworldScene extends Phaser.Scene {
             continue;
           }
 
-          // Convert puzzle coordinates to overworld tile coordinates
           // Puzzle bounds are in pixels, so convert to tiles first
           const { x: puzzleTileX, y: puzzleTileY } = this.gridMapper.worldToGrid(puzzleDefinition.bounds.x, puzzleDefinition.bounds.y);
-          const overworldTileX = puzzleTileX + island.x;
-          const overworldTileY = puzzleTileY + island.y;
 
-          // Generate a unique NPC ID from the constraint and island
-          const npcId = `constraint-${puzzleId}-${constraint.constructor.name}-${island.id}`;
+          if (item.position) {
+            // Cell-based constraint — position is already puzzle-relative
+            overworldTileX = puzzleTileX + item.position.x;
+            overworldTileY = puzzleTileY + item.position.y;
+            elementLabel = item.elementID;
+          } else {
+            // Island-based constraint — look up island by ID
+            const island = puzzle.islands.find(i => i.id === item.elementID);
+            if (!island) {
+              console.warn(`Could not find island ${item.elementID} in puzzle ${puzzleId}`);
+              continue;
+            }
+            overworldTileX = puzzleTileX + island.x;
+            overworldTileY = puzzleTileY + island.y;
+            elementLabel = island.id;
+          }
+
+          // Generate a unique NPC ID from the constraint and element
+          const npcId = `constraint-${puzzleId}-${constraint.constructor.name}-${elementLabel}`;
 
           // Check if this NPC already exists (avoid duplicates)
           if (this.npcs.find(n => n.id === npcId)) {
@@ -1245,14 +1288,14 @@ export class OverworldScene extends Phaser.Scene {
           const conversationFile = constraint.conversationFile;
           const conversationFileSolved = constraint.conversationFileSolved;
 
-          // Default appearance for constraint NPCs
-          const appearanceId = item.constraintType === 'IslandBridgeCountConstraint' ? 'Ruby' : 'sailorNS';
+          // Choose appearance based on constraint type
+          const appearanceId = getNPCSpriteKey(item.constraintType);
           const language = 'grass'; // Default language for constraint NPCs
 
           // Create NPC instance
           const npc = new NPC(
             npcId,
-            island.id, // Use island ID as NPC name for easier debugging
+            elementLabel, // Use element label as NPC name for easier debugging
             overworldTileX,
             overworldTileY,
             language,
