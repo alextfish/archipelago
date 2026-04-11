@@ -189,6 +189,8 @@ export class OverworldScene extends Phaser.Scene {
       frameHeight: 32
     });
     this.load.image('Farmer happy', 'resources/sprites/sailorEW happy.png');
+    // sailorEW uses 'sad' not 'frown' for its unhappy expression; load it as 'Farmer frown'
+    // so ConstraintFeedbackDisplay can use the standard '{sprite} frown' key
     this.load.image('Farmer frown', 'resources/sprites/sailorEW sad.png');
     this.load.image('Farmer neutral', 'resources/sprites/sailorEW neutral.png');
 

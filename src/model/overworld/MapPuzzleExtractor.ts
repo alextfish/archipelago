@@ -757,6 +757,16 @@ export class MapPuzzleExtractor {
     }
 
     /**
+     * Returns true when the constraint_type property indicates a cell-level constraint
+     * (MustHaveWater, EnclosedAreaSize) that does not require a matching island.
+     * Used by applyIslandConstraintsFromObjects to suppress spurious "no island" warnings
+     * and by extractCellConstraintsFromObjects to identify objects to process.
+     */
+    private isCellLevelConstraintType(constraintType: string | undefined): boolean {
+        return constraintType === 'MustHaveWater' || constraintType === 'EnclosedAreaSize';
+    }
+
+    /**
      * Count occurrences of each value in an array
      */
     private countOccurrences<T>(array: T[]): Map<T, number> {
@@ -831,13 +841,12 @@ export class MapPuzzleExtractor {
 
                 // Cell-level constraints (MustHaveWater, EnclosedAreaSize) don't need a
                 // matching island — they are handled by extractCellConstraintsFromObjects.
-                const isCellLevelConstraint = props.constraint_type === 'MustHaveWater' ||
-                    props.constraint_type === 'EnclosedAreaSize';
+                const cellLevel = this.isCellLevelConstraintType(props.constraint_type);
 
                 // Find island at this position
                 const island = islands.find(i => i.x === relativeTileX && i.y === relativeTileY);
                 if (!island) {
-                    if (!isCellLevelConstraint) {
+                    if (!cellLevel) {
                         console.warn(`Constraint object at puzzle-relative (${relativeTileX}, ${relativeTileY}) has no matching island`);
                     }
                     continue;
@@ -906,8 +915,8 @@ export class MapPuzzleExtractor {
                 if (props.constraint !== 'true') continue;
 
                 // Only handle cell-level constraint types here
+                if (!this.isCellLevelConstraintType(props.constraint_type)) continue;
                 const constraintType = props.constraint_type;
-                if (constraintType !== 'MustHaveWater' && constraintType !== 'EnclosedAreaSize') continue;
 
                 // Check whether the object lies within this puzzle's bounds
                 const objTileX = Math.floor(obj.x / tilewidth);
