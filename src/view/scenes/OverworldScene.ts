@@ -1253,6 +1253,11 @@ export class OverworldScene extends Phaser.Scene {
           const appearanceId = item.constraintType === 'IslandBridgeCountConstraint' ? 'Ruby' : 'sailorNS';
           const language = 'grass'; // Default language for constraint NPCs
 
+          // Build template variables (e.g. {{count}} for IslandBridgeCountConstraint)
+          const conversationVariables = item.requiredCount !== undefined
+            ? { count: String(item.requiredCount) }
+            : undefined;
+
           // Create NPC instance
           const npc = new NPC(
             npcId,
@@ -1263,7 +1268,8 @@ export class OverworldScene extends Phaser.Scene {
             appearanceId,
             conversationFile,
             conversationFileSolved,
-            undefined // No series for constraint NPCs
+            undefined, // No series for constraint NPCs
+            conversationVariables
           );
 
           this.npcs.push(npc);
@@ -2122,6 +2128,16 @@ export class OverworldScene extends Phaser.Scene {
       }
 
       const conversationSpec: ConversationSpec = await response.json();
+
+      // Apply conversation variable substitution (e.g. {{count}} → '2')
+      if (npc.conversationVariables) {
+        const variables = npc.conversationVariables;
+        for (const node of Object.values(conversationSpec.nodes)) {
+          if (node.npc?.glyphs) {
+            node.npc.glyphs = node.npc.glyphs.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? `{{${key}}}`);
+          }
+        }
+      }
 
       // Switch to conversation mode
       this.gameMode = 'conversation';

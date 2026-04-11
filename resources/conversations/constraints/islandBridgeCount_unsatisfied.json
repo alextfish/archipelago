@@ -5,7 +5,7 @@
     "main": {
       "npc": {
         "expression": "neutral",
-        "glyphs": "build bridge"
+        "glyphs": "me want {{count}} bridge"
       },
       "choices": [
         {

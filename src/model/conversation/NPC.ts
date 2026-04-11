@@ -19,6 +19,7 @@ export class NPC {
     readonly conversationFileSolved?: string;   // Conversation after series solved
     readonly seriesFile?: string;               // Filename in src/data/series/
     readonly appearanceId: string;              // ID for looking up sprite in registry
+    readonly conversationVariables?: Record<string, string>;  // Template variables for conversation glyphs
 
     constructor(
         id: string,
@@ -29,7 +30,8 @@ export class NPC {
         appearanceId: string,
         conversationFile?: string,
         conversationFileSolved?: string,
-        seriesFile?: string
+        seriesFile?: string,
+        conversationVariables?: Record<string, string>
     ) {
         this.id = id;
         this.name = name;
@@ -40,6 +42,7 @@ export class NPC {
         this.conversationFile = conversationFile;
         this.conversationFileSolved = conversationFileSolved;
         this.seriesFile = seriesFile;
+        this.conversationVariables = conversationVariables;
     }
 
     /**

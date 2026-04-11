@@ -5,7 +5,7 @@
     "main": {
       "npc": {
         "expression": "happy",
-        "glyphs": "good bridge"
+        "glyphs": "{{count}} bridge exclamation happy"
       },
       "choices": [
         {
