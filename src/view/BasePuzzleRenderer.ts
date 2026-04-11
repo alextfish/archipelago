@@ -105,6 +105,43 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
     // -------------------------------------------------------------------------
 
     /**
+     * Create constraint NPC sprites for cell-based constraints (those whose
+     * ConstraintDisplayItem has an explicit `position`), such as
+     * EnclosedAreaSizeConstraint.  Shared by both subclasses' init()
+     * implementations.
+     */
+    protected createConstraintNPCsFromPuzzleConstraints(puzzle: BridgePuzzle): void {
+        for (const constraint of puzzle.constraints) {
+            if (!constraint.personified) continue;
+            for (const item of constraint.getDisplayItems(puzzle)) {
+                if (!item.position) continue; // Island-based items handled by createConstraintNPCForIsland
+
+                const worldPos = this.gridMapper.gridToWorld(item.position.x, item.position.y);
+                const scale = this.gridMapper.getCellSize() / 32;
+                const spriteKey = getNPCSpriteKey(item.constraintType);
+
+                const npcSprite = this.scene.add.sprite(worldPos.x, worldPos.y, spriteKey, 0)
+                    .setOrigin(0, 0)
+                    .setScale(scale, scale);
+                this.constraintNPCs.set(item.elementID, npcSprite);
+                this.onGameObjectCreated(npcSprite);
+
+                if (item.requiredCount !== undefined && item.requiredCount >= 1 && item.requiredCount <= 8) {
+                    const cellSize = this.gridMapper.getCellSize();
+                    const numberSprite = this.scene.add.sprite(
+                        worldPos.x + cellSize / 2,
+                        worldPos.y + cellSize / 2,
+                        'counts overlay',
+                        item.requiredCount - 1,
+                    ).setOrigin(0.5, 0.5).setScale(scale, scale);
+                    this.constraintNumbers.set(item.elementID, numberSprite);
+                    this.onGameObjectCreated(numberSprite);
+                }
+            }
+        }
+    }
+
+    /**
      * Create a constraint NPC sprite and bridge-count number sprite for an island
      * that carries an IslandBridgeCountConstraint.  Shared by both subclasses'
      * init() implementations.
@@ -125,7 +162,7 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
             const numberSprite = this.scene.add.sprite(
                 worldPos.x + cellSize / 2,
                 worldPos.y + cellSize / 2,
-                'bridge counts',
+                'counts overlay',
                 num - 1,
             ).setOrigin(0.5, 0.5).setScale(scale, scale);
             this.constraintNumbers.set(island.id, numberSprite);

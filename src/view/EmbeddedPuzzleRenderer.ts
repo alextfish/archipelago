@@ -76,6 +76,8 @@ export class EmbeddedPuzzleRenderer extends BasePuzzleRenderer implements IPuzzl
         for (const island of puzzle.islands) {
             this.createConstraintNPCForIsland(island);
         }
+
+        this.createConstraintNPCsFromPuzzleConstraints(puzzle);
     }
 
     // -------------------------------------------------------------------------

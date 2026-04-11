@@ -239,8 +239,8 @@ export class OverworldScene extends Phaser.Scene {
       frameHeight: 32
     });
 
-    // Load bridge counts spritesheet for constraint NPCs
-    this.load.spritesheet('bridge counts', 'resources/sprites/bridge counts.png', {
+    // Load counts overlay spritesheet for constraint NPCs
+    this.load.spritesheet('counts overlay', 'resources/sprites/counts overlay.png', {
       frameWidth: 32,
       frameHeight: 32
     });
@@ -1334,14 +1334,14 @@ export class OverworldScene extends Phaser.Scene {
           sprite.setDepth(worldY);
           this.npcSprites.set(npc.id, sprite);
 
-          // Add bridge count number sprite for IslandBridgeCountConstraint
-          if (item.constraintType === 'IslandBridgeCountConstraint' && item.requiredCount) {
+          // Add count overlay sprite for constraints that specify a requiredCount
+          if ((item.constraintType === 'IslandBridgeCountConstraint' || item.constraintType === 'EnclosedAreaSizeConstraint') && item.requiredCount) {
             const count = item.requiredCount;
             if (count >= 1 && count <= 8) {
               const numberSprite = this.add.sprite(
                 worldX + this.tiledMapData.tilewidth / 2,
                 worldY - this.tiledMapData.tileheight / 2,
-                'bridge counts',
+                'counts overlay',
                 count - 1 // Frame index is count-1 for numbers 1-8
               );
               numberSprite.setOrigin(0.5, 0.5);

@@ -10,7 +10,7 @@ export interface ConstraintDisplayItem {
   glyphMessage: string;
   /** Type of constraint that generated this item (for choosing NPC sprite) */
   constraintType?: string;
-  /** Required count for IslandBridgeCountConstraint (1-8) */
+  /** Required count for overlay display (e.g. bridge count or enclosed area size, 1-8) */
   requiredCount?: number;
   /**
    * Optional grid position for the NPC and speech bubble.

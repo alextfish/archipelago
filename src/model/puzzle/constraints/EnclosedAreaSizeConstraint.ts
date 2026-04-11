@@ -251,6 +251,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
       glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "area not enclosed"),
       constraintType: 'EnclosedAreaSizeConstraint',
       position: { x: this.x, y: this.y },
+      requiredCount: this.expectedSize >= 0 ? this.expectedSize : undefined,
     }];
   }
 }
