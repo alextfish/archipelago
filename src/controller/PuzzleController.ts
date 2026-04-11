@@ -5,6 +5,7 @@ import type { PuzzleHost } from "./PuzzleHost";
 import { PuzzleValidator } from "@model/puzzle/PuzzleValidator";
 import type { BridgeType } from "@model/puzzle/BridgeType";
 import type { Bridge } from "@model/puzzle/Bridge";
+import type { Island } from "@model/puzzle/Island";
 import { UndoRedoManager } from "@model/UndoRedoManager";
 import { BuildBridgeCommand } from "@model/commands/BuildBridgeCommand";
 import { RemoveBridgeCommand } from "@model/commands/RemoveBridgeCommand";
@@ -69,19 +70,21 @@ export class PuzzleController {
         let isInvalid = false;
 
         if (typeLength !== -1) {
-            // fixed length: angle from start to cursor or island, endpoint at fixed length
+            // fixed length: compute endpoint at fixed distance in cursor direction, then snap to
+            // any nearby valid island so the preview locks on even when the cursor is not exactly
+            // over the island's grid cell.
             const startID = this.getIslandIDAt(start.x, start.y);
-            if (candidateIsland && startID && this.puzzle.couldPlaceBridgeOfType(startID, candidateIsland.id, this.currentBridgeType!.id)) {
-                // snap to island
-                previewEnd = { x: candidateIsland.x, y: candidateIsland.y };
-                const count = this.puzzle.getBridgeCountBetween(startID, candidateIsland.id);
+            const worldStart = (this.renderer as any).gridMapper.gridToWorld(start.x, start.y);
+            const angle = Math.atan2(_worldY - worldStart.y, _worldX - worldStart.x);
+            const rawEnd = { x: start.x + Math.cos(angle) * typeLength, y: start.y + Math.sin(angle) * typeLength };
+            const snapIsland = this.findIslandNearPoint(rawEnd.x, rawEnd.y);
+            if (snapIsland && startID && this.puzzle.couldPlaceBridgeOfType(startID, snapIsland.id, this.currentBridgeType!.id)) {
+                // snap preview endpoint exactly to the island
+                previewEnd = { x: snapIsland.x, y: snapIsland.y };
+                const count = this.puzzle.getBridgeCountBetween(startID, snapIsland.id);
                 isDouble = count === 1;
             } else {
-                // angle from start to cursor, endpoint = start + unit(angle)*length
-                // calculate true angle to cursor point from world coordinates
-                const worldStart = (this.renderer as any).gridMapper.gridToWorld(start.x, start.y);
-                const angle = Math.atan2(_worldY - worldStart.y, _worldX - worldStart.x);
-                previewEnd = { x: start.x + Math.cos(angle) * typeLength, y: start.y + Math.sin(angle) * typeLength };
+                previewEnd = rawEnd;
             }
         } else {
             // variable length: snap to candidate island if it's a valid placement, else follow cursor smoothly
@@ -139,6 +142,25 @@ export class PuzzleController {
                 return;
             }
         }
+        // For fixed-length bridges: even when the cursor is not on an island, try to snap to the
+        // island closest to the computed fixed-length endpoint (start + unit(angle) * length).
+        if (this.currentBridgeType && this.pendingStart) {
+            const typeLength = (this.currentBridgeType.length === undefined) ? -1 : this.currentBridgeType.length ?? -1;
+            if (typeLength !== -1) {
+                const worldStart = (this.renderer as any).gridMapper.gridToWorld(this.pendingStart.x, this.pendingStart.y);
+                const angle = Math.atan2(_worldY - worldStart.y, _worldX - worldStart.x);
+                const rawEnd = {
+                    x: this.pendingStart.x + Math.cos(angle) * typeLength,
+                    y: this.pendingStart.y + Math.sin(angle) * typeLength
+                };
+                const startID = this.getIslandIDAt(this.pendingStart.x, this.pendingStart.y);
+                const snapIsland = this.findIslandNearPoint(rawEnd.x, rawEnd.y);
+                if (snapIsland && startID && this.puzzle.couldPlaceBridgeOfType(startID, snapIsland.id, this.currentBridgeType.id)) {
+                    this.tryPlaceSecondEndpoint(snapIsland.x, snapIsland.y);
+                    return;
+                }
+            }
+        }
         // Otherwise cancel placement and release allocated bridge
         if (this.currentBridge) {
             // Release allocated bridge back to inventory
@@ -154,6 +176,24 @@ export class PuzzleController {
     private getIslandIDAt(x: number, y: number): string | null {
         const isl = this.puzzle.islands.find(i => i.x === x && i.y === y);
         return isl ? isl.id : null;
+    }
+
+    /**
+     * Returns the island whose grid position is within `tolerance` grid units of (x, y),
+     * or null if none is close enough.  When multiple islands are within range the
+     * nearest one is returned.
+     */
+    private findIslandNearPoint(x: number, y: number, tolerance: number = 0.7): Island | null {
+        let bestIsland: Island | null = null;
+        let bestDist = tolerance;
+        for (const island of this.puzzle.islands) {
+            const dist = Math.sqrt((island.x - x) ** 2 + (island.y - y) ** 2);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestIsland = island;
+            }
+        }
+        return bestIsland;
     }
 
     private startClickAndClickPlacement() {
