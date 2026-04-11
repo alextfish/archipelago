@@ -20,6 +20,11 @@ class MockPuzzleRenderer implements PuzzleRenderer {
   violations: string[] = [];
   dt: number = 0;
   puzzle: BridgePuzzle | undefined;
+  // Expose a gridMapper so PuzzleController can compute world positions
+  gridMapper = {
+    gridToWorld: (gx: number, gy: number) => ({ x: gx * 32, y: gy * 32 }),
+    getCellSize: () => 32,
+  };
 
   init(puzzle: BridgePuzzle): void {
     this.initCalled = true;
@@ -149,6 +154,8 @@ function createMockPuzzle(): Partial<BridgePuzzle> {
       }).length;
       return existing < puzzle.maxNumBridges;
     }),
+
+    getBridgeCountBetween: vi.fn((_startId: string, _endId: string) => 0),
 
     get placedBridges(): Bridge[] {
       return puzzle.bridges.filter(b => b.start && b.end);
@@ -707,6 +714,122 @@ describe("PuzzleController", () => {
       (controller as any).undoManager.clear();
       controller.redo();
       expect(mockRenderer.updateCalled).toBe(false);
+    });
+  });
+
+  describe("fixed-length bridge snapping", () => {
+    // Islands: I1 at (0,0), I2 at (3,0) — 3 units apart
+    // Bridge type has fixed length 3
+    const fixedBridgeType: BridgeType = { id: 'fixed3', length: 3, colour: 'brown' };
+    let snapBridge: Bridge;
+
+    beforeEach(() => {
+      mockPuzzle.islands = [
+        { id: 'I1', x: 0, y: 0 },
+        { id: 'I2', x: 3, y: 0 },
+      ] as any[];
+
+      snapBridge = { id: 'sb1', type: fixedBridgeType } as Bridge;
+
+      mockPuzzle.getAvailableBridgeTypes = vi.fn(() => [fixedBridgeType]);
+      mockPuzzle.takeBridgeOfType = vi.fn(() => snapBridge);
+      // Allow placement between I1 and I2
+      mockPuzzle.couldPlaceBridgeOfType = vi.fn(() => true);
+      mockPuzzle.getBridgeCountBetween = vi.fn(() => 0);
+
+      controller = new PuzzleController(
+        mockPuzzle as unknown as BridgePuzzle,
+        mockRenderer,
+        mockHost,
+      );
+    });
+
+    describe("onPointerMove preview snapping", () => {
+      it("snaps preview to island when cursor is not exactly on it but endpoint lands nearby", () => {
+        // Start placement at I1 (grid 0,0)
+        controller.tryPlaceFirstEndpoint(0, 0);
+
+        // Move cursor to world position (94, 4) — gridMapper maps (3,0) → (96,0), so cursor is
+        // slightly off but the angle points mostly right.  The fixed endpoint lands at ~(3, 0.125)
+        // which is within 0.7 of I2 at (3, 0).
+        controller.onPointerMove(94, 4, 2, 0); // gridX=2 (not an island)
+
+        expect(mockRenderer.previewBridgeCalled).toBe(true);
+        const previewBridge = mockRenderer.previewBridgeArg;
+        // Preview should be snapped to I2
+        expect(previewBridge.end.x).toBeCloseTo(3, 5);
+        expect(previewBridge.end.y).toBeCloseTo(0, 5);
+      });
+
+      it("does not snap preview when endpoint is not near any island", () => {
+        controller.tryPlaceFirstEndpoint(0, 0);
+
+        // Cursor pointing upward — endpoint would be near (0, 3), no island there
+        controller.onPointerMove(0, 96, 0, 3);
+
+        expect(mockRenderer.previewBridgeCalled).toBe(true);
+        const previewBridge = mockRenderer.previewBridgeArg;
+        // Preview end should be the raw computed endpoint, not snapped to any island
+        expect(previewBridge.end.x).toBeCloseTo(0, 1);
+        expect(previewBridge.end.y).toBeCloseTo(3, 1);
+      });
+
+      it("snaps preview even when cursor is exactly on island", () => {
+        controller.tryPlaceFirstEndpoint(0, 0);
+
+        // Cursor directly on I2 at world (96, 0)
+        controller.onPointerMove(96, 0, 3, 0);
+
+        expect(mockRenderer.previewBridgeCalled).toBe(true);
+        const previewBridge = mockRenderer.previewBridgeArg;
+        expect(previewBridge.end.x).toBeCloseTo(3, 5);
+        expect(previewBridge.end.y).toBeCloseTo(0, 5);
+      });
+    });
+
+    describe("onPointerUp snap-to-place", () => {
+      it("places bridge when pointer is released near computed endpoint (not on island grid cell)", () => {
+        controller.tryPlaceFirstEndpoint(0, 0);
+
+        // Lift mouse at world (94, 4) — gridX=2 (not on I2), but fixed-length endpoint is
+        // very close to I2 at (3, 0)
+        controller.onPointerUp(94, 4, 2, 0);
+
+        expect(mockPuzzle.placeBridge).toHaveBeenCalledWith(
+          expect.any(String),
+          { x: 0, y: 0 },
+          { x: 3, y: 0 },
+        );
+        expect(controller.pendingStart).toBeNull();
+      });
+
+      it("cancels placement when pointer is released with endpoint far from any island", () => {
+        controller.tryPlaceFirstEndpoint(0, 0);
+
+        // Lift mouse pointing up — endpoint near (0, 3), no island
+        controller.onPointerUp(0, 96, 0, 3);
+
+        expect(mockPuzzle.placeBridge).not.toHaveBeenCalled();
+        expect(controller.pendingStart).toBeNull();
+      });
+
+      it("snap-to-place also works for click-and-click: second click not on island", () => {
+        // Simulate click-click: first click starts placement, second click (pointerdown ignored,
+        // pointerup fires) snaps to nearby island
+        controller.onPointerDown(0, 0, 0, 0);   // start on I1
+        controller.onPointerUp(0, 0, 0, 0);      // up on same island → click-and-click mode
+
+        // Second interaction: pointerdown ignored (pendingStart set), pointerup fires away from
+        // any island but pointing toward I2
+        controller.onPointerDown(94, 4, 2, 0); // ignored
+        controller.onPointerUp(94, 4, 2, 0);   // snaps to I2
+
+        expect(mockPuzzle.placeBridge).toHaveBeenCalledWith(
+          expect.any(String),
+          { x: 0, y: 0 },
+          { x: 3, y: 0 },
+        );
+      });
     });
   });
 });

@@ -4,7 +4,7 @@
  * This script will:
  * 1. Start the player at the "forestPuzzle0" player start (adjacent to forest puzzle 0)
  * 2. Press E to enter the overworld puzzle
- * 3. Click island at grid (2,3) then (5,3) to place a bridge that violates a constraint
+ * 3. Click island at grid (2,3) then (6,3) to place a bridge that violates a constraint
  * 4. Verify that the constraint violation registered glyphs via ActiveGlyphTracker
  * 5. Press Tab to enter Translation Mode
  * 6. Verify that TranslationModeScene built highlights from those glyphs
@@ -193,9 +193,9 @@ async function waitForCameraReady(page, timeout = 10000) {
 async function clickOverworldPuzzleGrid(page, gridX, gridY) {
     const coords = await page.evaluate(({ gx, gy }) => {
         const game = window.game;
-        if (!game) return null;
+        if (!game) return { error: 'no game' };
         const scene = game.scene.getScene('OverworldScene');
-        if (!scene) return null;
+        if (!scene) return { error: 'no OverworldScene' };
         const pc = scene.puzzleController;
         if (!pc) return null;
         const renderer = pc.puzzleRenderer;
@@ -307,6 +307,20 @@ async function runTest() {
 
         console.log('[TEST] Clicking island at grid (6,3)...');
         await clickOverworldPuzzleGrid(page, 6, 3);
+
+        // Verify the bridge was actually placed before checking for constraint feedback
+        const bridgeCount = await page.evaluate(() => {
+            const scene = window.game?.scene.getScene('OverworldScene');
+            const pc = scene?.puzzleController;
+            const controller = pc?.activePuzzleController;
+            if (!controller) return -1;
+            return controller.puzzle.placedBridges.length;
+        });
+        console.log(`[TEST] Placed bridge count: ${bridgeCount}`);
+        if (bridgeCount <= 0) {
+            throw new Error(`Expected ≥1 placed bridge after clicking islands, but found ${bridgeCount}`);
+        }
+        console.log('[TEST] ✅ Bridge placed successfully');
 
         // Wait for the bridge_placed event to confirm the bridge was actually placed
         console.log('[TEST] Waiting for bridge_placed event...');

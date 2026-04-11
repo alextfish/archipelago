@@ -215,7 +215,7 @@ export class OverworldScene extends Phaser.Scene {
       frameHeight: 32
     });
 
-    // Load NPC icon sprites (user will provide these files)
+    // Load NPC icon sprites
     this.load.image(NPCIconConfig.INCOMPLETE, 'resources/sprites/icon-incomplete.png');
     this.load.image(NPCIconConfig.COMPLETE, 'resources/sprites/icon-complete.png');
 
