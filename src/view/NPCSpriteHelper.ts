@@ -15,6 +15,12 @@ export function getNPCSpriteKey(constraintType: string | undefined): string {
             return 'Ruby';
         case 'BridgeMustCoverIslandConstraint':
             return 'sailorNS';
+        case 'MustHaveWaterConstraint':
+            return 'Fisherman';
+        case 'IslandDirectionalBridgeConstraint':
+            return 'Pirate';
+        case 'EnclosedAreaSizeConstraint':
+            return 'Farmer';
         default:
             return 'sailorNS';
     }
