@@ -99,12 +99,12 @@ export class CameraManager {
         console.log(`  Puzzle bounds: ${puzzleBounds.width}x${puzzleBounds.height}, with padding: ${paddedBounds.width}x${paddedBounds.height}`);
         console.log(`  Camera viewport: ${camera.width}x${camera.height}, current zoom: ${camera.zoom}`);
 
-        // Create transition promise
-        return new Promise<void>((resolve) => {
-            // Pan to center of puzzle.
-            // camera.pan() tracks the world centre dynamically each frame as
-            // zoom changes, so it correctly centres on the target point even
-            // while zoomTo() is animating simultaneously.
+        // Run the pan + zoom animations and wait for both to reach their end.
+        // camera.pan() tracks the world centre dynamically each frame as zoom
+        // changes, so it correctly centres on the target point even while
+        // zoomTo() is animating simultaneously.  The promise resolves when the
+        // pan effect fires its completion callback (progress === 1).
+        await new Promise<void>((resolve) => {
             camera.pan(centerX, centerY, duration, 'Power2', false, (_camera, progress) => {
                 if (progress === 1) {
                     resolve();
@@ -114,6 +114,15 @@ export class CameraManager {
             // Zoom to fit puzzle
             camera.zoomTo(targetZoom, duration, 'Power2');
         });
+
+        // Snap to the exact final position.  In low-frame-rate environments
+        // (e.g. headless CI) the pan effect's final update can run before the
+        // zoom effect has committed the target zoom for that frame, leaving
+        // scrollX/scrollY slightly off.  Setting zoom and centreOn() explicitly
+        // here guarantees the camera lands exactly where we need it.
+        camera.setZoom(targetZoom);
+        camera.centerOn(centerX, centerY);
+        console.log(`CameraManager: Snapped camera to (${centerX}, ${centerY}) zoom=${camera.zoom} scroll=(${camera.scrollX.toFixed(0)}, ${camera.scrollY.toFixed(0)})`);
     }
 
     /**

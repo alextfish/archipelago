@@ -171,6 +171,21 @@ async function runViewportDiagnostics(page, label = '') {
 }
 
 /**
+ * Wait until the overworld camera's pan and zoom effects have both finished.
+ * This is needed before computing click coordinates so we read stable scrollX/scrollY.
+ */
+async function waitForCameraReady(page, timeout = 10000) {
+    await page.waitForFunction(() => {
+        const scene = window.game?.scene.getScene('OverworldScene');
+        if (!scene) return false;
+        const cam = scene.cameras.main;
+        const panDone  = !cam.panEffect  || !cam.panEffect.isRunning;
+        const zoomDone = !cam.zoomEffect || !cam.zoomEffect.isRunning;
+        return panDone && zoomDone;
+    }, { timeout });
+}
+
+/**
  * Compute the screen coordinates of the centre of a puzzle grid cell by
  * reading the overworld camera and the active EmbeddedPuzzleRenderer from
  * inside the browser, then click there.
@@ -193,11 +208,19 @@ async function clickOverworldPuzzleGrid(page, gridX, gridY) {
         const worldCentreY = worldPos.y + cellSize / 2;
 
         const cam = scene.cameras.main;
-        // Phaser world-to-screen: screenX = cam.x + (worldX - cam.scrollX) * cam.zoom
-        const screenX = cam.x + (worldCentreX - cam.scrollX) * cam.zoom;
-        const screenY = cam.y + (worldCentreY - cam.scrollY) * cam.zoom;
+        // Phaser 3: cam.worldView.x/y are the world-space left/top of what the camera
+        // currently shows.  screenX = (worldX - worldView.x) * zoom is always correct
+        // regardless of scroll representation or origin offset.
+        const screenX = (worldCentreX - cam.worldView.x) * cam.zoom;
+        const screenY = (worldCentreY - cam.worldView.y) * cam.zoom;
 
-        return { screenX, screenY, worldX: worldCentreX, worldY: worldCentreY, zoom: cam.zoom };
+        return {
+            screenX, screenY,
+            worldX: worldCentreX, worldY: worldCentreY,
+            zoom: cam.zoom,
+            scrollX: cam.scrollX, scrollY: cam.scrollY,
+            worldViewX: cam.worldView.x, worldViewY: cam.worldView.y,
+        };
     }, { gx: gridX, gy: gridY });
 
     if (!coords) {
@@ -219,7 +242,8 @@ async function clickOverworldPuzzleGrid(page, gridX, gridY) {
 
     console.log(
         `[TEST] Grid (${gridX},${gridY}) -> World (${coords.worldX.toFixed(0)},${coords.worldY.toFixed(0)}) ` +
-        `-> CanvasRelative (${coords.screenX.toFixed(0)},${coords.screenY.toFixed(0)}) [zoom=${coords.zoom.toFixed(2)}]` +
+        `-> worldView=(${coords.worldViewX.toFixed(0)},${coords.worldViewY.toFixed(0)}) zoom=${coords.zoom.toFixed(2)}` +
+        ` -> CanvasRelative (${coords.screenX.toFixed(0)},${coords.screenY.toFixed(0)})` +
         ` canvasOffset=(${canvasViewportOffset.left.toFixed(0)},${canvasViewportOffset.top.toFixed(0)})` +
         ` -> Viewport (${viewportX.toFixed(0)},${viewportY.toFixed(0)})`
     );
@@ -227,6 +251,7 @@ async function clickOverworldPuzzleGrid(page, gridX, gridY) {
     await page.mouse.click(viewportX, viewportY);
     await page.waitForTimeout(300);
 }
+
 
 async function runTest() {
     const { page, cleanup } = await initTest({
@@ -270,18 +295,29 @@ async function runTest() {
         // ── Diagnostic: layout after entering puzzle ──
         await runViewportDiagnostics(page, 'after-puzzle-entered');
 
-        // Allow camera transition to finish
-        await page.waitForTimeout(2000);
+        // Wait for the camera pan/zoom effects to fully settle before clicking
+        console.log('[TEST] Waiting for camera to settle...');
+        await waitForCameraReady(page);
+        console.log('[TEST] ✅ Camera ready');
 
-        // Click island at grid (2,3) then (5,3) to place a bridge
+        // Click island at grid (2,3) then (6,3) to place a bridge that violates
+        // the constraint on island (6,1) (which requires 1 bridge).
         console.log('[TEST] Clicking island at grid (2,3)...');
         await clickOverworldPuzzleGrid(page, 2, 3);
 
-        console.log('[TEST] Clicking island at grid (5,3)...');
-        await clickOverworldPuzzleGrid(page, 5, 3);
+        console.log('[TEST] Clicking island at grid (6,3)...');
+        await clickOverworldPuzzleGrid(page, 6, 3);
 
-        // Wait for constraint feedback
-        await page.waitForTimeout(1000);
+        // Wait for the bridge_placed event to confirm the bridge was actually placed
+        console.log('[TEST] Waiting for bridge_placed event...');
+        const bridgePlacedData = await waitForGameEvent(page, 'bridge_placed', 5000);
+        if (!bridgePlacedData) {
+            throw new Error('Bridge was not placed — check that island click coordinates are correct');
+        }
+        console.log('[TEST] ✅ Bridge placed', bridgePlacedData);
+
+        // Wait for constraint feedback to propagate
+        await page.waitForTimeout(500);
 
         // Verify glyphs were registered by the constraint violation speech bubble
         const glyphCount = await page.evaluate(() => {
