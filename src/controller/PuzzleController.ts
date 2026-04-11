@@ -9,6 +9,7 @@ import type { Island } from "@model/puzzle/Island";
 import { UndoRedoManager } from "@model/UndoRedoManager";
 import { BuildBridgeCommand } from "@model/commands/BuildBridgeCommand";
 import { RemoveBridgeCommand } from "@model/commands/RemoveBridgeCommand";
+import { emitTestEvent } from '@helpers/TestEvents';
 
 
 export class PuzzleController {
@@ -396,6 +397,7 @@ export class PuzzleController {
         this.selectAvailableBridgeType();
         this.notifyCountsChanged();
         this.validate();
+        emitTestEvent('bridge_placed', { endX: x, endY: y });
     }
 
     private selectAvailableBridgeType() {
