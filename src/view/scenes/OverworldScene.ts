@@ -30,7 +30,7 @@ import { WaterPropagationEngine } from '@model/overworld/WaterPropagationEngine'
 import type { TranslationModeScene } from '@view/scenes/TranslationModeScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { GridToWorldMapper } from '@view/GridToWorldMapper';
-import { getNPCSpriteKey } from '@view/NPCSpriteHelper';
+import { getNPCSpriteKey, loadNPCSprites } from '@view/NPCSpriteHelper';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -161,77 +161,7 @@ export class OverworldScene extends Phaser.Scene {
       frameWidth: 32,
       frameHeight: 32
     });
-    // Load NPC expression sprites for constraint feedback
-    this.load.image('sailorNS happy', 'resources/sprites/sailorNS happy.png');
-    this.load.image('sailorNS frown', 'resources/sprites/sailorNS frown.png');
-    this.load.image('sailorEW happy', 'resources/sprites/sailorEW happy.png');
-    this.load.image('sailorEW sad', 'resources/sprites/sailorEW sad.png');
-    this.load.image('Ruby happy', 'resources/sprites/Ruby happy.png');
-    this.load.image('Ruby frown', 'resources/sprites/Ruby frown.png');
-    this.load.image('Ruby neutral', 'resources/sprites/Ruby neutral.png');
-    this.load.spritesheet('Ruby', 'resources/sprites/Ruby neutral.png', {
-      frameWidth: 32,
-      frameHeight: 32
-    });
-
-    // Fisherman — placeholder sprites using sailorNS art until dedicated art is created
-    this.load.spritesheet('Fisherman', 'resources/sprites/sailorNS.png', {
-      frameWidth: 32,
-      frameHeight: 32
-    });
-    this.load.image('Fisherman happy', 'resources/sprites/sailorNS happy.png');
-    this.load.image('Fisherman frown', 'resources/sprites/sailorNS frown.png');
-    this.load.image('Fisherman neutral', 'resources/sprites/sailorNS neutral.png');
-
-    // Farmer — placeholder sprites using sailorEW art until dedicated art is created
-    this.load.spritesheet('Farmer', 'resources/sprites/sailorEW.png', {
-      frameWidth: 32,
-      frameHeight: 32
-    });
-    this.load.image('Farmer happy', 'resources/sprites/sailorEW happy.png');
-    // sailorEW uses 'sad' not 'frown' for its unhappy expression; load it as 'Farmer frown'
-    // so ConstraintFeedbackDisplay can use the standard '{sprite} frown' key
-    this.load.image('Farmer frown', 'resources/sprites/sailorEW sad.png');
-    this.load.image('Farmer neutral', 'resources/sprites/sailorEW neutral.png');
-
-    // Pirate — placeholder sprites using Ruby art until dedicated art is created
-    this.load.spritesheet('Pirate', 'resources/sprites/Ruby neutral.png', {
-      frameWidth: 32,
-      frameHeight: 32
-    });
-    this.load.image('Pirate happy', 'resources/sprites/Ruby happy.png');
-    this.load.image('Pirate frown', 'resources/sprites/Ruby frown.png');
-    this.load.image('Pirate neutral', 'resources/sprites/Ruby neutral.png');
-    this.load.spritesheet('Lyuba', 'resources/sprites/Lyuba neutral.png', {
-      frameWidth: 32,
-      frameHeight: 32
-    });
-    this.load.image('Lyuba happy', 'resources/sprites/Lyuba happy.png');
-    this.load.image('Lyuba frown', 'resources/sprites/Lyuba frown.png');
-    this.load.image('Lyuba neutral', 'resources/sprites/Lyuba neutral.png');
-    this.load.image('LyubaCleric', 'resources/sprites/LyubaCleric.png');
-    this.load.image('Mage1', 'resources/sprites/Mage1.png');
-    this.load.image('Mage2', 'resources/sprites/Mage2.png');
-    this.load.image('Mage3', 'resources/sprites/Mage3.png');
-    this.load.image('Mage4', 'resources/sprites/Mage4.png');
-    this.load.image('Citizen1_Idle', 'resources/sprites/Citizen1_Idle.png');
-    this.load.image('Citizen2_Idle', 'resources/sprites/Citizen2_Idle.png');
-    this.load.image('Fighter2_Idle', 'resources/sprites/Fighter2_Idle.png');
-
-    // Load high-resolution face sprites for conversations
-    this.load.image('faces/Lyuba neutral', 'resources/sprites/faces/Lyuba neutral.png');
-    this.load.image('faces/Lyuba happy', 'resources/sprites/faces/Lyuba happy.png');
-    this.load.image('faces/Lyuba frown', 'resources/sprites/faces/Lyuba frown.png');
-    this.load.image('faces/Lyuba cleric neutral', 'resources/sprites/faces/Lyuba cleric neutral.png');
-    this.load.image('faces/Lyuba cleric happy', 'resources/sprites/faces/Lyuba cleric happy.png');
-    this.load.image('faces/Lyuba cleric frown', 'resources/sprites/faces/Lyuba cleric frown.png');
-    this.load.image('faces/Lyuba cleric vhappy', 'resources/sprites/faces/Lyuba cleric vhappy.png');
-    this.load.image('faces/Lyuba cleric wink', 'resources/sprites/faces/Lyuba cleric wink.png');
-    this.load.image('faces/Ruby neutral', 'resources/sprites/faces/Ruby neutral.png');
-    this.load.image('faces/Ruby happy', 'resources/sprites/faces/Ruby happy.png');
-    this.load.image('faces/Ruby frown', 'resources/sprites/faces/Ruby frown.png');
-    this.load.image('faces/Ruby vhappy', 'resources/sprites/faces/Ruby vhappy.png');
-    this.load.image('faces/Ruby wink', 'resources/sprites/faces/Ruby wink.png');
+    loadNPCSprites(this.load);
 
     // Load language tileset for speech bubbles in constraint feedback
     this.load.spritesheet('language', 'resources/tilesets/language.png', {

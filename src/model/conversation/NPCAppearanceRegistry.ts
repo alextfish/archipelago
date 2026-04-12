@@ -5,6 +5,7 @@
 
 export interface NPCAppearance {
     spriteKey: string;         // Phaser asset key for sprite sheet
+    faceId?: string;           // Override for face texture lookup (e.g. 'Yan' for 'Farmer')
     expressions: {
         neutral: string | number;  // Frame name or index
         happy: string | number;
@@ -44,7 +45,7 @@ export class NPCAppearanceRegistry {
             },
         });
 
-        // Mage4 appearance (forest NPC)
+        // Mage4 appearance
         this.appearances.set('Mage4', {
             spriteKey: 'Mage4',
             expressions: {
@@ -74,9 +75,10 @@ export class NPCAppearanceRegistry {
             },
         });
 
-        // Fisherman appearance (placeholder: uses sailorNS sprites until dedicated art is created)
+        // Fisherman appearance (uses Evan face sprites)
         this.appearances.set('Fisherman', {
             spriteKey: 'Fisherman',
+            faceId: 'Evan',
             expressions: {
                 neutral: 0,
                 happy: 1,
@@ -84,9 +86,10 @@ export class NPCAppearanceRegistry {
             },
         });
 
-        // Farmer appearance (placeholder: uses sailorEW sprites until dedicated art is created)
+        // Farmer appearance (uses Yan face sprites)
         this.appearances.set('Farmer', {
             spriteKey: 'Farmer',
+            faceId: 'Yan',
             expressions: {
                 neutral: 0,
                 happy: 1,
@@ -94,7 +97,7 @@ export class NPCAppearanceRegistry {
             },
         });
 
-        // Pirate appearance (placeholder: uses Ruby sprites until dedicated art is created)
+        // Pirate appearance
         this.appearances.set('Pirate', {
             spriteKey: 'Pirate',
             expressions: {
@@ -150,12 +153,10 @@ export class NPCAppearanceRegistry {
      * @returns The face texture key or undefined if not available
      */
     getFaceTextureKey(appearanceId: string, expression: string): string | undefined {
-        // Construct the face texture key
-        // Format: "faces/{appearanceId} {expression}"
-        const faceKey = `faces/${appearanceId} ${expression}`;
-
-        // Only return if this face texture actually exists
-        // The caller (ConversationScene) should check if the texture exists
+        // Use faceId override if present (e.g. Farmer → Yan, Fisherman → Evan)
+        const appearance = this.appearances.get(appearanceId);
+        const faceId = appearance?.faceId ?? appearanceId;
+        const faceKey = `faces/${faceId} ${expression}`;
         return faceKey;
     }
 }
