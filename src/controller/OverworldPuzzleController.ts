@@ -279,8 +279,10 @@ export class OverworldPuzzleController {
         this.isExitingPuzzle = true;
 
         try {
-            // Hide HUD using PuzzleHUDManager
-            PuzzleHUDManager.getInstance().exitPuzzle();
+            // Hide puzzle controls (sidebar) immediately, but keep the solved overlay
+            // visible in the HUD scene so it remains on screen during the camera pan.
+            // The full HUD cleanup (hiding overlay + scene) happens after the pan.
+            PuzzleHUDManager.getInstance().hideControlsForOverworld();
 
             // Save puzzle state before exiting
             if (this.activePuzzleController) {
@@ -361,6 +363,10 @@ export class OverworldPuzzleController {
 
             // Return camera to overworld
             await this.cameraManager.transitionToOverworld();
+
+            // Camera pan complete: hide the solved overlay and fully clean up the HUD
+            // now that the player is back in view. Input is re-enabled right after this.
+            PuzzleHUDManager.getInstance().exitPuzzle();
 
             // Notify view to exit puzzle mode (enables player, shows cursor, etc.)
             onModeChange('exploration');
@@ -463,13 +469,14 @@ export class OverworldPuzzleController {
             onPuzzleSolved: () => {
                 console.log(`Overworld puzzle ${puzzleId} solved!`);
                 console.log('[DIAGNOSTIC] onPuzzleSolved callback triggered');
-                // Emit puzzleSolved event to show "Puzzle Solved!" overlay in HUD
+                // Show the solved overlay in the HUD first, then immediately begin the exit
+                // sequence on the next tick. The overlay stays visible throughout the camera
+                // pan and is hidden together with input being re-enabled once the pan finishes.
                 this.scene.events.emit('puzzleSolved');
-                // Delay exit to allow "Puzzle Solved!" message to be visible for 1.5 seconds
                 setTimeout(() => {
-                    console.log('[DIAGNOSTIC] Calling scene.exitOverworldPuzzle after delay');
+                    console.log('[DIAGNOSTIC] Calling scene.exitOverworldPuzzle after puzzleSolved');
                     (this.scene as any).exitOverworldPuzzle(true);
-                }, 1500);
+                }, 0);
             },
             onPuzzleExited: (success: boolean) => {
                 console.log('[DIAGNOSTIC] onPuzzleExited callback triggered, success:', success);

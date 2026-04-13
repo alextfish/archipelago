@@ -310,6 +310,19 @@ export class PuzzleHUDScene extends Phaser.Scene {
     }
 
     /**
+     * Hide puzzle controls (sidebar, background) while keeping the solved overlay visible.
+     * Used during overworld puzzle exit so the overlay stays on screen during the camera pan.
+     * The full HUD cleanup happens once the camera pan completes.
+     */
+    public hideControlsOnly(): void {
+        this.sidebar?.setVisible(false);
+        if (this.backgroundRect) {
+            this.backgroundRect.setVisible(false);
+        }
+        this.cleanupEventListeners();
+    }
+
+    /**
      * Set visibility of the HUD scene
      */
     setVisible(visible: boolean, puzzleType: 'overworld' | 'bridge'): void {

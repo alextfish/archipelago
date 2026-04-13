@@ -391,6 +391,10 @@ export class PuzzleSidebar {
     }
   }
 
+  setVisible(visible: boolean): void {
+    this.panel.setVisible(visible);
+  }
+
   destroy(): void {
     this.panel.destroy();
   }

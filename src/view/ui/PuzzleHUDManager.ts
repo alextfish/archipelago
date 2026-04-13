@@ -97,6 +97,18 @@ export class PuzzleHUDManager {
     }
 
     /**
+     * Hide puzzle controls while keeping the solved overlay visible.
+     * Call this when starting a solved overworld puzzle exit so the overlay
+     * remains on screen during the camera pan back to the player.
+     * Follow up with exitPuzzle() once the camera pan completes.
+     */
+    hideControlsForOverworld(): void {
+        if (!this.hudScene) return;
+        this.hudScene.hideControlsOnly();
+        console.log('PuzzleHUDManager: Controls hidden, solved overlay preserved for camera pan');
+    }
+
+    /**
      * Exit puzzle mode - hides HUD and cleans up
      */
     exitPuzzle(): void {
