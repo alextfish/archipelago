@@ -85,6 +85,15 @@ export class OverworldPuzzleController {
                 puzzleBounds.height
             );
 
+            // Notify view to enter puzzle mode (disables player, hides cursor, etc.)
+            onModeChange('puzzle');
+
+            // Store camera state and transition to puzzle view
+            this.cameraManager.storeCameraState();
+            await this.cameraManager.transitionToPuzzle(boundsRect);
+
+            // Clear baked overworld bridges now that the camera has arrived, so they vanish
+            // at the same moment the puzzle-view bridges are drawn by enterPuzzle() below.
             // If the puzzle was previously solved, clear the exact baked tiles first.
             // blankPuzzleRegion uses bounds arithmetic and may miss edge-of-bounds tiles;
             // clearBakedTiles removes precisely the tiles that were placed at bake time.
@@ -97,13 +106,6 @@ export class OverworldPuzzleController {
             if (this.bridgeManager) {
                 this.bridgeManager.blankPuzzleRegion(puzzleId, boundsRect);
             }
-
-            // Notify view to enter puzzle mode (disables player, hides cursor, etc.)
-            onModeChange('puzzle');
-
-            // Store camera state and transition to puzzle view
-            this.cameraManager.storeCameraState();
-            await this.cameraManager.transitionToPuzzle(boundsRect);
 
             // Create embedded puzzle renderer — use FlowPuzzleRenderer for FlowPuzzle instances
             this.puzzleRenderer = puzzle instanceof FlowPuzzle

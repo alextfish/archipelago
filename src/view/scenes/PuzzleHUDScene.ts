@@ -329,12 +329,15 @@ export class PuzzleHUDScene extends Phaser.Scene {
         console.log(`PuzzleHUDScene: Setting visibility to ${visible}`);
         this.scene.setVisible(visible);
 
+        // When showing the HUD, always re-show the sidebar in case hideControlsOnly()
+        // hid it while the solved overlay was on screen during a previous camera pan.
+        if (visible) {
+            this.sidebar?.setVisible(true);
+        }
+
         // Show/hide background with HUD
         if (this.backgroundRect) {
             this.backgroundRect.setVisible(visible && puzzleType === 'bridge');
         }
-
-        // Sidebar visibility is controlled by the scene visibility
-        // No need to explicitly control it
     }
 }

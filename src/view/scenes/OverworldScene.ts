@@ -1571,33 +1571,25 @@ export class OverworldScene extends Phaser.Scene {
    * Looks for layers with the custom property "autoRender: true" or layers with common visual suffixes
    */
   private setupVisualLayers(tilesets: Phaser.Tilemaps.Tileset[]) {
-    // Visual layer suffixes to auto-render (e.g., "Beach/water", "Forest/ground")
-    const visualLayerSuffixes = ['beach', 'lowground', 'water', 'pontoons', 'grass', 'ground', 'obstacles'];
-
     console.log('Setting up visual layers...');
 
     // Check all layers in the map
     for (const layerData of this.map.layers) {
       const layerName = layerData.name;
-      const layerSuffix = TiledLayerUtils.getLayerSuffix(layerName);
 
       // Skip special layers that are handled elsewhere
+      const layerSuffix = TiledLayerUtils.getLayerSuffix(layerName);
       if (layerSuffix === 'collision' ||
         layerSuffix === 'roofs' ||
         layerName === OverworldBridgeManager.getBridgesLayerName()) {
         continue;
       }
 
-      // Check if this layer should be auto-rendered
-      let shouldRender = visualLayerSuffixes.includes(layerSuffix);
-
-      // Also check for autoRender property in Tiled (if layer has properties)
-      if (layerData.properties && Array.isArray(layerData.properties)) {
-        const autoRenderProp = layerData.properties.find((prop: any) => prop.name === 'autoRender');
-        if (autoRenderProp && 'value' in autoRenderProp) {
-          shouldRender = (autoRenderProp as any).value === true;
-        }
-      }
+      // Render only layers that have the autoRender property set to true in Tiled
+      const autoRenderProp = layerData.properties && Array.isArray(layerData.properties)
+        ? layerData.properties.find((prop: any) => prop.name === 'autoRender')
+        : undefined;
+      const shouldRender = autoRenderProp != null && (autoRenderProp as any).value === true;
 
       if (shouldRender) {
         // Try to create this layer
