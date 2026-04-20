@@ -190,16 +190,17 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     }    /**
      * ConversationHost interface: Display NPC line
      */
-    displayNPCLine(expression: string, glyphFrames: number[], language: string, customFrame?: string): void {
-        console.log('ConversationScene: displayNPCLine called', { expression, glyphFrames: glyphFrames.length, language, customFrame });
+    displayNPCLine(expression: string, glyphFramesByRow: number[][], language: string, customFrame?: string): void {
+        console.log('ConversationScene: displayNPCLine called', { expression, sentenceCount: glyphFramesByRow.length, language, customFrame });
 
         if (!this.speechBubble) return;
 
         // Create/update speech bubble with 2x scale
-        this.speechBubble.create(glyphFrames, language, this.glyphRegistry, this.SPEECH_BUBBLE_SCALE);
+        this.speechBubble.create(glyphFramesByRow, language, this.glyphRegistry, this.SPEECH_BUBBLE_SCALE);
 
-        // Center the speech bubble horizontally (accounting for scale)
-        const bubbleWidth = (glyphFrames.length + 2) * 32 * this.SPEECH_BUBBLE_SCALE;
+        // Width is determined by the longest sentence; height by the number of sentences
+        const maxSentenceLength = glyphFramesByRow.reduce((max, row) => Math.max(max, row.length), 0);
+        const bubbleWidth = (maxSentenceLength + 2) * 32 * this.SPEECH_BUBBLE_SCALE;
         const bubbleX = (this.scale.width - bubbleWidth) / 2;
         this.speechBubble.setPosition(bubbleX, this.SPEECH_BUBBLE_Y);
         this.speechBubble.setVisible(true);

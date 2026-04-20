@@ -181,6 +181,24 @@ export class LanguageGlyphRegistry {
     }
 
     /**
+     * Parse a glyph string into per-sentence frame indices.
+     * Sentences are separated by ". " (full stop followed by a space).
+     * Each sentence is returned as its own array of frame indices.
+     * Empty sentences are omitted.
+     * @param language Language key
+     * @param glyphText Space-separated words, with ". " between sentences
+     */
+    parseGlyphsPerSentence(language: string, glyphText: string): number[][] {
+        return glyphText
+            .split('. ')
+            .map(sentence => sentence.trim())
+            .filter(sentence => sentence.length > 0)
+            .map(sentence =>
+                sentence.split(/\s+/).map(word => this.getGlyphFrame(language, word))
+            );
+    }
+
+    /**
      * Calculate speech bubble dimensions needed for text
      * @param glyphText Space-separated words
      * @returns Width in characters and number of rows
