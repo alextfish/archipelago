@@ -22,8 +22,14 @@ export interface ConstraintDisplayItem {
   position?: { x: number; y: number };
   /**
    * Optional frame index into the compass_overlay spritesheet to display
-   * alongside the NPC (0=north, 1=east, 2=south, 3=west).
+   * alongside the NPC (0=north, 1=east, 2=south, 3=west, 5=adjacent/all-directions).
    * Omit for constraints that have no directional component.
    */
   compassFrame?: number;
+  /**
+   * Optional key-value pairs substituted into the constraint's conversation JSON
+   * (e.g. `{ count: "2", direction: "above" }`).  When present, takes precedence
+   * over the legacy `requiredCount`-based variable building done in OverworldScene.
+   */
+  conversationVariables?: Record<string, string>;
 }

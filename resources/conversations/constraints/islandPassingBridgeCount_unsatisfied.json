@@ -5,7 +5,7 @@
     "main": {
       "npc": {
         "expression": "neutral",
-        "glyphs": "me want {{count}} bridge"
+        "glyphs": "me want {{count}} bridge {{direction}} island"
       },
       "choices": [
         {
