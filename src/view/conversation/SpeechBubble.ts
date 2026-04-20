@@ -50,33 +50,34 @@ export class SpeechBubble {
 
     /**
      * Create speech bubble with glyphs
-     * @param glyphFrames Array of frame indices for glyphs
+     * @param glyphFramesByRow Array of sentences; each sentence is an array of frame indices
      * @param language Language ID (for getting speech bubble frames)
      * @param registry Glyph registry
      * @param scale Scale factor for the bubble (default 1)
      * @param direction Which side of the bubble has the arrow pointing toward the NPC (default 'right')
      */
-    create(glyphFrames: number[], language: string, registry: LanguageGlyphRegistry, scale: number = 1, direction: BubbleDirection = 'right'): void {
+    create(glyphFramesByRow: number[][], language: string, registry: LanguageGlyphRegistry, scale: number = 1, direction: BubbleDirection = 'right'): void {
         // Clear existing content (also unregisters from tracker)
         this.clear();
 
-        if (glyphFrames.length === 0) {
+        const sentences = glyphFramesByRow.filter(row => row.length > 0);
+        if (sentences.length === 0) {
             return;
         }
 
         const bubbleFrames = registry.getSpeechBubbleFrames(language);
         const tileSize = 32; // Assuming 32x32 tiles
-        const glyphCount = glyphFrames.length;
 
         // Calculate bubble dimensions
-        const bubbleWidth = glyphCount + 2; // +2 for left/right edges
-        const bubbleHeight = 3; // Top edge, middle (with glyphs), bottom edge
+        const maxSentenceLength = Math.max(...sentences.map(row => row.length));
+        const bubbleWidth = maxSentenceLength + 2; // +2 for left/right edges
+        const bubbleHeight = sentences.length + 2; // +2 for top/bottom edges
 
         // Build background
         this.buildBackground(bubbleFrames, bubbleWidth, bubbleHeight, tileSize, direction);
 
         // Add glyphs
-        this.addGlyphs(glyphFrames, tileSize);
+        this.addGlyphs(sentences, tileSize);
 
         // Apply scale to the entire container
         this.container.setScale(scale);
@@ -89,10 +90,11 @@ export class SpeechBubble {
 
         // Register with tracker if one has been provided
         if (this.glyphTracker) {
+            const allFrames = sentences.flat();
             this.glyphTracker.registerGlyphSet({
                 id: this.registrationID,
                 language,
-                glyphs: glyphFrames.map((f, i) => ({ frameIndex: f, indexInBubble: i })),
+                glyphs: allFrames.map((f, i) => ({ frameIndex: f, indexInBubble: i })),
                 getBounds: () => this.getGlyphScreenBounds(),
             });
         }
@@ -200,23 +202,27 @@ export class SpeechBubble {
     }
 
     /**
-     * Add glyph sprites to the bubble
+     * Add glyph sprites to the bubble, one row per sentence
      */
-    private addGlyphs(glyphFrames: number[], tileSize: number): void {
+    private addGlyphs(glyphFramesByRow: number[][], tileSize: number): void {
         const startX = tileSize; // Start after left edge
-        const y = tileSize; // Middle row
 
-        for (let i = 0; i < glyphFrames.length; i++) {
-            const glyph = this.scene.add.image(
-                startX + i * tileSize,
-                y,
-                this.tilesetKey,
-                glyphFrames[i]
-            );
-            glyph.setOrigin(0, 0);
-            this.container.add(glyph);
-            this.glyphSprites.push(glyph);
-            this.glyphFrameIndices.push(glyphFrames[i]);
+        for (let rowIndex = 0; rowIndex < glyphFramesByRow.length; rowIndex++) {
+            const row = glyphFramesByRow[rowIndex];
+            const y = (rowIndex + 1) * tileSize; // Row rowIndex+1 (row 0 is top border)
+
+            for (let i = 0; i < row.length; i++) {
+                const glyph = this.scene.add.image(
+                    startX + i * tileSize,
+                    y,
+                    this.tilesetKey,
+                    row[i]
+                );
+                glyph.setOrigin(0, 0);
+                this.container.add(glyph);
+                this.glyphSprites.push(glyph);
+                this.glyphFrameIndices.push(row[i]);
+            }
         }
     }
 

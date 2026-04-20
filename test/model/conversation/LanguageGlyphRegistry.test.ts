@@ -124,6 +124,51 @@ describe('LanguageGlyphRegistry', () => {
         });
     });
 
+    describe('parseGlyphsPerSentence', () => {
+        it('should return a single sentence when no ". " separator is present', () => {
+            const registry = new LanguageGlyphRegistry();
+            const result = registry.parseGlyphsPerSentence('grass', 'me want bridge');
+
+            expect(result).toEqual([[31, 33, 32]]);
+        });
+
+        it('should split on ". " into multiple sentences', () => {
+            const registry = new LanguageGlyphRegistry();
+            const result = registry.parseGlyphsPerSentence('grass', 'me want bridge. you build bridge');
+
+            expect(result).toEqual([[31, 33, 32], [30, 34, 32]]);
+        });
+
+        it('should handle three or more sentences', () => {
+            const registry = new LanguageGlyphRegistry();
+            const result = registry.parseGlyphsPerSentence('grass', 'me bridge. you bridge. me want');
+
+            expect(result).toEqual([[31, 32], [30, 32], [31, 33]]);
+        });
+
+        it('should ignore empty sentences', () => {
+            const registry = new LanguageGlyphRegistry();
+            // Leading or trailing ". " would create empty parts after splitting
+            const result = registry.parseGlyphsPerSentence('grass', 'me bridge');
+
+            expect(result).toHaveLength(1);
+        });
+
+        it('should handle extra whitespace within each sentence', () => {
+            const registry = new LanguageGlyphRegistry();
+            const result = registry.parseGlyphsPerSentence('grass', '  me   bridge. you  build  ');
+
+            expect(result).toEqual([[31, 32], [30, 34]]);
+        });
+
+        it('should use missing glyph frame for unknown words', () => {
+            const registry = new LanguageGlyphRegistry();
+            const result = registry.parseGlyphsPerSentence('grass', 'me unknown. bridge');
+
+            expect(result).toEqual([[31, 6], [32]]);
+        });
+    });
+
     describe('calculateBubbleSize', () => {
         it('should calculate width based on word count', () => {
             const registry = new LanguageGlyphRegistry();

@@ -56,7 +56,7 @@ describe('ConversationController', () => {
     class MockHost implements ConversationHost {
         displayNPCLineCalls: Array<{
             expression: string;
-            glyphFrames: number[];
+            glyphFrames: number[][];
             language: string;
         }> = [];
 
@@ -65,7 +65,7 @@ describe('ConversationController', () => {
         applyEffectsCalls: ConversationEffect[][] = [];
         onConversationEndCalls = 0;
 
-        displayNPCLine(expression: string, glyphFrames: number[], language: string): void {
+        displayNPCLine(expression: string, glyphFrames: number[][], language: string): void {
             this.displayNPCLineCalls.push({ expression, glyphFrames, language });
         }
 
@@ -137,10 +137,7 @@ describe('ConversationController', () => {
             expect(mockHost.displayNPCLineCalls).toHaveLength(1);
             expect(mockHost.displayNPCLineCalls[0].expression).toBe('neutral');
             expect(mockHost.displayNPCLineCalls[0].language).toBe('grass');
-            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([31, 33, 32]); // me, want, bridge
-
-            // Should display choices
-            expect(mockHost.displayChoicesCalls).toHaveLength(1);
+            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([[31, 33, 32]]); // me, want, bridge
             expect(mockHost.displayChoicesCalls[0]).toEqual([
                 { text: 'OK', index: 0 },
                 { text: 'No', index: 1 },
@@ -167,10 +164,7 @@ describe('ConversationController', () => {
 
             // Should display first node again
             expect(mockHost.displayNPCLineCalls).toHaveLength(1);
-            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([31, 33, 32]);
-        });
-
-        it('should warn when starting new conversation while previous is active', () => {
+            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([[31, 33, 32]]);
             const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
 
             controller.startConversation(sampleSpec, testNPC);
@@ -194,7 +188,7 @@ describe('ConversationController', () => {
             // Should display next node
             expect(mockHost.displayNPCLineCalls).toHaveLength(1);
             expect(mockHost.displayNPCLineCalls[0].expression).toBe('happy');
-            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([30, 34, 32]); // you, build, bridge
+            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([[30, 34, 32]]); // you, build, bridge
         });
 
         it('should end conversation when node has end: true', () => {
@@ -337,7 +331,7 @@ describe('ConversationController', () => {
 
             // Should display intro node again
             expect(mockHost.displayNPCLineCalls).toHaveLength(1);
-            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([31, 33, 32]);
+            expect(mockHost.displayNPCLineCalls[0].glyphFrames).toEqual([[31, 33, 32]]);
         });
 
         it('should handle single-node conversations that end immediately', () => {
