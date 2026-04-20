@@ -31,6 +31,8 @@ import type { TranslationModeScene } from '@view/scenes/TranslationModeScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { GridToWorldMapper } from '@view/GridToWorldMapper';
 import { getNPCSpriteKey, loadNPCSprites } from '@view/NPCSpriteHelper';
+import { Collectible } from '@model/overworld/Collectible';
+import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -106,6 +108,12 @@ export class OverworldScene extends Phaser.Scene {
   // Door system
   private doors: Door[] = [];
   private doorSprites: Map<string, Phaser.Tilemaps.Tile> = new Map();
+
+  // Collectible system
+  private collectibles: Collectible[] = [];
+  private collectibleSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  /** Fixed-to-camera jewel count display elements, keyed by jewel colour. */
+  private jewel_hudElements: Map<string, { sprite: Phaser.GameObjects.Image; text: Phaser.GameObjects.Text }> = new Map();
 
   // Player start position management
   private playerStartManager?: PlayerStartManager;
@@ -992,6 +1000,9 @@ export class OverworldScene extends Phaser.Scene {
 
     // Load doors from object layers (once after all NPCs loaded)
     this.loadDoors();
+
+    // Load collectibles from "collectibles" object layers
+    this.loadCollectibles();
   }
 
 
@@ -1520,6 +1531,211 @@ export class OverworldScene extends Phaser.Scene {
    */
   private findLayersBySuffix(suffix: string): Phaser.Tilemaps.LayerData[] {
     return this.map.layers.filter(layer => TiledLayerUtils.getLayerSuffix(layer.name) === suffix);
+  }
+
+  /**
+   * Load collectibles from all "<anything>/collectibles" object layers in the Tiled map.
+   * Creates a Collectible model instance and an animated sprite for each object found.
+   */
+  private loadCollectibles(): void {
+    if (!this.map || !this.tiledMapData) return;
+
+    const collectiblesLayers = TiledLayerUtils.findObjectLayersByName(this.tiledMapData.layers, 'collectibles');
+
+    if (collectiblesLayers.length === 0) {
+      console.log('No collectibles layers found in map');
+      return;
+    }
+
+    console.log(`Found ${collectiblesLayers.length} collectibles layer(s)`);
+
+    const tileWidth = this.tiledMapData.tilewidth || 32;
+    const tileHeight = this.tiledMapData.tileheight || 32;
+
+    for (const layerInfo of collectiblesLayers) {
+      let layer = this.map.getObjectLayer(layerInfo.fullPath);
+      if (!layer) {
+        layer = this.map.getObjectLayer(layerInfo.name);
+      }
+      if (!layer) {
+        console.warn(`Failed to get collectibles layer: ${layerInfo.fullPath}`);
+        continue;
+      }
+
+      for (const obj of layer.objects) {
+        const collectible = Collectible.fromTiledObject(obj, tileWidth, tileHeight);
+        if (!collectible) {
+          console.warn(`Skipping invalid collectible object in ${layerInfo.fullPath}:`, obj);
+          continue;
+        }
+
+        this.collectibles.push(collectible);
+
+        // World pixel position: centre of tile
+        const worldX = collectible.tileX * tileWidth + tileWidth / 2;
+        const worldY = collectible.tileY * tileHeight + tileHeight / 2;
+
+        // Attempt to create a sprite using a key derived from the jewel colour.
+        // The animation is expected to be pre-defined (e.g. via Tiled tileset data).
+        // If the texture is not loaded we fall back to a plain rectangle for now.
+        const spriteKey = `jewel-${collectible.colour}`;
+        let sprite: Phaser.GameObjects.Sprite;
+
+        if (this.textures.exists(spriteKey)) {
+          sprite = this.add.sprite(worldX, worldY, spriteKey);
+          // Play the animation if one exists for this key
+          const animKey = `jewel-${collectible.colour}-anim`;
+          if (this.anims.exists(animKey)) {
+            sprite.play(animKey);
+          }
+        } else {
+          // Fallback: coloured rectangle rendered as a sprite (placeholder)
+          const colourMap: Record<string, number> = {
+            red: 0xff4444,
+            blue: 0x4444ff,
+            green: 0x44ff44,
+            yellow: 0xffff44,
+          };
+          const colour = colourMap[collectible.colour] ?? 0xffffff;
+          const gfx = this.make.graphics({ x: 0, y: 0, add: false });
+          gfx.fillStyle(colour, 1);
+          gfx.fillRect(0, 0, 16, 16);
+          const rt = this.add.renderTexture(worldX - 8, worldY - 8, 16, 16);
+          rt.draw(gfx);
+          rt.setDepth(worldY);
+          gfx.destroy();
+          // Use a sprite-like object handle; store the renderTexture under the same map
+          // by creating a transparent stand-in sprite at the correct position.
+          sprite = this.add.sprite(worldX, worldY, '__DEFAULT');
+          sprite.setVisible(false);
+          this.collectibleSprites.set(collectible.id, sprite);
+          console.log(`Collectible ${collectible.id} (${collectible.colour} jewel) loaded at (${collectible.tileX}, ${collectible.tileY}) — using placeholder`);
+          continue;
+        }
+
+        sprite.setDepth(worldY);
+        this.collectibleSprites.set(collectible.id, sprite);
+
+        // Register as interactable
+        this.interactables.push({
+          type: 'collectible',
+          tileX: collectible.tileX,
+          tileY: collectible.tileY,
+          data: { collectibleId: collectible.id },
+        });
+
+        console.log(`Loaded collectible: ${collectible.colour} jewel (id=${collectible.id}) at (${collectible.tileX}, ${collectible.tileY})`);
+      }
+    }
+
+    // Register interactables that use the real texture as collectible interactables
+    console.log(`Total collectibles loaded: ${this.collectibles.length}`);
+  }
+
+  /**
+   * Collect a jewel: update model state, remove its sprite from the world and
+   * interactables list, then refresh the overworld HUD.
+   */
+  private collectJewel(collectibleId: string): void {
+    const collectible = this.collectibles.find(c => c.id === collectibleId);
+    if (!collectible || collectible.collected) return;
+
+    collectible.collect();
+    this.gameState.collectJewel(collectible.colour);
+
+    // Remove sprite
+    const sprite = this.collectibleSprites.get(collectibleId);
+    if (sprite) {
+      sprite.destroy();
+      this.collectibleSprites.delete(collectibleId);
+    }
+
+    // Remove from interactables list
+    this.interactables = this.interactables.filter(
+      i => !(i.type === 'collectible' && i.data?.collectibleId === collectibleId)
+    );
+
+    // Update HUD
+    this.updateOverworldJewelHUD();
+
+    emitTestEvent('jewel_collected', { colour: collectible.colour, id: collectibleId });
+    console.log(`Collected ${collectible.colour} jewel (id=${collectibleId}). Total: ${this.gameState.getJewelCount(collectible.colour)}`);
+  }
+
+  /**
+   * Refresh the exploration-mode jewel HUD in the top-right of the screen.
+   * Creates or updates one sprite + text element per jewel colour that the
+   * player has collected at least once.
+   */
+  private updateOverworldJewelHUD(): void {
+    const items = this.gameState.getOverworldDisplayItems();
+    const itemHeight = 28;
+    const marginRight = 8;
+    const marginTop = 8;
+
+    // Remove elements for colours that are no longer needed
+    const activeColours = new Set(items.map(i => i.colour));
+    for (const [colour, els] of this.jewel_hudElements) {
+      if (!activeColours.has(colour)) {
+        els.sprite.destroy();
+        els.text.destroy();
+        this.jewel_hudElements.delete(colour);
+      }
+    }
+
+    // Add / update elements
+    items.forEach((item, index) => {
+      const y = marginTop + index * itemHeight;
+      const colourMap: Record<string, number> = {
+        red: 0xff4444,
+        blue: 0x4444ff,
+        green: 0x44ff44,
+        yellow: 0xffff44,
+      };
+
+      if (!this.jewel_hudElements.has(item.colour)) {
+        // Create new HUD elements fixed to the camera
+        const spriteKey = `jewel-${item.colour}`;
+        const textX = this.scale.width - marginRight - 32 - 4;
+        const spriteX = this.scale.width - marginRight - 16;
+
+        let hudSprite: Phaser.GameObjects.Image;
+        if (this.textures.exists(spriteKey)) {
+          hudSprite = this.add.image(spriteX, y + 8, spriteKey);
+        } else {
+          // Fallback: coloured circle
+          const gfx = this.add.graphics();
+          gfx.fillStyle(colourMap[item.colour] ?? 0xffffff, 1);
+          gfx.fillCircle(spriteX, y + 8, 8);
+          gfx.setScrollFactor(0);
+          gfx.setDepth(2000);
+          // Create a transparent stand-in for the map key
+          hudSprite = this.add.image(spriteX, y + 8, '__DEFAULT').setVisible(false);
+        }
+
+        hudSprite.setScrollFactor(0);
+        hudSprite.setDepth(2000);
+
+        const hudText = this.add.text(textX, y, String(item.count), {
+          fontSize: '14px',
+          color: '#ffffff',
+        });
+        hudText.setScrollFactor(0);
+        hudText.setDepth(2000);
+        hudText.setOrigin(1, 0);
+
+        this.jewel_hudElements.set(item.colour, { sprite: hudSprite, text: hudText });
+      } else {
+        // Update existing element
+        const els = this.jewel_hudElements.get(item.colour)!;
+        els.text.setText(String(item.count));
+        // Reposition in case the order changed
+        const spriteX = this.scale.width - marginRight - 16;
+        const textX = this.scale.width - marginRight - 32 - 4;
+        els.sprite.setPosition(spriteX, y + 8);
+        els.text.setPosition(textX, y);
+      }
+    });
   }
 
   /**
@@ -2056,6 +2272,11 @@ export class OverworldScene extends Phaser.Scene {
         // Future: handle lever interaction
         console.log('Lever interaction not yet implemented');
         break;
+      case 'collectible':
+        if (target.data?.collectibleId) {
+          this.collectJewel(target.data.collectibleId);
+        }
+        break;
     }
   }
 
@@ -2096,6 +2317,13 @@ export class OverworldScene extends Phaser.Scene {
 
       const conversationSpec: ConversationSpec = await response.json();
 
+      // Evaluate conditional start branches (e.g. jewel count checks) to pick
+      // the correct starting node for this conversation.
+      const startNodeId = ConversationConditionEvaluator.resolveStartNode(
+        conversationSpec,
+        { getJewelCount: (colour) => this.gameState.getJewelCount(colour) }
+      );
+
       // Apply conversation variable substitution (e.g. {{count}} → '2')
       if (npc.conversationVariables) {
         const variables = npc.conversationVariables;
@@ -2108,7 +2336,7 @@ export class OverworldScene extends Phaser.Scene {
 
       // Switch to conversation mode
       this.gameMode = 'conversation';
-      console.log(`Switching to conversation mode with NPC: ${npc.name} (solved: ${useSolvedConversation})`);
+      console.log(`Switching to conversation mode with NPC: ${npc.name} (solved: ${useSolvedConversation}, startNode: ${startNodeId})`);
 
       // Get conversation scene
       const conversationScene = this.scene.get('ConversationScene') as (ConversationScene & { startConversation: Function; events: Phaser.Events.EventEmitter }) | null;
@@ -2134,12 +2362,12 @@ export class OverworldScene extends Phaser.Scene {
       if (!this.scene.isActive('ConversationScene')) {
         // Wait for the scene to be created before starting conversation
         conversationScene.events.once('create', () => {
-          conversationScene.startConversation(conversationSpec, npc);
+          conversationScene.startConversation(conversationSpec, npc, startNodeId);
         });
         this.scene.launch('ConversationScene');
       } else {
         // Scene already running, start conversation immediately
-        conversationScene.startConversation(conversationSpec, npc);
+        conversationScene.startConversation(conversationSpec, npc, startNodeId);
       }
 
     } catch (error) {

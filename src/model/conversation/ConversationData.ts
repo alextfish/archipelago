@@ -3,6 +3,38 @@
  * Pure TypeScript interfaces - no game logic.
  */
 
+// ---------------------------------------------------------------------------
+// Conversation conditions – used to pick a non-default start node at runtime
+// ---------------------------------------------------------------------------
+
+/**
+ * Condition that passes when the player holds at least `count` jewels of the
+ * specified `colour`.
+ */
+export interface HasJewelsCondition {
+    type: 'hasJewels';
+    /** Jewel colour key, e.g. 'red'. */
+    colour: string;
+    /** Minimum number of jewels required. */
+    count: number;
+}
+
+/** Union of all supported condition types (extend as needed). */
+export type ConversationCondition = HasJewelsCondition;
+
+/**
+ * A conditional branch for the conversation start node.
+ * When `condition` evaluates to true at runtime the conversation begins at
+ * `start` instead of `ConversationSpec.start`.
+ */
+export interface ConditionalStart {
+    condition: ConversationCondition;
+    /** Node ID to jump to when the condition is met. */
+    start: string;
+}
+
+// ---------------------------------------------------------------------------
+
 export interface ConversationEffect {
     type: 'setExpression' | 'giveItem' | 'setFlag' | 'startPuzzle' | 'startSeries' | 'unlockDoor';
     expression?: string;      // For setExpression
@@ -39,6 +71,11 @@ export interface ConversationNode {
 export interface ConversationSpec {
     id: string;               // Unique conversation identifier
     npcId: string;            // Which NPC this conversation belongs to
-    start: string;            // Starting node ID
+    start: string;            // Default starting node ID
+    /**
+     * Optional list of conditional branches evaluated in order at conversation
+     * start.  The first condition that passes overrides `start`.
+     */
+    conditionalStart?: ConditionalStart[];
     nodes: Record<string, ConversationNode>;  // Map of node IDs to nodes
 }
