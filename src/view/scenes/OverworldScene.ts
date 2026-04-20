@@ -1631,7 +1631,7 @@ export class OverworldScene extends Phaser.Scene {
             yellow: 0xffff44,
           };
           const colour = colourMap[collectible.colour] ?? 0xffffff;
-          const gfx = this.make.graphics({ x: 0, y: 0, add: false });
+          const gfx = this.make.graphics({ x: 0, y: 0 }, false);
           gfx.fillStyle(colour, 1);
           gfx.fillRect(0, 0, 16, 16);
           const rt = this.add.renderTexture(worldX - 8, worldY - 8, 16, 16);

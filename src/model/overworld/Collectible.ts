@@ -66,7 +66,7 @@ export class Collectible {
      * @returns A Collectible instance, or null if the object lacks required properties.
      */
     static fromTiledObject(
-        obj: { id: number; x: number; y: number; properties?: Array<{ name: string; value: any }> },
+        obj: { id: number; x?: number; y?: number; properties?: Array<{ name: string; value: any }> },
         tileWidth: number,
         tileHeight: number
     ): Collectible | null {
