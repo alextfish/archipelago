@@ -274,4 +274,21 @@ describe("BridgePuzzle", () => {
       expect(strutConstraints).toHaveLength(2);
     });
   });
+
+  describe("givesFeedback", () => {
+    it("defaults to true when not specified in spec", () => {
+      const puzzle = new BridgePuzzle(puzzleSpec);
+      expect(puzzle.givesFeedback).toBe(true);
+    });
+
+    it("is true when explicitly set to true in spec", () => {
+      const puzzle = new BridgePuzzle({ ...puzzleSpec, givesFeedback: true });
+      expect(puzzle.givesFeedback).toBe(true);
+    });
+
+    it("is false when set to false in spec", () => {
+      const puzzle = new BridgePuzzle({ ...puzzleSpec, givesFeedback: false });
+      expect(puzzle.givesFeedback).toBe(false);
+    });
+  });
 });

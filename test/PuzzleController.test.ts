@@ -131,6 +131,7 @@ function createMockPuzzle(): Partial<BridgePuzzle> {
     bridges: [] as Bridge[],
     constraints: [] as any[],
     maxNumBridges: 2,
+    givesFeedback: true,
 
     getAvailableBridgeTypes: vi.fn(() => [] as BridgeType[]),
     takeBridgeOfType: vi.fn((): Bridge | undefined => undefined),
@@ -830,6 +831,84 @@ describe("PuzzleController", () => {
           { x: 3, y: 0 },
         );
       });
+    });
+  });
+
+  describe("givesFeedback=false suppresses constraint feedback", () => {
+    let showConstraintSpy: ReturnType<typeof vi.spyOn>;
+    let hideConstraintSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      const bridgeTypes: BridgeType[] = [{ id: "type1", colour: "black" }];
+      mockPuzzle.getAvailableBridgeTypes = vi.fn(() => bridgeTypes);
+      // Make the puzzle report all bridges placed so constraint feedback would normally show
+      mockPuzzle.allBridgesPlaced = vi.fn(() => true);
+
+      controller = new PuzzleController(
+        mockPuzzle as unknown as BridgePuzzle,
+        mockRenderer,
+        mockHost
+      );
+
+      showConstraintSpy = vi.spyOn(mockRenderer, 'showConstraintFeedback');
+      hideConstraintSpy = vi.spyOn(mockRenderer, 'hideConstraintFeedback');
+    });
+
+    it("suppresses showConstraintFeedback when givesFeedback is false and puzzle not solved", () => {
+      (mockPuzzle as any).givesFeedback = false;
+
+      const mockValidator = {
+        validateAll: vi.fn(() => ({
+          allSatisfied: false,
+          perConstraint: [{ constraintId: 'c1', result: { satisfied: false, affectedElements: ['A'] } }],
+          unsatisfiedCount: 1
+        } as ValidationResult)),
+        getConstraintDisplayItems: vi.fn(() => [])
+      };
+      (controller as any).validator = mockValidator;
+
+      controller.validate();
+
+      expect(showConstraintSpy).not.toHaveBeenCalled();
+      expect(hideConstraintSpy).toHaveBeenCalled();
+    });
+
+    it("suppresses violation highlights when givesFeedback is false and puzzle not solved", () => {
+      (mockPuzzle as any).givesFeedback = false;
+
+      const mockValidator = {
+        validateAll: vi.fn(() => ({
+          allSatisfied: false,
+          perConstraint: [{ constraintId: 'c1', result: { satisfied: false, affectedElements: ['A', 'B'] } }],
+          unsatisfiedCount: 1
+        } as ValidationResult)),
+        getConstraintDisplayItems: vi.fn(() => [])
+      };
+      (controller as any).validator = mockValidator;
+
+      controller.validate();
+
+      // Should call highlightViolations with empty array (not the real affected elements)
+      expect(mockRenderer.violations).toEqual([]);
+    });
+
+    it("shows constraint feedback normally when givesFeedback is true", () => {
+      (mockPuzzle as any).givesFeedback = true;
+
+      const mockValidator = {
+        validateAll: vi.fn(() => ({
+          allSatisfied: false,
+          perConstraint: [{ constraintId: 'c1', result: { satisfied: false, affectedElements: ['A'] } }],
+          unsatisfiedCount: 1
+        } as ValidationResult)),
+        getConstraintDisplayItems: vi.fn(() => [{ elementID: 'A', glyphMessage: 'bad', constraintType: 'MockConstraint' }])
+      };
+      (controller as any).validator = mockValidator;
+
+      controller.validate();
+
+      expect(showConstraintSpy).toHaveBeenCalled();
+      expect(mockRenderer.violations).toEqual(['A']);
     });
   });
 });
