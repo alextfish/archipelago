@@ -191,6 +191,17 @@ export class OverworldScene extends Phaser.Scene {
     this.load.image('cursor-out', 'resources/square_cursor_out.png');
     this.load.image('cursor-in', 'resources/square_cursor_in.png');
 
+    // Load jewel collectible spritesheets.  Each colour gets its own 3-frame
+    // slice of jewels.png so that frame 0 of 'jewel-red' is the first red
+    // frame, frame 0 of 'jewel-green' is the first green frame, etc.  This
+    // lets loadCollectibles() and updateOverworldJewelHUD() use the per-colour
+    // key without needing to know the raw frame offset.
+    const JEWEL_FRAME_CONFIG = { frameWidth: 16, frameHeight: 16 };
+    this.load.spritesheet('jewel-red',    'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 0,  endFrame: 2  });
+    this.load.spritesheet('jewel-green',  'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 4,  endFrame: 6  });
+    this.load.spritesheet('jewel-blue',   'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 8,  endFrame: 10 });
+    this.load.spritesheet('jewel-yellow', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 12, endFrame: 14 });
+
     // Load TMX file asynchronously, then load embedded tilesets
     this.loadTmxFile();
   }
@@ -389,8 +400,31 @@ export class OverworldScene extends Phaser.Scene {
     // Listen for series puzzle completion from BridgePuzzleScene
     this.events.on('seriesPuzzleCompleted', this.handleSeriesPuzzleCompleted, this);
 
+    // Register looping animations for collectible jewels
+    this.registerJewelAnimations();
+
     // Initialize overworld puzzle system
     this.initializeOverworldPuzzles();
+  }
+
+  /**
+   * Register looping animations for each jewel colour.
+   * Each 'jewel-<colour>' spritesheet was loaded with startFrame/endFrame so
+   * that frame 0 of the texture is always the first frame of that colour.
+   * All animations therefore use frames 0–2 at 5 fps (200 ms per frame).
+   */
+  private registerJewelAnimations(): void {
+    const jewel_colours = ['red', 'green', 'blue', 'yellow'];
+    for (const colour of jewel_colours) {
+      const textureKey = `jewel-${colour}`;
+      if (!this.textures.exists(textureKey)) continue;
+      this.anims.create({
+        key: `${textureKey}-anim`,
+        frames: this.anims.generateFrameNumbers(textureKey, { start: 0, end: 2 }),
+        frameRate: 5, // 200 ms per frame
+        repeat: -1,
+      });
+    }
   }
 
   private async initializeOverworldPuzzles(): Promise<void> {

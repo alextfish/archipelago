@@ -11,53 +11,24 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import fs from 'fs';
+import path from 'path';
 import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
 import type { ConditionContext } from '@model/conversation/ConversationConditionEvaluator';
 import { ConversationState } from '@model/conversation/ConversationState';
 import type { ConversationSpec } from '@model/conversation/ConversationData';
 
 // ---------------------------------------------------------------------------
-// Shared test data
+// Shared test data – loaded directly from the canonical JSON file so the test
+// stays in sync with the resource automatically.
 // ---------------------------------------------------------------------------
 
-/** Mirrors resources/conversations/guardJewelTest.json */
-const guardSpec: ConversationSpec = {
-    id: 'guardJewelTest',
-    npcId: 'guardJewelTest1',
-    conditionalStart: [
-        {
-            condition: { type: 'hasJewels', colour: 'red', count: 10 },
-            start: 'hasEnough',
-        },
-    ],
-    start: 'notEnough',
-    nodes: {
-        notEnough: {
-            npc: {
-                expression: 'neutral',
-                glyphs: 'not-enough red jewel',
-            },
-            end: true,
-        },
-        hasEnough: {
-            npc: {
-                expression: 'happy',
-                glyphs: 'you 10 red jewel exclamation you help',
-            },
-            choices: [
-                {
-                    text: 'Help',
-                    effects: [{ type: 'startSeries', seriesId: 'guardSeries1' }],
-                    end: true,
-                },
-                {
-                    text: 'Leave',
-                    end: true,
-                },
-            ],
-        },
-    },
-};
+const guardSpec: ConversationSpec = JSON.parse(
+    fs.readFileSync(
+        path.join(process.cwd(), 'resources/conversations/guardJewelTest.json'),
+        'utf-8'
+    )
+) as ConversationSpec;
 
 /** Create a ConditionContext that returns a fixed jewel count. */
 function makeContext(redCount: number): ConditionContext {
