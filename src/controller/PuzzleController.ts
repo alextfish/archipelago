@@ -476,14 +476,19 @@ export class PuzzleController {
         }
 
         if (!nowSolved) {
-            // inform view which constraints failed
-            const failed = results.perConstraint.filter(p => !p.result.satisfied);
-            const affected = failed.flatMap(f => f.result.affectedElements ?? []);
-            this.renderer.highlightViolations(affected);
+            // inform view which constraints failed — suppressed when puzzle gives no feedback
+            if (this.puzzle.givesFeedback) {
+                const failed = results.perConstraint.filter(p => !p.result.satisfied);
+                const affected = failed.flatMap(f => f.result.affectedElements ?? []);
+                this.renderer.highlightViolations(affected);
+            } else {
+                this.renderer.highlightViolations([]);
+            }
         }
 
-        // Show per-constraint NPC+speech-bubble feedback whenever all bridges are placed
-        if (this.puzzle.allBridgesPlaced()) {
+        // Show per-constraint NPC+speech-bubble feedback whenever all bridges are placed,
+        // but only if the puzzle gives feedback for unsolved states.
+        if (this.puzzle.allBridgesPlaced() && this.puzzle.givesFeedback) {
             const displayItems = this.validator.getConstraintDisplayItems();
             this.renderer.showConstraintFeedback(displayItems, this.puzzle);
         } else {

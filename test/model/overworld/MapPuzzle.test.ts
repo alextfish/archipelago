@@ -475,4 +475,38 @@ describe("MapPuzzleExtractor", () => {
             expect(puzzle.constraints.length).toBeGreaterThan(0);
         });
     });
+
+    describe("givesFeedback extraction from Tiled metadata", () => {
+        const baseMapData: TiledMapData = {
+            width: 10,
+            height: 10,
+            tilewidth: 32,
+            tileheight: 32,
+            layers: []
+        };
+
+        it("defaults givesFeedback to true when property is absent", () => {
+            const puzzle = extractor.createBridgePuzzle(
+                { id: "p1", bounds: { x: 0, y: 0, width: 96, height: 96 }, metadata: {} },
+                baseMapData
+            );
+            expect(puzzle.givesFeedback).toBe(true);
+        });
+
+        it("sets givesFeedback to true when Tiled property is 'true'", () => {
+            const puzzle = extractor.createBridgePuzzle(
+                { id: "p2", bounds: { x: 0, y: 0, width: 96, height: 96 }, metadata: { givesFeedback: 'true' } },
+                baseMapData
+            );
+            expect(puzzle.givesFeedback).toBe(true);
+        });
+
+        it("sets givesFeedback to false when Tiled property is 'false'", () => {
+            const puzzle = extractor.createBridgePuzzle(
+                { id: "p3", bounds: { x: 0, y: 0, width: 96, height: 96 }, metadata: { givesFeedback: 'false' } },
+                baseMapData
+            );
+            expect(puzzle.givesFeedback).toBe(false);
+        });
+    });
 });

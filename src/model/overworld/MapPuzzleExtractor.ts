@@ -238,6 +238,8 @@ export class MapPuzzleExtractor {
         const bridgeTypes = this.extractBridgeTypes(definition);
         const maxNumBridges = this.calculateMaxBridges(definition);
 
+        const givesFeedback = definition.metadata.givesFeedback !== 'false';
+
         const puzzleSpec: PuzzleSpec = {
             id: definition.id,
             type: definition.metadata.type || 'overworld',
@@ -248,7 +250,8 @@ export class MapPuzzleExtractor {
             islands,
             bridgeTypes,
             constraints,
-            maxNumBridges
+            maxNumBridges,
+            givesFeedback
         };
 
         return new BridgePuzzle(puzzleSpec);
