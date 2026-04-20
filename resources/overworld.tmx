@@ -652,6 +652,9 @@
  <tileset firstgid="528" name="jewels" tilewidth="32" tileheight="32" tilecount="16" columns="4">
   <image source="sprites/jewels.png" width="128" height="128"/>
   <tile id="1">
+   <properties>
+    <property name="jewel" value="red"/>
+   </properties>
    <animation>
     <frame tileid="0" duration="200"/>
     <frame tileid="1" duration="200"/>
