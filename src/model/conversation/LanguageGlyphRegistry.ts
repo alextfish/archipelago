@@ -90,7 +90,10 @@ export class LanguageGlyphRegistry {
             ['6', 67],
             ['7', 68],
             ['8', 69],
-            ['exclamation', 70],
+            ['9', 70],
+            ['10', 71],
+            ['exclamation', 72],
+            ['jewel', 73],
         ]);
 
         this.languages.set('grass', {
