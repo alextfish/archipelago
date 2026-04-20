@@ -67,7 +67,8 @@ export class IslandBridgeCountConstraint extends Constraint {
         elementID: island.id,
         glyphMessage,
         constraintType: 'IslandBridgeCountConstraint',
-        requiredCount: expected
+        requiredCount: expected,
+        conversationVariables: { count: String(expected) }
       });
     }
 

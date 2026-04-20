@@ -164,7 +164,7 @@ describe("EnclosedAreaSizeConstraint.getDisplayItems", () => {
     const constraint = new EnclosedAreaSizeConstraint(2, 2, 1);
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "good", constraintType: "EnclosedAreaSizeConstraint", position: { x: 2, y: 2 }, requiredCount: 1 }]);
+    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "good", constraintType: "EnclosedAreaSizeConstraint", position: { x: 2, y: 2 }, requiredCount: 1, conversationVariables: { count: "1" } }]);
   });
 
   it("returns 'area not enclosed' glyph message when cell is not enclosed", () => {
@@ -173,7 +173,7 @@ describe("EnclosedAreaSizeConstraint.getDisplayItems", () => {
     const constraint = new EnclosedAreaSizeConstraint(2, 2, 2);
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "area not enclosed", constraintType: "EnclosedAreaSizeConstraint", position: { x: 2, y: 2 }, requiredCount: 2 }]);
+    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "area not enclosed", constraintType: "EnclosedAreaSizeConstraint", position: { x: 2, y: 2 }, requiredCount: 2, conversationVariables: { count: "2" } }]);
   });
 
   it("returns 'not-enough enclosed area' when enclosed area is too small", () => {
@@ -192,7 +192,7 @@ describe("EnclosedAreaSizeConstraint.getDisplayItems", () => {
     const constraint = new EnclosedAreaSizeConstraint(2, 2, 5); // expects 5 but area is 1
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "not-enough enclosed area", constraintType: "EnclosedAreaSizeConstraint", position: { x: 2, y: 2 }, requiredCount: 5 }]);
+    expect(items).toEqual([{ elementID: "2,2", glyphMessage: "not-enough enclosed area", constraintType: "EnclosedAreaSizeConstraint", position: { x: 2, y: 2 }, requiredCount: 5, conversationVariables: { count: "5" } }]);
   });
 
   it("returns 'too-many enclosed area' when enclosed area is too large", () => {
@@ -213,6 +213,6 @@ describe("EnclosedAreaSizeConstraint.getDisplayItems", () => {
     const constraint = new EnclosedAreaSizeConstraint(3, 3, 1); // area is 9, expects 1
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "3,3", glyphMessage: "too-many enclosed area", constraintType: "EnclosedAreaSizeConstraint", position: { x: 3, y: 3 }, requiredCount: 1 }]);
+    expect(items).toEqual([{ elementID: "3,3", glyphMessage: "too-many enclosed area", constraintType: "EnclosedAreaSizeConstraint", position: { x: 3, y: 3 }, requiredCount: 1, conversationVariables: { count: "1" } }]);
   });
 });
