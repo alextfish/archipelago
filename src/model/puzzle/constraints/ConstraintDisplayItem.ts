@@ -28,8 +28,7 @@ export interface ConstraintDisplayItem {
   compassFrame?: number;
   /**
    * Optional key-value pairs substituted into the constraint's conversation JSON
-   * (e.g. `{ count: "2", direction: "above" }`).  When present, takes precedence
-   * over the legacy `requiredCount`-based variable building done in OverworldScene.
+   * (e.g. `{ count: "2", direction: "above" }`).
    */
   conversationVariables?: Record<string, string>;
 }

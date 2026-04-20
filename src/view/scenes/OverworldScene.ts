@@ -1280,13 +1280,8 @@ export class OverworldScene extends Phaser.Scene {
           const appearanceId = getNPCSpriteKey(item.constraintType);
           const language = 'grass'; // Default language for constraint NPCs
 
-          // Build template variables for conversation substitution.
-          // Prefer per-item variables when the constraint supplies them
-          // (e.g. IslandPassingBridgeCountConstraint provides both count and direction),
-          // otherwise fall back to the legacy count-only approach.
-          const conversationVariables = item.conversationVariables ?? (item.requiredCount !== undefined
-            ? { count: String(item.requiredCount) }
-            : undefined);
+          // Build template variables for conversation substitution from the constraint's display item.
+          const conversationVariables = item.conversationVariables;
 
           // Create NPC instance
           const npc = new NPC(
