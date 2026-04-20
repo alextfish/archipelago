@@ -113,7 +113,7 @@ export class OverworldScene extends Phaser.Scene {
   private collectibles: Collectible[] = [];
   private collectibleSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
   /** Fixed-to-camera jewel count display elements, keyed by jewel colour. */
-  private jewel_hudElements: Map<string, { sprite: Phaser.GameObjects.Image; text: Phaser.GameObjects.Text }> = new Map();
+  private jewelHUDElements: Map<string, { sprite: Phaser.GameObjects.Image; text: Phaser.GameObjects.Text }> = new Map();
 
   // Player start position management
   private playerStartManager?: PlayerStartManager;
@@ -1675,11 +1675,11 @@ export class OverworldScene extends Phaser.Scene {
 
     // Remove elements for colours that are no longer needed
     const activeColours = new Set(items.map(i => i.colour));
-    for (const [colour, els] of this.jewel_hudElements) {
+    for (const [colour, els] of this.jewelHUDElements) {
       if (!activeColours.has(colour)) {
         els.sprite.destroy();
         els.text.destroy();
-        this.jewel_hudElements.delete(colour);
+        this.jewelHUDElements.delete(colour);
       }
     }
 
@@ -1693,7 +1693,7 @@ export class OverworldScene extends Phaser.Scene {
         yellow: 0xffff44,
       };
 
-      if (!this.jewel_hudElements.has(item.colour)) {
+      if (!this.jewelHUDElements.has(item.colour)) {
         // Create new HUD elements fixed to the camera
         const spriteKey = `jewel-${item.colour}`;
         const textX = this.scale.width - marginRight - 32 - 4;
@@ -1724,10 +1724,10 @@ export class OverworldScene extends Phaser.Scene {
         hudText.setDepth(2000);
         hudText.setOrigin(1, 0);
 
-        this.jewel_hudElements.set(item.colour, { sprite: hudSprite, text: hudText });
+        this.jewelHUDElements.set(item.colour, { sprite: hudSprite, text: hudText });
       } else {
         // Update existing element
-        const els = this.jewel_hudElements.get(item.colour)!;
+        const els = this.jewelHUDElements.get(item.colour)!;
         els.text.setText(String(item.count));
         // Reposition in case the order changed
         const spriteX = this.scale.width - marginRight - 16;
