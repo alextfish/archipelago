@@ -13,9 +13,9 @@ export class ConversationState {
     private effectsApplied: ConversationEffect[];
     private focusedChoiceIndex: number | null;
 
-    constructor(spec: ConversationSpec) {
+    constructor(spec: ConversationSpec, startNodeId?: string) {
         this.spec = spec;
-        this.currentNodeId = spec.start;
+        this.currentNodeId = startNodeId ?? spec.start;
         this.ended = false;
         this.effectsApplied = [];
         this.focusedChoiceIndex = null;
