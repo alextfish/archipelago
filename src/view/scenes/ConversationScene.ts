@@ -149,9 +149,14 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     }
 
     /**
-     * Start a conversation with an NPC
+     * Start a conversation with an NPC.
+     *
+     * @param spec        The conversation specification.
+     * @param npc         The NPC being spoken to.
+     * @param startNodeId Optional override for the starting node (used when a
+     *                    condition evaluator has already resolved the branch).
      */
-    startConversation(spec: ConversationSpec, npc: NPC): void {
+    startConversation(spec: ConversationSpec, npc: NPC, startNodeId?: string): void {
         console.log('ConversationScene: startConversation called', { spec, npc });
 
         this.currentNPC = npc;
@@ -179,7 +184,7 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
 
         // Start conversation through controller
         console.log('ConversationScene: Starting conversation through controller');
-        this.controller.startConversation(spec, npc);
+        this.controller.startConversation(spec, npc, startNodeId);
 
         console.log('ConversationScene: startConversation complete');
     }    /**

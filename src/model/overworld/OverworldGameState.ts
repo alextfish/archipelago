@@ -6,6 +6,7 @@ import type { WaterPropagationEngine } from './WaterPropagationEngine';
 import type { OverworldPuzzleManager } from './OverworldPuzzleManager';
 import { PlayerTranslationDictionary } from '@model/translation/PlayerTranslationDictionary';
 import { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
+import type { PlayerOverworldDisplayItem } from './PlayerOverworldDisplay';
 
 /**
  * Manages state persistence for overworld puzzles
@@ -18,6 +19,9 @@ export class OverworldGameState {
     private puzzleProgress: Map<string, BridgePuzzle> = new Map();
     private completedPuzzles: Set<string> = new Set();
     private unlockedDoors: Set<string> = new Set();
+
+    /** Jewels the player has collected, keyed by colour (e.g. 'red'). */
+    private collectedJewels: Map<string, number> = new Map();
     
     // FlowPuzzle-specific state
     /** Track solved FlowPuzzles and their edge outputs (local coordinates) */
@@ -170,6 +174,55 @@ export class OverworldGameState {
         return Array.from(this.unlockedDoors);
     }
 
+    // -----------------------------------------------------------------------
+    // Jewel collection
+    // -----------------------------------------------------------------------
+
+    /**
+     * Record that the player has collected one jewel of the given colour.
+     */
+    collectJewel(colour: string): void {
+        const current = this.collectedJewels.get(colour) ?? 0;
+        this.collectedJewels.set(colour, current + 1);
+        console.log(`OverworldGameState: Collected ${colour} jewel (total: ${current + 1})`);
+    }
+
+    /**
+     * Return the number of collected jewels of the given colour.
+     * Returns 0 for unknown colours.
+     */
+    getJewelCount(colour: string): number {
+        return this.collectedJewels.get(colour) ?? 0;
+    }
+
+    /**
+     * Return a snapshot of all jewel counts as a plain object.
+     * Only colours with a count > 0 are included.
+     */
+    getJewelCounts(): Record<string, number> {
+        const result: Record<string, number> = {};
+        for (const [colour, count] of this.collectedJewels) {
+            if (count > 0) {
+                result[colour] = count;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Return the list of display items for the exploration-mode HUD.
+     * Only colours with at least one collected jewel are included.
+     */
+    getOverworldDisplayItems(): PlayerOverworldDisplayItem[] {
+        const items: PlayerOverworldDisplayItem[] = [];
+        for (const [colour, count] of this.collectedJewels) {
+            if (count > 0) {
+                items.push({ type: 'jewel', colour, count });
+            }
+        }
+        return items;
+    }
+
     /**
      * Get debug information about current state
      */
@@ -199,6 +252,7 @@ export class OverworldGameState {
         this.puzzleProgress.clear();
         this.completedPuzzles.clear();
         this.unlockedDoors.clear();
+        this.collectedJewels.clear();
         
         // Reset FlowPuzzle state
         this.flowPuzzleOutputs.clear();

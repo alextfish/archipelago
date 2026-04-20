@@ -58,9 +58,14 @@ export class ConversationController {
 
     /**
      * Start a conversation with an NPC
-     * Conversations always reset to the beginning, even if previously completed
+     * Conversations always reset to the beginning, even if previously completed.
+     *
+     * @param spec        The conversation specification.
+     * @param npc         The NPC being spoken to.
+     * @param startNodeId Optional override for the starting node (used when a
+     *                    condition evaluator has already picked the right branch).
      */
-    startConversation(spec: ConversationSpec, npc: NPC): void {
+    startConversation(spec: ConversationSpec, npc: NPC, startNodeId?: string): void {
         if (this.state && !this.state.isEnded()) {
             console.warn('Starting new conversation while previous one is still active');
         }
@@ -68,7 +73,7 @@ export class ConversationController {
         console.log(`ConversationController: Starting conversation with ${npc.name}, spec:`, spec);
 
         // Always create a fresh state - conversations reset each time
-        this.state = new ConversationState(spec);
+        this.state = new ConversationState(spec, startNodeId);
         this.currentNPC = npc;
         this.currentConversationId = spec.id;
         this.hostCleanupCalled = false;

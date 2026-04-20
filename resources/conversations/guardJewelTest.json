@@ -1,0 +1,39 @@
+{
+  "id": "guardJewelTest",
+  "npcId": "guardJewelTest1",
+  "conditionalStart": [
+    {
+      "condition": { "type": "hasJewels", "colour": "red", "count": 10 },
+      "start": "hasEnough"
+    }
+  ],
+  "start": "notEnough",
+  "nodes": {
+    "notEnough": {
+      "npc": {
+        "expression": "neutral",
+        "glyphs": "not-enough red jewel"
+      },
+      "end": true
+    },
+    "hasEnough": {
+      "npc": {
+        "expression": "happy",
+        "glyphs": "you 10 red jewel exclamation you help"
+      },
+      "choices": [
+        {
+          "text": "Help",
+          "effects": [
+            { "type": "startSeries", "seriesId": "guardSeries1" }
+          ],
+          "end": true
+        },
+        {
+          "text": "Leave",
+          "end": true
+        }
+      ]
+    }
+  }
+}
