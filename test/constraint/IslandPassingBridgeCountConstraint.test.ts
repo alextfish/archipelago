@@ -122,7 +122,7 @@ describe("IslandPassingBridgeCountConstraint", () => {
 });
 
 describe("IslandPassingBridgeCountConstraint.getDisplayItems", () => {
-  it("returns 'good' when count is correct", () => {
+  it("returns 'good' when count is correct, with requiredCount and compassFrame", () => {
     const islands = [{ id: "A", x: 2, y: 3 }, { id: "B", x: 1, y: 2 }, { id: "C", x: 3, y: 2 }];
     const bridges = [{ id: "b1", start: { x: 1, y: 2 }, end: { x: 3, y: 2 }, type: { id: "t1" } }];
     const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges });
@@ -130,7 +130,7 @@ describe("IslandPassingBridgeCountConstraint.getDisplayItems", () => {
     const constraint = new IslandPassingBridgeCountConstraint("A", "above", 1);
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "good", constraintType: "IslandPassingBridgeCountConstraint" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "good", constraintType: "IslandPassingBridgeCountConstraint", requiredCount: 1, compassFrame: 0 }]);
   });
 
   it("returns 'not-enough bridge above island' when too few pass above", () => {
@@ -140,7 +140,7 @@ describe("IslandPassingBridgeCountConstraint.getDisplayItems", () => {
     const constraint = new IslandPassingBridgeCountConstraint("A", "above", 1);
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge above island", constraintType: "IslandPassingBridgeCountConstraint" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge above island", constraintType: "IslandPassingBridgeCountConstraint", requiredCount: 1, compassFrame: 0 }]);
   });
 
   it("returns 'too-many bridge below island' when too many pass below", () => {
@@ -154,7 +154,7 @@ describe("IslandPassingBridgeCountConstraint.getDisplayItems", () => {
     const constraint = new IslandPassingBridgeCountConstraint("A", "below", 1);
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "too-many bridge below island", constraintType: "IslandPassingBridgeCountConstraint" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "too-many bridge below island", constraintType: "IslandPassingBridgeCountConstraint", requiredCount: 1, compassFrame: 2 }]);
   });
 
   it("returns 'not-enough bridge left-of island' when too few pass to the left", () => {
@@ -164,7 +164,7 @@ describe("IslandPassingBridgeCountConstraint.getDisplayItems", () => {
     const constraint = new IslandPassingBridgeCountConstraint("A", "left", 1);
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge left-of island", constraintType: "IslandPassingBridgeCountConstraint" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge left-of island", constraintType: "IslandPassingBridgeCountConstraint", requiredCount: 1, compassFrame: 3 }]);
   });
 
   it("returns 'not-enough bridge right-of island' when too few pass to the right", () => {
@@ -174,17 +174,17 @@ describe("IslandPassingBridgeCountConstraint.getDisplayItems", () => {
     const constraint = new IslandPassingBridgeCountConstraint("A", "right", 1);
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge right-of island", constraintType: "IslandPassingBridgeCountConstraint" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge right-of island", constraintType: "IslandPassingBridgeCountConstraint", requiredCount: 1, compassFrame: 1 }]);
   });
 
-  it("returns 'not-enough bridge adjacent island' when too few pass adjacent", () => {
+  it("returns 'not-enough bridge adjacent island' when too few pass adjacent, with no compassFrame", () => {
     const islands = [{ id: "A", x: 2, y: 2 }];
     const puzzle = makeMockPuzzle({ islands, bridges: [], placedBridges: [] });
 
     const constraint = new IslandPassingBridgeCountConstraint("A", "adjacent", 1);
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge adjacent island", constraintType: "IslandPassingBridgeCountConstraint" }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough bridge adjacent island", constraintType: "IslandPassingBridgeCountConstraint", requiredCount: 1, compassFrame: undefined }]);
   });
 
   it("returns empty array when island is not found", () => {
@@ -194,5 +194,15 @@ describe("IslandPassingBridgeCountConstraint.getDisplayItems", () => {
     const items = constraint.getDisplayItems(puzzle as any);
 
     expect(items).toEqual([]);
+  });
+
+  it("includes the expected count as requiredCount in all display items", () => {
+    const islands = [{ id: "A", x: 2, y: 5 }];
+    const puzzle = makeMockPuzzle({ islands, bridges: [], placedBridges: [] });
+
+    const constraint = new IslandPassingBridgeCountConstraint("A", "above", 3);
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items[0].requiredCount).toBe(3);
   });
 });

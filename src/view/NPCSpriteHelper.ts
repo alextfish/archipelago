@@ -13,6 +13,8 @@ export function getNPCSpriteKey(constraintType: string | undefined): string {
     switch (constraintType) {
         case 'IslandBridgeCountConstraint':
             return 'Ruby';
+        case 'IslandPassingBridgeCountConstraint':
+            return 'Pirate';
         case 'BridgeMustCoverIslandConstraint':
             return 'sailorNS';
         case 'MustHaveWaterConstraint':
@@ -66,14 +68,20 @@ export function loadNPCSprites(loader: Phaser.Loader.LoaderPlugin): void {
     loader.image('Farmer frown', 'resources/sprites/yan frown.png');
     loader.image('Farmer neutral', 'resources/sprites/yan neutral.png');
 
-    // Pirate — placeholder sprites using Ruby art until dedicated art is created
-    loader.spritesheet('Pirate', 'resources/sprites/Ruby neutral.png', {
+    // Pirate — used for IslandDirectionalBridgeConstraint and IslandPassingBridgeCountConstraint
+    loader.spritesheet('Pirate', 'resources/sprites/Pirate neutral.png', {
         frameWidth: 32,
         frameHeight: 32
     });
-    loader.image('Pirate happy', 'resources/sprites/Ruby happy.png');
-    loader.image('Pirate frown', 'resources/sprites/Ruby frown.png');
-    loader.image('Pirate neutral', 'resources/sprites/Ruby neutral.png');
+    loader.image('Pirate happy', 'resources/sprites/Pirate happy.png');
+    loader.image('Pirate frown', 'resources/sprites/Pirate frown.png');
+    loader.image('Pirate neutral', 'resources/sprites/Pirate neutral.png');
+
+    // Compass overlay spritesheet — four frames: north (0), east (1), south (2), west (3)
+    loader.spritesheet('compass overlay', 'resources/sprites/compass_overlay.png', {
+        frameWidth: 32,
+        frameHeight: 32
+    });
 
     // Lyuba
     loader.spritesheet('Lyuba', 'resources/sprites/Lyuba neutral.png', {
@@ -114,6 +122,9 @@ export function loadNPCSprites(loader: Phaser.Loader.LoaderPlugin): void {
     loader.image('faces/Yan neutral', 'resources/sprites/faces/Yan_face_casual_neutral.png');
     loader.image('faces/Yan happy', 'resources/sprites/faces/Yan_face_casual_happy.png');
     loader.image('faces/Yan frown', 'resources/sprites/faces/Yan_face_casual_dislike.png');
+    loader.image('faces/Pirate neutral', 'resources/sprites/faces/Pirate neutral.png');
+    loader.image('faces/Pirate happy', 'resources/sprites/faces/Pirate happy.png');
+    loader.image('faces/Pirate frown', 'resources/sprites/faces/Pirate frown.png');
 }
 
 /**

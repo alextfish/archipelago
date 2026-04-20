@@ -20,4 +20,10 @@ export interface ConstraintDisplayItem {
    * bridge's strut location rather than at an island.
    */
   position?: { x: number; y: number };
+  /**
+   * Optional frame index into the compass_overlay spritesheet to display
+   * alongside the NPC (0=north, 1=east, 2=south, 3=west).
+   * Omit for constraints that have no directional component.
+   */
+  compassFrame?: number;
 }

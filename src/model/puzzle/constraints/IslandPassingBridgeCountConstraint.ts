@@ -16,6 +16,8 @@ import type { Island } from '../Island';
  * - "adjacent": total count of bridges passing directly adjacent (one cell away) in any direction
  */
 export class IslandPassingBridgeCountConstraint extends Constraint {
+  override readonly conversationFile = 'constraints/islandPassingBridgeCount_unsatisfied.json';
+  override readonly conversationFileSolved = 'constraints/islandPassingBridgeCount_satisfied.json';
   private islandId: string;
   private direction: 'above' | 'below' | 'left' | 'right' | 'adjacent';
   private expectedCount: number;
@@ -160,18 +162,30 @@ export class IslandPassingBridgeCountConstraint extends Constraint {
     }
   }
 
+  /** Maps direction to the compass_overlay frame index (0=N, 1=E, 2=S, 3=W). */
+  private directionCompassFrame(): number | undefined {
+    switch (this.direction) {
+      case 'above': return 0;
+      case 'right': return 1;
+      case 'below': return 2;
+      case 'left': return 3;
+      case 'adjacent': return undefined;
+    }
+  }
+
   override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
     const island = puzzle.islands.find(i => i.id === this.islandId);
     if (!island) return [];
     const result = this.check(puzzle);
+    const compassFrame = this.directionCompassFrame();
     if (result.satisfied) {
-      return [{ elementID: this.islandId, glyphMessage: "good", constraintType: 'IslandPassingBridgeCountConstraint' }];
+      return [{ elementID: this.islandId, glyphMessage: "good", constraintType: 'IslandPassingBridgeCountConstraint', requiredCount: this.expectedCount, compassFrame }];
     }
     const dirWord = this.directionGlyphWord();
     const passingBridges = this.findPassingBridges(puzzle, island);
     const actualCount = passingBridges.length;
     const prefix = actualCount < this.expectedCount ? "not-enough" : "too-many";
     const glyphMessage = `${prefix} bridge ${dirWord} island`;
-    return [{ elementID: this.islandId, glyphMessage, constraintType: 'IslandPassingBridgeCountConstraint' }];
+    return [{ elementID: this.islandId, glyphMessage, constraintType: 'IslandPassingBridgeCountConstraint', requiredCount: this.expectedCount, compassFrame }];
   }
 }

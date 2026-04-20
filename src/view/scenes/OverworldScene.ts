@@ -74,6 +74,7 @@ export class OverworldScene extends Phaser.Scene {
   private npcIcons: Map<string, Phaser.GameObjects.Image> = new Map();
   private npcSeriesStates: Map<string, NPCSeriesState> = new Map();
   private constraintNumberSprites: Map<string, Phaser.GameObjects.Sprite> = new Map(); // Bridge count numbers for constraint NPCs
+  private constraintCompassSprites: Map<string, Phaser.GameObjects.Sprite> = new Map(); // Compass direction sprites for directional constraint NPCs
   private seriesManager?: SeriesManager;
 
   // Roof hiding system
@@ -179,6 +180,12 @@ export class OverworldScene extends Phaser.Scene {
 
     // Load counts overlay spritesheet for constraint NPCs
     this.load.spritesheet('counts overlay', 'resources/sprites/counts overlay.png', {
+      frameWidth: 32,
+      frameHeight: 32
+    });
+
+    // Load compass overlay spritesheet for directional constraint NPCs
+    this.load.spritesheet('compass overlay', 'resources/sprites/compass_overlay.png', {
       frameWidth: 32,
       frameHeight: 32
     });
@@ -1310,7 +1317,7 @@ export class OverworldScene extends Phaser.Scene {
           this.npcSprites.set(npc.id, sprite);
 
           // Add count overlay sprite for constraints that specify a requiredCount
-          if ((item.constraintType === 'IslandBridgeCountConstraint' || item.constraintType === 'EnclosedAreaSizeConstraint') && item.requiredCount) {
+          if ((item.constraintType === 'IslandBridgeCountConstraint' || item.constraintType === 'EnclosedAreaSizeConstraint' || item.constraintType === 'IslandPassingBridgeCountConstraint') && item.requiredCount) {
             const count = item.requiredCount;
             if (count >= 1 && count <= 8) {
               const numberSprite = this.add.sprite(
@@ -1323,6 +1330,19 @@ export class OverworldScene extends Phaser.Scene {
               numberSprite.setDepth(worldY + 1);
               this.constraintNumberSprites.set(npc.id, numberSprite);
             }
+          }
+
+          // Add compass overlay sprite for directional constraints
+          if (item.compassFrame !== undefined) {
+            const compassSprite = this.add.sprite(
+              worldX + this.tiledMapData.tilewidth / 2,
+              worldY - this.tiledMapData.tileheight / 2,
+              'compass overlay',
+              item.compassFrame
+            );
+            compassSprite.setOrigin(0.5, 0.5);
+            compassSprite.setDepth(worldY + 2);
+            this.constraintCompassSprites.set(npc.id, compassSprite);
           }
 
           // Add test marker for automated testing
@@ -1347,7 +1367,7 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   /**
-   * Hide constraint NPCs (and their number sprites) for a specific puzzle.
+   * Hide constraint NPCs (and their number/compass sprites) for a specific puzzle.
    * Called when entering puzzle mode so EmbeddedPuzzleRenderer's NPCs are visible.
    */
   private hideConstraintNPCsForPuzzle(puzzleId: string): void {
@@ -1365,11 +1385,17 @@ export class OverworldScene extends Phaser.Scene {
       }
     }
 
+    for (const [npcId, compassSprite] of this.constraintCompassSprites) {
+      if (npcId.startsWith(prefix)) {
+        compassSprite.setVisible(false);
+      }
+    }
+
     console.log(`Hidden constraint NPCs for puzzle: ${puzzleId}`);
   }
 
   /**
-   * Show constraint NPCs (and their number sprites) for a specific puzzle.
+   * Show constraint NPCs (and their number/compass sprites) for a specific puzzle.
    * Called when exiting puzzle mode to restore overworld NPCs.
    */
   private showConstraintNPCsForPuzzle(puzzleId: string): void {
@@ -1384,6 +1410,12 @@ export class OverworldScene extends Phaser.Scene {
     for (const [npcId, numberSprite] of this.constraintNumberSprites) {
       if (npcId.startsWith(prefix)) {
         numberSprite.setVisible(true);
+      }
+    }
+
+    for (const [npcId, compassSprite] of this.constraintCompassSprites) {
+      if (npcId.startsWith(prefix)) {
+        compassSprite.setVisible(true);
       }
     }
 

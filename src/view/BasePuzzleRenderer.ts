@@ -45,6 +45,7 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
     protected constraintNPCs: Map<string, Phaser.GameObjects.Sprite> = new Map();
     protected strutBridgeNPCs: Map<string, Phaser.GameObjects.Sprite> = new Map();
     protected constraintNumbers: Map<string, Phaser.GameObjects.Sprite> = new Map();
+    protected constraintCompasses: Map<string, Phaser.GameObjects.Sprite> = new Map();
     protected bridgeGraphics: Map<string, Phaser.GameObjects.Container> = new Map();
 
     // Interactive hit-zones for placed bridges
@@ -136,6 +137,18 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
                     ).setOrigin(0.5, 0.5).setScale(scale, scale);
                     this.constraintNumbers.set(item.elementID, numberSprite);
                     this.onGameObjectCreated(numberSprite);
+                }
+
+                if (item.compassFrame !== undefined) {
+                    const cellSize = this.gridMapper.getCellSize();
+                    const compassSprite = this.scene.add.sprite(
+                        worldPos.x + cellSize / 2,
+                        worldPos.y + cellSize / 2,
+                        'compass overlay',
+                        item.compassFrame,
+                    ).setOrigin(0.5, 0.5).setScale(scale, scale);
+                    this.constraintCompasses.set(item.elementID, compassSprite);
+                    this.onGameObjectCreated(compassSprite);
                 }
             }
         }
