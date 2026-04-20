@@ -146,12 +146,22 @@ describe('LanguageGlyphRegistry', () => {
             expect(result).toEqual([[31, 32], [30, 32], [31, 33]]);
         });
 
-        it('should ignore empty sentences', () => {
+        it('should ignore empty sentences from a leading ". "', () => {
             const registry = new LanguageGlyphRegistry();
-            // Leading or trailing ". " would create empty parts after splitting
-            const result = registry.parseGlyphsPerSentence('grass', 'me bridge');
+            // A leading ". " produces an empty string before the first sentence
+            const result = registry.parseGlyphsPerSentence('grass', '. me bridge');
 
             expect(result).toHaveLength(1);
+            expect(result[0]).toEqual([31, 32]);
+        });
+
+        it('should ignore empty sentences from a trailing ". "', () => {
+            const registry = new LanguageGlyphRegistry();
+            // A trailing ". " produces an empty string after the last sentence
+            const result = registry.parseGlyphsPerSentence('grass', 'me bridge. ');
+
+            expect(result).toHaveLength(1);
+            expect(result[0]).toEqual([31, 32]);
         });
 
         it('should handle extra whitespace within each sentence', () => {

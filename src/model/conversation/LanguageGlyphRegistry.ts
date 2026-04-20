@@ -189,7 +189,7 @@ export class LanguageGlyphRegistry {
      * @param glyphText Space-separated words, with ". " between sentences
      */
     parseGlyphsPerSentence(language: string, glyphText: string): number[][] {
-        return glyphText.trim()
+        return glyphText
             .split('. ')
             .map(sentence => sentence.trim())
             .filter(sentence => sentence.length > 0)
