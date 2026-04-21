@@ -64,13 +64,13 @@ export class IslandBridgeCountConstraint extends Constraint {
       }
 
       // Extract optional disguise and conversation overrides stored on the island
-      const getIslandProp = (prefix: string): string | undefined =>
+      const getConstraintPropertyValue = (prefix: string): string | undefined =>
         island.constraints?.find(c => c.startsWith(`${prefix}=`))?.substring(prefix.length + 1);
 
-      const disguiseSpriteKey = getIslandProp('disguise_sprite');
-      const disguiseSpriteSolvedKey = getIslandProp('disguise_sprite_solved');
-      const conversationFile = getIslandProp('conversation_file');
-      const conversationFileSolved = getIslandProp('conversation_file_solved');
+      const disguiseSpriteKey = getConstraintPropertyValue('disguise_sprite');
+      const disguiseSpriteSolvedKey = getConstraintPropertyValue('disguise_sprite_solved');
+      const conversationFile = getConstraintPropertyValue('conversation_file');
+      const conversationFileSolved = getConstraintPropertyValue('conversation_file_solved');
 
       items.push({
         elementID: island.id,

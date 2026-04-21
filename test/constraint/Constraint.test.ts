@@ -272,15 +272,17 @@ describe("IslandBridgeCountConstraint.getDisplayItems", () => {
     expect(item.conversationFileSolved).toBe("journalcave-bridgecount-satisfied.json");
   });
 
-  it("omits disguise fields when island has no disguise properties", () => {
-    const islands = [
-      { id: "A", x: 1, y: 1, constraints: ["num_bridges=1"] },
+  it("reports correct glyphMessage for a disguised island when satisfied", () => {
+    const disguisedConstraints = [
+      "num_bridges=1",
+      "disguise_sprite=Cultist-1",
+      "disguise_sprite_solved=Cultist-1-Ruby",
     ];
     const bridges = [
       { id: "b1", start: { x: 1, y: 1 }, end: { x: 3, y: 1 }, type: { id: "t1" } },
     ];
     const puzzle = makeMockPuzzle({
-      islands,
+      islands: [{ id: "A", x: 1, y: 1, constraints: disguisedConstraints }],
       bridges,
       bridgesFromIsland: (island: any) => bridgesFromIsland(island, bridges),
     });
@@ -289,11 +291,32 @@ describe("IslandBridgeCountConstraint.getDisplayItems", () => {
     const items = constraint.getDisplayItems(puzzle as any);
 
     expect(items).toHaveLength(1);
-    const item = items[0];
-    expect(item.disguiseSpriteKey).toBeUndefined();
-    expect(item.disguiseSpriteSolvedKey).toBeUndefined();
-    expect(item.conversationFile).toBeUndefined();
-    expect(item.conversationFileSolved).toBeUndefined();
+    expect(items[0].glyphMessage).toBe("good");
+    expect(items[0].disguiseSpriteKey).toBe("Cultist-1");
+  });
+
+  it("reports correct glyphMessage for a disguised island when unsatisfied", () => {
+    const disguisedConstraints = [
+      "num_bridges=2",
+      "disguise_sprite=Cultist-1",
+      "disguise_sprite_solved=Cultist-1-Ruby",
+    ];
+    const bridges = [
+      { id: "b1", start: { x: 1, y: 1 }, end: { x: 3, y: 1 }, type: { id: "t1" } },
+    ];
+    const puzzle = makeMockPuzzle({
+      islands: [{ id: "A", x: 1, y: 1, constraints: disguisedConstraints }],
+      bridges,
+      bridgesFromIsland: (island: any) => bridgesFromIsland(island, bridges),
+    });
+
+    const constraint = new IslandBridgeCountConstraint();
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toHaveLength(1);
+    expect(items[0].glyphMessage).toBe("not-enough bridge");
+    expect(items[0].disguiseSpriteKey).toBe("Cultist-1");
+    expect(items[0].disguiseSpriteSolvedKey).toBe("Cultist-1-Ruby");
   });
 });
 
