@@ -2660,6 +2660,8 @@ export class OverworldScene extends Phaser.Scene {
           });
           animSprite.play(animKey);
         });
+      } else if (mapping) {
+        console.warn(`Door animation texture '${mapping.animationKey}' not loaded — skipping animation for door ${door.id}`);
       }
 
       // Apply the state change (model, collision, tile sprite)
@@ -2667,14 +2669,16 @@ export class OverworldScene extends Phaser.Scene {
 
     } finally {
       // Pan back to the player and resume follow regardless of errors
-      const playerX = this.player.x;
-      const playerY = this.player.y;
-      await new Promise<void>((resolve) => {
-        this.cameras.main.pan(playerX, playerY, PAN_DURATION, 'Power2', false, (_cam, progress) => {
-          if (progress === 1) resolve();
+      if (this.player) {
+        const playerX = this.player.x;
+        const playerY = this.player.y;
+        await new Promise<void>((resolve) => {
+          this.cameras.main.pan(playerX, playerY, PAN_DURATION, 'Power2', false, (_cam, progress) => {
+            if (progress === 1) resolve();
+          });
         });
-      });
-      this.cameras.main.startFollow(this.player);
+        this.cameras.main.startFollow(this.player);
+      }
       this.playerController?.setEnabled(true);
     }
   }
