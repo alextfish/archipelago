@@ -26,6 +26,7 @@ export interface PuzzleSpec { // can be loaded from JSON
   bridgeTypes: BridgeTypeSpec[];
   constraints: { type: string; params?: any }[];
   maxNumBridges: number;
+  givesFeedback?: boolean; // defaults to true; when false, no constraint feedback is shown for invalid solutions
 }
 
 export class BridgePuzzle {
@@ -36,6 +37,7 @@ export class BridgePuzzle {
   constraints: Constraint[];
   inventory: BridgeInventory;
   maxNumBridges: number;
+  givesFeedback: boolean;
 
   constructor(spec: PuzzleSpec) {
     this.id = spec.id;
@@ -43,6 +45,7 @@ export class BridgePuzzle {
     this.height = spec.size.height;
     this.islands = spec.islands;
     this.constraints = createConstraintsFromSpec(spec.constraints);
+    this.givesFeedback = spec.givesFeedback ?? true;
     const bridgeTypes = spec.bridgeTypes.map(
       (spec) => ({
         ...createBridgeType({

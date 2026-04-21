@@ -12,9 +12,12 @@ import { emitTestEvent } from '@helpers/TestEvents';
 
 export interface ConversationHost {
     /**
-     * Display NPC dialogue with glyphs
+     * Display NPC dialogue with glyphs.
+     * @param glyphFramesByRow Array of sentences; each sentence is an array of
+     *   frame indices.  Multi-sentence speech bubbles are rendered with one row
+     *   per sentence.
      */
-    displayNPCLine(expression: string, glyphFrames: number[], language: string, customFrame?: string): void;
+    displayNPCLine(expression: string, glyphFramesByRow: number[][], language: string, customFrame?: string): void;
 
     /**
      * Display player choice options
@@ -154,13 +157,13 @@ export class ConversationController {
 
         // Display NPC line if present
         if (node.npc) {
-            const glyphFrames = this.glyphRegistry.parseGlyphs(
+            const glyphFramesByRow = this.glyphRegistry.parseGlyphsPerSentence(
                 this.currentNPC.language,
                 node.npc.glyphs
             );
 
-            console.log(`ConversationController: Displaying NPC line with ${glyphFrames.length} glyphs`);
-            this.host.displayNPCLine(expression, glyphFrames, this.currentNPC.language, node.npc.frame);
+            console.log(`ConversationController: Displaying NPC line with ${glyphFramesByRow.length} sentence(s)`);
+            this.host.displayNPCLine(expression, glyphFramesByRow, this.currentNPC.language, node.npc.frame);
         }
 
         // Always display choices (even if empty) to clear old buttons

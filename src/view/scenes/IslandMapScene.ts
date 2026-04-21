@@ -32,6 +32,11 @@ export class IslandMapScene extends Phaser.Scene {
             frameWidth: 32,
             frameHeight: 32
         });
+        // Load compass overlay spritesheet for directional constraint NPCs
+        this.load.spritesheet('compass overlay', 'resources/sprites/compass_overlay.png', {
+            frameWidth: 32,
+            frameHeight: 32
+        });
         // Load NPC sprite used for constraint feedback display
         this.load.spritesheet('sailorNS', 'resources/sprites/sailorNS.png', {
             frameWidth: 32,
@@ -44,6 +49,13 @@ export class IslandMapScene extends Phaser.Scene {
         this.load.image('Ruby frown', 'resources/sprites/Ruby frown.png');
         this.load.image('Ruby neutral', 'resources/sprites/Ruby neutral.png');
         this.load.spritesheet('Ruby', 'resources/sprites/Ruby neutral.png', {
+            frameWidth: 32,
+            frameHeight: 32
+        });
+        this.load.image('Pirate happy', 'resources/sprites/Pirate happy.png');
+        this.load.image('Pirate frown', 'resources/sprites/Pirate frown.png');
+        this.load.image('Pirate neutral', 'resources/sprites/Pirate neutral.png');
+        this.load.spritesheet('Pirate', 'resources/sprites/Pirate neutral.png', {
             frameWidth: 32,
             frameHeight: 32
         });

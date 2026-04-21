@@ -133,7 +133,7 @@ export class ConstraintFeedbackDisplay {
       if (this.glyphTracker) {
         bubble.setGlyphTracker(this.glyphTracker);
       }
-      bubble.create(glyphFrames, this.language, this.glyphRegistry, 1, direction);
+      bubble.create([glyphFrames], this.language, this.glyphRegistry, 1, direction);
       bubble.setPosition(containerWorld.x, containerWorld.y);
       bubble.setDepth(this.depth + 1);
       this.speechBubbles.push(bubble);

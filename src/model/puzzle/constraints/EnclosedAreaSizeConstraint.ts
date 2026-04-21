@@ -252,6 +252,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
       constraintType: 'EnclosedAreaSizeConstraint',
       position: { x: this.x, y: this.y },
       requiredCount: this.expectedSize >= 0 ? this.expectedSize : undefined,
+      conversationVariables: this.expectedSize >= 0 ? { count: String(this.expectedSize) } : undefined,
     }];
   }
 }
