@@ -13,9 +13,10 @@ export interface DoorPosition {
  */
 export class Door {
     readonly id: string;
-    readonly positions: DoorPosition[];  // Tiles this door occupies
-    readonly seriesId?: string;          // Series that unlocks this door
-    readonly spriteId?: string;          // Sprite identifier for rendering
+    readonly positions: DoorPosition[];      // Tiles this door occupies
+    readonly seriesId?: string;              // Series that unlocks this door
+    readonly overworldPuzzleId?: string;     // Overworld puzzle that unlocks/locks this door
+    readonly spriteId?: string;              // Sprite identifier for rendering
     private locked: boolean;
 
     constructor(
@@ -23,7 +24,8 @@ export class Door {
         positions: DoorPosition[],
         locked: boolean = true,
         seriesId?: string,
-        spriteId?: string
+        spriteId?: string,
+        overworldPuzzleId?: string
     ) {
         if (positions.length === 0) {
             throw new Error('Door must have at least one position');
@@ -34,6 +36,7 @@ export class Door {
         this.locked = locked;
         this.seriesId = seriesId;
         this.spriteId = spriteId;
+        this.overworldPuzzleId = overworldPuzzleId;
     }
 
     /**
@@ -78,9 +81,10 @@ export class Door {
         // Extract door ID from object
         const id = obj.name || obj.id?.toString() || 'unknown';
         
-        // Extract seriesId from custom properties
+        // Extract custom properties
         let seriesId: string | undefined;
         let spriteId: string | undefined;
+        let overworldPuzzleId: string | undefined;
         
         if (obj.properties && Array.isArray(obj.properties)) {
             const seriesProp = obj.properties.find((p: any) => p.name === 'seriesId');
@@ -91,6 +95,11 @@ export class Door {
             const spriteProp = obj.properties.find((p: any) => p.name === 'spriteId');
             if (spriteProp && spriteProp.value) {
                 spriteId = spriteProp.value;
+            }
+
+            const overworldPuzzleProp = obj.properties.find((p: any) => p.name === 'overworldPuzzleId');
+            if (overworldPuzzleProp && overworldPuzzleProp.value) {
+                overworldPuzzleId = overworldPuzzleProp.value;
             }
         }
         
@@ -111,6 +120,6 @@ export class Door {
             }
         }
         
-        return new Door(id, positions, true, seriesId, spriteId);
+        return new Door(id, positions, true, seriesId, spriteId, overworldPuzzleId);
     }
 }

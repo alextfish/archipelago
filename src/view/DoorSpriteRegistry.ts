@@ -1,11 +1,19 @@
 /**
  * Configuration for door sprite rendering
- * Maps door sprite IDs to tileset sprite indices
+ * Maps door sprite IDs to tileset sprite indices and opening animation data
  */
 
 export interface DoorSpriteMapping {
     closed: number;
     open: number;
+    /** Phaser texture key for the opening animation spritesheet */
+    animationKey: string;
+    /** Frame width of each animation frame in pixels */
+    frameWidth: number;
+    /** Frame height of each animation frame in pixels */
+    frameHeight: number;
+    /** Number of frames in the opening animation */
+    frameCount: number;
 }
 
 /**
@@ -16,23 +24,50 @@ export const DoorSpriteRegistry: Record<string, DoorSpriteMapping> = {
     // Horizontal doors
     'forestDoorHClosed': {
         closed: 30,
-        open: 31
+        open: 31,
+        animationKey: 'forestDoorHOpening',
+        frameWidth: 32,
+        frameHeight: 32,
+        frameCount: 4
     },
     'forestDoorHOpen': {
         closed: 30,
-        open: 31
+        open: 31,
+        animationKey: 'forestDoorHOpening',
+        frameWidth: 32,
+        frameHeight: 32,
+        frameCount: 4
     },
 
     // Vertical doors
     'forestDoorVClosed': {
         closed: 32,
-        open: 33
+        open: 33,
+        animationKey: 'forestDoorVOpening',
+        frameWidth: 32,
+        frameHeight: 64,
+        frameCount: 4
     },
     'forestDoorVOpen': {
         closed: 32,
-        open: 33
+        open: 33,
+        animationKey: 'forestDoorVOpening',
+        frameWidth: 32,
+        frameHeight: 64,
+        frameCount: 4
     }
 };
+
+/**
+ * Get the full sprite mapping for a door, or null if not found.
+ * Used to access animation metadata alongside closed/open frame indices.
+ */
+export function getDoorSpriteMapping(spriteId: string | undefined): DoorSpriteMapping | null {
+    if (!spriteId) {
+        return null;
+    }
+    return DoorSpriteRegistry[spriteId] ?? null;
+}
 
 /**
  * Get the sprite frame index for a door based on its sprite ID and locked state

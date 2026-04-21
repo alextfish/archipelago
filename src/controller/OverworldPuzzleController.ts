@@ -14,6 +14,18 @@ import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 
 /**
+ * Result returned from exitPuzzle(), describing what happened to the puzzle state.
+ */
+export interface PuzzleExitResult {
+    /** The ID of the puzzle that was exited */
+    puzzleId: string;
+    /** True if the puzzle was just solved and bridges were baked (action = 'bake') */
+    wasSolved: boolean;
+    /** True if a previously-solved puzzle was un-solved and bridges were cleared (action = 'blank') */
+    wasUnsolved: boolean;
+}
+
+/**
  * Coordinates the lifecycle of overworld puzzle solving:
  * - Entering puzzle mode (camera transitions, renderer setup, HUD)
  * - Managing active puzzle state
@@ -253,23 +265,23 @@ export class OverworldPuzzleController {
      * 
      * @param success - Whether the puzzle was solved or cancelled
      * @param onModeChange - Callback when returning to exploration mode
-     * @returns Promise that resolves when puzzle exit is complete
+     * @returns Promise resolving with information about the puzzle exit action
      */
     public async exitPuzzle(
         success: boolean,
         onModeChange: (mode: 'exploration') => void,
         onBeforeTransition?: () => void
-    ): Promise<void> {
+    ): Promise<PuzzleExitResult> {
         // Guard against re-entrant calls (prevents infinite loop when puzzle is solved)
         if (this.isExitingPuzzle) {
             console.log('Already exiting puzzle, ignoring duplicate call');
-            return;
+            return { puzzleId: this.currentPuzzleId ?? '', wasSolved: false, wasUnsolved: false };
         }
 
         const activeData = this.gameState.getActivePuzzle();
         if (!activeData) {
             console.warn('No active puzzle to exit');
-            return;
+            return { puzzleId: '', wasSolved: false, wasUnsolved: false };
         }
 
         console.log(`OverworldPuzzleController: Exiting puzzle: ${activeData.id} (success: ${success})`);
@@ -379,6 +391,12 @@ export class OverworldPuzzleController {
             this.currentPuzzleId = undefined;
 
             console.log('Successfully exited puzzle');
+
+            return {
+                puzzleId: activeData.id,
+                wasSolved: action === 'bake',
+                wasUnsolved: action === 'blank'
+            };
 
         } catch (error) {
             console.error('Error exiting puzzle:', error);
