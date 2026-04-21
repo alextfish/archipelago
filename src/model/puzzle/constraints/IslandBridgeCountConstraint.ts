@@ -63,12 +63,25 @@ export class IslandBridgeCountConstraint extends Constraint {
         glyphMessage = "too-many bridge";
       }
 
+      // Extract optional disguise and conversation overrides stored on the island
+      const getIslandProp = (prefix: string): string | undefined =>
+        island.constraints?.find(c => c.startsWith(`${prefix}=`))?.substring(prefix.length + 1);
+
+      const disguiseSpriteKey = getIslandProp('disguise_sprite');
+      const disguiseSpriteSolvedKey = getIslandProp('disguise_sprite_solved');
+      const conversationFile = getIslandProp('conversation_file');
+      const conversationFileSolved = getIslandProp('conversation_file_solved');
+
       items.push({
         elementID: island.id,
         glyphMessage,
         constraintType: 'IslandBridgeCountConstraint',
         requiredCount: expected,
-        conversationVariables: { count: String(expected) }
+        conversationVariables: { count: String(expected) },
+        ...(disguiseSpriteKey !== undefined && { disguiseSpriteKey }),
+        ...(disguiseSpriteSolvedKey !== undefined && { disguiseSpriteSolvedKey }),
+        ...(conversationFile !== undefined && { conversationFile }),
+        ...(conversationFileSolved !== undefined && { conversationFileSolved }),
       });
     }
 

@@ -31,4 +31,29 @@ export interface ConstraintDisplayItem {
    * (e.g. `{ count: "2", direction: "above" }`).
    */
   conversationVariables?: Record<string, string>;
+  /**
+   * Optional texture key for the overworld NPC sprite when the puzzle is unsatisfied.
+   * When set, overrides the default sprite chosen by {@link getNPCSpriteKey}.
+   * The sprite image must be loaded under this key (the OverworldScene loads it from
+   * `resources/sprites/<disguiseSpriteKey>.png`).
+   */
+  disguiseSpriteKey?: string;
+  /**
+   * Optional texture key for the overworld NPC sprite when the puzzle is satisfied.
+   * Works together with {@link disguiseSpriteKey}: when the associated puzzle is solved the
+   * sprite flips to this texture, revealing the constraint's "true" identity.
+   */
+  disguiseSpriteSolvedKey?: string;
+  /**
+   * Optional per-island override for the unsatisfied conversation file
+   * (relative to `resources/conversations/`).  When set, takes precedence over
+   * `Constraint.conversationFile` for this specific island.
+   */
+  conversationFile?: string;
+  /**
+   * Optional per-island override for the satisfied conversation file
+   * (relative to `resources/conversations/`).  When set, takes precedence over
+   * `Constraint.conversationFileSolved` for this specific island.
+   */
+  conversationFileSolved?: string;
 }

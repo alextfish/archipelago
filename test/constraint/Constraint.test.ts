@@ -237,11 +237,20 @@ describe("IslandBridgeCountConstraint.getDisplayItems", () => {
     expect(items).toEqual([{ elementID: "A", glyphMessage: "too-many bridge", constraintType: "IslandBridgeCountConstraint", requiredCount: 1, conversationVariables: { count: "1" } }]);
   });
 
-  it("returns one item per constrained island with mixed satisfaction", () => {
+  it("propagates disguise sprite and conversation overrides when present on island", () => {
     const islands = [
-      { id: "A", x: 1, y: 1, constraints: ["num_bridges=1"] },
-      { id: "B", x: 3, y: 1, constraints: ["num_bridges=2"] },
-      { id: "C", x: 5, y: 1, constraints: [] },
+      {
+        id: "A",
+        x: 1,
+        y: 1,
+        constraints: [
+          "num_bridges=1",
+          "disguise_sprite=Cultist-1",
+          "disguise_sprite_solved=Cultist-1-Ruby",
+          "conversation_file=journalcave-bridgecount-unsatisfied.json",
+          "conversation_file_solved=journalcave-bridgecount-satisfied.json",
+        ],
+      },
     ];
     const bridges = [
       { id: "b1", start: { x: 1, y: 1 }, end: { x: 3, y: 1 }, type: { id: "t1" } },
@@ -255,9 +264,36 @@ describe("IslandBridgeCountConstraint.getDisplayItems", () => {
     const constraint = new IslandBridgeCountConstraint();
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toHaveLength(2);
-    expect(items).toContainEqual({ elementID: "A", glyphMessage: "good", constraintType: "IslandBridgeCountConstraint", requiredCount: 1, conversationVariables: { count: "1" } });
-    expect(items).toContainEqual({ elementID: "B", glyphMessage: "not-enough bridge", constraintType: "IslandBridgeCountConstraint", requiredCount: 2, conversationVariables: { count: "2" } });
+    expect(items).toHaveLength(1);
+    const item = items[0];
+    expect(item.disguiseSpriteKey).toBe("Cultist-1");
+    expect(item.disguiseSpriteSolvedKey).toBe("Cultist-1-Ruby");
+    expect(item.conversationFile).toBe("journalcave-bridgecount-unsatisfied.json");
+    expect(item.conversationFileSolved).toBe("journalcave-bridgecount-satisfied.json");
+  });
+
+  it("omits disguise fields when island has no disguise properties", () => {
+    const islands = [
+      { id: "A", x: 1, y: 1, constraints: ["num_bridges=1"] },
+    ];
+    const bridges = [
+      { id: "b1", start: { x: 1, y: 1 }, end: { x: 3, y: 1 }, type: { id: "t1" } },
+    ];
+    const puzzle = makeMockPuzzle({
+      islands,
+      bridges,
+      bridgesFromIsland: (island: any) => bridgesFromIsland(island, bridges),
+    });
+
+    const constraint = new IslandBridgeCountConstraint();
+    const items = constraint.getDisplayItems(puzzle as any);
+
+    expect(items).toHaveLength(1);
+    const item = items[0];
+    expect(item.disguiseSpriteKey).toBeUndefined();
+    expect(item.disguiseSpriteSolvedKey).toBeUndefined();
+    expect(item.conversationFile).toBeUndefined();
+    expect(item.conversationFileSolved).toBeUndefined();
   });
 });
 
