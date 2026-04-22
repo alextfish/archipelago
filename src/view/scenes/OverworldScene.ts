@@ -651,7 +651,13 @@ export class OverworldScene extends Phaser.Scene {
       for (let ly = 0; ly < puzzle.height; ly++) {
         for (let lx = 0; lx < puzzle.width; lx++) {
           const isBorder = lx === 0 || lx === puzzle.width - 1 || ly === 0 || ly === puzzle.height - 1;
-          if (isBorder && puzzle.getFlowSquare(lx, ly)) {
+          if (!isBorder) continue;
+          const fs = puzzle.getFlowSquare(lx, ly);
+          // Only include border tiles that have at least one outgoing flow direction.
+          // Decorative water tiles (no directions) must not act as channel endpoints —
+          // they would cause the flood-fill to terminate at a tile that cannot propagate
+          // water into the puzzle, masking the real entry point further along.
+          if (fs && (fs.outgoing ?? []).length > 0) {
             edgeTiles.push({
               x: lx,
               y: ly,

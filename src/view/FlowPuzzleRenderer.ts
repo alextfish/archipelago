@@ -34,6 +34,45 @@ export class FlowPuzzleRenderer extends EmbeddedPuzzleRenderer {
         this.tileVisualCallback = cb;
     }
 
+    /**
+     * Returns a Promise that resolves once all pending wave-animation timers have
+     * fired, capped at `maxMs` milliseconds.  If there are no pending timers the
+     * Promise resolves immediately.
+     *
+     * This lets callers (e.g. OverworldPuzzleController) wait for the visual
+     * propagation to finish before destroying the renderer, rather than cancelling
+     * the animation prematurely.
+     */
+    waitForAnimation(maxMs: number = 2000): Promise<void> {
+        if (this.pendingTimers.length === 0) {
+            return Promise.resolve();
+        }
+
+        return new Promise<void>((resolve) => {
+            let remaining = this.pendingTimers.length;
+            const onTimerComplete = () => {
+                remaining--;
+                if (remaining <= 0) resolve();
+            };
+
+            // Attach a completion callback to each pending timer.
+            // Phaser.Time.TimerEvent does not natively support chaining, so we
+            // wrap each callback by replacing its `callback` property while
+            // preserving the original fire.
+            for (const timer of this.pendingTimers) {
+                const original = timer.callback;
+                const scope = timer.callbackScope;
+                timer.callback = (...args: unknown[]) => {
+                    original.call(scope, ...args);
+                    onTimerComplete();
+                };
+            }
+
+            // Safety cap: resolve after maxMs even if some timers were removed.
+            this.scene.time.delayedCall(maxMs, resolve);
+        });
+    }
+
     // -------------------------------------------------------------------------
     // Overrides
     // -------------------------------------------------------------------------

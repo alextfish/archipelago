@@ -346,6 +346,19 @@ export class MapPuzzleExtractor {
                     obstacle: false,
                     pontoon: false
                 });
+
+                // Warn about border flow squares with no flow directions — these block
+                // edge-input propagation and are almost always a Tiled authoring error.
+                const isBorder = localX === 0 || localY === 0
+                    || localX === puzzleWidthInTiles - 1
+                    || localY === puzzleHeightInTiles - 1;
+                if (isBorder && outgoing.length === 0 && !props.source) {
+                    console.warn(
+                        `[FlowSquare] "${definition.id}" border tile at local (${localX},${localY}) ` +
+                        `world (${tx},${ty}) has GID ${gid} with NO flow directions — ` +
+                        `edge inputs here will not propagate into the puzzle`
+                    );
+                }
             }
         }
 
