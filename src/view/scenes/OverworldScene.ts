@@ -33,6 +33,14 @@ import { GridToWorldMapper } from '@view/GridToWorldMapper';
 import { getNPCSpriteKey, loadNPCSprites } from '@view/NPCSpriteHelper';
 import { Collectible } from '@model/overworld/Collectible';
 import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
+import type { PlayerStartPosition } from '@model/overworld/PlayerStartManager';
+
+/** X position of the translation-mode book icon (📖) in screen space. */
+const BOOK_ICON_X = 12;
+/** Width allowance for the book icon, so the warp button sits clear of it. */
+const BOOK_ICON_WIDTH = 40;
+/** Y position shared by the book icon and the warp button. */
+const TOP_BUTTON_Y = 12;
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -118,6 +126,11 @@ export class OverworldScene extends Phaser.Scene {
 
   // Player start position management
   private playerStartManager?: PlayerStartManager;
+
+  // Dev warp button
+  private warpButton?: Phaser.GameObjects.Text;
+  private warpDialog?: Phaser.GameObjects.Container;
+  private isWarpDialogOpen: boolean = false;
 
   // Active series tracking (for navigation)
   private currentSeries: any = null;
@@ -511,6 +524,9 @@ export class OverworldScene extends Phaser.Scene {
 
       // Launch Translation Mode overlay and connect to shared game-state services
       this.launchTranslationMode();
+
+      // Create dev warp button (top-left, right of the translation book icon)
+      this.createWarpButton();
 
     } catch (error) {
       console.error('Failed to initialize overworld puzzles:', error);
@@ -2225,6 +2241,11 @@ export class OverworldScene extends Phaser.Scene {
         return;
       }
 
+      // Ignore clicks when the warp dialog is open (let its own handlers deal with them)
+      if (this.isWarpDialogOpen) {
+        return;
+      }
+
       // Mark pointer as held
       this.isPointerHeld = true;
 
@@ -3035,5 +3056,128 @@ export class OverworldScene extends Phaser.Scene {
       tileX,
       tileY
     };
+  }
+
+  // === DEV WARP BUTTON ===
+
+  /**
+   * Create a fixed-camera ⚡ warp button at the top-left of the screen,
+   * positioned to the right of the translation-mode book icon (📖 is at x=12).
+   */
+  private createWarpButton(): void {
+    // Book icon sits at BOOK_ICON_X in TranslationModeScene; allow BOOK_ICON_WIDTH room so they
+    // do not overlap.  The button sits at screen-space coordinates, so it must have
+    // setScrollFactor(0) to stay fixed on screen as the camera moves.
+    this.warpButton = this.add.text(BOOK_ICON_X + BOOK_ICON_WIDTH, TOP_BUTTON_Y, '⚡', { fontSize: '28px' });
+    this.warpButton.setScrollFactor(0);
+    this.warpButton.setDepth(2000);
+    this.warpButton.setInteractive({ useHandCursor: true });
+    this.warpButton.on('pointerdown', () => {
+      if (this.isWarpDialogOpen) {
+        this.hideWarpDialog();
+      } else {
+        this.showWarpDialog();
+      }
+    });
+  }
+
+  /**
+   * Show a fixed-camera dialog listing all player-start positions.
+   * Clicking an entry teleports the player; clicking Cancel (or the ⚡ button
+   * again) closes the dialog without warping.
+   */
+  private showWarpDialog(): void {
+    if (!this.playerStartManager) return;
+
+    this.isWarpDialogOpen = true;
+
+    const starts = this.playerStartManager.getAllStarts();
+
+    const padding = 8;
+    const rowHeight = 32;
+    const dialogWidth = 180;
+    const dialogHeight = padding * 2 + (starts.length + 1) * rowHeight; // +1 for Cancel row
+
+    const dialogX = BOOK_ICON_X + BOOK_ICON_WIDTH; // Flush with left edge of the ⚡ button
+    const dialogY = TOP_BUTTON_Y + 36; // Below the warp button
+
+    const container = this.add.container(dialogX, dialogY);
+    container.setScrollFactor(0);
+    container.setDepth(2001);
+
+    // Background
+    const bg = this.add.rectangle(0, 0, dialogWidth, dialogHeight, 0x222244, 0.92);
+    bg.setOrigin(0, 0);
+    container.add(bg);
+
+    // Border
+    const border = this.add.rectangle(0, 0, dialogWidth, dialogHeight, 0x8888cc, 0);
+    border.setOrigin(0, 0);
+    border.setStrokeStyle(1, 0x8888cc, 1);
+    container.add(border);
+
+    // Title label
+    const title = this.add.text(padding, padding, 'Warp to…', {
+      fontSize: '14px',
+      color: '#aaaadd',
+    });
+    container.add(title);
+
+    // One button per player-start position
+    starts.forEach((start, index) => {
+      const y = padding + rowHeight * (index + 1);
+      const label = start.id || `start ${index + 1}`;
+      const btn = this.add.text(padding, y, label, {
+        fontSize: '16px',
+        color: '#ffffff',
+        backgroundColor: '#334466',
+        padding: { x: 6, y: 4 },
+      });
+      btn.setInteractive({ useHandCursor: true });
+      btn.on('pointerover', () => btn.setColor('#ffff88'));
+      btn.on('pointerout', () => btn.setColor('#ffffff'));
+      btn.on('pointerdown', () => {
+        this.hideWarpDialog();
+        this.warpToStart(start);
+      });
+      container.add(btn);
+    });
+
+    // Cancel button
+    const cancelY = padding + rowHeight * (starts.length + 1);
+    const cancelBtn = this.add.text(padding, cancelY, 'Cancel', {
+      fontSize: '16px',
+      color: '#ffaaaa',
+      backgroundColor: '#442222',
+      padding: { x: 6, y: 4 },
+    });
+    cancelBtn.setInteractive({ useHandCursor: true });
+    cancelBtn.on('pointerover', () => cancelBtn.setColor('#ff8888'));
+    cancelBtn.on('pointerout', () => cancelBtn.setColor('#ffaaaa'));
+    cancelBtn.on('pointerdown', () => this.hideWarpDialog());
+    container.add(cancelBtn);
+
+    this.warpDialog = container;
+  }
+
+  /** Hide and destroy the warp dialog. */
+  private hideWarpDialog(): void {
+    this.isWarpDialogOpen = false;
+    if (this.warpDialog) {
+      this.warpDialog.destroy();
+      this.warpDialog = undefined;
+    }
+  }
+
+  /**
+   * Teleport the player to a player-start position.
+   * Clears any tap-to-move target so the player does not continue walking
+   * after being warped.
+   */
+  private warpToStart(start: PlayerStartPosition): void {
+    if (!this.player) return;
+    this.player.setPosition(start.x, start.y);
+    this.playerController?.clearTargetPosition();
+    console.log(`[Warp] Teleported player to "${start.id}" at (${start.x}, ${start.y})`);
   }
 }
