@@ -34,13 +34,7 @@ import { getNPCSpriteKey, loadNPCSprites } from '@view/NPCSpriteHelper';
 import { Collectible } from '@model/overworld/Collectible';
 import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
 import type { PlayerStartPosition } from '@model/overworld/PlayerStartManager';
-
-/** X position of the translation-mode book icon (📖) in screen space. */
-const BOOK_ICON_X = 12;
-/** Width allowance for the book icon, so the warp button sits clear of it. */
-const BOOK_ICON_WIDTH = 40;
-/** Y position shared by the book icon and the warp button. */
-const TOP_BUTTON_Y = 12;
+import { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -53,6 +47,9 @@ export class OverworldScene extends Phaser.Scene {
   private collisionLayers: Phaser.Tilemaps.TilemapLayer[] = []; // All source collision layers from Tiled
   private bridgesLayer!: Phaser.Tilemaps.TilemapLayer;
   private collisionArray: number[][] = [];
+  /** Tiles that are permanently BLOCKED due to explicit Tiled collision-layer properties
+   * (collides=true / walkable=false). Water propagation must never change these. */
+  private permanentBlockedTiles: Set<string> = new Set();
   private gameMode: 'exploration' | 'conversation' | 'puzzle' = 'exploration';
   private isExitingPuzzle: boolean = false; // Guard to prevent re-entrant exit calls
   private isPointerHeld: boolean = false; // Track if pointer is held down for continuous movement
@@ -121,16 +118,12 @@ export class OverworldScene extends Phaser.Scene {
   // Collectible system
   private collectibles: Collectible[] = [];
   private collectibleSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
-  /** Fixed-to-camera jewel count display elements, keyed by jewel colour. */
-  private jewelHUDElements: Map<string, { sprite: Phaser.GameObjects.Image; text: Phaser.GameObjects.Text }> = new Map();
 
   // Player start position management
   private playerStartManager?: PlayerStartManager;
 
-  // Dev warp button
-  private warpButton?: Phaser.GameObjects.Text;
-  private warpDialog?: Phaser.GameObjects.Container;
-  private isWarpDialogOpen: boolean = false;
+  // Overworld HUD scene (book icon, warp button, jewel counts)
+  private overworldHUD?: OverworldHUDScene;
 
   // Active series tracking (for navigation)
   private currentSeries: any = null;
@@ -525,8 +518,12 @@ export class OverworldScene extends Phaser.Scene {
       // Launch Translation Mode overlay and connect to shared game-state services
       this.launchTranslationMode();
 
-      // Create dev warp button (top-left, right of the translation book icon)
-      this.createWarpButton();
+      // Launch the overworld HUD scene and wire it up with the services it needs
+      this.launchOverworldHUD();
+
+      // TODO: remove — temporary starting jewel to verify HUD visibility
+      this.gameState.collectJewel('green');
+      this.overworldHUD?.refreshJewelHUD();
 
     } catch (error) {
       console.error('Failed to initialize overworld puzzles:', error);
@@ -825,8 +822,11 @@ export class OverworldScene extends Phaser.Scene {
 
         // Always enforce the correct collision type — applyFlowWaterCollision may have
         // set this tile to BLOCKED even if the pontoon is already in the right visual state.
+        // Never override tiles that are permanently BLOCKED by Tiled collision-layer properties.
         const correctCollisionType = shouldBeHigh ? CollisionType.WALKABLE : CollisionType.WALKABLE_LOW;
-        this.setCollisionAt(tileX, tileY, correctCollisionType);
+        if (!this.isPermanentlyBlocked(tileX, tileY)) {
+          this.setCollisionAt(tileX, tileY, correctCollisionType);
+        }
 
         if (pontoon.isHigh === shouldBeHigh) continue; // already correct variant, no visual swap needed
 
@@ -943,6 +943,28 @@ export class OverworldScene extends Phaser.Scene {
       translationScene.setServices(
         this.gameState.glyphTracker,
         this.gameState.translationDictionary
+      );
+    }
+  }
+
+  /**
+   * Launch the OverworldHUD scene and wire it up with the services it needs.
+   * The HUD scene runs at zoom=1 so its screen-space coordinates are always
+   * pixel-accurate, regardless of the world camera zoom.
+   */
+  private launchOverworldHUD(): void {
+    if (!this.playerStartManager) return;
+
+    if (!this.scene.isActive('OverworldHUDScene')) {
+      this.scene.launch('OverworldHUDScene');
+    }
+    const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
+    if (hud) {
+      this.overworldHUD = hud;
+      hud.setServices(
+        this.playerStartManager,
+        (start) => this.warpToStart(start),
+        () => this.gameState.getOverworldDisplayItems(),
       );
     }
   }
@@ -1740,86 +1762,10 @@ export class OverworldScene extends Phaser.Scene {
     );
 
     // Update HUD
-    this.updateOverworldJewelHUD();
+    this.overworldHUD?.refreshJewelHUD();
 
     emitTestEvent('jewel_collected', { colour: collectible.colour, id: collectibleId });
     console.log(`Collected ${collectible.colour} jewel (id=${collectibleId}). Total: ${this.gameState.getJewelCount(collectible.colour)}`);
-  }
-
-  /**
-   * Refresh the exploration-mode jewel HUD in the top-right of the screen.
-   * Creates or updates one sprite + text element per jewel colour that the
-   * player has collected at least once.
-   */
-  private updateOverworldJewelHUD(): void {
-    const items = this.gameState.getOverworldDisplayItems();
-    const itemHeight = 28;
-    const marginRight = 8;
-    const marginTop = 8;
-
-    // Remove elements for colours that are no longer needed
-    const activeColours = new Set(items.map(i => i.colour));
-    for (const [colour, els] of this.jewelHUDElements) {
-      if (!activeColours.has(colour)) {
-        els.sprite.destroy();
-        els.text.destroy();
-        this.jewelHUDElements.delete(colour);
-      }
-    }
-
-    // Add / update elements
-    items.forEach((item, index) => {
-      const y = marginTop + index * itemHeight;
-      const colourMap: Record<string, number> = {
-        red: 0xff4444,
-        blue: 0x4444ff,
-        green: 0x44ff44,
-        yellow: 0xffff44,
-      };
-
-      if (!this.jewelHUDElements.has(item.colour)) {
-        // Create new HUD elements fixed to the camera
-        const spriteKey = `jewel-${item.colour}`;
-        const textX = this.scale.width - marginRight - 32 - 4;
-        const spriteX = this.scale.width - marginRight - 16;
-
-        let hudSprite: Phaser.GameObjects.Image;
-        if (this.textures.exists(spriteKey)) {
-          hudSprite = this.add.image(spriteX, y + 8, spriteKey);
-        } else {
-          // Fallback: coloured circle
-          const gfx = this.add.graphics();
-          gfx.fillStyle(colourMap[item.colour] ?? 0xffffff, 1);
-          gfx.fillCircle(spriteX, y + 8, 8);
-          gfx.setScrollFactor(0);
-          gfx.setDepth(2000);
-          // Create a transparent stand-in for the map key
-          hudSprite = this.add.image(spriteX, y + 8, '__DEFAULT').setVisible(false);
-        }
-
-        hudSprite.setScrollFactor(0);
-        hudSprite.setDepth(2000);
-
-        const hudText = this.add.text(textX, y, String(item.count), {
-          fontSize: '14px',
-          color: '#ffffff',
-        });
-        hudText.setScrollFactor(0);
-        hudText.setDepth(2000);
-        hudText.setOrigin(1, 0);
-
-        this.jewelHUDElements.set(item.colour, { sprite: hudSprite, text: hudText });
-      } else {
-        // Update existing element
-        const els = this.jewelHUDElements.get(item.colour)!;
-        els.text.setText(String(item.count));
-        // Reposition in case the order changed
-        const spriteX = this.scale.width - marginRight - 16;
-        const textX = this.scale.width - marginRight - 32 - 4;
-        els.sprite.setPosition(spriteX, y + 8);
-        els.text.setPosition(textX, y);
-      }
-    });
   }
 
   /**
@@ -2150,6 +2096,17 @@ export class OverworldScene extends Phaser.Scene {
 
     console.log(`Collision tiles: BLOCKED=${blockedCount}, WALKABLE=${walkableCount}, WALKABLE_LOW=${walkableLowCount}, STAIRS=${stairsCount}, ALWAYS_HIGH=${alwaysHighCount}`);
 
+    // Record tiles that are permanently BLOCKED by Tiled collision-layer properties.
+    // Water propagation must never override these, even if water flows beneath them.
+    this.permanentBlockedTiles.clear();
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        if (this.collisionArray[y][x] === CollisionType.BLOCKED) {
+          this.permanentBlockedTiles.add(`${x},${y}`);
+        }
+      }
+    }
+
     // Post-pass: apply pontoon collision, overriding whatever the main loop computed.
     // Pontoons are not on collision layers so their positions default to WALKABLE;
     // this pass enforces the correct type based on each tile's initial isHigh state.
@@ -2212,6 +2169,15 @@ export class OverworldScene extends Phaser.Scene {
     this.collisionArray[tileY][tileX] = collisionType;
   }
 
+  /**
+   * Returns true if this tile was statically marked as BLOCKED by Tiled collision-layer
+   * properties (collides=true / walkable=false) at map-load time.
+   * Water propagation and pontoon logic must never change these tiles.
+   */
+  public isPermanentlyBlocked(tileX: number, tileY: number): boolean {
+    return this.permanentBlockedTiles.has(`${tileX},${tileY}`);
+  }
+
   // === OVERWORLD PUZZLE METHODS ===
 
   /**
@@ -2248,7 +2214,7 @@ export class OverworldScene extends Phaser.Scene {
       }
 
       // Ignore clicks when the warp dialog is open (let its own handlers deal with them)
-      if (this.isWarpDialogOpen) {
+      if (this.overworldHUD?.isWarpDialogOpen()) {
         return;
       }
 
@@ -3067,121 +3033,9 @@ export class OverworldScene extends Phaser.Scene {
     };
   }
 
-  // === DEV WARP BUTTON ===
-
-  /**
-   * Create a fixed-camera ⚡ warp button at the top-left of the screen,
-   * positioned to the right of the translation-mode book icon (📖 is at x=12).
-   */
-  private createWarpButton(): void {
-    // Book icon sits at BOOK_ICON_X in TranslationModeScene; allow BOOK_ICON_WIDTH room so they
-    // do not overlap.  The button sits at screen-space coordinates, so it must have
-    // setScrollFactor(0) to stay fixed on screen as the camera moves.
-    this.warpButton = this.add.text(BOOK_ICON_X + BOOK_ICON_WIDTH, TOP_BUTTON_Y, '⚡', { fontSize: '28px' });
-    this.warpButton.setScrollFactor(0);
-    this.warpButton.setDepth(2000);
-    this.warpButton.setInteractive({ useHandCursor: true });
-    this.warpButton.on('pointerdown', () => {
-      if (this.isWarpDialogOpen) {
-        this.hideWarpDialog();
-      } else {
-        this.showWarpDialog();
-      }
-    });
-  }
-
-  /**
-   * Show a fixed-camera dialog listing all player-start positions.
-   * Clicking an entry teleports the player; clicking Cancel (or the ⚡ button
-   * again) closes the dialog without warping.
-   */
-  private showWarpDialog(): void {
-    if (!this.playerStartManager) return;
-
-    this.isWarpDialogOpen = true;
-
-    const starts = this.playerStartManager.getAllStarts();
-
-    const padding = 8;
-    const rowHeight = 32;
-    const dialogWidth = 180;
-    const dialogHeight = padding * 2 + (starts.length + 1) * rowHeight; // +1 for Cancel row
-
-    const dialogX = BOOK_ICON_X + BOOK_ICON_WIDTH; // Flush with left edge of the ⚡ button
-    const dialogY = TOP_BUTTON_Y + 36; // Below the warp button
-
-    const container = this.add.container(dialogX, dialogY);
-    container.setScrollFactor(0);
-    container.setDepth(2001);
-
-    // Background
-    const bg = this.add.rectangle(0, 0, dialogWidth, dialogHeight, 0x222244, 0.92);
-    bg.setOrigin(0, 0);
-    container.add(bg);
-
-    // Border
-    const border = this.add.rectangle(0, 0, dialogWidth, dialogHeight, 0x8888cc, 0);
-    border.setOrigin(0, 0);
-    border.setStrokeStyle(1, 0x8888cc, 1);
-    container.add(border);
-
-    // Title label
-    const title = this.add.text(padding, padding, 'Warp to…', {
-      fontSize: '14px',
-      color: '#aaaadd',
-    });
-    container.add(title);
-
-    // One button per player-start position
-    starts.forEach((start, index) => {
-      const y = padding + rowHeight * (index + 1);
-      const label = start.id || `start ${index + 1}`;
-      const btn = this.add.text(padding, y, label, {
-        fontSize: '16px',
-        color: '#ffffff',
-        backgroundColor: '#334466',
-        padding: { x: 6, y: 4 },
-      });
-      btn.setInteractive({ useHandCursor: true });
-      btn.on('pointerover', () => btn.setColor('#ffff88'));
-      btn.on('pointerout', () => btn.setColor('#ffffff'));
-      btn.on('pointerdown', () => {
-        this.hideWarpDialog();
-        this.warpToStart(start);
-      });
-      container.add(btn);
-    });
-
-    // Cancel button
-    const cancelY = padding + rowHeight * (starts.length + 1);
-    const cancelBtn = this.add.text(padding, cancelY, 'Cancel', {
-      fontSize: '16px',
-      color: '#ffaaaa',
-      backgroundColor: '#442222',
-      padding: { x: 6, y: 4 },
-    });
-    cancelBtn.setInteractive({ useHandCursor: true });
-    cancelBtn.on('pointerover', () => cancelBtn.setColor('#ff8888'));
-    cancelBtn.on('pointerout', () => cancelBtn.setColor('#ffaaaa'));
-    cancelBtn.on('pointerdown', () => this.hideWarpDialog());
-    container.add(cancelBtn);
-
-    this.warpDialog = container;
-  }
-
-  /** Hide and destroy the warp dialog. */
-  private hideWarpDialog(): void {
-    this.isWarpDialogOpen = false;
-    if (this.warpDialog) {
-      this.warpDialog.destroy();
-      this.warpDialog = undefined;
-    }
-  }
-
   /**
    * Teleport the player to a player-start position.
-   * Clears any tap-to-move target so the player does not continue walking
-   * after being warped.
+   * Called via callback from OverworldHUDScene when the player picks a warp destination.
    */
   private warpToStart(start: PlayerStartPosition): void {
     if (!this.player) return;

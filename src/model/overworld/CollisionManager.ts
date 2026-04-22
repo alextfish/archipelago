@@ -247,7 +247,9 @@ export class CollisionManager {
     resetFlowTilesToWalkableLow(flowTiles: ReadonlyArray<{ tileX: number; tileY: number }>): void {
         for (const { tileX, tileY } of flowTiles) {
             const current = this.overworldScene.getCollisionAt(tileX, tileY);
-            if (current !== CollisionType.ALWAYS_HIGH && current !== CollisionType.STAIRS) {
+            if (current !== CollisionType.ALWAYS_HIGH &&
+                current !== CollisionType.STAIRS &&
+                !this.overworldScene.isPermanentlyBlocked(tileX, tileY)) {
                 this.overworldScene.setCollisionAt(tileX, tileY, CollisionType.WALKABLE_LOW);
             }
         }
