@@ -243,7 +243,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     return { size: cells.length, isEnclosed, cells };
   }
 
-  override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+  protected override getCoreDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
     const result = this.check(puzzle);
     // check() always sets glyphMessage for violations; fallback matches the most common failure case
     return [{
