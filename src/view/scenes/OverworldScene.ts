@@ -33,6 +33,14 @@ import { GridToWorldMapper } from '@view/GridToWorldMapper';
 import { getNPCSpriteKey, loadNPCSprites } from '@view/NPCSpriteHelper';
 import { Collectible } from '@model/overworld/Collectible';
 import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
+import type { PlayerStartPosition } from '@model/overworld/PlayerStartManager';
+
+/** X position of the translation-mode book icon (📖) in screen space. */
+const BOOK_ICON_X = 12;
+/** Width allowance for the book icon, so the warp button sits clear of it. */
+const BOOK_ICON_WIDTH = 40;
+/** Y position shared by the book icon and the warp button. */
+const TOP_BUTTON_Y = 12;
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -3057,10 +3065,10 @@ export class OverworldScene extends Phaser.Scene {
    * positioned to the right of the translation-mode book icon (📖 is at x=12).
    */
   private createWarpButton(): void {
-    // Book icon sits at x=12 in TranslationModeScene; allow enough room (≈44px) so they
+    // Book icon sits at BOOK_ICON_X in TranslationModeScene; allow BOOK_ICON_WIDTH room so they
     // do not overlap.  The button sits at screen-space coordinates, so it must have
     // setScrollFactor(0) to stay fixed on screen as the camera moves.
-    this.warpButton = this.add.text(52, 12, '⚡', { fontSize: '28px' });
+    this.warpButton = this.add.text(BOOK_ICON_X + BOOK_ICON_WIDTH, TOP_BUTTON_Y, '⚡', { fontSize: '28px' });
     this.warpButton.setScrollFactor(0);
     this.warpButton.setDepth(2000);
     this.warpButton.setInteractive({ useHandCursor: true });
@@ -3090,8 +3098,8 @@ export class OverworldScene extends Phaser.Scene {
     const dialogWidth = 180;
     const dialogHeight = padding * 2 + (starts.length + 1) * rowHeight; // +1 for Cancel row
 
-    const dialogX = 48; // Flush with left edge of the ⚡ button
-    const dialogY = 48; // Below the warp button
+    const dialogX = BOOK_ICON_X + BOOK_ICON_WIDTH; // Flush with left edge of the ⚡ button
+    const dialogY = TOP_BUTTON_Y + 36; // Below the warp button
 
     const container = this.add.container(dialogX, dialogY);
     container.setScrollFactor(0);
@@ -3166,7 +3174,7 @@ export class OverworldScene extends Phaser.Scene {
    * Clears any tap-to-move target so the player does not continue walking
    * after being warped.
    */
-  private warpToStart(start: import('@model/overworld/PlayerStartManager').PlayerStartPosition): void {
+  private warpToStart(start: PlayerStartPosition): void {
     if (!this.player) return;
     this.player.setPosition(start.x, start.y);
     this.playerController?.clearTargetPosition();
