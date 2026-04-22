@@ -162,6 +162,7 @@ export class PlayerController {
      * - WALKABLE     → 'upper'
      * - WALKABLE_LOW → 'lower'
      * - STAIRS       → 'stairs'
+     * - ALWAYS_HIGH  → 'upper'
      * - BLOCKED / unknown → keep current layer
      */
     private updatePlayerLayerFromTile(): void {
@@ -179,12 +180,14 @@ export class PlayerController {
             this.playerLayer = 'lower';
         } else if (currentType === CollisionType.STAIRS) {
             this.playerLayer = 'stairs';
+        } else if (currentType === CollisionType.ALWAYS_HIGH) {
+            this.playerLayer = 'upper';
         }
         // BLOCKED or unknown: leave playerLayer unchanged
 
         if (isTestMode()) {
             if (this.playerLayer !== previousLayer) {
-                const typeNames: Record<number, string> = { 0: 'BLOCKED', 1: 'WALKABLE', 2: 'WALKABLE_LOW', 3: 'STAIRS' };
+                const typeNames: Record<number, string> = { 0: 'BLOCKED', 1: 'WALKABLE', 2: 'WALKABLE_LOW', 3: 'STAIRS', 4: 'ALWAYS_HIGH' };
                 console.log(`[PlayerLayer] ${previousLayer} -> ${this.playerLayer} (tile ${tileX},${tileY} type=${typeNames[currentType] ?? currentType})`);
             }
             this.updateLayerDebugDisplay(tileX, tileY);
@@ -412,6 +415,8 @@ export class PlayerController {
                 this.playerLayer = 'lower';
             } else if (targetType === CollisionType.STAIRS) {
                 this.playerLayer = 'stairs';
+            } else if (targetType === CollisionType.ALWAYS_HIGH) {
+                this.playerLayer = 'upper';
             }
             return true;
         }
@@ -431,7 +436,10 @@ export class PlayerController {
         if (to === CollisionType.BLOCKED) return false;
         if (to === CollisionType.STAIRS) return true;
         if (from === CollisionType.STAIRS) return true;
-        return from === to;
+        // ALWAYS_HIGH is upper-ground, so treat it as WALKABLE for layer-matching.
+        const normFrom = from === CollisionType.ALWAYS_HIGH ? CollisionType.WALKABLE : from;
+        const normTo = to === CollisionType.ALWAYS_HIGH ? CollisionType.WALKABLE : to;
+        return normFrom === normTo;
     }
 
     /**
@@ -476,6 +484,30 @@ export class PlayerController {
             } else {
                 this.player.anims.play('idle-down', true);
             }
+        }
+    }
+
+    /**
+     * Clear the tap-to-move target and snap the player to their idle animation.
+     * Call this when an external system (e.g. conversation) takes over from movement.
+     */
+    stopAndIdle(): void {
+        this.clearTargetPosition();
+        this.moveX = 0;
+        this.moveY = 0;
+        if (this.player.anims.currentAnim) {
+            const currentAnim = this.player.anims.currentAnim.key;
+            if (currentAnim.includes('up')) {
+                this.player.anims.play('idle-up', true);
+            } else if (currentAnim.includes('left')) {
+                this.player.anims.play('idle-left', true);
+            } else if (currentAnim.includes('right')) {
+                this.player.anims.play('idle-right', true);
+            } else {
+                this.player.anims.play('idle-down', true);
+            }
+        } else {
+            this.player.anims.play('idle-down', true);
         }
     }
 

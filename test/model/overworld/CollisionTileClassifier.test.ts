@@ -86,6 +86,37 @@ describe('CollisionTileClassifier', () => {
             ]);
             expect(result.collisionType).toBe(CollisionType.STAIRS);
         });
+
+        it('returns ALWAYS_HIGH when a tile has alwaysHigh=true', () => {
+            const result = CollisionTileClassifier.classifyTile([{ properties: { alwaysHigh: true } }]);
+            expect(result.collisionType).toBe(CollisionType.ALWAYS_HIGH);
+            expect(result.hasTile).toBe(true);
+        });
+
+        it('ALWAYS_HIGH takes priority over walkable and walkable_low', () => {
+            const result = CollisionTileClassifier.classifyTile([
+                { properties: { walkable_low: true } },
+                { properties: { alwaysHigh: true } },
+                { properties: { walkable: true } },
+            ]);
+            expect(result.collisionType).toBe(CollisionType.ALWAYS_HIGH);
+        });
+
+        it('STAIRS takes priority over alwaysHigh', () => {
+            const result = CollisionTileClassifier.classifyTile([
+                { properties: { alwaysHigh: true } },
+                { properties: { stairs: true } },
+            ]);
+            expect(result.collisionType).toBe(CollisionType.STAIRS);
+        });
+
+        it('ALWAYS_HIGH is preserved when a later tile has no walkable properties', () => {
+            const result = CollisionTileClassifier.classifyTile([
+                { properties: { alwaysHigh: true } },
+                {},
+            ]);
+            expect(result.collisionType).toBe(CollisionType.ALWAYS_HIGH);
+        });
     });
 
     describe('toSubLayerValues', () => {
@@ -138,6 +169,16 @@ describe('CollisionTileClassifier', () => {
             });
             expect(result).toEqual({ upperGround: 0, lowerGround: 0, blocked: 1 });
         });
+
+        it('returns upperGround=1 for ALWAYS_HIGH (blocks player on lower layer, immune to water)', () => {
+            const result = CollisionTileClassifier.toSubLayerValues({
+                collisionType: CollisionType.ALWAYS_HIGH,
+                hasWalkable: false,
+                hasWalkableLow: false,
+                hasTile: true
+            });
+            expect(result).toEqual({ upperGround: 1, lowerGround: 0, blocked: 0 });
+        });
     });
 
     describe('classifyTile + toSubLayerValues round-trip', () => {
@@ -169,6 +210,12 @@ describe('CollisionTileClassifier', () => {
             const classification = CollisionTileClassifier.classifyTile([{ properties: { stairs: true } }]);
             const subLayers = CollisionTileClassifier.toSubLayerValues(classification);
             expect(subLayers).toEqual({ upperGround: 0, lowerGround: 0, blocked: 0 });
+        });
+
+        it('alwaysHigh tile → upperGround sub-layer', () => {
+            const classification = CollisionTileClassifier.classifyTile([{ properties: { alwaysHigh: true } }]);
+            const subLayers = CollisionTileClassifier.toSubLayerValues(classification);
+            expect(subLayers).toEqual({ upperGround: 1, lowerGround: 0, blocked: 0 });
         });
     });
 });

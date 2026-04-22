@@ -217,9 +217,9 @@ export class OverworldScene extends Phaser.Scene {
     // lets loadCollectibles() and updateOverworldJewelHUD() use the per-colour
     // key without needing to know the raw frame offset.
     const JEWEL_FRAME_CONFIG = { frameWidth: 16, frameHeight: 16 };
-    this.load.spritesheet('jewel-red',    'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 0,  endFrame: 2  });
-    this.load.spritesheet('jewel-green',  'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 4,  endFrame: 6  });
-    this.load.spritesheet('jewel-blue',   'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 8,  endFrame: 10 });
+    this.load.spritesheet('jewel-red', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 0, endFrame: 2 });
+    this.load.spritesheet('jewel-green', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 4, endFrame: 6 });
+    this.load.spritesheet('jewel-blue', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 8, endFrame: 10 });
     this.load.spritesheet('jewel-yellow', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 12, endFrame: 14 });
 
     // Load TMX file asynchronously, then load embedded tilesets
@@ -909,8 +909,12 @@ export class OverworldScene extends Phaser.Scene {
 
     // Pontoon at this position (if any): always enforce correct collision and swap
     // visual variant when the high/low state has changed.
+    // Skip pontoons on ALWAYS_HIGH or STAIRS tiles — they are immune to flow water overrides.
     const pontoon = this.pontoonTiles.get(key);
-    if (pontoon) {
+    const pontoonCollision = pontoon ? this.getCollisionAt(pontoon.tileX, pontoon.tileY) : undefined;
+    if (pontoon &&
+      pontoonCollision !== CollisionType.ALWAYS_HIGH &&
+      pontoonCollision !== CollisionType.STAIRS) {
       const correctCollision = hasWater ? CollisionType.WALKABLE : CollisionType.WALKABLE_LOW;
       this.setCollisionAt(tileX, tileY, correctCollision);
       if (pontoon.isHigh !== hasWater) {
@@ -2131,6 +2135,7 @@ export class OverworldScene extends Phaser.Scene {
     let walkableCount = 0;
     let walkableLowCount = 0;
     let stairsCount = 0;
+    let alwaysHighCount = 0;
 
     for (let y = 0; y < mapHeight; y++) {
       for (let x = 0; x < mapWidth; x++) {
@@ -2139,10 +2144,11 @@ export class OverworldScene extends Phaser.Scene {
         else if (type === CollisionType.WALKABLE) walkableCount++;
         else if (type === CollisionType.WALKABLE_LOW) walkableLowCount++;
         else if (type === CollisionType.STAIRS) stairsCount++;
+        else if (type === CollisionType.ALWAYS_HIGH) alwaysHighCount++;
       }
     }
 
-    console.log(`Collision tiles: BLOCKED=${blockedCount}, WALKABLE=${walkableCount}, WALKABLE_LOW=${walkableLowCount}, STAIRS=${stairsCount}`);
+    console.log(`Collision tiles: BLOCKED=${blockedCount}, WALKABLE=${walkableCount}, WALKABLE_LOW=${walkableLowCount}, STAIRS=${stairsCount}, ALWAYS_HIGH=${alwaysHighCount}`);
 
     // Post-pass: apply pontoon collision, overriding whatever the main loop computed.
     // Pontoons are not on collision layers so their positions default to WALKABLE;
@@ -2421,6 +2427,8 @@ export class OverworldScene extends Phaser.Scene {
 
       // Switch to conversation mode
       this.gameMode = 'conversation';
+      this.interactionCursor?.hide();
+      this.playerController?.stopAndIdle();
       console.log(`Switching to conversation mode with NPC: ${npc.name} (solved: ${useSolvedConversation}, startNode: ${startNodeId})`);
 
       // Get conversation scene
@@ -2753,6 +2761,7 @@ export class OverworldScene extends Phaser.Scene {
 
       // Disable player movement
       if (this.playerController) {
+        this.playerController.stopAndIdle();
         this.playerController.setEnabled(false);
       }
 
