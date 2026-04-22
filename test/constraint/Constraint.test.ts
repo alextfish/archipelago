@@ -266,6 +266,13 @@ describe("IslandBridgeCountConstraint.getDisplayItems", () => {
 
     expect(items).toHaveLength(1);
     const item = items[0];
+    // Core constraint properties must still be present
+    expect(item.elementID).toBe("A");
+    expect(item.glyphMessage).toBe("good");
+    expect(item.constraintType).toBe("IslandBridgeCountConstraint");
+    expect(item.requiredCount).toBe(1);
+    expect(item.conversationVariables).toEqual({ count: "1" });
+    // Disguise properties enriched from island constraint strings
     expect(item.disguiseSpriteKey).toBe("Cultist-1");
     expect(item.disguiseSpriteSolvedKey).toBe("Cultist-1-Ruby");
     expect(item.conversationFile).toBe("journalcave-bridgecount-unsatisfied.json");
