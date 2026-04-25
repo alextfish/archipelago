@@ -528,6 +528,20 @@ export class MapPuzzleExtractor {
             console.log(`Auto-added IslandDirectionalBridgeConstraint(${constraintType}) for island ${island.id} in puzzle ${definition.id}`);
         }
 
+        // Auto-add one IslandVisibilityConstraint per island that has num_visible=
+        for (const island of islands) {
+            const rule = island.constraints?.find(c => c.startsWith('num_visible='));
+            if (!rule) continue;
+            const count = parseInt(rule.split('=')[1]);
+            if (!isNaN(count)) {
+                constraints.push({
+                    type: 'IslandVisibilityConstraint',
+                    params: { islandId: island.id, count }
+                });
+                console.log(`Auto-added IslandVisibilityConstraint(${count}) for island ${island.id} in puzzle ${definition.id}`);
+            }
+        }
+
         // Add cell-level constraints (MustHaveWater, EnclosedAreaSize) from Tiled objects
         constraints.push(...this.extractCellConstraintsFromObjects(definition, tiledMap));
 
@@ -883,6 +897,15 @@ export class MapPuzzleExtractor {
                 if (props.directional_constraint) {
                     constraints.push(`directional_constraint=${props.directional_constraint}`);
                     console.log(`Applied directional_constraint=${props.directional_constraint} constraint to island ${island.id}`);
+                }
+
+                // Check for num_visible property
+                if (props.num_visible) {
+                    const numVisible = parseInt(props.num_visible);
+                    if (!isNaN(numVisible)) {
+                        constraints.push(`num_visible=${numVisible}`);
+                        console.log(`Applied num_visible=${numVisible} constraint to island ${island.id}`);
+                    }
                 }
 
                 // Add constraints to island

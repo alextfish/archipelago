@@ -161,6 +161,7 @@ export class IslandVisibilityConstraint extends Constraint {
       elementID: this.islandId,
       glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "good"),
       constraintType: 'IslandVisibilityConstraint',
+      requiredCount: this.expectedCount,
     }];
   }
 }

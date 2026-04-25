@@ -70,6 +70,14 @@ export class OverworldHUDScene extends Phaser.Scene {
             this.toggleTranslation();
         });
 
+        // Escape closes translation mode (but does not open it)
+        this.input.keyboard?.on('keydown-ESC', () => {
+            const translationScene = this.scene.get('TranslationModeScene') as any;
+            if (translationScene?.overlay?.visible) {
+                translationScene.deactivate();
+            }
+        });
+
         // Warp button – sits immediately right of the book icon
         const warpButton = this.add.text(BOOK_ICON_X + BOOK_ICON_WIDTH, TOP_BUTTON_Y, '⚡', { fontSize: '28px' });
         warpButton.setDepth(200);
