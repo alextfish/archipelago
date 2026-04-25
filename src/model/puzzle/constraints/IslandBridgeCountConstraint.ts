@@ -44,7 +44,7 @@ export class IslandBridgeCountConstraint extends Constraint {
     };
   }
 
-  override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+  protected override getCoreDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
     const items: ConstraintDisplayItem[] = [];
 
     for (const island of puzzle.islands) {
@@ -68,7 +68,7 @@ export class IslandBridgeCountConstraint extends Constraint {
         glyphMessage,
         constraintType: 'IslandBridgeCountConstraint',
         requiredCount: expected,
-        conversationVariables: { count: String(expected) }
+        conversationVariables: { count: String(expected) },
       });
     }
 
