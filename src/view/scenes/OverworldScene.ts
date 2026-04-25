@@ -209,11 +209,11 @@ export class OverworldScene extends Phaser.Scene {
     // frame, frame 0 of 'jewel-green' is the first green frame, etc.  This
     // lets loadCollectibles() and updateOverworldJewelHUD() use the per-colour
     // key without needing to know the raw frame offset.
-    const JEWEL_FRAME_CONFIG = { frameWidth: 16, frameHeight: 16 };
-    this.load.spritesheet('jewel-red', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 0, endFrame: 2 });
-    this.load.spritesheet('jewel-green', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 4, endFrame: 6 });
-    this.load.spritesheet('jewel-blue', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 8, endFrame: 10 });
-    this.load.spritesheet('jewel-yellow', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 12, endFrame: 14 });
+    const JEWEL_FRAME_CONFIG = { frameWidth: 32, frameHeight: 32 };
+    this.load.spritesheet('jewel-red', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 0, endFrame: 3 });
+    this.load.spritesheet('jewel-green', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 4, endFrame: 7 });
+    this.load.spritesheet('jewel-blue', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 8, endFrame: 11 });
+    this.load.spritesheet('jewel-yellow', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 12, endFrame: 15 });
 
     // Load TMX file asynchronously, then load embedded tilesets
     this.loadTmxFile();
@@ -433,7 +433,7 @@ export class OverworldScene extends Phaser.Scene {
       if (!this.textures.exists(textureKey)) continue;
       this.anims.create({
         key: `${textureKey}-anim`,
-        frames: this.anims.generateFrameNumbers(textureKey, { start: 0, end: 2 }),
+        frames: this.anims.generateFrameNumbers(textureKey, { start: 0, end: 3 }),
         frameRate: 5, // 200 ms per frame
         repeat: -1,
       });
@@ -1847,6 +1847,14 @@ export class OverworldScene extends Phaser.Scene {
         // Try to create this layer
         const layer = this.map.createLayer(layerName, tilesets);
         if (layer) {
+          // Layers with the custom property renderAbovePlayer=true render above
+          // the player and NPCs (e.g. tree canopies, overhangs).
+          const abovePlayerProp = layerData.properties && Array.isArray(layerData.properties)
+            ? layerData.properties.find((prop: any) => prop.name === 'renderAbovePlayer')
+            : undefined;
+          if (abovePlayerProp != null && (abovePlayerProp as any).value === true) {
+            layer.setDepth(10);
+          }
           console.log(`Visual layer "${layerName}" created successfully`);
         } else {
           console.warn(`Failed to create visual layer "${layerName}"`);
