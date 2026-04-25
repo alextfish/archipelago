@@ -33,8 +33,8 @@ export class PhaserPuzzleRenderer extends BasePuzzleRenderer {
       });
 
       this.islandGraphics.set(island.id, sprite);
-      this.createConstraintNPCForIsland(island);
     }
+    this.createConstraintNPCsFromPuzzleConstraints(puzzle);
   }
 
   screenToGrid(screenX: number, screenY: number): Point {

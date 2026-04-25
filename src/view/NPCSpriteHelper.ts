@@ -3,6 +3,13 @@ import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import { StrutBridge } from '@model/puzzle/StrutBridge';
 import type { GridToWorldMapper } from './GridToWorldMapper';
 
+/** Frame indices for the on-map 32×32 NPC expression spritesheet convention. */
+export const NPC_FRAME = {
+    NEUTRAL: 0,
+    FROWN: 1,
+    HAPPY: 2,
+} as const;
+
 /**
  * Returns the base sprite key (texture atlas key) to use for the NPC that
  * represents a given constraint type.
@@ -14,13 +21,15 @@ export function getNPCSpriteKey(constraintType: string | undefined): string {
         case 'IslandBridgeCountConstraint':
             return 'Ruby';
         case 'IslandPassingBridgeCountConstraint':
-            return 'Pirate';
+            return 'Pirate-M';
+        case 'IslandVisibilityConstraint':
+            return 'Pirate-F';
         case 'BridgeMustCoverIslandConstraint':
             return 'sailorNS';
         case 'MustHaveWaterConstraint':
             return 'Fisherman';
         case 'IslandDirectionalBridgeConstraint':
-            return 'Pirate';
+            return 'Pirate-M';
         case 'EnclosedAreaSizeConstraint':
             return 'Farmer';
         default:
@@ -31,67 +40,31 @@ export function getNPCSpriteKey(constraintType: string | undefined): string {
 /**
  * Load all NPC sprites (expressions, faces, and characters) into the Phaser loader.
  * Call this from a scene's preload() method.
+ *
+ * All on-map 32×32 character sprites use the convention: a single PNG
+ * spritesheet with three frames — frame 0 = neutral, frame 1 = frown, frame 2 = happy.
  */
 export function loadNPCSprites(loader: Phaser.Loader.LoaderPlugin): void {
-    // sailorNS expressions
-    loader.image('sailorNS happy', 'resources/sprites/sailorNS happy.png');
-    loader.image('sailorNS frown', 'resources/sprites/sailorNS frown.png');
+    const sheet = (key: string, path: string) =>
+        loader.spritesheet(key, path, { frameWidth: 32, frameHeight: 32 });
 
-    // sailorEW expressions
-    loader.image('sailorEW happy', 'resources/sprites/sailorEW happy.png');
-    loader.image('sailorEW sad', 'resources/sprites/sailorEW sad.png');
+    // Overworld and constraint NPCs
+    sheet('sailorNS', 'resources/sprites/sailorNS.png');
+    sheet('sailorEW', 'resources/sprites/sailorEW.png');
+    sheet('Ruby', 'resources/sprites/Ruby.png');
+    sheet('Fisherman', 'resources/sprites/Evan.png');   // Evan — MustHaveWaterConstraint
+    sheet('Farmer', 'resources/sprites/Yan.png');    // Yan — EnclosedAreaSizeConstraint
+    sheet('Pirate-M', 'resources/sprites/Pirate-M.png'); // IslandPassingBridgeCountConstraint, IslandDirectionalBridgeConstraint
+    sheet('Pirate-F', 'resources/sprites/Pirate-F.png'); // IslandVisibilityConstraint
+    sheet('Lyuba', 'resources/sprites/Lyuba.png');
 
-    // Ruby
-    loader.image('Ruby happy', 'resources/sprites/Ruby happy.png');
-    loader.image('Ruby frown', 'resources/sprites/Ruby frown.png');
-    loader.image('Ruby neutral', 'resources/sprites/Ruby neutral.png');
-    loader.spritesheet('Ruby', 'resources/sprites/Ruby neutral.png', {
-        frameWidth: 32,
-        frameHeight: 32
-    });
-
-    // Evan — used for MustHaveWaterConstraint (Fisherman)
-    loader.spritesheet('Fisherman', 'resources/sprites/Evan neutral.png', {
-        frameWidth: 32,
-        frameHeight: 32
-    });
-    loader.image('Fisherman happy', 'resources/sprites/Evan happy.png');
-    loader.image('Fisherman frown', 'resources/sprites/Evan frown.png');
-    loader.image('Fisherman neutral', 'resources/sprites/Evan neutral.png');
-
-    // yan — used for EnclosedAreaSizeConstraint (Farmer)
-    loader.spritesheet('Farmer', 'resources/sprites/yan neutral.png', {
-        frameWidth: 32,
-        frameHeight: 32
-    });
-    loader.image('Farmer happy', 'resources/sprites/yan happy.png');
-    loader.image('Farmer frown', 'resources/sprites/yan frown.png');
-    loader.image('Farmer neutral', 'resources/sprites/yan neutral.png');
-
-    // Pirate — used for IslandDirectionalBridgeConstraint and IslandPassingBridgeCountConstraint
-    loader.spritesheet('Pirate', 'resources/sprites/Pirate neutral.png', {
-        frameWidth: 32,
-        frameHeight: 32
-    });
-    loader.image('Pirate happy', 'resources/sprites/Pirate happy.png');
-    loader.image('Pirate frown', 'resources/sprites/Pirate frown.png');
-    loader.image('Pirate neutral', 'resources/sprites/Pirate neutral.png');
+    loader.image('LyubaCleric', 'resources/sprites/LyubaCleric.png');
 
     // Compass overlay spritesheet — four frames: north (0), east (1), south (2), west (3)
     loader.spritesheet('compass overlay', 'resources/sprites/compass_overlay.png', {
         frameWidth: 32,
         frameHeight: 32
     });
-
-    // Lyuba
-    loader.spritesheet('Lyuba', 'resources/sprites/Lyuba neutral.png', {
-        frameWidth: 32,
-        frameHeight: 32
-    });
-    loader.image('Lyuba happy', 'resources/sprites/Lyuba happy.png');
-    loader.image('Lyuba frown', 'resources/sprites/Lyuba frown.png');
-    loader.image('Lyuba neutral', 'resources/sprites/Lyuba neutral.png');
-    loader.image('LyubaCleric', 'resources/sprites/LyubaCleric.png');
 
     // Background characters
     loader.image('Mage1', 'resources/sprites/Mage1.png');
@@ -102,7 +75,7 @@ export function loadNPCSprites(loader: Phaser.Loader.LoaderPlugin): void {
     loader.image('Citizen2_Idle', 'resources/sprites/Citizen2_Idle.png');
     loader.image('Fighter2_Idle', 'resources/sprites/Fighter2_Idle.png');
 
-    // High-resolution face sprites for conversations
+    // High-resolution face sprites for conversations (individual images, unaffected by the 3-frame convention)
     loader.image('faces/Lyuba neutral', 'resources/sprites/faces/Lyuba neutral.png');
     loader.image('faces/Lyuba happy', 'resources/sprites/faces/Lyuba happy.png');
     loader.image('faces/Lyuba frown', 'resources/sprites/faces/Lyuba frown.png');

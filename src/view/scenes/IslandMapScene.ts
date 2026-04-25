@@ -3,6 +3,7 @@ import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import { GridToWorldMapper } from '../GridToWorldMapper';
 import { PhaserPuzzleRenderer } from '../PhaserPuzzleRenderer';
 import { isTestMode, attachTestMarker } from '@helpers/TestMarkers';
+import { loadNPCSprites } from '../NPCSpriteHelper';
 
 export class IslandMapScene extends Phaser.Scene {
     private puzzle: BridgePuzzle | null = null;
@@ -37,28 +38,8 @@ export class IslandMapScene extends Phaser.Scene {
             frameWidth: 32,
             frameHeight: 32
         });
-        // Load NPC sprite used for constraint feedback display
-        this.load.spritesheet('sailorNS', 'resources/sprites/sailorNS.png', {
-            frameWidth: 32,
-            frameHeight: 32
-        });
-        // Load NPC expression sprites for constraint feedback
-        this.load.image('sailorNS happy', 'resources/sprites/sailorNS happy.png');
-        this.load.image('sailorNS frown', 'resources/sprites/sailorNS frown.png');
-        this.load.image('Ruby happy', 'resources/sprites/Ruby happy.png');
-        this.load.image('Ruby frown', 'resources/sprites/Ruby frown.png');
-        this.load.image('Ruby neutral', 'resources/sprites/Ruby neutral.png');
-        this.load.spritesheet('Ruby', 'resources/sprites/Ruby neutral.png', {
-            frameWidth: 32,
-            frameHeight: 32
-        });
-        this.load.image('Pirate happy', 'resources/sprites/Pirate happy.png');
-        this.load.image('Pirate frown', 'resources/sprites/Pirate frown.png');
-        this.load.image('Pirate neutral', 'resources/sprites/Pirate neutral.png');
-        this.load.spritesheet('Pirate', 'resources/sprites/Pirate neutral.png', {
-            frameWidth: 32,
-            frameHeight: 32
-        });
+        // Load NPC sprites for constraint feedback display
+        loadNPCSprites(this.load);
         console.log('IslandMapScene: preload() finished');
     }
 

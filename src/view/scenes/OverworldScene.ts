@@ -168,14 +168,6 @@ export class OverworldScene extends Phaser.Scene {
     });
 
     // Load NPC sprites
-    this.load.spritesheet('sailorNS', 'resources/sprites/sailorNS.png', {
-      frameWidth: 32,
-      frameHeight: 32
-    });
-    this.load.spritesheet('sailorEW', 'resources/sprites/sailorEW.png', {
-      frameWidth: 32,
-      frameHeight: 32
-    });
     loadNPCSprites(this.load);
 
     // Load language tileset for speech bubbles in constraint feedback
@@ -1363,7 +1355,7 @@ export class OverworldScene extends Phaser.Scene {
           this.npcSprites.set(npc.id, sprite);
 
           // Add count overlay sprite for constraints that specify a requiredCount
-          if ((item.constraintType === 'IslandBridgeCountConstraint' || item.constraintType === 'EnclosedAreaSizeConstraint' || item.constraintType === 'IslandPassingBridgeCountConstraint') && item.requiredCount) {
+          if (item.requiredCount !== undefined && item.requiredCount >= 1 && item.requiredCount <= 8) {
             const count = item.requiredCount;
             if (count >= 1 && count <= 8) {
               const numberSprite = this.add.sprite(

@@ -73,10 +73,6 @@ export class EmbeddedPuzzleRenderer extends BasePuzzleRenderer implements IPuzzl
         // time on the same renderer starts cleanly.
         this.destroy();
 
-        for (const island of puzzle.islands) {
-            this.createConstraintNPCForIsland(island);
-        }
-
         this.createConstraintNPCsFromPuzzleConstraints(puzzle);
     }
 

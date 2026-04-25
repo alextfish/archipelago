@@ -11,10 +11,9 @@ import { BridgeSpriteFrames, BridgeVisualConstants } from './BridgeSpriteFrameRe
 import { ConstraintFeedbackDisplay } from './ConstraintFeedbackDisplay';
 import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
 import type { ConstraintDisplayItem } from '@model/puzzle/constraints/ConstraintDisplayItem';
-import { parseNumBridgesConstraint } from '@model/puzzle/Island';
-import type { Island } from '@model/puzzle/Island';
+
 import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
-import { getNPCSpriteKey, updateStrutBridgeNPCSprites } from './NPCSpriteHelper';
+import { getNPCSpriteKey, updateStrutBridgeNPCSprites, NPC_FRAME } from './NPCSpriteHelper';
 
 /**
  * Abstract base class for both puzzle renderers.
@@ -106,22 +105,26 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
     // -------------------------------------------------------------------------
 
     /**
-     * Create constraint NPC sprites for cell-based constraints (those whose
-     * ConstraintDisplayItem has an explicit `position`), such as
-     * EnclosedAreaSizeConstraint.  Shared by both subclasses' init()
-     * implementations.
+     * Create constraint NPC sprites for all personified constraints.
+     * Resolves grid position from `item.position` if present (cell-based
+     * constraints such as EnclosedAreaSizeConstraint), or by looking up the
+     * island by `item.elementID` (island-anchored constraints such as
+     * IslandBridgeCountConstraint and IslandVisibilityConstraint).
+     * Shared by both subclasses' init() implementations.
      */
     protected createConstraintNPCsFromPuzzleConstraints(puzzle: BridgePuzzle): void {
         for (const constraint of puzzle.constraints) {
             if (!constraint.personified) continue;
             for (const item of constraint.getDisplayItems(puzzle)) {
-                if (!item.position) continue; // Island-based items handled by createConstraintNPCForIsland
+                // Resolve grid position: explicit for cell-based, island lookup for island-anchored
+                const gridPos = item.position ?? puzzle.islands.find(i => i.id === item.elementID);
+                if (!gridPos) continue;
 
-                const worldPos = this.gridMapper.gridToWorld(item.position.x, item.position.y);
+                const worldPos = this.gridMapper.gridToWorld(gridPos.x, gridPos.y);
                 const scale = this.gridMapper.getCellSize() / 32;
                 const spriteKey = getNPCSpriteKey(item.constraintType);
 
-                const npcSprite = this.scene.add.sprite(worldPos.x, worldPos.y, spriteKey, 0)
+                const npcSprite = this.scene.add.sprite(worldPos.x, worldPos.y, spriteKey, NPC_FRAME.NEUTRAL)
                     .setOrigin(0, 0)
                     .setScale(scale, scale);
                 this.constraintNPCs.set(item.elementID, npcSprite);
@@ -151,35 +154,6 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
                     this.onGameObjectCreated(compassSprite);
                 }
             }
-        }
-    }
-
-    /**
-     * Create a constraint NPC sprite and bridge-count number sprite for an island
-     * that carries an IslandBridgeCountConstraint.  Shared by both subclasses'
-     * init() implementations.
-     */
-    protected createConstraintNPCForIsland(island: Island): void {
-        const worldPos = this.gridMapper.gridToWorld(island.x, island.y);
-        const num = parseNumBridgesConstraint(island);
-        if (num !== null && num >= 1 && num <= 8) {
-            const scale = this.gridMapper.getCellSize() / 32;
-
-            const npcSprite = this.scene.add.sprite(worldPos.x, worldPos.y, 'Ruby', 0)
-                .setOrigin(0, 0)
-                .setScale(scale, scale);
-            this.constraintNPCs.set(island.id, npcSprite);
-            this.onGameObjectCreated(npcSprite);
-
-            const cellSize = this.gridMapper.getCellSize();
-            const numberSprite = this.scene.add.sprite(
-                worldPos.x + cellSize / 2,
-                worldPos.y + cellSize / 2,
-                'counts overlay',
-                num - 1,
-            ).setOrigin(0.5, 0.5).setScale(scale, scale);
-            this.constraintNumbers.set(island.id, numberSprite);
-            this.onGameObjectCreated(numberSprite);
         }
     }
 
@@ -448,7 +422,7 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
     protected updateStrutBridgeNPCs(puzzle: BridgePuzzle): void {
         const scale = this.gridMapper.getCellSize() / 32;
         updateStrutBridgeNPCSprites(puzzle, this.strutBridgeNPCs, this.gridMapper, (worldPos) => {
-            const npc = this.scene.add.sprite(worldPos.x, worldPos.y, getNPCSpriteKey('BridgeMustCoverIslandConstraint'), 0)
+            const npc = this.scene.add.sprite(worldPos.x, worldPos.y, getNPCSpriteKey('BridgeMustCoverIslandConstraint'), NPC_FRAME.NEUTRAL)
                 .setScale(scale, scale);
             this.onGameObjectCreated(npc);
             return npc;

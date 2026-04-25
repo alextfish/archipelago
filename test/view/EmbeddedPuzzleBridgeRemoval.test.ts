@@ -307,7 +307,7 @@ describe('EmbeddedPuzzleRenderer Bridge Removal', () => {
                     { id: 'plain-island', x: 3, y: 1, constraints: [] },
                 ],
                 bridgeTypes: [{ id: 'single', colour: 'black', count: 5 }],
-                constraints: [],
+                constraints: [{ type: 'IslandBridgeCountConstraint' }],
                 maxNumBridges: 3
             });
 
