@@ -509,4 +509,130 @@ describe("MapPuzzleExtractor", () => {
             expect(puzzle.givesFeedback).toBe(false);
         });
     });
+
+    describe("disguise properties on constraint objects", () => {
+        it("stores disguise sprite and conversation overrides on the island", () => {
+            const mapData: TiledMapData = {
+                width: 10,
+                height: 10,
+                tilewidth: 32,
+                tileheight: 32,
+                layers: [
+                    {
+                        name: "ground",
+                        type: "tilelayer",
+                        width: 10,
+                        height: 10,
+                        // Island tile (id=6) at grid position (1,1)
+                        data: Array(100).fill(0).map((_, i) => i === 11 ? 6 : 0),
+                        visible: true,
+                        opacity: 1
+                    },
+                    {
+                        name: "puzzles",
+                        type: "objectgroup",
+                        visible: true,
+                        opacity: 1,
+                        objects: [
+                            {
+                                id: 1,
+                                name: "test_puzzle",
+                                type: "puzzle",
+                                x: 0, y: 0, width: 320, height: 320,
+                                visible: true, rotation: 0, properties: []
+                            },
+                            {
+                                id: 2,
+                                name: "constraint_obj",
+                                type: "",
+                                // Pixel position (32,32) → tile (1,1) → matches the island
+                                x: 32, y: 32, width: 32, height: 32,
+                                visible: true, rotation: 0,
+                                properties: [
+                                    { name: "constraint", value: "true", type: "string" },
+                                    { name: "num_bridges", value: "2", type: "string" },
+                                    { name: "disguise_sprite", value: "Cultist-1", type: "string" },
+                                    { name: "disguise_sprite_solved", value: "Cultist-1-Ruby", type: "string" },
+                                    { name: "conversation_file", value: "journalcave-bridgecount-unsatisfied.json", type: "string" },
+                                    { name: "conversation_file_solved", value: "journalcave-bridgecount-satisfied.json", type: "string" },
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            };
+
+            const puzzle = extractor.createBridgePuzzle(
+                { id: "test_puzzle", bounds: { x: 0, y: 0, width: 320, height: 320 }, metadata: {} },
+                mapData
+            );
+
+            const island = puzzle.islands.find(i => i.x === 1 && i.y === 1);
+            expect(island).toBeDefined();
+            expect(island!.constraints).toContain("num_bridges=2");
+            expect(island!.constraints).toContain("disguise_sprite=Cultist-1");
+            expect(island!.constraints).toContain("disguise_sprite_solved=Cultist-1-Ruby");
+            expect(island!.constraints).toContain("conversation_file=journalcave-bridgecount-unsatisfied.json");
+            expect(island!.constraints).toContain("conversation_file_solved=journalcave-bridgecount-satisfied.json");
+        });
+
+        it("does not add disguise properties when absent from constraint object", () => {
+            const mapData: TiledMapData = {
+                width: 10,
+                height: 10,
+                tilewidth: 32,
+                tileheight: 32,
+                layers: [
+                    {
+                        name: "ground",
+                        type: "tilelayer",
+                        width: 10,
+                        height: 10,
+                        data: Array(100).fill(0).map((_, i) => i === 11 ? 6 : 0),
+                        visible: true,
+                        opacity: 1
+                    },
+                    {
+                        name: "puzzles",
+                        type: "objectgroup",
+                        visible: true,
+                        opacity: 1,
+                        objects: [
+                            {
+                                id: 1,
+                                name: "test_puzzle",
+                                type: "puzzle",
+                                x: 0, y: 0, width: 320, height: 320,
+                                visible: true, rotation: 0, properties: []
+                            },
+                            {
+                                id: 2,
+                                name: "constraint_obj",
+                                type: "",
+                                x: 32, y: 32, width: 32, height: 32,
+                                visible: true, rotation: 0,
+                                properties: [
+                                    { name: "constraint", value: "true", type: "string" },
+                                    { name: "num_bridges", value: "3", type: "string" },
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            };
+
+            const puzzle = extractor.createBridgePuzzle(
+                { id: "test_puzzle", bounds: { x: 0, y: 0, width: 320, height: 320 }, metadata: {} },
+                mapData
+            );
+
+            const island = puzzle.islands.find(i => i.x === 1 && i.y === 1);
+            expect(island).toBeDefined();
+            expect(island!.constraints).toContain("num_bridges=3");
+            const hasDisguise = island!.constraints?.some(c =>
+                c.startsWith("disguise_") || c.startsWith("conversation_file")
+            );
+            expect(hasDisguise).toBeFalsy();
+        });
+    });
 });

@@ -92,7 +92,7 @@ export class MustTouchAHorizontalBridge extends GridCellConstraint {
         };
     }
 
-    override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    protected override getCoreDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
         const result = this.check(puzzle);
         return [{
             elementID: `${this.x},${this.y}`,
@@ -126,7 +126,7 @@ export class MustTouchAVerticalBridge extends GridCellConstraint {
         };
     }
 
-    override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    protected override getCoreDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
         const result = this.check(puzzle);
         return [{
             elementID: `${this.x},${this.y}`,

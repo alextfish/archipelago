@@ -80,6 +80,10 @@ export class OverworldScene extends Phaser.Scene {
   private npcSeriesStates: Map<string, NPCSeriesState> = new Map();
   private constraintNumberSprites: Map<string, Phaser.GameObjects.Sprite> = new Map(); // Bridge count numbers for constraint NPCs
   private constraintCompassSprites: Map<string, Phaser.GameObjects.Sprite> = new Map(); // Compass direction sprites for directional constraint NPCs
+  /** Disguise sprite keys for constraint NPCs that have a custom appearance.
+   *  Keyed by NPC ID; stores the unsatisfied and satisfied texture keys so that
+   *  the sprite can be flipped when the associated puzzle is solved. */
+  private constraintDisguiseKeys: Map<string, { normalKey: string; solvedKey: string }> = new Map();
   private seriesManager?: SeriesManager;
 
   // Roof hiding system
@@ -231,6 +235,9 @@ export class OverworldScene extends Phaser.Scene {
       // Load embedded tilesets from the map data
       this.loadEmbeddedTilesets(this.tiledMapData);
 
+      // Load any disguise sprites declared on constraint objects in the map
+      this.loadDisguiseSprites(this.tiledMapData);
+
       // Add the converted map data to Phaser's cache
       this.cache.tilemap.add('overworldMap', { format: 1, data: this.tiledMapData });
       console.log('Map file loaded and converted successfully');
@@ -288,6 +295,53 @@ export class OverworldScene extends Phaser.Scene {
 
     // Start the loader if we added any new assets
     if (!this.load.isLoading() && this.load.totalToLoad > 0) {
+      this.load.start();
+    }
+  }
+
+  /**
+   * Scan all constraint objects in the Tiled map for `disguise_sprite` and
+   * `disguise_sprite_solved` properties, and queue those images for loading.
+   * Must be called after the map JSON is available but before sprites are created
+   * (i.e. from within {@link loadTmxFile}).
+   */
+  private loadDisguiseSprites(tiledMapData: any): void {
+    if (!tiledMapData?.layers) return;
+
+    const keysToLoad = new Set<string>();
+
+    const scanLayer = (layer: any): void => {
+      if (layer.type === 'group' && layer.layers) {
+        for (const child of layer.layers) {
+          scanLayer(child);
+        }
+      } else if (layer.type === 'objectgroup' && layer.objects) {
+        for (const obj of layer.objects) {
+          if (!Array.isArray(obj.properties)) continue;
+          const props: Record<string, string> = {};
+          for (const p of obj.properties) {
+            props[p.name] = String(p.value);
+          }
+          if (props.constraint !== 'true') continue;
+          if (props.disguise_sprite) keysToLoad.add(props.disguise_sprite);
+          if (props.disguise_sprite_solved) keysToLoad.add(props.disguise_sprite_solved);
+        }
+      }
+    };
+
+    for (const layer of tiledMapData.layers) {
+      scanLayer(layer);
+    }
+
+    for (const key of keysToLoad) {
+      if (!this.textures.exists(key)) {
+        const path = `resources/sprites/${key}.png`;
+        this.load.image(key, path);
+        console.log(`Queued disguise sprite for loading: ${key} (${path})`);
+      }
+    }
+
+    if (keysToLoad.size > 0 && !this.load.isLoading() && this.load.totalToLoad > 0) {
       this.load.start();
     }
   } private createFallbackMap() {
@@ -1320,12 +1374,12 @@ export class OverworldScene extends Phaser.Scene {
             continue;
           }
 
-          // Get conversation files from the constraint
-          const conversationFile = constraint.conversationFile;
-          const conversationFileSolved = constraint.conversationFileSolved;
+          // Get conversation files: per-island overrides take precedence over constraint defaults
+          const conversationFile = item.conversationFile ?? constraint.conversationFile;
+          const conversationFileSolved = item.conversationFileSolved ?? constraint.conversationFileSolved;
 
-          // Choose appearance based on constraint type
-          const appearanceId = getNPCSpriteKey(item.constraintType);
+          // Choose appearance: disguise sprite overrides the default for the constraint type
+          const appearanceId = item.disguiseSpriteKey ?? getNPCSpriteKey(item.constraintType);
           const language = 'grass'; // Default language for constraint NPCs
 
           // Build template variables for conversation substitution from the constraint's display item.
@@ -1361,6 +1415,15 @@ export class OverworldScene extends Phaser.Scene {
           sprite.setOrigin(0, 1);
           sprite.setDepth(worldY);
           this.npcSprites.set(npc.id, sprite);
+
+          // If this NPC has a disguise, record the solved sprite key so the texture
+          // can be flipped to the "revealed" appearance when the puzzle is solved.
+          if (item.disguiseSpriteKey && item.disguiseSpriteSolvedKey) {
+            this.constraintDisguiseKeys.set(npc.id, {
+              normalKey: item.disguiseSpriteKey,
+              solvedKey: item.disguiseSpriteSolvedKey,
+            });
+          }
 
           // Add count overlay sprite for constraints that specify a requiredCount
           if ((item.constraintType === 'IslandBridgeCountConstraint' || item.constraintType === 'EnclosedAreaSizeConstraint' || item.constraintType === 'IslandPassingBridgeCountConstraint') && item.requiredCount) {
@@ -1446,10 +1509,16 @@ export class OverworldScene extends Phaser.Scene {
    */
   private showConstraintNPCsForPuzzle(puzzleId: string): void {
     const prefix = `constraint-${puzzleId}-`;
+    const isSolved = this.gameState.isPuzzleCompleted(puzzleId);
 
     for (const [npcId, sprite] of this.npcSprites) {
       if (npcId.startsWith(prefix)) {
         sprite.setVisible(true);
+        // Update disguised NPCs to their "revealed" sprite once the puzzle is solved
+        const disguise = this.constraintDisguiseKeys.get(npcId);
+        if (disguise) {
+          sprite.setTexture(isSolved ? disguise.solvedKey : disguise.normalKey);
+        }
       }
     }
 
