@@ -30,6 +30,7 @@ import { WaterPropagationEngine } from '@model/overworld/WaterPropagationEngine'
 import type { TranslationModeScene } from '@view/scenes/TranslationModeScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { GridToWorldMapper } from '@view/GridToWorldMapper';
+import { TileAnimationManager } from '@view/TileAnimationManager';
 import { getNPCSpriteKey, loadNPCSprites } from '@view/NPCSpriteHelper';
 import { Collectible } from '@model/overworld/Collectible';
 import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
@@ -85,6 +86,9 @@ export class OverworldScene extends Phaser.Scene {
    *  the sprite can be flipped when the associated puzzle is solved. */
   private constraintDisguiseKeys: Map<string, { normalKey: string; solvedKey: string }> = new Map();
   private seriesManager?: SeriesManager;
+
+  // Tile animations
+  private tileAnimationManager?: TileAnimationManager;
 
   // Roof hiding system
   private roofManager?: RoofManager;
@@ -413,6 +417,9 @@ export class OverworldScene extends Phaser.Scene {
 
     // Create roofs layers (should be above player)
     this.setupRoofsLayer(tilesets);
+
+    // Initialise tile animations (scans all created layers once to cache tile instances)
+    this.tileAnimationManager = new TileAnimationManager(this.map, tilesets);
 
     // Set world bounds to match map size
     const mapWidth = this.map.widthInPixels;
@@ -2192,7 +2199,9 @@ export class OverworldScene extends Phaser.Scene {
     }
   }
 
-  update() {
+  update(_time: number, delta: number) {
+    this.tileAnimationManager?.update(delta);
+
     // Only handle player movement in exploration mode
     if (this.gameMode === 'exploration' && this.playerController) {
       this.playerController.update();

@@ -4847,7 +4847,7 @@
   <objectgroup id="91" name="puzzles">
    <object id="115" name="bayPuzzle1" x="992" y="1824" width="256" height="224">
     <properties>
-     <property name="bridges" value="2,2,2,2,2,2"/>
+     <property name="bridges" value="2,2,2,2,2,2,2"/>
     </properties>
    </object>
    <object id="116" name="see2" x="1120" y="1920" width="32" height="32">

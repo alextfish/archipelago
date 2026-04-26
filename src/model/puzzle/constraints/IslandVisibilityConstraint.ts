@@ -110,7 +110,7 @@ export class IslandVisibilityConstraint extends Constraint {
       currentY += dy;
 
       // Check bounds
-      if (currentX <= 0 || currentX >= puzzle.width || currentY <= 0 || currentY >= puzzle.height) {
+      if (currentX < 0 || currentX >= puzzle.width || currentY < 0 || currentY >= puzzle.height) {
         break;
       }
 
