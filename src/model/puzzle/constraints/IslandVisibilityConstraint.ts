@@ -14,6 +14,9 @@ import type { Island } from '../Island';
  *    connecting them with no gaps
  */
 export class IslandVisibilityConstraint extends Constraint {
+  override readonly conversationFile = 'constraints/islandVisibility_unsatisfied.json';
+  override readonly conversationFileSolved = 'constraints/islandVisibility_satisfied.json';
+
   private islandId: string;
   private expectedCount: number;
 
@@ -161,7 +164,7 @@ export class IslandVisibilityConstraint extends Constraint {
       elementID: this.islandId,
       glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "good"),
       constraintType: 'IslandVisibilityConstraint',
-      requiredCount: this.expectedCount,
+      requiredCount: this.expectedCount, conversationVariables: { count: String(this.expectedCount) },
     }];
   }
 }

@@ -126,7 +126,8 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
 
                 const npcSprite = this.scene.add.sprite(worldPos.x, worldPos.y, spriteKey, NPC_FRAME.NEUTRAL)
                     .setOrigin(0, 0)
-                    .setScale(scale, scale);
+                    .setScale(scale, scale)
+                    .setDepth(10);
                 this.constraintNPCs.set(item.elementID, npcSprite);
                 this.onGameObjectCreated(npcSprite);
 
@@ -137,7 +138,7 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
                         worldPos.y + cellSize / 2,
                         'counts overlay',
                         item.requiredCount - 1,
-                    ).setOrigin(0.5, 0.5).setScale(scale, scale);
+                    ).setOrigin(0.5, 0.5).setScale(scale, scale).setDepth(11);
                     this.constraintNumbers.set(item.elementID, numberSprite);
                     this.onGameObjectCreated(numberSprite);
                 }
@@ -149,7 +150,7 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
                         worldPos.y + cellSize / 2,
                         'compass overlay',
                         item.compassFrame,
-                    ).setOrigin(0.5, 0.5).setScale(scale, scale);
+                    ).setOrigin(0.5, 0.5).setScale(scale, scale).setDepth(11);
                     this.constraintCompasses.set(item.elementID, compassSprite);
                     this.onGameObjectCreated(compassSprite);
                 }
@@ -509,6 +510,7 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
         const midX = (startWorld.x + endWorld.x) / 2 + cellSize / 2;
         const midY = (startWorld.y + endWorld.y) / 2 + cellSize / 2;
         const container = this.scene.add.container(midX, midY);
+        container.setDepth(5);
         container.setRotation(angle);
 
         // Use double-bridge frames when two bridge ids share the same island-pair

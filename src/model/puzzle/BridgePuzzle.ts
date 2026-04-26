@@ -64,28 +64,25 @@ export class BridgePuzzle {
     } else {
       this.maxNumBridges = 2;
     }
-      // Build constraints from spec. If the spec does not include any constraints,
-      // automatically add fixed-length constraints for each fixed-length bridge type
-      // so standalone fixed-length tests still get validated.
-      const hasSpecConstraints = Array.isArray(spec.constraints) && spec.constraints.length > 0;
-      if (!hasSpecConstraints) {
-        for (const bt of bridgeTypes) {
-          const len = (bt.length === undefined) ? -1 : bt.length ?? -1;
-          if (len !== -1) {
-            // add a constraint enforcing this bridge type's fixed length
-            this.constraints.push(BridgeLengthConstraint.fromSpec({ typeId: bt.id, length: len }));
-          }
+    // Build constraints from spec. If the spec does not include any constraints,
+    // automatically add fixed-length constraints for each fixed-length bridge type
+    // so standalone fixed-length tests still get validated.
+    const hasSpecConstraints = Array.isArray(spec.constraints) && spec.constraints.length > 0;
+    if (!hasSpecConstraints) {
+      for (const bt of bridgeTypes) {
+        const len = (bt.length === undefined) ? -1 : bt.length ?? -1;
+        if (len !== -1) {
+          // add a constraint enforcing this bridge type's fixed length
+          this.constraints.push(BridgeLengthConstraint.fromSpec({ typeId: bt.id, length: len }));
         }
       }
-      // Always add one BridgeMustCoverIslandConstraint per StrutBridge instance.
-      // These are per-bridge constraints (keyed by bridge ID) rather than the
-      // type-level constraints above, so each bridge gets its own constraint
-      // that tracks whether that specific bridge covers an island.
-      for (const bridge of this.inventory.bridges) {
-        if (bridge instanceof StrutBridge) {
-          this.constraints.push(new BridgeMustCoverIslandConstraint(bridge.id));
-        }
+    }
+    // Always add one BridgeMustCoverIslandConstraint per StrutBridge instance.
+    for (const bridge of this.inventory.bridges) {
+      if (bridge instanceof StrutBridge) {
+        this.constraints.push(new BridgeMustCoverIslandConstraint(bridge.id));
       }
+    }
   }
 
   /** Get all bridges (placed or unplaced) */
@@ -154,7 +151,7 @@ export class BridgePuzzle {
 
   /**
    * Returns whether a bridge of the given type can be placed between two islands.
-   * If typeId is undefined, this behaves like the legacy couldPlaceBridgeAt (only max-bridges and existence checks).
+   * If typeId is undefined, this performs only max-bridges and existence checks.
    */
   couldPlaceBridgeOfType(startIslandId: string, endIslandId: string, typeId?: string): boolean {
     if (startIslandId === endIslandId) return false;
@@ -222,7 +219,6 @@ export class BridgePuzzle {
 
     return false;
   }
-
   takeBridgeOfType(typeId: string): Bridge | undefined {
     return this.inventory.takeBridge(typeId);
   }
@@ -322,5 +318,6 @@ export class BridgePuzzle {
     return result;
   }
 }
+
 
 

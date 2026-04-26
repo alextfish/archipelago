@@ -97,9 +97,19 @@ export class NPCAppearanceRegistry {
             },
         });
 
-        // Pirate appearance
-        this.appearances.set('Pirate', {
-            spriteKey: 'Pirate',
+        // Pirate-M appearance (IslandPassingBridgeCountConstraint, IslandDirectionalBridgeConstraint)
+        this.appearances.set('Pirate-M', {
+            spriteKey: 'Pirate-M',
+            expressions: {
+                neutral: 0,
+                happy: 1,
+                sad: 2,
+            },
+        });
+
+        // Pirate-F appearance (IslandVisibilityConstraint)
+        this.appearances.set('Pirate-F', {
+            spriteKey: 'Pirate-F',
             expressions: {
                 neutral: 0,
                 happy: 1,

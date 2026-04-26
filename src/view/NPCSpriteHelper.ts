@@ -87,7 +87,7 @@ export function loadNPCSprites(loader: Phaser.Loader.LoaderPlugin): void {
     loader.image('faces/Ruby neutral', 'resources/sprites/faces/Ruby neutral.png');
     loader.image('faces/Ruby happy', 'resources/sprites/faces/Ruby happy.png');
     loader.image('faces/Ruby frown', 'resources/sprites/faces/Ruby frown.png');
-    loader.image('faces/Ruby vhappy', 'resources/sprites/faces/Ruby vhappy.png');
+    loader.image('faces/Ruby happyish', 'resources/sprites/faces/Ruby happyish.png');
     loader.image('faces/Ruby wink', 'resources/sprites/faces/Ruby wink.png');
     loader.image('faces/Evan neutral', 'resources/sprites/faces/Evan_face_neutral.png');
     loader.image('faces/Evan happy', 'resources/sprites/faces/Evan_face_like.png');
@@ -95,9 +95,7 @@ export function loadNPCSprites(loader: Phaser.Loader.LoaderPlugin): void {
     loader.image('faces/Yan neutral', 'resources/sprites/faces/Yan_face_casual_neutral.png');
     loader.image('faces/Yan happy', 'resources/sprites/faces/Yan_face_casual_happy.png');
     loader.image('faces/Yan frown', 'resources/sprites/faces/Yan_face_casual_dislike.png');
-    loader.image('faces/Pirate neutral', 'resources/sprites/faces/Pirate neutral.png');
-    loader.image('faces/Pirate happy', 'resources/sprites/faces/Pirate happy.png');
-    loader.image('faces/Pirate frown', 'resources/sprites/faces/Pirate frown.png');
+    loader.image('faces/Pirate-F neutral', 'resources/sprites/faces/Pirate-F neutral.png');
 }
 
 /**

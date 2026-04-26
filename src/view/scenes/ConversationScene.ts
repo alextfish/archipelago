@@ -13,6 +13,7 @@ import type { NPC } from '@model/conversation/NPC';
 import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
 import { NPCAppearanceRegistry } from '@model/conversation/NPCAppearanceRegistry';
 import { attachTestMarker, isTestMode } from '@helpers/TestMarkers';
+import { loadNPCSprites } from '../NPCSpriteHelper';
 import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
 
 export class ConversationScene extends Phaser.Scene implements ConversationHost {
@@ -79,42 +80,8 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
             });
         }
 
-        // Load NPC sprites (sailorNS, sailorEW, Lyuba, Mage4)
-        // TODO: Load these based on which NPCs are in the game
-        const npcAppearances = ['sailorNS', 'sailorEW', 'Lyuba', 'Mage4'];
-        for (const appearanceId of npcAppearances) {
-            if (this.appearanceRegistry.hasAppearance(appearanceId)) {
-                const spritePath = this.appearanceRegistry.getSpritePath(appearanceId);
-                if (!this.textures.exists(appearanceId)) {
-                    this.load.spritesheet(appearanceId, spritePath, {
-                        frameWidth: 32,
-                        frameHeight: 32,
-                    });
-                }
-            }
-        }
-
-        // Load high-resolution face sprites for conversations
-        const faceSprites = [
-            'faces/Lyuba neutral',
-            'faces/Lyuba happy',
-            'faces/Lyuba frown',
-            'faces/Lyuba cleric neutral',
-            'faces/Lyuba cleric happy',
-            'faces/Lyuba cleric frown',
-            'faces/Lyuba cleric vhappy',
-            'faces/Lyuba cleric wink',
-            'faces/Ruby neutral',
-            'faces/Ruby happy',
-            'faces/Ruby frown',
-            'faces/Ruby vhappy',
-            'faces/Ruby wink',
-        ];
-        for (const faceKey of faceSprites) {
-            if (!this.textures.exists(faceKey)) {
-                this.load.image(faceKey, `resources/sprites/${faceKey}.png`);
-            }
-        }
+        // Load all NPC spritesheets and face portraits
+        loadNPCSprites(this.load);
     }
 
     /**
