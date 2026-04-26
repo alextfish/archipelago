@@ -105,17 +105,17 @@ describe("IslandVisibilityConstraint.getDisplayItems", () => {
     expect(items).toEqual([{ elementID: "A", glyphMessage: "good", constraintType: "IslandVisibilityConstraint", requiredCount: 1 }]);
   });
 
-  it("returns 'not-enough island connected' when too few islands are visible", () => {
+  it("returns 'see not-enough island' when too few islands are visible", () => {
     const islands = [{ id: "A", x: 1, y: 1 }];
     const puzzle = makeMockPuzzle({ islands, bridges: [], placedBridges: [], width: 4, height: 3 });
 
     const constraint = new IslandVisibilityConstraint("A", 2);
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "not-enough island connected", constraintType: "IslandVisibilityConstraint", requiredCount: 2 }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "see not-enough island", constraintType: "IslandVisibilityConstraint", requiredCount: 2 }]);
   });
 
-  it("returns 'too-many island connected' when too many islands are visible", () => {
+  it("returns 'see too-many island' when too many islands are visible", () => {
     const islands = [
       { id: "A", x: 1, y: 1 },
       { id: "B", x: 2, y: 1 },
@@ -130,6 +130,6 @@ describe("IslandVisibilityConstraint.getDisplayItems", () => {
     const constraint = new IslandVisibilityConstraint("A", 1);
     const items = constraint.getDisplayItems(puzzle as any);
 
-    expect(items).toEqual([{ elementID: "A", glyphMessage: "too-many island connected", constraintType: "IslandVisibilityConstraint", requiredCount: 1 }]);
+    expect(items).toEqual([{ elementID: "A", glyphMessage: "see too-many island", constraintType: "IslandVisibilityConstraint", requiredCount: 1 }]);
   });
 });

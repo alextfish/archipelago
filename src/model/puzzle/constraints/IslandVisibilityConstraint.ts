@@ -53,9 +53,9 @@ export class IslandVisibilityConstraint extends Constraint {
     let glyphMessage: string | undefined;
     if (!ok) {
       if (actualCount < this.expectedCount) {
-        glyphMessage = "not-enough island connected";
+        glyphMessage = "see not-enough island";
       } else {
-        glyphMessage = "too-many island connected";
+        glyphMessage = "see too-many island";
       }
     }
 
