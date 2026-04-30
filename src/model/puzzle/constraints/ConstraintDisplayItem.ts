@@ -56,4 +56,9 @@ export interface ConstraintDisplayItem {
    * `Constraint.conversationFileSolved` for this specific island.
    */
   conversationFileSolved?: string;
+  /**
+   * Whether the NPC sprite for this constraint should play its idle animation.
+   * Driven by the `animate` property on the constraint's Tiled object.
+   */
+  animate?: boolean;
 }

@@ -63,10 +63,11 @@ export abstract class Constraint {
       const disguiseSpriteSolvedKey = get('disguise_sprite_solved');
       const conversationFile = get('conversation_file');
       const conversationFileSolved = get('conversation_file_solved');
+      const animate = island.constraints!.includes('animate=true') || undefined;
 
-      const hasDisguise = [disguiseSpriteKey, disguiseSpriteSolvedKey, conversationFile, conversationFileSolved]
+      const hasOverride = [disguiseSpriteKey, disguiseSpriteSolvedKey, conversationFile, conversationFileSolved, animate]
         .some(v => v !== undefined);
-      if (!hasDisguise) return item;
+      if (!hasOverride) return item;
 
       return {
         ...item,
@@ -74,6 +75,7 @@ export abstract class Constraint {
         ...(disguiseSpriteSolvedKey !== undefined && { disguiseSpriteSolvedKey }),
         ...(conversationFile !== undefined && { conversationFile }),
         ...(conversationFileSolved !== undefined && { conversationFileSolved }),
+        ...(animate !== undefined && { animate }),
       };
     });
   }

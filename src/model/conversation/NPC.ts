@@ -20,6 +20,7 @@ export class NPC {
     readonly seriesFile?: string;               // Filename in src/data/series/
     readonly appearanceId: string;              // ID for looking up sprite in registry
     readonly conversationVariables?: Record<string, string>;  // Template variables for conversation glyphs
+    readonly animate: boolean;                  // Whether the NPC should play its idle animation
 
     constructor(
         id: string,
@@ -31,7 +32,8 @@ export class NPC {
         conversationFile?: string,
         conversationFileSolved?: string,
         seriesFile?: string,
-        conversationVariables?: Record<string, string>
+        conversationVariables?: Record<string, string>,
+        animate: boolean = false
     ) {
         this.id = id;
         this.name = name;
@@ -43,6 +45,7 @@ export class NPC {
         this.conversationFileSolved = conversationFileSolved;
         this.seriesFile = seriesFile;
         this.conversationVariables = conversationVariables;
+        this.animate = animate;
     }
 
     /**

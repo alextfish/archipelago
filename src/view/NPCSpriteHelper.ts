@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import { StrutBridge } from '@model/puzzle/StrutBridge';
 import type { GridToWorldMapper } from './GridToWorldMapper';
+import { NPCAppearanceRegistry } from '@model/conversation/NPCAppearanceRegistry';
 
 /** Frame indices for the on-map 32×32 NPC expression spritesheet convention. */
 export const NPC_FRAME = {
@@ -146,4 +147,46 @@ export function updateStrutBridgeNPCSprites(
             }
         }
     }
+}
+
+/**
+ * Register Phaser sprite animations for any NPC appearance that declares an
+ * `idleAnimation` in the registry.  Call this once from a scene's `create()`
+ * method (after all textures have loaded).
+ *
+ * Each animation is keyed as `<spriteKey>-idle` and loops indefinitely.
+ * Per-frame durations from the registry are preserved; `frameRate: 1` is set
+ * as a harmless fallback for any frame that lacks an explicit duration.
+ */
+export function registerNPCAnimations(scene: Phaser.Scene, registry: NPCAppearanceRegistry): void {
+    for (const id of registry.getAllAppearanceIDs()) {
+        const frames = registry.getIdleAnimation(id);
+        if (!frames) continue;
+
+        const appearance = registry.getAppearance(id);
+        const key = `${appearance.spriteKey}-idle`;
+        if (scene.anims.exists(key)) continue;
+
+        scene.anims.create({
+            key,
+            frames: frames.map(f => ({
+                key: appearance.spriteKey,
+                frame: f.frame,
+                duration: f.duration,
+            })),
+            frameRate: 1,
+            repeat: -1,
+        });
+    }
+}
+
+/**
+ * Returns the Phaser animation key for an NPC appearance's idle animation,
+ * or `undefined` if the appearance has no idle animation.
+ */
+export function getNPCIdleAnimationKey(appearanceId: string, registry: NPCAppearanceRegistry): string | undefined {
+    const frames = registry.getIdleAnimation(appearanceId);
+    if (!frames) return undefined;
+    const appearance = registry.getAppearance(appearanceId);
+    return `${appearance.spriteKey}-idle`;
 }

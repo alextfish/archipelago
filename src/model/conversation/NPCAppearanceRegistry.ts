@@ -3,6 +3,12 @@
  * Maps NPC appearance IDs to sprite asset keys and expression frame names.
  */
 
+/** A single frame in an NPC idle animation, with an explicit duration in milliseconds. */
+export interface NPCAnimationFrame {
+    frame: string | number;
+    duration: number; // milliseconds
+}
+
 export interface NPCAppearance {
     spriteKey: string;         // Phaser asset key for sprite sheet
     faceId?: string;           // Override for face texture lookup (e.g. 'Yan' for 'Farmer')
@@ -11,6 +17,8 @@ export interface NPCAppearance {
         happy: string | number;
         sad: string | number;
     };
+    /** Idle animation frames to loop when the NPC has `animate: true`. Omit for static sprites. */
+    idleAnimation?: NPCAnimationFrame[];
 }
 
 export class NPCAppearanceRegistry {
@@ -115,6 +123,11 @@ export class NPCAppearanceRegistry {
                 happy: 1,
                 sad: 2,
             },
+            idleAnimation: [
+                { frame: 11, duration: 200 },
+                { frame: 9, duration: 200 },
+                { frame: 10, duration: 400 },
+            ],
         });
     }
 
@@ -151,6 +164,20 @@ export class NPCAppearanceRegistry {
      */
     hasAppearance(appearanceId: string): boolean {
         return this.appearances.has(appearanceId);
+    }
+
+    /**
+     * Get the idle animation frames for a given appearance, or undefined if none.
+     */
+    getIdleAnimation(appearanceId: string): NPCAnimationFrame[] | undefined {
+        return this.appearances.get(appearanceId)?.idleAnimation;
+    }
+
+    /**
+     * Get all registered appearance IDs.
+     */
+    getAllAppearanceIDs(): string[] {
+        return Array.from(this.appearances.keys());
     }
 
     /**

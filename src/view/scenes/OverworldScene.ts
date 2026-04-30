@@ -31,7 +31,8 @@ import type { TranslationModeScene } from '@view/scenes/TranslationModeScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { GridToWorldMapper } from '@view/GridToWorldMapper';
 import { TileAnimationManager } from '@view/TileAnimationManager';
-import { getNPCSpriteKey, loadNPCSprites } from '@view/NPCSpriteHelper';
+import { getNPCSpriteKey, loadNPCSprites, registerNPCAnimations, getNPCIdleAnimationKey } from '@view/NPCSpriteHelper';
+import { NPCAppearanceRegistry } from '@model/conversation/NPCAppearanceRegistry';
 import { Collectible } from '@model/overworld/Collectible';
 import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
 import type { PlayerStartPosition } from '@model/overworld/PlayerStartManager';
@@ -86,6 +87,7 @@ export class OverworldScene extends Phaser.Scene {
    *  the sprite can be flipped when the associated puzzle is solved. */
   private constraintDisguiseKeys: Map<string, { normalKey: string; solvedKey: string }> = new Map();
   private seriesManager?: SeriesManager;
+  private npcAppearanceRegistry: NPCAppearanceRegistry = new NPCAppearanceRegistry();
 
   // Tile animations
   private tileAnimationManager?: TileAnimationManager;
@@ -468,6 +470,9 @@ export class OverworldScene extends Phaser.Scene {
 
     // Register looping animations for collectible jewels
     this.registerJewelAnimations();
+
+    // Register looping idle animations for animated NPCs
+    registerNPCAnimations(this, this.npcAppearanceRegistry);
 
     // Initialize overworld puzzle system
     this.initializeOverworldPuzzles();
@@ -1173,6 +1178,7 @@ export class OverworldScene extends Phaser.Scene {
       const seriesFile = properties?.find((p: any) => p.name === 'series')?.value;
       const language = properties?.find((p: any) => p.name === 'language')?.value || 'grass';
       const appearanceId = properties?.find((p: any) => p.name === 'appearance')?.value || 'sailorNS';
+      const animate = properties?.find((p: any) => p.name === 'animate')?.value === true;
 
       // Create NPC instance
       // Use Tiled's unique object ID for npc.id to ensure uniqueness (multiple NPCs can share the same name)
@@ -1185,7 +1191,9 @@ export class OverworldScene extends Phaser.Scene {
         appearanceId,
         conversationFile,
         conversationFileSolved,
-        seriesFile
+        seriesFile,
+        undefined,
+        animate
       );
 
       this.npcs.push(npc);
@@ -1216,6 +1224,11 @@ export class OverworldScene extends Phaser.Scene {
           showBorder: true
         });
         console.log(`[TEST] Added test marker for NPC: ${npc.id} at tile (${tileX}, ${tileY}), world (${worldX}, ${worldY})`);
+      }
+
+      if (npc.animate) {
+        const animKey = getNPCIdleAnimationKey(appearanceId, this.npcAppearanceRegistry);
+        if (animKey) sprite.play(animKey);
       }
 
       console.log(`Loaded NPC: ${npc.name} at (${tileX}, ${tileY}), language: ${language}, conversation: ${conversationFile || 'none'}, series: ${seriesFile || 'none'}`);
@@ -1395,7 +1408,8 @@ export class OverworldScene extends Phaser.Scene {
             conversationFile,
             conversationFileSolved,
             undefined, // No series for constraint NPCs
-            conversationVariables
+            conversationVariables,
+            item.animate ?? false
           );
 
           this.npcs.push(npc);
@@ -1463,6 +1477,11 @@ export class OverworldScene extends Phaser.Scene {
               showBorder: true
             });
             console.log(`[TEST] Added test marker for constraint NPC: ${npc.id} at tile (${overworldTileX}, ${overworldTileY}), world (${worldX}, ${worldY})`);
+          }
+
+          if (npc.animate) {
+            const animKey = getNPCIdleAnimationKey(appearanceId, this.npcAppearanceRegistry);
+            if (animKey) sprite.play(animKey);
           }
 
           constraintNPCCount++;

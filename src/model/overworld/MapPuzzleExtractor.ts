@@ -455,9 +455,9 @@ export class MapPuzzleExtractor {
         const puzzleEndX = puzzleStartX + Math.ceil(definition.bounds.width / tilewidth);
         const puzzleEndY = puzzleStartY + Math.ceil(definition.bounds.height / tileheight);
 
-        console.log(`    Checking puzzle ${definition.id} in layer ${layer.name}`);
-        console.log(`    Puzzle bounds: tile (${puzzleStartX},${puzzleStartY}) to (${puzzleEndX},${puzzleEndY})`);
-        console.log(`    Looking for island tile IDs: [${islandTileIDs.join(', ')}]`);
+        // console.log(`    Checking puzzle ${definition.id} in layer ${layer.name}`);
+        // console.log(`    Puzzle bounds: tile (${puzzleStartX},${puzzleStartY}) to (${puzzleEndX},${puzzleEndY})`);
+        // console.log(`    Looking for island tile IDs: [${islandTileIDs.join(', ')}]`);
 
         // Scan the puzzle area for island tiles
         let tilesChecked = 0;
@@ -485,7 +485,7 @@ export class MapPuzzleExtractor {
             }
         }
 
-        console.log(`    Checked ${tilesChecked} tiles, found ${tilesFound} islands`);
+        //console.log(`    Checked ${tilesChecked} tiles, found ${tilesFound} islands`);
 
         return islands;
     }
@@ -929,6 +929,15 @@ export class MapPuzzleExtractor {
                 if (constraints.length > 0) {
                     island.constraints = island.constraints || [];
                     island.constraints.push(...constraints);
+                }
+
+                // Propagate animate flag regardless of other constraint properties
+                if (props.animate === 'true') {
+                    island.constraints = island.constraints || [];
+                    if (!island.constraints.includes('animate=true')) {
+                        island.constraints.push('animate=true');
+                        console.log(`Applied animate=true to island ${island.id}`);
+                    }
                 }
             }
         }
