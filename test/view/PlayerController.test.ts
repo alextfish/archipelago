@@ -304,7 +304,7 @@ describe('PlayerController', () => {
             it('clamps x to the central band while inside the tile', () => {
                 const { ctrl, player } = makeControllerWithNarrow(CollisionType.NARROW_NS);
                 // Player is inside tile (3,3) but offset far to the right.
-                player.x = TILE_3_CENTRE + 10; // well outside the ±6 px band
+                player.x = TILE_3_CENTRE + 10; // well outside the ±NARROW_HALF_WIDTH px band
                 player.y = TILE_3_CENTRE;
 
                 // Try to move further right (sub-tile move, stays in same tile).
@@ -374,7 +374,7 @@ describe('PlayerController', () => {
             it('clamps y to the central band while inside the tile', () => {
                 const { ctrl, player } = makeControllerWithNarrow(CollisionType.NARROW_EW);
                 player.x = TILE_3_CENTRE;
-                player.y = TILE_3_CENTRE + 10; // outside ±6 band
+                player.y = TILE_3_CENTRE + 10; // outside ±NARROW_HALF_WIDTH band
 
                 ctrl.setTargetPosition(player.x, player.y + 5);
                 ctrl.update();
