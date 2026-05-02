@@ -15,6 +15,11 @@ const TILE_SIZE = 32; // Must match the map's tilewidth/tileheight
  */
 const NARROW_HALF_WIDTH = 6;
 
+/** Returns the world-space centre of the tile at the given tile coordinate. */
+function tileCentre(tileCoord: number): number {
+    return (tileCoord + 0.5) * TILE_SIZE;
+}
+
 /**
  * PlayerController manages the player character in the overworld.
  * Handles player movement, animations, and collision setup.
@@ -399,11 +404,11 @@ export class PlayerController {
                 const currentType = this.getCollisionAt(currentTileX, currentTileY);
                 if (currentType === CollisionType.NARROW_NS) {
                     // Clamp x to the central band; allow y freely.
-                    const centreX = (currentTileX + 0.5) * TILE_SIZE;
+                    const centreX = tileCentre(currentTileX);
                     finalX = Math.max(centreX - NARROW_HALF_WIDTH, Math.min(centreX + NARROW_HALF_WIDTH, nextX));
                 } else if (currentType === CollisionType.NARROW_EW) {
                     // Clamp y to the central band; allow x freely.
-                    const centreY = (currentTileY + 0.5) * TILE_SIZE;
+                    const centreY = tileCentre(currentTileY);
                     finalY = Math.max(centreY - NARROW_HALF_WIDTH, Math.min(centreY + NARROW_HALF_WIDTH, nextY));
                 }
             }
@@ -455,10 +460,10 @@ export class PlayerController {
         // Snap the constrained axis to the tile centre when entering a narrow passage,
         // nudging the player onto the bridge rather than leaving them near the edge.
         if (targetType === CollisionType.NARROW_NS) {
-            this.player.x = (nextTileX + 0.5) * TILE_SIZE;
+            this.player.x = tileCentre(nextTileX);
             this.moveX = this.player.x - originalX;
         } else if (targetType === CollisionType.NARROW_EW) {
-            this.player.y = (nextTileY + 0.5) * TILE_SIZE;
+            this.player.y = tileCentre(nextTileY);
             this.moveY = this.player.y - originalY;
         }
 

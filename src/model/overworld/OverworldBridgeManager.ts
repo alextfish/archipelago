@@ -283,13 +283,13 @@ export class OverworldBridgeManager {
             let bridgeTileStartX: number, bridgeTileStartY: number;
             let bridgeTileEndX: number, bridgeTileEndY: number;
             if (isHorizontal) {
-                bridgeTileStartX = Math.floor((puzzleBounds.x + startX * 32) / tileWidth);
-                bridgeTileEndX = Math.floor((puzzleBounds.x + endX * 32) / tileWidth);
-                bridgeTileStartY = bridgeTileEndY = Math.floor((puzzleBounds.y + startY * 32) / tileHeight);
+                bridgeTileStartX = Math.floor((puzzleBounds.x + startX * tileWidth) / tileWidth);
+                bridgeTileEndX = Math.floor((puzzleBounds.x + endX * tileWidth) / tileWidth);
+                bridgeTileStartY = bridgeTileEndY = Math.floor((puzzleBounds.y + startY * tileHeight) / tileHeight);
             } else {
-                bridgeTileStartY = Math.floor((puzzleBounds.y + startY * 32) / tileHeight);
-                bridgeTileEndY = Math.floor((puzzleBounds.y + endY * 32) / tileHeight);
-                bridgeTileStartX = bridgeTileEndX = Math.floor((puzzleBounds.x + startX * 32) / tileWidth);
+                bridgeTileStartY = Math.floor((puzzleBounds.y + startY * tileHeight) / tileHeight);
+                bridgeTileEndY = Math.floor((puzzleBounds.y + endY * tileHeight) / tileHeight);
+                bridgeTileStartX = bridgeTileEndX = Math.floor((puzzleBounds.x + startX * tileWidth) / tileWidth);
             }
 
             // Check whether this tile belongs to the current bridge's span.
