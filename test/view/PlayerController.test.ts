@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type Phaser from 'phaser';
-import { PlayerController } from '@view/PlayerController';
+import { PlayerController, NARROW_HALF_WIDTH } from '@view/PlayerController';
 import { CollisionType } from '@model/overworld/CollisionTypes';
 
 // Mock Phaser types for testing
@@ -312,8 +312,8 @@ describe('PlayerController', () => {
                 ctrl.update();
 
                 const centreX = TILE_3_CENTRE;
-                expect(player.x).toBeGreaterThanOrEqual(centreX - 6);
-                expect(player.x).toBeLessThanOrEqual(centreX + 6);
+                expect(player.x).toBeGreaterThanOrEqual(centreX - NARROW_HALF_WIDTH);
+                expect(player.x).toBeLessThanOrEqual(centreX + NARROW_HALF_WIDTH);
             });
 
             it('snaps x to tile centre when entering from north', () => {
@@ -380,8 +380,8 @@ describe('PlayerController', () => {
                 ctrl.update();
 
                 const centreY = TILE_3_CENTRE;
-                expect(player.y).toBeGreaterThanOrEqual(centreY - 6);
-                expect(player.y).toBeLessThanOrEqual(centreY + 6);
+                expect(player.y).toBeGreaterThanOrEqual(centreY - NARROW_HALF_WIDTH);
+                expect(player.y).toBeLessThanOrEqual(centreY + NARROW_HALF_WIDTH);
             });
 
             it('snaps y to tile centre when entering from the west', () => {

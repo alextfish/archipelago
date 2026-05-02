@@ -12,8 +12,9 @@ const TILE_SIZE = 32; // Must match the map's tilewidth/tileheight
  * Half-width of the walkable central band inside a narrow-passage tile.
  * The player's constrained axis is clamped within (tileCentre ± NARROW_HALF_WIDTH).
  * At TILE_SIZE=32 this gives a 12-pixel walkable band centred on the tile.
+ * Exported so tests and other modules can use the same value without hardcoding.
  */
-const NARROW_HALF_WIDTH = 6;
+export const NARROW_HALF_WIDTH = 6;
 
 /** Returns the world-space centre of the tile at the given tile coordinate. */
 function tileCentre(tileCoord: number): number {
