@@ -8,6 +8,9 @@ export interface CollisionTileProperties {
     walkable?: boolean;
     walkable_low?: boolean;
     stairs?: boolean;
+    alwaysHigh?: boolean;
+    narrow_ns?: boolean;
+    narrow_ew?: boolean;
     [key: string]: any;
 }
 
@@ -47,6 +50,7 @@ export class CollisionTileClassifier {
      * Rules (in priority order):
      * - No tile found in any layer → WALKABLE (open ground)
      * - Any tile with `stairs = true` → STAIRS (always passable)
+     * - Any tile with `alwaysHigh = true` → ALWAYS_HIGH (upper ground, immune to water flow)
      * - Any tile with `walkable = true` → WALKABLE (upper ground)
      * - Any tile with `walkable_low = true` → WALKABLE_LOW (lower ground)
      * - Tile present but none of the above → BLOCKED (wall / obstacle)
@@ -57,6 +61,9 @@ export class CollisionTileClassifier {
         let collisionType: CollisionType = CollisionType.WALKABLE;
         let hasWalkable = false;
         let hasWalkableLow = false;
+        let hasAlwaysHigh = false;
+        let hasNarrowNS = false;
+        let hasNarrowEW = false;
         let hasTile = false;
 
         for (const tile of layerTiles) {
@@ -64,13 +71,34 @@ export class CollisionTileClassifier {
             hasTile = true;
 
             if (tile.properties) {
+                if ('alwaysHigh' in tile.properties && tile.properties.alwaysHigh === true) {
+                    hasAlwaysHigh = true;
+                    collisionType = CollisionType.ALWAYS_HIGH;
+                }
                 if ('walkable' in tile.properties && tile.properties.walkable === true) {
                     hasWalkable = true;
-                    collisionType = CollisionType.WALKABLE;
+                    // Only set WALKABLE if a higher-priority type has not already been assigned.
+                    if (collisionType !== CollisionType.ALWAYS_HIGH && collisionType !== CollisionType.STAIRS) {
+                        collisionType = CollisionType.WALKABLE;
+                    }
                 }
                 if ('walkable_low' in tile.properties && tile.properties.walkable_low === true) {
                     hasWalkableLow = true;
-                    collisionType = CollisionType.WALKABLE_LOW;
+                    if (collisionType !== CollisionType.ALWAYS_HIGH && collisionType !== CollisionType.STAIRS) {
+                        collisionType = CollisionType.WALKABLE_LOW;
+                    }
+                }
+                if ('narrow_ns' in tile.properties && tile.properties.narrow_ns === true) {
+                    hasNarrowNS = true;
+                    if (collisionType !== CollisionType.ALWAYS_HIGH && collisionType !== CollisionType.STAIRS) {
+                        collisionType = CollisionType.NARROW_NS;
+                    }
+                }
+                if ('narrow_ew' in tile.properties && tile.properties.narrow_ew === true) {
+                    hasNarrowEW = true;
+                    if (collisionType !== CollisionType.ALWAYS_HIGH && collisionType !== CollisionType.STAIRS) {
+                        collisionType = CollisionType.NARROW_EW;
+                    }
                 }
                 if ('stairs' in tile.properties && tile.properties.stairs === true) {
                     collisionType = CollisionType.STAIRS;
@@ -78,9 +106,10 @@ export class CollisionTileClassifier {
             }
 
             // A tile present with no walkable properties is blocked.
-            // The `collisionType !== STAIRS` guard ensures that a stairs tile processed
-            // earlier in the loop cannot be overridden to BLOCKED by a later property-less tile.
-            if (!hasWalkable && !hasWalkableLow && collisionType !== CollisionType.STAIRS) {
+            // The guard ensures that a higher-priority type already assigned cannot be
+            // overridden to BLOCKED by a later property-less tile.
+            if (!hasWalkable && !hasWalkableLow && !hasAlwaysHigh && !hasNarrowNS && !hasNarrowEW &&
+                collisionType !== CollisionType.STAIRS) {
                 collisionType = CollisionType.BLOCKED;
             }
         }
@@ -111,6 +140,18 @@ export class CollisionTileClassifier {
         if (result.collisionType === CollisionType.STAIRS) {
             // Stairs: passable from both layers
             return { upperGround: 0, lowerGround: 0, blocked: 0 };
+        }
+
+        if (result.collisionType === CollisionType.ALWAYS_HIGH) {
+            // Always upper ground: player on the lower layer is blocked here
+            return { upperGround: 1, lowerGround: 0, blocked: 0 };
+        }
+
+        if (result.collisionType === CollisionType.NARROW_NS ||
+            result.collisionType === CollisionType.NARROW_EW) {
+            // Narrow passages are upper-ground tiles; the directional movement
+            // constraint is enforced by PlayerController, not by the sub-layer system.
+            return { upperGround: 1, lowerGround: 0, blocked: 0 };
         }
 
         if (result.hasWalkableLow) {

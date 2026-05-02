@@ -73,10 +73,6 @@ export class EmbeddedPuzzleRenderer extends BasePuzzleRenderer implements IPuzzl
         // time on the same renderer starts cleanly.
         this.destroy();
 
-        for (const island of puzzle.islands) {
-            this.createConstraintNPCForIsland(island);
-        }
-
         this.createConstraintNPCsFromPuzzleConstraints(puzzle);
     }
 
@@ -95,6 +91,22 @@ export class EmbeddedPuzzleRenderer extends BasePuzzleRenderer implements IPuzzl
     // clearHighlights — extends base to also clear any tints set by
     // highlightIslands() / flashBridges() (overworld-specific methods).
     // -------------------------------------------------------------------------
+
+    override updateFromPuzzle(puzzle: BridgePuzzle): void {
+        super.updateFromPuzzle(puzzle);
+        // Constraint count overlays are created during init() and thus sit earlier
+        // in the container's child list than bridges added here. Re-order them to
+        // the end so they always render above any placed bridges.
+        for (const sprite of this.constraintNPCs.values()) {
+            this.puzzleContainer.bringToTop(sprite);
+        }
+        for (const sprite of this.constraintNumbers.values()) {
+            this.puzzleContainer.bringToTop(sprite);
+        }
+        for (const sprite of this.constraintCompasses.values()) {
+            this.puzzleContainer.bringToTop(sprite);
+        }
+    }
 
     override clearHighlights(): void {
         super.clearHighlights();

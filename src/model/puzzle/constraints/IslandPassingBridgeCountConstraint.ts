@@ -173,7 +173,7 @@ export class IslandPassingBridgeCountConstraint extends Constraint {
     }
   }
 
-  override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+  protected override getCoreDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
     const island = puzzle.islands.find(i => i.id === this.islandId);
     if (!island) return [];
     const result = this.check(puzzle);

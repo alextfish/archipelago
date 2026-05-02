@@ -56,7 +56,7 @@ export class BridgeMustCoverIslandConstraint extends Constraint {
     };
   }
 
-  override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+  protected override getCoreDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
     if (!this.bridgeID) return [];
 
     const bridge = puzzle.bridges.find(b => b.id === this.bridgeID);

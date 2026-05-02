@@ -19,7 +19,7 @@ import type { GridToWorldMapper } from './GridToWorldMapper';
 import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
 import { SpeechBubblePlacer, type BubbleRequest } from '@model/puzzle/SpeechBubblePlacer';
 import type { Point } from '@model/puzzle/Point';
-import { getNPCSpriteKey } from './NPCSpriteHelper';
+import { getNPCSpriteKey, NPC_FRAME } from './NPCSpriteHelper';
 
 export class ConstraintFeedbackDisplay {
   private scene: Phaser.Scene;
@@ -113,10 +113,10 @@ export class ConstraintFeedbackDisplay {
           this.originalNPCTextures.set(item.elementID, existingNPC.texture.key);
         }
 
-        // Choose NPC sprite based on constraint type
+        // Choose NPC expression frame based on satisfaction
         const baseSprite = getNPCSpriteKey(item.constraintType);
-        const spriteKey = isSatisfied ? `${baseSprite} happy` : `${baseSprite} frown`;
-        existingNPC.setTexture(spriteKey, 0);
+        const frame = isSatisfied ? NPC_FRAME.HAPPY : NPC_FRAME.FROWN;
+        existingNPC.setTexture(baseSprite, frame);
       }
 
       // Decide which side of the bubble has the arrow (i.e. faces the NPC).
@@ -147,7 +147,7 @@ export class ConstraintFeedbackDisplay {
       for (const [islandId, originalTexture] of this.originalNPCTextures) {
         const npc = this.existingNPCSprites.get(islandId);
         if (npc) {
-          npc.setTexture(originalTexture, 0);
+          npc.setTexture(originalTexture, NPC_FRAME.NEUTRAL);
         }
       }
       this.originalNPCTextures.clear();
@@ -164,7 +164,7 @@ export class ConstraintFeedbackDisplay {
     for (const [islandId, originalTexture] of this.originalNPCTextures) {
       const npc = this.existingNPCSprites.get(islandId);
       if (npc) {
-        npc.setTexture(originalTexture, 0);
+        npc.setTexture(originalTexture, NPC_FRAME.NEUTRAL);
       }
     }
     this.originalNPCTextures.clear();

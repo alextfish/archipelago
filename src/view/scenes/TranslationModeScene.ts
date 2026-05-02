@@ -46,9 +46,6 @@ export class TranslationModeScene extends Phaser.Scene {
     private overlay: Phaser.GameObjects.Rectangle | null = null;
     private highlights: HighlightEntry[] = [];
 
-    /** Book-icon button – always visible at top-left. */
-    private bookIcon: Phaser.GameObjects.Text | null = null;
-
     /** Currently open edit panel container (null when hidden). */
     private editPanel: Phaser.GameObjects.Container | null = null;
     /** Phaser DOM element wrapping the <input>. */
@@ -89,25 +86,13 @@ export class TranslationModeScene extends Phaser.Scene {
         this.overlay.setDepth(DEPTH_OVERLAY);
         this.overlay.setVisible(false);
 
-        // Book-icon toggle button – always visible
-        this.bookIcon = this.add.text(12, 12, '📖', { fontSize: '28px' });
-        this.bookIcon.setDepth(DEPTH_INPUT_PANEL + 10);
-        this.bookIcon.setInteractive({ useHandCursor: true });
-        this.bookIcon.on('pointerdown', () => this.toggle());
-
-        // Tab key toggles translation mode
-        this.input.keyboard?.on('keydown-TAB', (event: KeyboardEvent) => {
-            event.preventDefault();
-            this.toggle();
-        });
-
         // Store keys used in update() so they are not recreated every frame
         if (this.input.keyboard) {
             this.keyEnter = this.input.keyboard.addKey('ENTER');
             this.keyEsc = this.input.keyboard.addKey('ESC');
         }
 
-        // Start hidden; book icon is the only persistent element
+        // Start hidden
         this.deactivate();
     }
 
@@ -128,11 +113,12 @@ export class TranslationModeScene extends Phaser.Scene {
     activate(): void {
         if (!this.glyphTracker || !this.translationDict) return;
 
-        // Pause every running scene except this one
+        // Pause every running scene except this one and the HUD (which must stay
+        // interactive so the book icon can close translation mode)
         this.pausedScenes = [];
         for (const scene of this.scene.manager.scenes) {
             const key = scene.sys.settings.key as string;
-            if (key !== 'TranslationModeScene' && scene.sys.isActive()) {
+            if (key !== 'TranslationModeScene' && key !== 'OverworldHUDScene' && scene.sys.isActive()) {
                 scene.sys.pause();
                 this.pausedScenes.push(key);
             }

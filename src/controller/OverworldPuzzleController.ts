@@ -309,10 +309,20 @@ export class OverworldPuzzleController {
                 this.puzzleInputHandler = undefined;
             }
 
-            // Clean up puzzle renderer
-            if (this.puzzleRenderer) {
-                this.puzzleRenderer.destroy();
-                this.puzzleRenderer = undefined;
+            // For a solved FlowPuzzle the wave-animation timers are already running
+            // (scheduled by updateFromPuzzle just before onPuzzleSolved fires).
+            // Defer renderer cleanup so those timers can fire during the camera
+            // transition rather than being cancelled immediately here.
+            const isSolvedFlow = actualSuccess &&
+                activeData.puzzle instanceof FlowPuzzle &&
+                this.puzzleRenderer instanceof FlowPuzzleRenderer;
+
+            if (!isSolvedFlow) {
+                // Clean up puzzle renderer immediately for all other cases
+                if (this.puzzleRenderer) {
+                    this.puzzleRenderer.destroy();
+                    this.puzzleRenderer = undefined;
+                }
             }
 
             // Handle collision and bridge rendering based on whether puzzle was solved
@@ -371,12 +381,28 @@ export class OverworldPuzzleController {
                 }
             }
 
-            // Update visuals (water tiles, pontoons) before the camera pan so they
-            // are correct during the transition rather than only after it finishes.
-            onBeforeTransition?.();
-
-            // Return camera to overworld
-            await this.cameraManager.transitionToOverworld();
+            if (isSolvedFlow) {
+                // Run the wave animation and camera transition in parallel.
+                // waitForAnimation is capped at the camera duration so both finish
+                // together; any waves that didn't fire in time are caught by the
+                // safety snap (onBeforeTransition) below.
+                const flowRenderer = this.puzzleRenderer as FlowPuzzleRenderer;
+                await Promise.all([
+                    this.cameraManager.transitionToOverworld(),
+                    flowRenderer.waitForAnimation(1000)
+                ]);
+                // Safety snap: ensures tiles that didn't animate in time are correct.
+                onBeforeTransition?.();
+                // Animation complete — safe to destroy.
+                flowRenderer.destroy();
+                this.puzzleRenderer = undefined;
+            } else {
+                // Update visuals (water tiles, pontoons) before the camera pan so they
+                // are correct during the transition rather than only after it finishes.
+                onBeforeTransition?.();
+                // Return camera to overworld
+                await this.cameraManager.transitionToOverworld();
+            }
 
             // Camera pan complete: hide the solved overlay and fully clean up the HUD
             // now that the player is back in view. Input is re-enabled right after this.

@@ -1,0 +1,5 @@
+# Prevent Dropbox from syncing the git internals directory.
+# Git operations require exclusive, atomic writes to .git/ - Dropbox's
+# real-time sync causes race conditions and index corruption.
+# Use GitHub (already configured as origin) for cross-device git sync instead.
+.git

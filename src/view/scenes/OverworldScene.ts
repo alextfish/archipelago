@@ -30,9 +30,12 @@ import { WaterPropagationEngine } from '@model/overworld/WaterPropagationEngine'
 import type { TranslationModeScene } from '@view/scenes/TranslationModeScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { GridToWorldMapper } from '@view/GridToWorldMapper';
+import { TileAnimationManager } from '@view/TileAnimationManager';
 import { getNPCSpriteKey, loadNPCSprites } from '@view/NPCSpriteHelper';
 import { Collectible } from '@model/overworld/Collectible';
 import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
+import type { PlayerStartPosition } from '@model/overworld/PlayerStartManager';
+import { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -45,6 +48,9 @@ export class OverworldScene extends Phaser.Scene {
   private collisionLayers: Phaser.Tilemaps.TilemapLayer[] = []; // All source collision layers from Tiled
   private bridgesLayer!: Phaser.Tilemaps.TilemapLayer;
   private collisionArray: number[][] = [];
+  /** Tiles that are permanently BLOCKED due to explicit Tiled collision-layer properties
+   * (collides=true / walkable=false). Water propagation must never change these. */
+  private permanentBlockedTiles: Set<string> = new Set();
   private gameMode: 'exploration' | 'conversation' | 'puzzle' = 'exploration';
   private isExitingPuzzle: boolean = false; // Guard to prevent re-entrant exit calls
   private isPointerHeld: boolean = false; // Track if pointer is held down for continuous movement
@@ -75,7 +81,14 @@ export class OverworldScene extends Phaser.Scene {
   private npcSeriesStates: Map<string, NPCSeriesState> = new Map();
   private constraintNumberSprites: Map<string, Phaser.GameObjects.Sprite> = new Map(); // Bridge count numbers for constraint NPCs
   private constraintCompassSprites: Map<string, Phaser.GameObjects.Sprite> = new Map(); // Compass direction sprites for directional constraint NPCs
+  /** Disguise sprite keys for constraint NPCs that have a custom appearance.
+   *  Keyed by NPC ID; stores the unsatisfied and satisfied texture keys so that
+   *  the sprite can be flipped when the associated puzzle is solved. */
+  private constraintDisguiseKeys: Map<string, { normalKey: string; solvedKey: string }> = new Map();
   private seriesManager?: SeriesManager;
+
+  // Tile animations
+  private tileAnimationManager?: TileAnimationManager;
 
   // Roof hiding system
   private roofManager?: RoofManager;
@@ -113,11 +126,12 @@ export class OverworldScene extends Phaser.Scene {
   // Collectible system
   private collectibles: Collectible[] = [];
   private collectibleSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
-  /** Fixed-to-camera jewel count display elements, keyed by jewel colour. */
-  private jewelHUDElements: Map<string, { sprite: Phaser.GameObjects.Image; text: Phaser.GameObjects.Text }> = new Map();
 
   // Player start position management
   private playerStartManager?: PlayerStartManager;
+
+  // Overworld HUD scene (book icon, warp button, jewel counts)
+  private overworldHUD?: OverworldHUDScene;
 
   // Active series tracking (for navigation)
   private currentSeries: any = null;
@@ -162,14 +176,6 @@ export class OverworldScene extends Phaser.Scene {
     });
 
     // Load NPC sprites
-    this.load.spritesheet('sailorNS', 'resources/sprites/sailorNS.png', {
-      frameWidth: 32,
-      frameHeight: 32
-    });
-    this.load.spritesheet('sailorEW', 'resources/sprites/sailorEW.png', {
-      frameWidth: 32,
-      frameHeight: 32
-    });
     loadNPCSprites(this.load);
 
     // Load language tileset for speech bubbles in constraint feedback
@@ -203,11 +209,11 @@ export class OverworldScene extends Phaser.Scene {
     // frame, frame 0 of 'jewel-green' is the first green frame, etc.  This
     // lets loadCollectibles() and updateOverworldJewelHUD() use the per-colour
     // key without needing to know the raw frame offset.
-    const JEWEL_FRAME_CONFIG = { frameWidth: 16, frameHeight: 16 };
-    this.load.spritesheet('jewel-red',    'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 0,  endFrame: 2  });
-    this.load.spritesheet('jewel-green',  'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 4,  endFrame: 6  });
-    this.load.spritesheet('jewel-blue',   'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 8,  endFrame: 10 });
-    this.load.spritesheet('jewel-yellow', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 12, endFrame: 14 });
+    const JEWEL_FRAME_CONFIG = { frameWidth: 32, frameHeight: 32 };
+    this.load.spritesheet('jewel-red', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 0, endFrame: 3 });
+    this.load.spritesheet('jewel-green', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 4, endFrame: 7 });
+    this.load.spritesheet('jewel-blue', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 8, endFrame: 11 });
+    this.load.spritesheet('jewel-yellow', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 12, endFrame: 15 });
 
     // Load door opening animation spritesheets (horizontal and vertical variants).
     // Each sheet is a horizontal strip of frames showing the door swinging open.
@@ -236,6 +242,9 @@ export class OverworldScene extends Phaser.Scene {
 
       // Load embedded tilesets from the map data
       this.loadEmbeddedTilesets(this.tiledMapData);
+
+      // Load any disguise sprites declared on constraint objects in the map
+      this.loadDisguiseSprites(this.tiledMapData);
 
       // Add the converted map data to Phaser's cache
       this.cache.tilemap.add('overworldMap', { format: 1, data: this.tiledMapData });
@@ -294,6 +303,53 @@ export class OverworldScene extends Phaser.Scene {
 
     // Start the loader if we added any new assets
     if (!this.load.isLoading() && this.load.totalToLoad > 0) {
+      this.load.start();
+    }
+  }
+
+  /**
+   * Scan all constraint objects in the Tiled map for `disguise_sprite` and
+   * `disguise_sprite_solved` properties, and queue those images for loading.
+   * Must be called after the map JSON is available but before sprites are created
+   * (i.e. from within {@link loadTmxFile}).
+   */
+  private loadDisguiseSprites(tiledMapData: any): void {
+    if (!tiledMapData?.layers) return;
+
+    const keysToLoad = new Set<string>();
+
+    const scanLayer = (layer: any): void => {
+      if (layer.type === 'group' && layer.layers) {
+        for (const child of layer.layers) {
+          scanLayer(child);
+        }
+      } else if (layer.type === 'objectgroup' && layer.objects) {
+        for (const obj of layer.objects) {
+          if (!Array.isArray(obj.properties)) continue;
+          const props: Record<string, string> = {};
+          for (const p of obj.properties) {
+            props[p.name] = String(p.value);
+          }
+          if (props.constraint !== 'true') continue;
+          if (props.disguise_sprite) keysToLoad.add(props.disguise_sprite);
+          if (props.disguise_sprite_solved) keysToLoad.add(props.disguise_sprite_solved);
+        }
+      }
+    };
+
+    for (const layer of tiledMapData.layers) {
+      scanLayer(layer);
+    }
+
+    for (const key of keysToLoad) {
+      if (!this.textures.exists(key)) {
+        const path = `resources/sprites/${key}.png`;
+        this.load.image(key, path);
+        console.log(`Queued disguise sprite for loading: ${key} (${path})`);
+      }
+    }
+
+    if (keysToLoad.size > 0 && !this.load.isLoading() && this.load.totalToLoad > 0) {
       this.load.start();
     }
   } private createFallbackMap() {
@@ -374,6 +430,9 @@ export class OverworldScene extends Phaser.Scene {
     // Create roofs layers (should be above player)
     this.setupRoofsLayer(tilesets);
 
+    // Initialise tile animations (scans all created layers once to cache tile instances)
+    this.tileAnimationManager = new TileAnimationManager(this.map, tilesets);
+
     // Set world bounds to match map size
     const mapWidth = this.map.widthInPixels;
     const mapHeight = this.map.heightInPixels;
@@ -439,7 +498,7 @@ export class OverworldScene extends Phaser.Scene {
       if (!this.textures.exists(textureKey)) continue;
       this.anims.create({
         key: `${textureKey}-anim`,
-        frames: this.anims.generateFrameNumbers(textureKey, { start: 0, end: 2 }),
+        frames: this.anims.generateFrameNumbers(textureKey, { start: 0, end: 3 }),
         frameRate: 5, // 200 ms per frame
         repeat: -1,
       });
@@ -523,6 +582,13 @@ export class OverworldScene extends Phaser.Scene {
 
       // Launch Translation Mode overlay and connect to shared game-state services
       this.launchTranslationMode();
+
+      // Launch the overworld HUD scene and wire it up with the services it needs
+      this.launchOverworldHUD();
+
+      // TODO: remove — temporary starting jewel to verify HUD visibility
+      this.gameState.collectJewel('green');
+      this.overworldHUD?.refreshJewelHUD();
 
     } catch (error) {
       console.error('Failed to initialize overworld puzzles:', error);
@@ -650,7 +716,13 @@ export class OverworldScene extends Phaser.Scene {
       for (let ly = 0; ly < puzzle.height; ly++) {
         for (let lx = 0; lx < puzzle.width; lx++) {
           const isBorder = lx === 0 || lx === puzzle.width - 1 || ly === 0 || ly === puzzle.height - 1;
-          if (isBorder && puzzle.getFlowSquare(lx, ly)) {
+          if (!isBorder) continue;
+          const fs = puzzle.getFlowSquare(lx, ly);
+          // Only include border tiles that have at least one outgoing flow direction.
+          // Decorative water tiles (no directions) must not act as channel endpoints —
+          // they would cause the flood-fill to terminate at a tile that cannot propagate
+          // water into the puzzle, masking the real entry point further along.
+          if (fs && (fs.outgoing ?? []).length > 0) {
             edgeTiles.push({
               x: lx,
               y: ly,
@@ -821,8 +893,11 @@ export class OverworldScene extends Phaser.Scene {
 
         // Always enforce the correct collision type — applyFlowWaterCollision may have
         // set this tile to BLOCKED even if the pontoon is already in the right visual state.
+        // Never override tiles that are permanently BLOCKED by Tiled collision-layer properties.
         const correctCollisionType = shouldBeHigh ? CollisionType.WALKABLE : CollisionType.WALKABLE_LOW;
-        this.setCollisionAt(tileX, tileY, correctCollisionType);
+        if (!this.isPermanentlyBlocked(tileX, tileY)) {
+          this.setCollisionAt(tileX, tileY, correctCollisionType);
+        }
 
         if (pontoon.isHigh === shouldBeHigh) continue; // already correct variant, no visual swap needed
 
@@ -905,8 +980,12 @@ export class OverworldScene extends Phaser.Scene {
 
     // Pontoon at this position (if any): always enforce correct collision and swap
     // visual variant when the high/low state has changed.
+    // Skip pontoons on ALWAYS_HIGH or STAIRS tiles — they are immune to flow water overrides.
     const pontoon = this.pontoonTiles.get(key);
-    if (pontoon) {
+    const pontoonCollision = pontoon ? this.getCollisionAt(pontoon.tileX, pontoon.tileY) : undefined;
+    if (pontoon &&
+      pontoonCollision !== CollisionType.ALWAYS_HIGH &&
+      pontoonCollision !== CollisionType.STAIRS) {
       const correctCollision = hasWater ? CollisionType.WALKABLE : CollisionType.WALKABLE_LOW;
       this.setCollisionAt(tileX, tileY, correctCollision);
       if (pontoon.isHigh !== hasWater) {
@@ -935,6 +1014,28 @@ export class OverworldScene extends Phaser.Scene {
       translationScene.setServices(
         this.gameState.glyphTracker,
         this.gameState.translationDictionary
+      );
+    }
+  }
+
+  /**
+   * Launch the OverworldHUD scene and wire it up with the services it needs.
+   * The HUD scene runs at zoom=1 so its screen-space coordinates are always
+   * pixel-accurate, regardless of the world camera zoom.
+   */
+  private launchOverworldHUD(): void {
+    if (!this.playerStartManager) return;
+
+    if (!this.scene.isActive('OverworldHUDScene')) {
+      this.scene.launch('OverworldHUDScene');
+    }
+    const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
+    if (hud) {
+      this.overworldHUD = hud;
+      hud.setServices(
+        this.playerStartManager,
+        (start) => this.warpToStart(start),
+        () => this.gameState.getOverworldDisplayItems(),
       );
     }
   }
@@ -1284,12 +1385,12 @@ export class OverworldScene extends Phaser.Scene {
             continue;
           }
 
-          // Get conversation files from the constraint
-          const conversationFile = constraint.conversationFile;
-          const conversationFileSolved = constraint.conversationFileSolved;
+          // Get conversation files: per-island overrides take precedence over constraint defaults
+          const conversationFile = item.conversationFile ?? constraint.conversationFile;
+          const conversationFileSolved = item.conversationFileSolved ?? constraint.conversationFileSolved;
 
-          // Choose appearance based on constraint type
-          const appearanceId = getNPCSpriteKey(item.constraintType);
+          // Choose appearance: disguise sprite overrides the default for the constraint type
+          const appearanceId = item.disguiseSpriteKey ?? getNPCSpriteKey(item.constraintType);
           const language = 'grass'; // Default language for constraint NPCs
 
           // Build template variables for conversation substitution from the constraint's display item.
@@ -1326,8 +1427,17 @@ export class OverworldScene extends Phaser.Scene {
           sprite.setDepth(worldY);
           this.npcSprites.set(npc.id, sprite);
 
+          // If this NPC has a disguise, record the solved sprite key so the texture
+          // can be flipped to the "revealed" appearance when the puzzle is solved.
+          if (item.disguiseSpriteKey && item.disguiseSpriteSolvedKey) {
+            this.constraintDisguiseKeys.set(npc.id, {
+              normalKey: item.disguiseSpriteKey,
+              solvedKey: item.disguiseSpriteSolvedKey,
+            });
+          }
+
           // Add count overlay sprite for constraints that specify a requiredCount
-          if ((item.constraintType === 'IslandBridgeCountConstraint' || item.constraintType === 'EnclosedAreaSizeConstraint' || item.constraintType === 'IslandPassingBridgeCountConstraint') && item.requiredCount) {
+          if (item.requiredCount !== undefined && item.requiredCount >= 1 && item.requiredCount <= 8) {
             const count = item.requiredCount;
             if (count >= 1 && count <= 8) {
               const numberSprite = this.add.sprite(
@@ -1410,10 +1520,16 @@ export class OverworldScene extends Phaser.Scene {
    */
   private showConstraintNPCsForPuzzle(puzzleId: string): void {
     const prefix = `constraint-${puzzleId}-`;
+    const isSolved = this.gameState.isPuzzleCompleted(puzzleId);
 
     for (const [npcId, sprite] of this.npcSprites) {
       if (npcId.startsWith(prefix)) {
         sprite.setVisible(true);
+        // Update disguised NPCs to their "revealed" sprite once the puzzle is solved
+        const disguise = this.constraintDisguiseKeys.get(npcId);
+        if (disguise) {
+          sprite.setTexture(isSolved ? disguise.solvedKey : disguise.normalKey);
+        }
       }
     }
 
@@ -1732,86 +1848,10 @@ export class OverworldScene extends Phaser.Scene {
     );
 
     // Update HUD
-    this.updateOverworldJewelHUD();
+    this.overworldHUD?.refreshJewelHUD();
 
     emitTestEvent('jewel_collected', { colour: collectible.colour, id: collectibleId });
     console.log(`Collected ${collectible.colour} jewel (id=${collectibleId}). Total: ${this.gameState.getJewelCount(collectible.colour)}`);
-  }
-
-  /**
-   * Refresh the exploration-mode jewel HUD in the top-right of the screen.
-   * Creates or updates one sprite + text element per jewel colour that the
-   * player has collected at least once.
-   */
-  private updateOverworldJewelHUD(): void {
-    const items = this.gameState.getOverworldDisplayItems();
-    const itemHeight = 28;
-    const marginRight = 8;
-    const marginTop = 8;
-
-    // Remove elements for colours that are no longer needed
-    const activeColours = new Set(items.map(i => i.colour));
-    for (const [colour, els] of this.jewelHUDElements) {
-      if (!activeColours.has(colour)) {
-        els.sprite.destroy();
-        els.text.destroy();
-        this.jewelHUDElements.delete(colour);
-      }
-    }
-
-    // Add / update elements
-    items.forEach((item, index) => {
-      const y = marginTop + index * itemHeight;
-      const colourMap: Record<string, number> = {
-        red: 0xff4444,
-        blue: 0x4444ff,
-        green: 0x44ff44,
-        yellow: 0xffff44,
-      };
-
-      if (!this.jewelHUDElements.has(item.colour)) {
-        // Create new HUD elements fixed to the camera
-        const spriteKey = `jewel-${item.colour}`;
-        const textX = this.scale.width - marginRight - 32 - 4;
-        const spriteX = this.scale.width - marginRight - 16;
-
-        let hudSprite: Phaser.GameObjects.Image;
-        if (this.textures.exists(spriteKey)) {
-          hudSprite = this.add.image(spriteX, y + 8, spriteKey);
-        } else {
-          // Fallback: coloured circle
-          const gfx = this.add.graphics();
-          gfx.fillStyle(colourMap[item.colour] ?? 0xffffff, 1);
-          gfx.fillCircle(spriteX, y + 8, 8);
-          gfx.setScrollFactor(0);
-          gfx.setDepth(2000);
-          // Create a transparent stand-in for the map key
-          hudSprite = this.add.image(spriteX, y + 8, '__DEFAULT').setVisible(false);
-        }
-
-        hudSprite.setScrollFactor(0);
-        hudSprite.setDepth(2000);
-
-        const hudText = this.add.text(textX, y, String(item.count), {
-          fontSize: '14px',
-          color: '#ffffff',
-        });
-        hudText.setScrollFactor(0);
-        hudText.setDepth(2000);
-        hudText.setOrigin(1, 0);
-
-        this.jewelHUDElements.set(item.colour, { sprite: hudSprite, text: hudText });
-      } else {
-        // Update existing element
-        const els = this.jewelHUDElements.get(item.colour)!;
-        els.text.setText(String(item.count));
-        // Reposition in case the order changed
-        const spriteX = this.scale.width - marginRight - 16;
-        const textX = this.scale.width - marginRight - 32 - 4;
-        els.sprite.setPosition(spriteX, y + 8);
-        els.text.setPosition(textX, y);
-      }
-    });
   }
 
   /**
@@ -1887,6 +1927,14 @@ export class OverworldScene extends Phaser.Scene {
         // Try to create this layer
         const layer = this.map.createLayer(layerName, tilesets);
         if (layer) {
+          // Layers with the custom property renderAbovePlayer=true render above
+          // the player and NPCs (e.g. tree canopies, overhangs).
+          const abovePlayerProp = layerData.properties && Array.isArray(layerData.properties)
+            ? layerData.properties.find((prop: any) => prop.name === 'renderAbovePlayer')
+            : undefined;
+          if (abovePlayerProp != null && (abovePlayerProp as any).value === true) {
+            layer.setDepth(10);
+          }
           console.log(`Visual layer "${layerName}" created successfully`);
         } else {
           console.warn(`Failed to create visual layer "${layerName}"`);
@@ -2127,6 +2175,7 @@ export class OverworldScene extends Phaser.Scene {
     let walkableCount = 0;
     let walkableLowCount = 0;
     let stairsCount = 0;
+    let alwaysHighCount = 0;
 
     for (let y = 0; y < mapHeight; y++) {
       for (let x = 0; x < mapWidth; x++) {
@@ -2135,10 +2184,22 @@ export class OverworldScene extends Phaser.Scene {
         else if (type === CollisionType.WALKABLE) walkableCount++;
         else if (type === CollisionType.WALKABLE_LOW) walkableLowCount++;
         else if (type === CollisionType.STAIRS) stairsCount++;
+        else if (type === CollisionType.ALWAYS_HIGH) alwaysHighCount++;
       }
     }
 
-    console.log(`Collision tiles: BLOCKED=${blockedCount}, WALKABLE=${walkableCount}, WALKABLE_LOW=${walkableLowCount}, STAIRS=${stairsCount}`);
+    console.log(`Collision tiles: BLOCKED=${blockedCount}, WALKABLE=${walkableCount}, WALKABLE_LOW=${walkableLowCount}, STAIRS=${stairsCount}, ALWAYS_HIGH=${alwaysHighCount}`);
+
+    // Record tiles that are permanently BLOCKED by Tiled collision-layer properties.
+    // Water propagation must never override these, even if water flows beneath them.
+    this.permanentBlockedTiles.clear();
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        if (this.collisionArray[y][x] === CollisionType.BLOCKED) {
+          this.permanentBlockedTiles.add(`${x},${y}`);
+        }
+      }
+    }
 
     // Post-pass: apply pontoon collision, overriding whatever the main loop computed.
     // Pontoons are not on collision layers so their positions default to WALKABLE;
@@ -2150,7 +2211,9 @@ export class OverworldScene extends Phaser.Scene {
     }
   }
 
-  update() {
+  update(_time: number, delta: number) {
+    this.tileAnimationManager?.update(delta);
+
     // Only handle player movement in exploration mode
     if (this.gameMode === 'exploration' && this.playerController) {
       this.playerController.update();
@@ -2202,6 +2265,15 @@ export class OverworldScene extends Phaser.Scene {
     this.collisionArray[tileY][tileX] = collisionType;
   }
 
+  /**
+   * Returns true if this tile was statically marked as BLOCKED by Tiled collision-layer
+   * properties (collides=true / walkable=false) at map-load time.
+   * Water propagation and pontoon logic must never change these tiles.
+   */
+  public isPermanentlyBlocked(tileX: number, tileY: number): boolean {
+    return this.permanentBlockedTiles.has(`${tileX},${tileY}`);
+  }
+
   // === OVERWORLD PUZZLE METHODS ===
 
   /**
@@ -2234,6 +2306,11 @@ export class OverworldScene extends Phaser.Scene {
       // Only handle clicks in exploration mode
       if (this.gameMode !== 'exploration') {
         console.log('[DIAGNOSTIC] Ignoring click - not in exploration mode');
+        return;
+      }
+
+      // Ignore clicks when the warp dialog is open (let its own handlers deal with them)
+      if (this.overworldHUD?.isWarpDialogOpen()) {
         return;
       }
 
@@ -2412,6 +2489,8 @@ export class OverworldScene extends Phaser.Scene {
 
       // Switch to conversation mode
       this.gameMode = 'conversation';
+      this.interactionCursor?.hide();
+      this.playerController?.stopAndIdle();
       console.log(`Switching to conversation mode with NPC: ${npc.name} (solved: ${useSolvedConversation}, startNode: ${startNodeId})`);
 
       // Get conversation scene
@@ -2839,6 +2918,7 @@ export class OverworldScene extends Phaser.Scene {
 
       // Disable player movement
       if (this.playerController) {
+        this.playerController.stopAndIdle();
         this.playerController.setEnabled(false);
       }
 
@@ -3167,5 +3247,16 @@ export class OverworldScene extends Phaser.Scene {
       tileX,
       tileY
     };
+  }
+
+  /**
+   * Teleport the player to a player-start position.
+   * Called via callback from OverworldHUDScene when the player picks a warp destination.
+   */
+  private warpToStart(start: PlayerStartPosition): void {
+    if (!this.player) return;
+    this.player.setPosition(start.x, start.y);
+    this.playerController?.clearTargetPosition();
+    console.log(`[Warp] Teleported player to "${start.id}" at (${start.x}, ${start.y})`);
   }
 }

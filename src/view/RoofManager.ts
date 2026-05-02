@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 
 /**
  * Represents a roof hide zone with its tiles and polygon area
@@ -52,29 +53,21 @@ export class RoofManager {
             return;
         }
 
-        // Helper: Get the layer suffix (everything after the last '/')
-        const getLayerSuffix = (layerName: string): string => {
-            const lastSlash = layerName.lastIndexOf('/');
-            return lastSlash >= 0 ? layerName.substring(lastSlash + 1) : layerName;
-        };
+        // Find all "roof hide zones" object layers recursively (e.g., nested inside "Beach", "Forest" groups)
+        const hideZoneLayerResults = TiledLayerUtils.findObjectLayersByName(tiledMapData.layers, 'roof hide zones');
 
-        // Find all "roof hide zones" object layers (e.g., "Beach/roof hide zones", "Forest/roof hide zones")
-        const hideZoneLayers = tiledMapData.layers.filter(
-            (layer: any) => layer.type === 'objectgroup' && getLayerSuffix(layer.name) === 'roof hide zones'
-        );
-
-        if (hideZoneLayers.length === 0) {
+        if (hideZoneLayerResults.length === 0) {
             console.warn('RoofManager: No "*/roof hide zones" object layers found');
             return;
         }
 
-        console.log(`RoofManager: Found ${hideZoneLayers.length} roof hide zones layers`);
+        console.log(`RoofManager: Found ${hideZoneLayerResults.length} roof hide zones layers`);
 
         // Process each layer
-        for (const hideZoneLayer of hideZoneLayers) {
+        for (const { fullPath, data: hideZoneLayer } of hideZoneLayerResults) {
             if (!hideZoneLayer.objects) continue;
 
-            console.log(`RoofManager: Processing layer "${hideZoneLayer.name}" with ${hideZoneLayer.objects.length} objects`);
+            console.log(`RoofManager: Processing layer "${fullPath}" with ${hideZoneLayer.objects.length} objects`);
 
             // Process each polygon object in the layer
             for (const obj of hideZoneLayer.objects) {

@@ -5,6 +5,7 @@ import { IslandMapScene } from "@view/scenes/IslandMapScene";
 import { OverworldScene } from "@view/scenes/OverworldScene";
 import { ConversationScene } from "@view/scenes/ConversationScene";
 import { TranslationModeScene } from "@view/scenes/TranslationModeScene";
+import { OverworldHUDScene } from "@view/scenes/OverworldHUDScene";
 import { getPlayerPosition, getNPCSpriteStatus } from "@helpers/TestEvents";
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -20,7 +21,7 @@ const config: Phaser.Types.Core.GameConfig = {
   dom: {
     createContainer: true,
   },
-  scene: [OverworldScene, ConversationScene, BridgePuzzleScene, PuzzleHUDScene, IslandMapScene, TranslationModeScene],
+  scene: [OverworldScene, ConversationScene, BridgePuzzleScene, PuzzleHUDScene, IslandMapScene, OverworldHUDScene, TranslationModeScene],
 };
 
 const game = new Phaser.Game(config);

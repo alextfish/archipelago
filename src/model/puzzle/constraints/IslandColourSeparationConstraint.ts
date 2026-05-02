@@ -113,7 +113,7 @@ export class IslandColourSeparationConstraint extends Constraint {
     return colourConstraint.split('=')[1];
   }
 
-  override getDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+  protected override getCoreDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
     const result = this.check(puzzle);
     const violatedIds = new Set(result.affectedElements ?? []);
     const violationGlyph = result.glyphMessage ?? `${this.colour1} island must-not connected ${this.colour2} island`;

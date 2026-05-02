@@ -346,6 +346,19 @@ export class MapPuzzleExtractor {
                     obstacle: false,
                     pontoon: false
                 });
+
+                // Warn about border flow squares with no flow directions — these block
+                // edge-input propagation and are almost always a Tiled authoring error.
+                const isBorder = localX === 0 || localY === 0
+                    || localX === puzzleWidthInTiles - 1
+                    || localY === puzzleHeightInTiles - 1;
+                if (isBorder && outgoing.length === 0 && !props.source) {
+                    console.warn(
+                        `[FlowSquare] "${definition.id}" border tile at local (${localX},${localY}) ` +
+                        `world (${tx},${ty}) has GID ${gid} with NO flow directions — ` +
+                        `edge inputs here will not propagate into the puzzle`
+                    );
+                }
             }
         }
 
@@ -513,6 +526,20 @@ export class MapPuzzleExtractor {
                 params: { islandId: island.id, constraintType }
             });
             console.log(`Auto-added IslandDirectionalBridgeConstraint(${constraintType}) for island ${island.id} in puzzle ${definition.id}`);
+        }
+
+        // Auto-add one IslandVisibilityConstraint per island that has num_visible=
+        for (const island of islands) {
+            const rule = island.constraints?.find(c => c.startsWith('num_visible='));
+            if (!rule) continue;
+            const count = parseInt(rule.split('=')[1]);
+            if (!isNaN(count)) {
+                constraints.push({
+                    type: 'IslandVisibilityConstraint',
+                    params: { islandId: island.id, count }
+                });
+                console.log(`Auto-added IslandVisibilityConstraint(${count}) for island ${island.id} in puzzle ${definition.id}`);
+            }
         }
 
         // Add cell-level constraints (MustHaveWater, EnclosedAreaSize) from Tiled objects
@@ -870,6 +897,32 @@ export class MapPuzzleExtractor {
                 if (props.directional_constraint) {
                     constraints.push(`directional_constraint=${props.directional_constraint}`);
                     console.log(`Applied directional_constraint=${props.directional_constraint} constraint to island ${island.id}`);
+                }
+
+                // Check for num_visible property
+                if (props.num_visible) {
+                    const numVisible = parseInt(props.num_visible);
+                    if (!isNaN(numVisible)) {
+                        constraints.push(`num_visible=${numVisible}`);
+                        console.log(`Applied num_visible=${numVisible} constraint to island ${island.id}`);
+                    }
+                    // Check for disguise sprite and conversation overrides
+                    if (props.disguise_sprite) {
+                        constraints.push(`disguise_sprite=${props.disguise_sprite}`);
+                        console.log(`Applied disguise_sprite=${props.disguise_sprite} to island ${island.id}`);
+                    }
+                    if (props.disguise_sprite_solved) {
+                        constraints.push(`disguise_sprite_solved=${props.disguise_sprite_solved}`);
+                        console.log(`Applied disguise_sprite_solved=${props.disguise_sprite_solved} to island ${island.id}`);
+                    }
+                    if (props.conversation_file) {
+                        constraints.push(`conversation_file=${props.conversation_file}`);
+                        console.log(`Applied conversation_file=${props.conversation_file} to island ${island.id}`);
+                    }
+                    if (props.conversation_file_solved) {
+                        constraints.push(`conversation_file_solved=${props.conversation_file_solved}`);
+                        console.log(`Applied conversation_file_solved=${props.conversation_file_solved} to island ${island.id}`);
+                    }
                 }
 
                 // Add constraints to island

@@ -227,7 +227,10 @@ export class CollisionManager {
      */
     applyFlowWaterCollision(wetWorldTiles: ReadonlyArray<{ tileX: number; tileY: number }>): void {
         for (const { tileX, tileY } of wetWorldTiles) {
-            this.overworldScene.setCollisionAt(tileX, tileY, CollisionType.BLOCKED);
+            const current = this.overworldScene.getCollisionAt(tileX, tileY);
+            if (current !== CollisionType.ALWAYS_HIGH && current !== CollisionType.STAIRS) {
+                this.overworldScene.setCollisionAt(tileX, tileY, CollisionType.BLOCKED);
+            }
         }
         console.log(`CollisionManager: Blocked ${wetWorldTiles.length} wet flow tiles`);
     }
@@ -243,7 +246,12 @@ export class CollisionManager {
      */
     resetFlowTilesToWalkableLow(flowTiles: ReadonlyArray<{ tileX: number; tileY: number }>): void {
         for (const { tileX, tileY } of flowTiles) {
-            this.overworldScene.setCollisionAt(tileX, tileY, CollisionType.WALKABLE_LOW);
+            const current = this.overworldScene.getCollisionAt(tileX, tileY);
+            if (current !== CollisionType.ALWAYS_HIGH &&
+                current !== CollisionType.STAIRS &&
+                !this.overworldScene.isPermanentlyBlocked(tileX, tileY)) {
+                this.overworldScene.setCollisionAt(tileX, tileY, CollisionType.WALKABLE_LOW);
+            }
         }
         console.log(`CollisionManager: Reset ${flowTiles.length} flow tiles to WALKABLE_LOW`);
     }
