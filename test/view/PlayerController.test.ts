@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type Phaser from 'phaser';
-import { PlayerController } from '@view/PlayerController';
+import { PlayerController, NARROW_HALF_WIDTH } from '@view/PlayerController';
+import { CollisionType } from '@model/overworld/CollisionTypes';
 
 // Mock Phaser types for testing
 type MockSprite = {
@@ -197,6 +198,204 @@ describe('PlayerController', () => {
         it('should return the player sprite', () => {
             const sprite = controller.getSprite();
             expect(sprite).toBe(mockPlayer as unknown as Phaser.GameObjects.Sprite);
+        });
+    });
+
+    // ---------------------------------------------------------------------------
+    // Narrow-passage (NARROW_NS / NARROW_EW) movement tests
+    //
+    // These tests construct a controller with a getCollisionAt function so the
+    // movement-validation path is exercised.  The player starts inside tile (3,3)
+    // at world position (96+16, 96+16) = (112, 112) — i.e. the centre of tile
+    // (3,3) when TILE_SIZE=32.  Adjacent tiles are WALKABLE unless overridden.
+    // ---------------------------------------------------------------------------
+    describe('narrow passage movement', () => {
+        const TILE_SIZE = 32;
+        // Centre of tile (3,3)
+        const TILE_3_CENTRE = 3 * TILE_SIZE + TILE_SIZE / 2; // 112
+
+        /** Build a controller whose collision map has one special tile at (3,3). */
+        function makeControllerWithNarrow(narrowType: CollisionType): {
+            ctrl: PlayerController;
+            player: MockSprite;
+        } {
+            const player: MockSprite = {
+                x: TILE_3_CENTRE,
+                y: TILE_3_CENTRE,
+                width: TILE_SIZE,
+                height: TILE_SIZE,
+                setPosition: vi.fn(function (x: number, y: number) {
+                    player.x = x;
+                    player.y = y;
+                }),
+                anims: { play: vi.fn(), currentAnim: null }
+            };
+            const scene: MockScene = {
+                anims: { create: vi.fn(), generateFrameNumbers: vi.fn(() => []) },
+                game: { loop: { delta: 16 } }
+            };
+            const cursors: MockCursors = {
+                up: { isDown: false }, down: { isDown: false },
+                left: { isDown: false }, right: { isDown: false }
+            };
+
+            const getCollisionAt = (tx: number, ty: number): CollisionType => {
+                if (tx === 3 && ty === 3) return narrowType;
+                return CollisionType.WALKABLE;
+            };
+
+            const ctrl = new PlayerController(
+                scene as unknown as Phaser.Scene,
+                player as unknown as Phaser.GameObjects.Sprite,
+                cursors as unknown as Phaser.Types.Input.Keyboard.CursorKeys,
+                getCollisionAt
+            );
+            return { ctrl, player };
+        }
+
+        describe('NARROW_NS (vertical passage)', () => {
+            it('allows entering from the north (player moves downward into tile)', () => {
+                // Player is just above tile (3,3), moving south (positive dy).
+                const { ctrl, player } = makeControllerWithNarrow(CollisionType.NARROW_NS);
+                // Place player at the bottom of tile (3,2) — about to cross into (3,3).
+                player.x = TILE_3_CENTRE;
+                player.y = 3 * TILE_SIZE - 2; // just inside row 2
+
+                // Target is the tile centre — distance > TARGET_REACHED_THRESHOLD so movement fires.
+                ctrl.setTargetPosition(player.x, TILE_3_CENTRE);
+                ctrl.update();
+
+                // Should have moved into row 3.
+                expect(Math.floor(player.y / TILE_SIZE)).toBe(3);
+            });
+
+            it('blocks entering from the east (player moves leftward into tile)', () => {
+                const { ctrl, player } = makeControllerWithNarrow(CollisionType.NARROW_NS);
+                // Place player just to the right of tile (3,3) in tile (4,3), moving west.
+                player.x = 4 * TILE_SIZE + TILE_SIZE / 2;
+                player.y = TILE_3_CENTRE;
+
+                const startX = player.x;
+                ctrl.setTargetPosition(player.x - 60, player.y);
+                ctrl.update();
+
+                // Should NOT have crossed into tile (3,3) horizontally.
+                expect(player.x).toBeLessThan(startX); // moves within tile 4
+                expect(Math.floor(player.x / TILE_SIZE)).toBeGreaterThanOrEqual(3);
+                // Player should not be inside tile 3 column (< 3*TILE_SIZE+TILE_SIZE = 4*TILE_SIZE)
+                // when coming from the east they are blocked at the tile boundary.
+                expect(Math.floor(player.x / TILE_SIZE)).not.toBe(3);
+            });
+
+            it('blocks entering from the west (player moves rightward into tile)', () => {
+                const { ctrl, player } = makeControllerWithNarrow(CollisionType.NARROW_NS);
+                player.x = 2 * TILE_SIZE + TILE_SIZE / 2;
+                player.y = TILE_3_CENTRE;
+
+                const startX = player.x;
+                ctrl.setTargetPosition(player.x + 60, player.y);
+                ctrl.update();
+
+                expect(player.x).toBeGreaterThan(startX);
+                // Should stop at tile 2 boundary, not enter tile 3.
+                expect(Math.floor(player.x / TILE_SIZE)).toBe(2);
+            });
+
+            it('clamps x to the central band while inside the tile', () => {
+                const { ctrl, player } = makeControllerWithNarrow(CollisionType.NARROW_NS);
+                // Player is inside tile (3,3) but offset far to the right.
+                player.x = TILE_3_CENTRE + 10; // well outside the ±NARROW_HALF_WIDTH px band
+                player.y = TILE_3_CENTRE;
+
+                // Try to move further right (sub-tile move, stays in same tile).
+                ctrl.setTargetPosition(player.x + 5, player.y);
+                ctrl.update();
+
+                const centreX = TILE_3_CENTRE;
+                expect(player.x).toBeGreaterThanOrEqual(centreX - NARROW_HALF_WIDTH);
+                expect(player.x).toBeLessThanOrEqual(centreX + NARROW_HALF_WIDTH);
+            });
+
+            it('snaps x to tile centre when entering from north', () => {
+                const { ctrl, player } = makeControllerWithNarrow(CollisionType.NARROW_NS);
+                // Player slightly off-centre horizontally, just above tile boundary.
+                player.x = TILE_3_CENTRE + 4; // offset but still above boundary
+                player.y = 3 * TILE_SIZE - 1;
+
+                ctrl.setTargetPosition(player.x, player.y + 8);
+                ctrl.update();
+
+                if (Math.floor(player.y / TILE_SIZE) === 3) {
+                    // If the player crossed into tile 3, x should be snapped to centre.
+                    expect(player.x).toBe(TILE_3_CENTRE);
+                }
+            });
+        });
+
+        describe('NARROW_EW (horizontal passage)', () => {
+            it('allows entering from the west (player moves rightward into tile)', () => {
+                const { ctrl, player } = makeControllerWithNarrow(CollisionType.NARROW_EW);
+                player.x = 3 * TILE_SIZE - 2;
+                player.y = TILE_3_CENTRE;
+
+                // Target is the tile centre — distance > TARGET_REACHED_THRESHOLD so movement fires.
+                ctrl.setTargetPosition(TILE_3_CENTRE, player.y);
+                ctrl.update();
+
+                expect(Math.floor(player.x / TILE_SIZE)).toBe(3);
+            });
+
+            it('blocks entering from the north (player moves downward into tile)', () => {
+                const { ctrl, player } = makeControllerWithNarrow(CollisionType.NARROW_EW);
+                player.x = TILE_3_CENTRE;
+                player.y = 2 * TILE_SIZE + TILE_SIZE / 2;
+
+                const startY = player.y;
+                ctrl.setTargetPosition(player.x, player.y + 60);
+                ctrl.update();
+
+                expect(player.y).toBeGreaterThan(startY);
+                expect(Math.floor(player.y / TILE_SIZE)).toBe(2);
+            });
+
+            it('blocks entering from the south (player moves upward into tile)', () => {
+                const { ctrl, player } = makeControllerWithNarrow(CollisionType.NARROW_EW);
+                player.x = TILE_3_CENTRE;
+                player.y = 4 * TILE_SIZE + TILE_SIZE / 2;
+
+                const startY = player.y;
+                ctrl.setTargetPosition(player.x, player.y - 60);
+                ctrl.update();
+
+                expect(player.y).toBeLessThan(startY);
+                expect(Math.floor(player.y / TILE_SIZE)).toBe(4);
+            });
+
+            it('clamps y to the central band while inside the tile', () => {
+                const { ctrl, player } = makeControllerWithNarrow(CollisionType.NARROW_EW);
+                player.x = TILE_3_CENTRE;
+                player.y = TILE_3_CENTRE + 10; // outside ±NARROW_HALF_WIDTH band
+
+                ctrl.setTargetPosition(player.x, player.y + 5);
+                ctrl.update();
+
+                const centreY = TILE_3_CENTRE;
+                expect(player.y).toBeGreaterThanOrEqual(centreY - NARROW_HALF_WIDTH);
+                expect(player.y).toBeLessThanOrEqual(centreY + NARROW_HALF_WIDTH);
+            });
+
+            it('snaps y to tile centre when entering from the west', () => {
+                const { ctrl, player } = makeControllerWithNarrow(CollisionType.NARROW_EW);
+                player.x = 3 * TILE_SIZE - 1;
+                player.y = TILE_3_CENTRE + 4;
+
+                ctrl.setTargetPosition(player.x + 8, player.y);
+                ctrl.update();
+
+                if (Math.floor(player.x / TILE_SIZE) === 3) {
+                    expect(player.y).toBe(TILE_3_CENTRE);
+                }
+            });
         });
     });
 });

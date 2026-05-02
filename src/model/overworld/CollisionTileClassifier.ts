@@ -9,6 +9,8 @@ export interface CollisionTileProperties {
     walkable_low?: boolean;
     stairs?: boolean;
     alwaysHigh?: boolean;
+    narrow_ns?: boolean;
+    narrow_ew?: boolean;
     [key: string]: any;
 }
 
@@ -60,6 +62,8 @@ export class CollisionTileClassifier {
         let hasWalkable = false;
         let hasWalkableLow = false;
         let hasAlwaysHigh = false;
+        let hasNarrowNS = false;
+        let hasNarrowEW = false;
         let hasTile = false;
 
         for (const tile of layerTiles) {
@@ -84,6 +88,18 @@ export class CollisionTileClassifier {
                         collisionType = CollisionType.WALKABLE_LOW;
                     }
                 }
+                if ('narrow_ns' in tile.properties && tile.properties.narrow_ns === true) {
+                    hasNarrowNS = true;
+                    if (collisionType !== CollisionType.ALWAYS_HIGH && collisionType !== CollisionType.STAIRS) {
+                        collisionType = CollisionType.NARROW_NS;
+                    }
+                }
+                if ('narrow_ew' in tile.properties && tile.properties.narrow_ew === true) {
+                    hasNarrowEW = true;
+                    if (collisionType !== CollisionType.ALWAYS_HIGH && collisionType !== CollisionType.STAIRS) {
+                        collisionType = CollisionType.NARROW_EW;
+                    }
+                }
                 if ('stairs' in tile.properties && tile.properties.stairs === true) {
                     collisionType = CollisionType.STAIRS;
                 }
@@ -92,7 +108,7 @@ export class CollisionTileClassifier {
             // A tile present with no walkable properties is blocked.
             // The guard ensures that a higher-priority type already assigned cannot be
             // overridden to BLOCKED by a later property-less tile.
-            if (!hasWalkable && !hasWalkableLow && !hasAlwaysHigh &&
+            if (!hasWalkable && !hasWalkableLow && !hasAlwaysHigh && !hasNarrowNS && !hasNarrowEW &&
                 collisionType !== CollisionType.STAIRS) {
                 collisionType = CollisionType.BLOCKED;
             }
@@ -128,6 +144,13 @@ export class CollisionTileClassifier {
 
         if (result.collisionType === CollisionType.ALWAYS_HIGH) {
             // Always upper ground: player on the lower layer is blocked here
+            return { upperGround: 1, lowerGround: 0, blocked: 0 };
+        }
+
+        if (result.collisionType === CollisionType.NARROW_NS ||
+            result.collisionType === CollisionType.NARROW_EW) {
+            // Narrow passages are upper-ground tiles; the directional movement
+            // constraint is enforced by PlayerController, not by the sub-layer system.
             return { upperGround: 1, lowerGround: 0, blocked: 0 };
         }
 
