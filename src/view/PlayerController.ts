@@ -8,6 +8,12 @@ import { isTestMode } from '@helpers/TestMarkers';
 const PLAYER_SPEED = 200;
 const TARGET_REACHED_THRESHOLD = 5; // Pixels - how close is "close enough" to target
 const TILE_SIZE = 32; // Must match the map's tilewidth/tileheight
+/**
+ * Half-width of the walkable central band inside a narrow-passage tile.
+ * The player's constrained axis is clamped within (tileCentre ± NARROW_HALF_WIDTH).
+ * At TILE_SIZE=32 this gives a 12-pixel walkable band centred on the tile.
+ */
+const NARROW_HALF_WIDTH = 6;
 
 /**
  * PlayerController manages the player character in the overworld.
@@ -182,12 +188,14 @@ export class PlayerController {
             this.playerLayer = 'stairs';
         } else if (currentType === CollisionType.ALWAYS_HIGH) {
             this.playerLayer = 'upper';
+        } else if (currentType === CollisionType.NARROW_NS || currentType === CollisionType.NARROW_EW) {
+            this.playerLayer = 'upper';
         }
         // BLOCKED or unknown: leave playerLayer unchanged
 
         if (isTestMode()) {
             if (this.playerLayer !== previousLayer) {
-                const typeNames: Record<number, string> = { 0: 'BLOCKED', 1: 'WALKABLE', 2: 'WALKABLE_LOW', 3: 'STAIRS', 4: 'ALWAYS_HIGH' };
+                const typeNames: Record<number, string> = { 0: 'BLOCKED', 1: 'WALKABLE', 2: 'WALKABLE_LOW', 3: 'STAIRS', 4: 'ALWAYS_HIGH', 5: 'NARROW_NS', 6: 'NARROW_EW' };
                 console.log(`[PlayerLayer] ${previousLayer} -> ${this.playerLayer} (tile ${tileX},${tileY} type=${typeNames[currentType] ?? currentType})`);
             }
             this.updateLayerDebugDisplay(tileX, tileY);
@@ -357,24 +365,53 @@ export class PlayerController {
      * Try to move the player by (dx, dy).
      * Returns true and applies the move if the target tile is passable;
      * returns false and leaves the player position unchanged otherwise.
+     *
+     * Narrow-passage tiles (NARROW_NS / NARROW_EW) have directional constraints:
+     * - NARROW_NS: entry and exit are only permitted from north or south (no east/west crossing).
+     *   While the player occupies the tile their x is clamped to the central band.
+     * - NARROW_EW: entry and exit are only permitted from east or west (no north/south crossing).
+     *   While the player occupies the tile their y is clamped to the central band.
+     * On crossing into a narrow passage the player is snapped to the tile's centre on the
+     * constrained axis, so they walk onto the bridge rather than off its edge.
      */
     private attemptMove(dx: number, dy: number): boolean {
         if (dx === 0 && dy === 0) return false;
 
-        const nextX = this.player.x + dx;
-        const nextY = this.player.y + dy;
+        const originalX = this.player.x;
+        const originalY = this.player.y;
+        const nextX = originalX + dx;
+        const nextY = originalY + dy;
 
-        const currentTileX = Math.floor(this.player.x / TILE_SIZE);
-        const currentTileY = Math.floor(this.player.y / TILE_SIZE);
+        const currentTileX = Math.floor(originalX / TILE_SIZE);
+        const currentTileY = Math.floor(originalY / TILE_SIZE);
         const nextTileX = Math.floor(nextX / TILE_SIZE);
         const nextTileY = Math.floor(nextY / TILE_SIZE);
 
-        // Sub-tile movement within the same tile is always allowed
-        if (nextTileX === currentTileX && nextTileY === currentTileY) {
-            this.player.x = nextX;
-            this.player.y = nextY;
-            this.moveX = dx;
-            this.moveY = dy;
+        const crossesX = nextTileX !== currentTileX;
+        const crossesY = nextTileY !== currentTileY;
+
+        // Sub-tile movement within the same tile.
+        if (!crossesX && !crossesY) {
+            let finalX = nextX;
+            let finalY = nextY;
+
+            if (this.getCollisionAt) {
+                const currentType = this.getCollisionAt(currentTileX, currentTileY);
+                if (currentType === CollisionType.NARROW_NS) {
+                    // Clamp x to the central band; allow y freely.
+                    const centreX = (currentTileX + 0.5) * TILE_SIZE;
+                    finalX = Math.max(centreX - NARROW_HALF_WIDTH, Math.min(centreX + NARROW_HALF_WIDTH, nextX));
+                } else if (currentType === CollisionType.NARROW_EW) {
+                    // Clamp y to the central band; allow x freely.
+                    const centreY = (currentTileY + 0.5) * TILE_SIZE;
+                    finalY = Math.max(centreY - NARROW_HALF_WIDTH, Math.min(centreY + NARROW_HALF_WIDTH, nextY));
+                }
+            }
+
+            this.player.x = finalX;
+            this.player.y = finalY;
+            this.moveX = finalX - originalX;
+            this.moveY = finalY - originalY;
             return true;
         }
 
@@ -395,32 +432,68 @@ export class PlayerController {
         // can slide the player along the open axis instead (e.g. up+left → just left when
         // there's a wall above). This also prevents squeezing through an infinitely thin
         // corner gap where both intermediates are blocked.
-        if (nextTileX !== currentTileX && nextTileY !== currentTileY) {
+        if (crossesX && crossesY) {
             const hType = this.getCollisionAt(nextTileX, currentTileY); // horizontal step
             const vType = this.getCollisionAt(currentTileX, nextTileY); // vertical step
-            if (!this.canEnter(currentType, hType) || !this.canEnter(currentType, vType)) {
+            if (!this.canEnter(currentType, hType) || this.isNarrowEntryBlocked(currentType, hType, true, false)) {
+                return false;
+            }
+            if (!this.canEnter(currentType, vType) || this.isNarrowEntryBlocked(currentType, vType, false, true)) {
                 return false;
             }
         }
 
-        if (this.canEnter(currentType, targetType)) {
-            this.player.x = nextX;
-            this.player.y = nextY;
-            this.moveX = dx;
-            this.moveY = dy;
-            // Keep playerLayer in sync immediately (also synced at the top of each update())
-            if (targetType === CollisionType.WALKABLE) {
-                this.playerLayer = 'upper';
-            } else if (targetType === CollisionType.WALKABLE_LOW) {
-                this.playerLayer = 'lower';
-            } else if (targetType === CollisionType.STAIRS) {
-                this.playerLayer = 'stairs';
-            } else if (targetType === CollisionType.ALWAYS_HIGH) {
-                this.playerLayer = 'upper';
-            }
-            return true;
+        if (!this.canEnter(currentType, targetType)) return false;
+        if (this.isNarrowEntryBlocked(currentType, targetType, crossesX, crossesY)) return false;
+
+        // Move is valid — apply it.
+        this.player.x = nextX;
+        this.player.y = nextY;
+        this.moveX = dx;
+        this.moveY = dy;
+
+        // Snap the constrained axis to the tile centre when entering a narrow passage,
+        // nudging the player onto the bridge rather than leaving them near the edge.
+        if (targetType === CollisionType.NARROW_NS) {
+            this.player.x = (nextTileX + 0.5) * TILE_SIZE;
+            this.moveX = this.player.x - originalX;
+        } else if (targetType === CollisionType.NARROW_EW) {
+            this.player.y = (nextTileY + 0.5) * TILE_SIZE;
+            this.moveY = this.player.y - originalY;
         }
 
+        // Keep playerLayer in sync immediately (also synced at the top of each update())
+        if (targetType === CollisionType.WALKABLE ||
+            targetType === CollisionType.NARROW_NS ||
+            targetType === CollisionType.NARROW_EW) {
+            this.playerLayer = 'upper';
+        } else if (targetType === CollisionType.WALKABLE_LOW) {
+            this.playerLayer = 'lower';
+        } else if (targetType === CollisionType.STAIRS) {
+            this.playerLayer = 'stairs';
+        } else if (targetType === CollisionType.ALWAYS_HIGH) {
+            this.playerLayer = 'upper';
+        }
+        return true;
+    }
+
+    /**
+     * Return true when a tile crossing is forbidden by a narrow-passage constraint,
+     * regardless of layer compatibility.
+     *
+     * - NARROW_NS tiles may only be entered or exited via a north/south crossing
+     *   (i.e. the move must not cross a tile boundary in x).
+     * - NARROW_EW tiles may only be entered or exited via an east/west crossing
+     *   (i.e. the move must not cross a tile boundary in y).
+     */
+    private isNarrowEntryBlocked(
+        from: CollisionType, to: CollisionType,
+        crossesX: boolean, crossesY: boolean
+    ): boolean {
+        if (to === CollisionType.NARROW_NS && crossesX) return true;
+        if (from === CollisionType.NARROW_NS && crossesX) return true;
+        if (to === CollisionType.NARROW_EW && crossesY) return true;
+        if (from === CollisionType.NARROW_EW && crossesY) return true;
         return false;
     }
 
@@ -431,14 +504,19 @@ export class PlayerController {
      *   - STAIRS can be entered from any layer (transition tile)
      *   - When leaving STAIRS, any non-blocked tile is allowed
      *   - Otherwise the player must stay on matching ground level
+     *   - NARROW_NS and NARROW_EW are treated as upper-ground (same layer as WALKABLE)
      */
     private canEnter(from: CollisionType, to: CollisionType): boolean {
         if (to === CollisionType.BLOCKED) return false;
         if (to === CollisionType.STAIRS) return true;
         if (from === CollisionType.STAIRS) return true;
-        // ALWAYS_HIGH is upper-ground, so treat it as WALKABLE for layer-matching.
-        const normFrom = from === CollisionType.ALWAYS_HIGH ? CollisionType.WALKABLE : from;
-        const normTo = to === CollisionType.ALWAYS_HIGH ? CollisionType.WALKABLE : to;
+        // ALWAYS_HIGH and narrow passages are upper-ground; normalise to WALKABLE for layer matching.
+        const normFrom = (from === CollisionType.ALWAYS_HIGH ||
+            from === CollisionType.NARROW_NS || from === CollisionType.NARROW_EW)
+            ? CollisionType.WALKABLE : from;
+        const normTo = (to === CollisionType.ALWAYS_HIGH ||
+            to === CollisionType.NARROW_NS || to === CollisionType.NARROW_EW)
+            ? CollisionType.WALKABLE : to;
         return normFrom === normTo;
     }
 

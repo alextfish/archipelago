@@ -68,6 +68,14 @@ export class OverworldBridgeManager {
      * and update collision array to make them walkable.
      * 
      * Uses junction tiles when multiple bridges meet at the same tile.
+     *
+     * Single bridges (only one bridge between a pair of islands) receive narrow-passage
+     * collision on their body tiles (the squares strictly between the two island endpoints):
+     * - Vertical single bridges → NARROW_NS (passable north/south only)
+     * - Horizontal single bridges → NARROW_EW (passable east/west only)
+     * When multiple bridges span the same island pair every tile (including body tiles) is
+     * given full WALKABLE collision, as with the original behaviour.
+     * Island endpoint tiles are always given full WALKABLE collision regardless.
      */
     bakePuzzleBridges(puzzleId: string, puzzleBounds: Phaser.Geom.Rectangle, bridges: Bridge[]): void {
         console.log(`OverworldBridgeManager: Baking ${bridges.length} bridges for puzzle ${puzzleId}`);
@@ -86,6 +94,10 @@ export class OverworldBridgeManager {
         if (layerData.data && layerData.data.length > 0) {
             console.log(`  First row exists: ${!!layerData.data[0]}, length: ${layerData.data[0]?.length}`);
         }
+
+        // Count how many bridges span each island pair so we know whether to use
+        // full WALKABLE or narrow-passage collision on body tiles.
+        const bridgeCountPerPair = this.countBridgesPerIslandPair(bridges);
 
         // Phase 1: Collect all bridge segments and their connections at each tile
         const tileConnectionsMap = new Map<string, TileConnections>();
@@ -133,9 +145,11 @@ export class OverworldBridgeManager {
                 this.bakedTilePositions.get(puzzleId)!.push({ tileX, tileY });
             }
 
-            // Make walkable by updating collision through collision manager
-            // This updates the collision array so tryMove sees it as passable
-            this.collisionManager.setCollisionAt(tileX, tileY, CollisionType.WALKABLE);
+            // Determine appropriate collision type for this tile.
+            const collisionType = this.getBakedTileCollisionType(
+                tileX, tileY, connections, puzzleBounds, bridges, bridgeCountPerPair
+            );
+            this.collisionManager.setCollisionAt(tileX, tileY, collisionType);
         }
 
         console.log(`OverworldBridgeManager: Baked ${bridges.length} bridges (${tilesPlaced} tiles placed) for puzzle ${puzzleId}`);
@@ -204,6 +218,103 @@ export class OverworldBridgeManager {
                 if (gridY < endY) connections.south = true;    // Has segment to the south
             }
         }
+    }
+
+    /**
+     * Build a normalised island-pair key for a bridge, independent of direction.
+     * Two bridges between the same pair of islands will produce the same key.
+     */
+    private islandPairKey(bridge: Bridge): string {
+        if (!bridge.start || !bridge.end) return '';
+        const ax = bridge.start.x, ay = bridge.start.y;
+        const bx = bridge.end.x, by = bridge.end.y;
+        // Normalise so the lexically smaller endpoint always comes first.
+        if (ay < by || (ay === by && ax < bx)) {
+            return `${ax},${ay}-${bx},${by}`;
+        }
+        return `${bx},${by}-${ax},${ay}`;
+    }
+
+    /**
+     * Return a map from normalised island-pair key to the number of bridges that
+     * span that pair.  Only bridges with both start and end positions are counted.
+     */
+    private countBridgesPerIslandPair(bridges: Bridge[]): Map<string, number> {
+        const counts = new Map<string, number>();
+        for (const bridge of bridges) {
+            if (!bridge.start || !bridge.end) continue;
+            const key = this.islandPairKey(bridge);
+            counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
+        return counts;
+    }
+
+    /**
+     * Return the collision type to assign to a baked bridge tile.
+     *
+     * - Island endpoint tiles (the first and last tile of a bridge) always receive
+     *   full WALKABLE collision regardless of bridge multiplicity.
+     * - Body tiles of a bridge with multiple spans between the same island pair
+     *   also receive full WALKABLE collision.
+     * - Body tiles of a single-span bridge receive NARROW_NS (vertical) or
+     *   NARROW_EW (horizontal), so the player can only walk along the bridge axis.
+     */
+    private getBakedTileCollisionType(
+        tileX: number,
+        tileY: number,
+        _connections: TileConnections,
+        puzzleBounds: Phaser.Geom.Rectangle,
+        bridges: Bridge[],
+        bridgeCountPerPair: Map<string, number>
+    ): CollisionType {
+        const tileWidth = this.tiledMapData.tilewidth as number;
+        const tileHeight = this.tiledMapData.tileheight as number;
+
+        for (const bridge of bridges) {
+            if (!bridge.start || !bridge.end) continue;
+
+            const isHorizontal = bridge.start.y === bridge.end.y;
+            const startX = Math.min(bridge.start.x, bridge.end.x);
+            const endX = Math.max(bridge.start.x, bridge.end.x);
+            const startY = Math.min(bridge.start.y, bridge.end.y);
+            const endY = Math.max(bridge.start.y, bridge.end.y);
+
+            // Compute the world tile X/Y for the start and end of this bridge.
+            let bridgeTileStartX: number, bridgeTileStartY: number;
+            let bridgeTileEndX: number, bridgeTileEndY: number;
+            if (isHorizontal) {
+                bridgeTileStartX = Math.floor((puzzleBounds.x + startX * 32) / tileWidth);
+                bridgeTileEndX = Math.floor((puzzleBounds.x + endX * 32) / tileWidth);
+                bridgeTileStartY = bridgeTileEndY = Math.floor((puzzleBounds.y + startY * 32) / tileHeight);
+            } else {
+                bridgeTileStartY = Math.floor((puzzleBounds.y + startY * 32) / tileHeight);
+                bridgeTileEndY = Math.floor((puzzleBounds.y + endY * 32) / tileHeight);
+                bridgeTileStartX = bridgeTileEndX = Math.floor((puzzleBounds.x + startX * 32) / tileWidth);
+            }
+
+            // Check whether this tile belongs to the current bridge's span.
+            const onBridge = isHorizontal
+                ? (tileY === bridgeTileStartY && tileX >= bridgeTileStartX && tileX <= bridgeTileEndX)
+                : (tileX === bridgeTileStartX && tileY >= bridgeTileStartY && tileY <= bridgeTileEndY);
+
+            if (!onBridge) continue;
+
+            // Island endpoint tiles always get full walkability.
+            const isEndpoint = isHorizontal
+                ? (tileX === bridgeTileStartX || tileX === bridgeTileEndX)
+                : (tileY === bridgeTileStartY || tileY === bridgeTileEndY);
+
+            if (isEndpoint) return CollisionType.WALKABLE;
+
+            // Body tile: narrow passage for single-span bridges, walkable for multi-span.
+            const pairKey = this.islandPairKey(bridge);
+            const pairCount = bridgeCountPerPair.get(pairKey) ?? 1;
+            if (pairCount > 1) return CollisionType.WALKABLE;
+            return isHorizontal ? CollisionType.NARROW_EW : CollisionType.NARROW_NS;
+        }
+
+        // Tile not matched to any specific bridge (e.g. junction) — use full walkable.
+        return CollisionType.WALKABLE;
     }
 
     /**
