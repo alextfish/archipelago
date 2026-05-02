@@ -117,6 +117,50 @@ describe('CollisionTileClassifier', () => {
             ]);
             expect(result.collisionType).toBe(CollisionType.ALWAYS_HIGH);
         });
+
+        it('returns NARROW_NS when a tile has narrow_ns=true', () => {
+            const result = CollisionTileClassifier.classifyTile([{ properties: { narrow_ns: true } }]);
+            expect(result.collisionType).toBe(CollisionType.NARROW_NS);
+            expect(result.hasTile).toBe(true);
+        });
+
+        it('returns NARROW_EW when a tile has narrow_ew=true', () => {
+            const result = CollisionTileClassifier.classifyTile([{ properties: { narrow_ew: true } }]);
+            expect(result.collisionType).toBe(CollisionType.NARROW_EW);
+            expect(result.hasTile).toBe(true);
+        });
+
+        it('NARROW_NS prevents a property-less tile from overriding to BLOCKED', () => {
+            const result = CollisionTileClassifier.classifyTile([
+                { properties: { narrow_ns: true } },
+                {}, // no properties — must not clobber NARROW_NS
+            ]);
+            expect(result.collisionType).toBe(CollisionType.NARROW_NS);
+        });
+
+        it('NARROW_EW prevents a property-less tile from overriding to BLOCKED', () => {
+            const result = CollisionTileClassifier.classifyTile([
+                { properties: { narrow_ew: true } },
+                {},
+            ]);
+            expect(result.collisionType).toBe(CollisionType.NARROW_EW);
+        });
+
+        it('STAIRS takes priority over narrow_ns', () => {
+            const result = CollisionTileClassifier.classifyTile([
+                { properties: { narrow_ns: true } },
+                { properties: { stairs: true } },
+            ]);
+            expect(result.collisionType).toBe(CollisionType.STAIRS);
+        });
+
+        it('ALWAYS_HIGH takes priority over narrow_ew', () => {
+            const result = CollisionTileClassifier.classifyTile([
+                { properties: { narrow_ew: true } },
+                { properties: { alwaysHigh: true } },
+            ]);
+            expect(result.collisionType).toBe(CollisionType.ALWAYS_HIGH);
+        });
     });
 
     describe('toSubLayerValues', () => {
@@ -179,6 +223,26 @@ describe('CollisionTileClassifier', () => {
             });
             expect(result).toEqual({ upperGround: 1, lowerGround: 0, blocked: 0 });
         });
+
+        it('returns upperGround=1 for NARROW_NS (treated as upper-ground)', () => {
+            const result = CollisionTileClassifier.toSubLayerValues({
+                collisionType: CollisionType.NARROW_NS,
+                hasWalkable: false,
+                hasWalkableLow: false,
+                hasTile: true
+            });
+            expect(result).toEqual({ upperGround: 1, lowerGround: 0, blocked: 0 });
+        });
+
+        it('returns upperGround=1 for NARROW_EW (treated as upper-ground)', () => {
+            const result = CollisionTileClassifier.toSubLayerValues({
+                collisionType: CollisionType.NARROW_EW,
+                hasWalkable: false,
+                hasWalkableLow: false,
+                hasTile: true
+            });
+            expect(result).toEqual({ upperGround: 1, lowerGround: 0, blocked: 0 });
+        });
     });
 
     describe('classifyTile + toSubLayerValues round-trip', () => {
@@ -214,6 +278,18 @@ describe('CollisionTileClassifier', () => {
 
         it('alwaysHigh tile → upperGround sub-layer', () => {
             const classification = CollisionTileClassifier.classifyTile([{ properties: { alwaysHigh: true } }]);
+            const subLayers = CollisionTileClassifier.toSubLayerValues(classification);
+            expect(subLayers).toEqual({ upperGround: 1, lowerGround: 0, blocked: 0 });
+        });
+
+        it('narrow_ns tile → upperGround sub-layer', () => {
+            const classification = CollisionTileClassifier.classifyTile([{ properties: { narrow_ns: true } }]);
+            const subLayers = CollisionTileClassifier.toSubLayerValues(classification);
+            expect(subLayers).toEqual({ upperGround: 1, lowerGround: 0, blocked: 0 });
+        });
+
+        it('narrow_ew tile → upperGround sub-layer', () => {
+            const classification = CollisionTileClassifier.classifyTile([{ properties: { narrow_ew: true } }]);
             const subLayers = CollisionTileClassifier.toSubLayerValues(classification);
             expect(subLayers).toEqual({ upperGround: 1, lowerGround: 0, blocked: 0 });
         });
