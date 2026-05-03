@@ -325,11 +325,11 @@ describe('PlayerController', () => {
                 ctrl.setTargetPosition(player.x, player.y + 8);
                 ctrl.update();
 
-                if (Math.floor(player.y / TILE_SIZE) === 3) {
-                    // If the player crossed into tile 3, x should be clamped to the valid band.
-                    expect(player.x).toBeGreaterThanOrEqual(TILE_3_CENTRE - NARROW_HALF_WIDTH);
-                    expect(player.x).toBeLessThanOrEqual(TILE_3_CENTRE + NARROW_HALF_WIDTH);
-                }
+                // The player must have crossed into tile 3.
+                expect(Math.floor(player.y / TILE_SIZE)).toBe(3);
+                // x should be clamped to the valid band.
+                expect(player.x).toBeGreaterThanOrEqual(TILE_3_CENTRE - NARROW_HALF_WIDTH);
+                expect(player.x).toBeLessThanOrEqual(TILE_3_CENTRE + NARROW_HALF_WIDTH);
             });
         });
 
@@ -393,10 +393,11 @@ describe('PlayerController', () => {
                 ctrl.setTargetPosition(player.x + 8, player.y);
                 ctrl.update();
 
-                if (Math.floor(player.x / TILE_SIZE) === 3) {
-                    expect(player.y).toBeGreaterThanOrEqual(TILE_3_CENTRE - NARROW_HALF_WIDTH);
-                    expect(player.y).toBeLessThanOrEqual(TILE_3_CENTRE + NARROW_HALF_WIDTH);
-                }
+                // The player must have crossed into tile 3.
+                expect(Math.floor(player.x / TILE_SIZE)).toBe(3);
+                // y should be clamped to the valid band.
+                expect(player.y).toBeGreaterThanOrEqual(TILE_3_CENTRE - NARROW_HALF_WIDTH);
+                expect(player.y).toBeLessThanOrEqual(TILE_3_CENTRE + NARROW_HALF_WIDTH);
             });
         });
     });
