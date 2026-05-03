@@ -46,6 +46,40 @@ describe('Door', () => {
             expect(door.spriteId).toBe('wooden-door');
         });
 
+        it('should store optional overworldPuzzleId', () => {
+            const door = new Door(
+                'door1',
+                [{ tileX: 5, tileY: 10 }],
+                true,
+                undefined,
+                undefined,
+                'overworld-puzzle-1'
+            );
+
+            expect(door.overworldPuzzleId).toBe('overworld-puzzle-1');
+        });
+
+        it('should store all optional fields together', () => {
+            const door = new Door(
+                'door1',
+                [{ tileX: 5, tileY: 10 }],
+                true,
+                'tutorial-series',
+                'wooden-door',
+                'overworld-puzzle-1'
+            );
+
+            expect(door.seriesId).toBe('tutorial-series');
+            expect(door.spriteId).toBe('wooden-door');
+            expect(door.overworldPuzzleId).toBe('overworld-puzzle-1');
+        });
+
+        it('should default overworldPuzzleId to undefined when not provided', () => {
+            const door = new Door('door1', [{ tileX: 5, tileY: 10 }]);
+
+            expect(door.overworldPuzzleId).toBeUndefined();
+        });
+
         it('should throw error when no positions provided', () => {
             expect(() => new Door('door1', [])).toThrow('Door must have at least one position');
         });
@@ -175,6 +209,61 @@ describe('Door', () => {
 
             expect(door.seriesId).toBe('tutorial-series');
             expect(door.spriteId).toBe('wooden-door');
+        });
+
+        it('should extract overworldPuzzleId from properties', () => {
+            const tiledObj = {
+                name: 'door1',
+                x: 160,
+                y: 320,
+                width: 32,
+                height: 32,
+                properties: [
+                    { name: 'overworldPuzzleId', value: 'forest-puzzle-1' }
+                ]
+            };
+
+            const door = Door.fromTiledObject(tiledObj, 32, 32);
+
+            expect(door.overworldPuzzleId).toBe('forest-puzzle-1');
+        });
+
+        it('should extract all three link properties together', () => {
+            const tiledObj = {
+                name: 'door1',
+                x: 160,
+                y: 320,
+                width: 32,
+                height: 32,
+                properties: [
+                    { name: 'seriesId', value: 'tutorial-series' },
+                    { name: 'spriteId', value: 'wooden-door' },
+                    { name: 'overworldPuzzleId', value: 'forest-puzzle-1' }
+                ]
+            };
+
+            const door = Door.fromTiledObject(tiledObj, 32, 32);
+
+            expect(door.seriesId).toBe('tutorial-series');
+            expect(door.spriteId).toBe('wooden-door');
+            expect(door.overworldPuzzleId).toBe('forest-puzzle-1');
+        });
+
+        it('should default overworldPuzzleId to undefined when property absent', () => {
+            const tiledObj = {
+                name: 'door1',
+                x: 160,
+                y: 320,
+                width: 32,
+                height: 32,
+                properties: [
+                    { name: 'seriesId', value: 'tutorial-series' }
+                ]
+            };
+
+            const door = Door.fromTiledObject(tiledObj, 32, 32);
+
+            expect(door.overworldPuzzleId).toBeUndefined();
         });
 
         it('should use id as fallback when name is missing', () => {

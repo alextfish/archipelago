@@ -21,7 +21,7 @@ import { FilePuzzleLoader, LocalStorageProgressStore } from '@model/series/Serie
 import { NPCIconConfig } from '@view/NPCIconConfig';
 import { Door } from '@model/overworld/Door';
 import { PlayerStartManager } from '@model/overworld/PlayerStartManager';
-import { getDoorSpriteFrame } from '@view/DoorSpriteRegistry';
+import { getDoorSpriteFrame, getDoorSpriteMapping } from '@view/DoorSpriteRegistry';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import { CollisionTileClassifier } from '@model/overworld/CollisionTileClassifier';
 import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
@@ -216,6 +216,18 @@ export class OverworldScene extends Phaser.Scene {
     this.load.spritesheet('jewel-green', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 4, endFrame: 7 });
     this.load.spritesheet('jewel-blue', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 8, endFrame: 11 });
     this.load.spritesheet('jewel-yellow', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 12, endFrame: 15 });
+
+    // Load door opening animation spritesheets (horizontal and vertical variants).
+    // Each sheet is a horizontal strip of frames showing the door swinging open.
+    // Frame dimensions match those specified in DoorSpriteRegistry.
+    this.load.spritesheet('forestDoorHOpening', 'resources/sprites/forestDoorHOpening.png', {
+      frameWidth: 32,
+      frameHeight: 32
+    });
+    this.load.spritesheet('forestDoorVOpening', 'resources/sprites/forestDoorVOpening.png', {
+      frameWidth: 32,
+      frameHeight: 64
+    });
 
     // Load TMX file asynchronously, then load embedded tilesets
     this.loadTmxFile();
@@ -2671,7 +2683,108 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   /**
-   * Unlock a door by ID
+   * Synchronously apply a door state change: update the model, collision, sprite, and game state.
+   * Used by animateDoorChange() after the camera has panned and animation has played.
+   */
+  private applyDoorChange(door: Door, unlock: boolean): void {
+    if (unlock) {
+      door.unlock();
+      this.gameState.unlockDoor(door.id);
+    } else {
+      door.lock();
+      this.gameState.lockDoor(door.id);
+    }
+    this.collisionManager.updateDoorCollision(door);
+    this.updateDoorSprite(door);
+    console.log(`Door ${door.id} ${unlock ? 'unlocked' : 'locked'} successfully`);
+  }
+
+  /**
+   * Animate a door opening or closing:
+   *   1. Disable player movement and stop camera follow
+   *   2. Pan camera to the door
+   *   3. Play the opening animation sprite (if the spritesheet is loaded)
+   *   4. Apply the door state change (update model, collision, and tile sprite)
+   *   5. Pan camera back to the player
+   *   6. Resume camera follow and re-enable player movement
+   */
+  private async animateDoorChange(door: Door, unlock: boolean): Promise<void> {
+    const PAN_DURATION = 800;
+    const tileW = this.tiledMapData?.tilewidth ?? 32;
+    const tileH = this.tiledMapData?.tileheight ?? 32;
+
+    // Compute world-space centre of the door from its tile positions
+    const positions = door.getPositions();
+    const sumX = positions.reduce((acc, p) => acc + p.tileX, 0);
+    const sumY = positions.reduce((acc, p) => acc + p.tileY, 0);
+    const doorWorldX = (sumX / positions.length + 0.5) * tileW;
+    const doorWorldY = (sumY / positions.length + 0.5) * tileH;
+
+    // Disable player movement and stop follow so we can freely pan
+    this.playerController?.setEnabled(false);
+    this.cameras.main.stopFollow();
+
+    try {
+      // Pan to the door
+      await new Promise<void>((resolve) => {
+        this.cameras.main.pan(doorWorldX, doorWorldY, PAN_DURATION, 'Power2', false, (_cam, progress) => {
+          if (progress === 1) resolve();
+        });
+      });
+
+      // Play the opening animation if the spritesheet is available
+      const mapping = getDoorSpriteMapping(door.spriteId);
+      if (mapping && this.textures.exists(mapping.animationKey)) {
+        const animKey = `${mapping.animationKey}-play`;
+
+        // Register animation lazily (idempotent: Phaser ignores duplicates)
+        if (!this.anims.exists(animKey)) {
+          this.anims.create({
+            key: animKey,
+            frames: this.anims.generateFrameNumbers(mapping.animationKey, {
+              start: 0,
+              end: mapping.frameCount - 1
+            }),
+            frameRate: 8,
+            repeat: 0
+          });
+        }
+
+        await new Promise<void>((resolve) => {
+          const animSprite = this.add.sprite(doorWorldX, doorWorldY, mapping.animationKey, 0);
+          animSprite.setOrigin(0.5, 0.5);
+          animSprite.once('animationcomplete', () => {
+            animSprite.destroy();
+            resolve();
+          });
+          animSprite.play(animKey);
+        });
+      } else if (mapping) {
+        console.warn(`Door animation texture '${mapping.animationKey}' not loaded — skipping animation for door ${door.id}`);
+      }
+
+      // Apply the state change (model, collision, tile sprite)
+      this.applyDoorChange(door, unlock);
+
+    } finally {
+      // Pan back to the player and resume follow regardless of errors
+      if (this.player) {
+        const playerX = this.player.x;
+        const playerY = this.player.y;
+        await new Promise<void>((resolve) => {
+          this.cameras.main.pan(playerX, playerY, PAN_DURATION, 'Power2', false, (_cam, progress) => {
+            if (progress === 1) resolve();
+          });
+        });
+        this.cameras.main.startFollow(this.player);
+      }
+      this.playerController?.setEnabled(true);
+    }
+  }
+
+  /**
+   * Unlock a door by ID immediately, without animation.
+   * Used for conversation-triggered unlocks and as an internal helper.
    */
   private unlockDoor(doorId: string): void {
     const door = this.doors.find(d => d.id === doorId);
@@ -2685,26 +2798,14 @@ export class OverworldScene extends Phaser.Scene {
       return;
     }
 
-    console.log(`Unlocking door: ${doorId}`);
-    door.unlock();
-
-    // Update game state
-    this.gameState.unlockDoor(doorId);
-
-    // Update collision
-    this.collisionManager.updateDoorCollision(door);
-
-    // Update door sprite to show open state
-    this.updateDoorSprite(door);
-
-    console.log(`Door ${doorId} unlocked successfully`);
+    this.applyDoorChange(door, true);
   }
 
   /**
    * Handle completion of a puzzle within a series
    * Called when BridgePuzzleScene completes a series puzzle
    */
-  private handleSeriesPuzzleCompleted(data: { puzzleId: string; success: boolean }): void {
+  private async handleSeriesPuzzleCompleted(data: { puzzleId: string; success: boolean }): Promise<void> {
     console.log(`[OverworldScene] Series puzzle completed: ${data.puzzleId}, success: ${data.success}`);
 
     // BridgePuzzleScene has closed — restore the jewel HUD regardless of outcome
@@ -2747,9 +2848,15 @@ export class OverworldScene extends Phaser.Scene {
 
     // Check if the series is now complete
     if (this.currentSeries.isSeriesCompleted()) {
-      console.log(`Series ${this.currentSeries.id} completed! Unlocking door...`);
-      // Unlock the door associated with this series
-      this.unlockDoor(this.currentSeries.id);
+      console.log(`Series ${this.currentSeries.id} completed! Animating door unlock...`);
+      // Find and animate the door associated with this series
+      const seriesDoor = this.doors.find(d => d.id === this.currentSeries.id);
+      if (seriesDoor && seriesDoor.isLocked()) {
+        await this.animateDoorChange(seriesDoor, true);
+      } else if (!seriesDoor) {
+        // No animated door found — fall back to instant unlock by ID
+        this.unlockDoor(this.currentSeries.id);
+      }
 
       // Update NPC icon to show completion
       for (const [npcId, state] of this.npcSeriesStates.entries()) {
@@ -2934,7 +3041,7 @@ export class OverworldScene extends Phaser.Scene {
         this.showConstraintNPCsForPuzzle(activePuzzleId);
       }
 
-      await this.puzzleController.exitPuzzle(success, (mode: 'exploration') => {
+      const exitResult = await this.puzzleController.exitPuzzle(success, (mode: 'exploration') => {
         console.log('[DIAGNOSTIC] onModeChange callback called, setting mode to:', mode);
         this.gameMode = mode;
         // Resume camera follow after returning to exploration
@@ -2955,7 +3062,39 @@ export class OverworldScene extends Phaser.Scene {
 
       // (water visuals already updated in the onBeforeTransition callback above)
 
-      // Re-enable player movement
+      // Before re-enabling player movement, animate any doors linked to this puzzle.
+      // Camera is following the player again (set by onModeChange above) and player
+      // movement is still disabled (set during enterOverworldPuzzle), so animateDoorChange
+      // can immediately pan away without needing extra setup.
+
+      // Animate overworld-puzzle-linked doors
+      if (exitResult.wasSolved || exitResult.wasUnsolved) {
+        const linkedDoors = this.doors.filter(d => d.overworldPuzzleId === exitResult.puzzleId);
+        for (const door of linkedDoors) {
+          if (exitResult.wasSolved && door.isLocked()) {
+            console.log(`Animating unlock of door ${door.id} linked to overworld puzzle ${exitResult.puzzleId}`);
+            await this.animateDoorChange(door, true);
+          } else if (exitResult.wasUnsolved && !door.isLocked()) {
+            console.log(`Animating lock of door ${door.id} linked to overworld puzzle ${exitResult.puzzleId}`);
+            await this.animateDoorChange(door, false);
+          }
+        }
+      }
+
+      // Animate series-puzzle-linked door if series is now complete
+      if (success && this.currentSeries && this.currentSeries.isSeriesCompleted()) {
+        console.log(`Series ${this.currentSeries.id} completed! Animating door unlock...`);
+        const seriesDoor = this.doors.find(d => d.id === this.currentSeries.id);
+        if (seriesDoor && seriesDoor.isLocked()) {
+          await this.animateDoorChange(seriesDoor, true);
+        } else if (!seriesDoor) {
+          // No animated door found — fall back to instant unlock by ID
+          this.unlockDoor(this.currentSeries.id);
+        }
+      }
+
+      // Re-enable player movement (animateDoorChange also re-enables it, but we ensure
+      // it is enabled here even when no door animations ran)
       if (this.playerController) {
         this.playerController.setEnabled(true);
         console.log('[DIAGNOSTIC] Player controller re-enabled');
@@ -2982,15 +3121,8 @@ export class OverworldScene extends Phaser.Scene {
 
       console.log('Successfully exited overworld puzzle');
 
-      // Update NPC icons and unlock door if series is complete
+      // Update NPC icons if series is associated
       if (success && this.currentSeries) {
-        // Check if the series is now complete
-        if (this.currentSeries.isSeriesCompleted()) {
-          console.log(`Series ${this.currentSeries.id} completed! Unlocking door...`);
-          // Unlock the door associated with this series
-          this.unlockDoor(this.currentSeries.id);
-        }
-
         // Find the NPC associated with this series and update their icon
         for (const [npcId, state] of this.npcSeriesStates.entries()) {
           if (state.getSeries()?.id === this.currentSeries.id) {

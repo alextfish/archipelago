@@ -161,6 +161,14 @@ export class OverworldGameState {
     }
 
     /**
+     * Lock a door by ID (removes it from the unlocked set)
+     */
+    lockDoor(doorId: string): void {
+        console.log(`OverworldGameState: Locking door ${doorId}`);
+        this.unlockedDoors.delete(doorId);
+    }
+
+    /**
      * Check if a door is unlocked
      */
     isDoorUnlocked(doorId: string): boolean {
