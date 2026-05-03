@@ -906,23 +906,24 @@ export class MapPuzzleExtractor {
                         constraints.push(`num_visible=${numVisible}`);
                         console.log(`Applied num_visible=${numVisible} constraint to island ${island.id}`);
                     }
-                    // Check for disguise sprite and conversation overrides
-                    if (props.disguise_sprite) {
-                        constraints.push(`disguise_sprite=${props.disguise_sprite}`);
-                        console.log(`Applied disguise_sprite=${props.disguise_sprite} to island ${island.id}`);
-                    }
-                    if (props.disguise_sprite_solved) {
-                        constraints.push(`disguise_sprite_solved=${props.disguise_sprite_solved}`);
-                        console.log(`Applied disguise_sprite_solved=${props.disguise_sprite_solved} to island ${island.id}`);
-                    }
-                    if (props.conversation_file) {
-                        constraints.push(`conversation_file=${props.conversation_file}`);
-                        console.log(`Applied conversation_file=${props.conversation_file} to island ${island.id}`);
-                    }
-                    if (props.conversation_file_solved) {
-                        constraints.push(`conversation_file_solved=${props.conversation_file_solved}`);
-                        console.log(`Applied conversation_file_solved=${props.conversation_file_solved} to island ${island.id}`);
-                    }
+                }
+
+                // Disguise sprite and conversation overrides apply to any constraint type
+                if (props.disguise_sprite) {
+                    constraints.push(`disguise_sprite=${props.disguise_sprite}`);
+                    console.log(`Applied disguise_sprite=${props.disguise_sprite} to island ${island.id}`);
+                }
+                if (props.disguise_sprite_solved) {
+                    constraints.push(`disguise_sprite_solved=${props.disguise_sprite_solved}`);
+                    console.log(`Applied disguise_sprite_solved=${props.disguise_sprite_solved} to island ${island.id}`);
+                }
+                if (props.conversation_file) {
+                    constraints.push(`conversation_file=${props.conversation_file}`);
+                    console.log(`Applied conversation_file=${props.conversation_file} to island ${island.id}`);
+                }
+                if (props.conversation_file_solved) {
+                    constraints.push(`conversation_file_solved=${props.conversation_file_solved}`);
+                    console.log(`Applied conversation_file_solved=${props.conversation_file_solved} to island ${island.id}`);
                 }
 
                 // Add constraints to island

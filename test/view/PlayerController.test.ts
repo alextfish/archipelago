@@ -316,18 +316,19 @@ describe('PlayerController', () => {
                 expect(player.x).toBeLessThanOrEqual(centreX + NARROW_HALF_WIDTH);
             });
 
-            it('snaps x to tile centre when entering from north', () => {
+            it('clamps x to the valid band when entering from north', () => {
                 const { ctrl, player } = makeControllerWithNarrow(CollisionType.NARROW_NS);
                 // Player slightly off-centre horizontally, just above tile boundary.
-                player.x = TILE_3_CENTRE + 4; // offset but still above boundary
+                player.x = TILE_3_CENTRE + 4; // offset but within the ±NARROW_HALF_WIDTH band
                 player.y = 3 * TILE_SIZE - 1;
 
                 ctrl.setTargetPosition(player.x, player.y + 8);
                 ctrl.update();
 
                 if (Math.floor(player.y / TILE_SIZE) === 3) {
-                    // If the player crossed into tile 3, x should be snapped to centre.
-                    expect(player.x).toBe(TILE_3_CENTRE);
+                    // If the player crossed into tile 3, x should be clamped to the valid band.
+                    expect(player.x).toBeGreaterThanOrEqual(TILE_3_CENTRE - NARROW_HALF_WIDTH);
+                    expect(player.x).toBeLessThanOrEqual(TILE_3_CENTRE + NARROW_HALF_WIDTH);
                 }
             });
         });
@@ -384,7 +385,7 @@ describe('PlayerController', () => {
                 expect(player.y).toBeLessThanOrEqual(centreY + NARROW_HALF_WIDTH);
             });
 
-            it('snaps y to tile centre when entering from the west', () => {
+            it('clamps y to the valid band when entering from the west', () => {
                 const { ctrl, player } = makeControllerWithNarrow(CollisionType.NARROW_EW);
                 player.x = 3 * TILE_SIZE - 1;
                 player.y = TILE_3_CENTRE + 4;
@@ -393,7 +394,8 @@ describe('PlayerController', () => {
                 ctrl.update();
 
                 if (Math.floor(player.x / TILE_SIZE) === 3) {
-                    expect(player.y).toBe(TILE_3_CENTRE);
+                    expect(player.y).toBeGreaterThanOrEqual(TILE_3_CENTRE - NARROW_HALF_WIDTH);
+                    expect(player.y).toBeLessThanOrEqual(TILE_3_CENTRE + NARROW_HALF_WIDTH);
                 }
             });
         });

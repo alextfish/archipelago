@@ -488,7 +488,7 @@ describe("PuzzleController", () => {
 
       controller.cancelPlacement(); // should return the bridge
 
-      expect(mockPuzzle.inventory.returnBridge).toHaveBeenCalledWith(allocatedBridgeId);
+      expect(mockPuzzle.inventory!.returnBridge).toHaveBeenCalledWith(allocatedBridgeId);
       expect(controller.currentBridge).toBeNull();
       expect(controller.pendingStart).toBeNull();
     });
@@ -501,7 +501,7 @@ describe("PuzzleController", () => {
 
       controller.tryPlaceAt(1, 2); // same island again — used to lose the bridge
 
-      expect(mockPuzzle.inventory.returnBridge).toHaveBeenCalledWith(allocatedBridgeId);
+      expect(mockPuzzle.inventory!.returnBridge).toHaveBeenCalledWith(allocatedBridgeId);
       expect(controller.currentBridge).toBeNull();
       // Player can now start again without having lost a bridge from inventory
     });
@@ -517,7 +517,7 @@ describe("PuzzleController", () => {
       controller.removeBridge('placed1');
 
       // cancelPlacement must have returned the in-progress bridge
-      expect(mockPuzzle.inventory.returnBridge).toHaveBeenCalledWith(inProgressBridgeId);
+      expect(mockPuzzle.inventory!.returnBridge).toHaveBeenCalledWith(inProgressBridgeId);
       // And the target bridge must have been removed via the command
       expect(mockPuzzle.removeBridge).toHaveBeenCalledWith('placed1');
       expect(controller.currentBridge).toBeNull();
