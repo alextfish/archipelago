@@ -143,7 +143,7 @@ describe('ConstraintFeedbackDisplay', () => {
 
     display.update(items, puzzle);
 
-    expect(npc.setTexture).toHaveBeenCalledWith('Ruby happy', 0);
+    expect(npc.setTexture).toHaveBeenCalledWith('Ruby', 2);
   });
 
   it('changes existing NPC sprite texture to frown when constraint is not satisfied', () => {
@@ -157,7 +157,7 @@ describe('ConstraintFeedbackDisplay', () => {
 
     display.update(items, puzzle);
 
-    expect(npc.setTexture).toHaveBeenCalledWith('Ruby frown', 0);
+    expect(npc.setTexture).toHaveBeenCalledWith('Ruby', 1);
   });
 
   it('restores original NPC texture when clear() is called', () => {
@@ -167,7 +167,7 @@ describe('ConstraintFeedbackDisplay', () => {
     const puzzle = makeMockPuzzle([{ id: 'A', x: 1, y: 1 }]);
 
     display.update([{ elementID: 'A', glyphMessage: 'good', constraintType: 'IslandBridgeCountConstraint' }], puzzle);
-    expect(npc.setTexture).toHaveBeenCalledWith('Ruby happy', 0);
+    expect(npc.setTexture).toHaveBeenCalledWith('Ruby', 2);
 
     display.clear();
 
