@@ -477,6 +477,52 @@ describe("PuzzleController", () => {
       expect(controller.currentBridge).toBeNull();
       expect(controller.pendingStart).toBeNull();
     });
+
+    it('returns allocated bridge to inventory when cancelPlacement is called mid-placement', () => {
+      // Regression: cancelPlacement used to clear pendingStart without returning currentBridge,
+      // causing the allocated bridge to permanently disappear from the inventory.
+      controller.tryPlaceAt(1, 2); // allocates bridge for first endpoint
+
+      expect(controller.currentBridge).not.toBeNull();
+      const allocatedBridgeId = controller.currentBridge!.id;
+
+      controller.cancelPlacement(); // should return the bridge
+
+      expect(mockPuzzle.inventory.returnBridge).toHaveBeenCalledWith(allocatedBridgeId);
+      expect(controller.currentBridge).toBeNull();
+      expect(controller.pendingStart).toBeNull();
+    });
+
+    it('does not lose bridge when the same start island is clicked twice via tryPlaceAt', () => {
+      // Regression: clicking the same island twice called cancelPlacement() without returning
+      // the allocated bridge, permanently removing it from the inventory.
+      controller.tryPlaceAt(1, 2); // first endpoint — allocates bridge
+      const allocatedBridgeId = controller.currentBridge!.id;
+
+      controller.tryPlaceAt(1, 2); // same island again — used to lose the bridge
+
+      expect(mockPuzzle.inventory.returnBridge).toHaveBeenCalledWith(allocatedBridgeId);
+      expect(controller.currentBridge).toBeNull();
+      // Player can now start again without having lost a bridge from inventory
+    });
+
+    it('returns in-progress bridge when removeBridge is called mid-placement', () => {
+      // Regression: removeBridge called cancelPlacement() which did not return currentBridge.
+      // This caused the in-progress bridge to permanently disappear.
+      controller.tryPlaceAt(1, 2); // allocates bridge for first endpoint
+      const inProgressBridgeId = controller.currentBridge!.id;
+
+      // Now player picks up a different already-placed bridge while mid-placement
+      (mockPuzzle.bridges as any[]).push({ id: 'placed1', type: { id: 'type1' }, start: { x: 1, y: 2 }, end: { x: 3, y: 2 } });
+      controller.removeBridge('placed1');
+
+      // cancelPlacement must have returned the in-progress bridge
+      expect(mockPuzzle.inventory.returnBridge).toHaveBeenCalledWith(inProgressBridgeId);
+      // And the target bridge must have been removed via the command
+      expect(mockPuzzle.removeBridge).toHaveBeenCalledWith('placed1');
+      expect(controller.currentBridge).toBeNull();
+      expect(controller.pendingStart).toBeNull();
+    });
   });
 
   describe("bridge removal", () => {

@@ -2666,6 +2666,7 @@ export class OverworldScene extends Phaser.Scene {
     }
 
     // Launch BridgePuzzleScene with the puzzle data
+    this.overworldHUD?.setJewelHUDVisible(false);
     this.scene.launch('BridgePuzzleScene', { puzzleData, seriesMode: true });
   }
 
@@ -2705,6 +2706,9 @@ export class OverworldScene extends Phaser.Scene {
    */
   private handleSeriesPuzzleCompleted(data: { puzzleId: string; success: boolean }): void {
     console.log(`[OverworldScene] Series puzzle completed: ${data.puzzleId}, success: ${data.success}`);
+
+    // BridgePuzzleScene has closed — restore the jewel HUD regardless of outcome
+    this.overworldHUD?.setJewelHUDVisible(true);
 
     if (!this.currentSeries) {
       console.warn('No current series - ignoring puzzle completion');
@@ -2827,6 +2831,9 @@ export class OverworldScene extends Phaser.Scene {
       if (this.interactionCursor) {
         this.interactionCursor.hide();
       }
+
+      // Hide jewel HUD while solving a puzzle
+      this.overworldHUD?.setJewelHUDVisible(false);
 
       // Disable player movement
       if (this.playerController) {
@@ -2953,6 +2960,9 @@ export class OverworldScene extends Phaser.Scene {
         this.playerController.setEnabled(true);
         console.log('[DIAGNOSTIC] Player controller re-enabled');
       }
+
+      // Restore jewel HUD now that we're back in exploration mode
+      this.overworldHUD?.setJewelHUDVisible(true);
 
       // Restore all pointer handlers (they were removed by PuzzleInputHandler.destroy())
       console.log('[DIAGNOSTIC] Restoring input handlers after puzzle exit - gameMode:', this.gameMode);

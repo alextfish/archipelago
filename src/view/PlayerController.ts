@@ -14,7 +14,7 @@ const TILE_SIZE = 32; // Must match the map's tilewidth/tileheight
  * At TILE_SIZE=32 this gives a 12-pixel walkable band centred on the tile.
  * Exported so tests and other modules can use the same value without hardcoding.
  */
-export const NARROW_HALF_WIDTH = 6;
+export const NARROW_HALF_WIDTH = 8;
 
 /** Returns the world-space centre of the tile at the given tile coordinate. */
 function tileCentre(tileCoord: number): number {
@@ -458,13 +458,16 @@ export class PlayerController {
         this.moveX = dx;
         this.moveY = dy;
 
-        // Snap the constrained axis to the tile centre when entering a narrow passage,
-        // nudging the player onto the bridge rather than leaving them near the edge.
+        // Clamp the constrained axis to the central band when entering a narrow passage.
+        // Using clamp (not snap-to-centre) avoids a jerk when the player is already
+        // within the valid band.
         if (targetType === CollisionType.NARROW_NS) {
-            this.player.x = tileCentre(nextTileX);
+            const centreX = tileCentre(nextTileX);
+            this.player.x = Math.max(centreX - NARROW_HALF_WIDTH, Math.min(centreX + NARROW_HALF_WIDTH, nextX));
             this.moveX = this.player.x - originalX;
         } else if (targetType === CollisionType.NARROW_EW) {
-            this.player.y = tileCentre(nextTileY);
+            const centreY = tileCentre(nextTileY);
+            this.player.y = Math.max(centreY - NARROW_HALF_WIDTH, Math.min(centreY + NARROW_HALF_WIDTH, nextY));
             this.moveY = this.player.y - originalY;
         }
 

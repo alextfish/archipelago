@@ -309,7 +309,9 @@ export class PuzzleSidebar {
         if (id === typeId) {
           bg.setFillStyle(0x9999aa, 1); // Bright cyan when selected
         } else {
-          bg.setFillStyle(0x555555, 1); // Grey when not selected
+          // Keep depleted buttons dark so they don't look available
+          const avail = this.counts[id] ?? 0;
+          bg.setFillStyle(avail > 0 ? 0x555555 : 0x222222, 1);
         }
       }
     }

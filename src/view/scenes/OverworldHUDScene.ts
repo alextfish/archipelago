@@ -160,6 +160,14 @@ export class OverworldHUDScene extends Phaser.Scene {
         });
     }
 
+    /** Show or hide the jewel count display (e.g. hide while solving a puzzle). */
+    setJewelHUDVisible(visible: boolean): void {
+        for (const els of this.jewelHUDElements.values()) {
+            els.sprite.setVisible(visible);
+            els.text.setVisible(visible);
+        }
+    }
+
     /**
      * Returns true while the warp dialog is open.
      * OverworldScene checks this to suppress pointer-move events so the player

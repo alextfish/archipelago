@@ -285,11 +285,15 @@ export class PuzzleController {
         this.nextOrPreviousBridgeType(false);
     }
     cancelPlacement() {
+        // If a bridge was already allocated for preview (happens at first endpoint),
+        // return it to inventory so it is not permanently lost.
+        if (this.currentBridge) {
+            if (this.currentBridge.id) this.puzzle.inventory.returnBridge(this.currentBridge.id);
+            this.currentBridge = null;
+        }
         this.pendingStart = null;
         this.renderer.clearHighlights();
         this.renderer.setPlacing(false);
-        // Cancel any in-progress placement. We did not allocate a bridge yet
-        // (allocation happens on the second endpoint), so just clear state and visuals.
     }
 
     tryPlaceAt(x: number, y: number) {
