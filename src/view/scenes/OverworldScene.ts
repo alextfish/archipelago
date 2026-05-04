@@ -15,28 +15,30 @@ import { NPC } from '@model/conversation/NPC';
 import type { ConversationSpec } from '@model/conversation/ConversationData';
 import { attachTestMarker, isTestMode, getTestConfig } from '@helpers/TestMarkers';
 import { emitTestEvent } from '@helpers/TestEvents';
-import { NPCSeriesState } from '@model/conversation/NPCSeriesState';
 import { SeriesFactory, SeriesManager } from '@model/series/SeriesFactory';
 import { FilePuzzleLoader, LocalStorageProgressStore } from '@model/series/SeriesLoaders';
 import { NPCIconConfig } from '@view/NPCIconConfig';
 import { Door } from '@model/overworld/Door';
 import { PlayerStartManager } from '@model/overworld/PlayerStartManager';
-import { getDoorSpriteMapping } from '@view/DoorSpriteRegistry';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
-import { CollisionTileClassifier } from '@model/overworld/CollisionTileClassifier';
 import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
-import { RiverChannelExtractor } from '@model/overworld/RiverChannelExtractor';
+import { RiverChannelInitialiser } from '@model/overworld/RiverChannelInitialiser';
 import { WaterPropagationEngine } from '@model/overworld/WaterPropagationEngine';
 import type { TranslationModeScene } from '@view/scenes/TranslationModeScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { GridToWorldMapper } from '@view/GridToWorldMapper';
 import { TileAnimationManager } from '@view/TileAnimationManager';
-import { getNPCSpriteKey, loadNPCSprites, registerNPCAnimations, getNPCIdleAnimationKey } from '@view/NPCSpriteHelper';
-import { NPCAppearanceRegistry } from '@model/conversation/NPCAppearanceRegistry';
-import { Collectible } from '@model/overworld/Collectible';
+import { loadNPCSprites } from '@view/NPCSpriteHelper';
 import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
 import type { PlayerStartPosition } from '@model/overworld/PlayerStartManager';
 import { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
+import { CollisionInitialiser } from '@model/overworld/CollisionInitialiser';
+import { FlowWaterVisualManager } from '@view/FlowWaterVisualManager';
+import { DoorManager } from '@view/DoorManager';
+import { CollectibleManager } from '@view/CollectibleManager';
+import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
+import { NPCSpriteController } from '@view/NPCSpriteController';
+import { ConversationVariableSubstitutor } from '@model/conversation/ConversationVariableSubstitutor';
 
 /**
  * Depth value for overhead layers (roofs, canopies, etc.) that should always
@@ -83,17 +85,7 @@ export class OverworldScene extends Phaser.Scene {
 
   // NPC and conversation system
   private npcs: NPC[] = [];
-  private npcSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
-  private npcIcons: Map<string, Phaser.GameObjects.Image> = new Map();
-  private npcSeriesStates: Map<string, NPCSeriesState> = new Map();
-  private constraintNumberSprites: Map<string, Phaser.GameObjects.Sprite> = new Map(); // Bridge count numbers for constraint NPCs
-  private constraintCompassSprites: Map<string, Phaser.GameObjects.Sprite> = new Map(); // Compass direction sprites for directional constraint NPCs
-  /** Disguise sprite keys for constraint NPCs that have a custom appearance.
-   *  Keyed by NPC ID; stores the unsatisfied and satisfied texture keys so that
-   *  the sprite can be flipped when the associated puzzle is solved. */
-  private constraintDisguiseKeys: Map<string, { normalKey: string; solvedKey: string }> = new Map();
   private seriesManager?: SeriesManager;
-  private npcAppearanceRegistry: NPCAppearanceRegistry = new NPCAppearanceRegistry();
 
   // Tile animations
   private tileAnimationManager?: TileAnimationManager;
@@ -102,38 +94,21 @@ export class OverworldScene extends Phaser.Scene {
   private roofManager?: RoofManager;
   private roofsLayers: Phaser.Tilemaps.TilemapLayer[] = [];
 
-  // FlowPuzzle water visuals: GIDs removed from the water Tiled layer so that dried-up river
-  // tiles look dry in the overworld. Keyed by "tileX,tileY". Stored so the tile can be
-  // restored if the player re-enters and re-floods those squares.
-  private waterTileGidCache: Map<string, { gid: number; layerName: string }> = new Map();
-
   /** Merged tile data from all Tiled `water` layers — built once at load time and used by
-   * RiverChannelExtractor to trace inter-puzzle river channels. */
+   * RiverChannelInitialiser to trace inter-puzzle river channels. */
   private mergedWaterLayerData?: number[];
 
-  /** Registry of pontoon tiles found on "pontoons" layers at map-load time.
-   * Keyed by "tileX,tileY". Each entry carries enough data to swap the tile and
-   * update its collision when the water level at that position changes. */
-  private pontoonTiles: Map<string, {
-    tileX: number;
-    tileY: number;
-    /** Current GID on the pontoons Tiled layer. */
-    currentGID: number;
-    /** Layer name the tile lives on (e.g. "Forest/pontoons"). */
-    layerName: string;
-    /** Whether the current tile variant is the high-water (raised) version. */
-    isHigh: boolean;
-    /** Signed offset to add to currentGID to produce the alternate variant. */
-    toggleOffset: number;
-  }> = new Map();
-
-  // Door system
-  private doors: Door[] = [];
-  private doorSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
-
-  // Collectible system
-  private collectibles: Collectible[] = [];
-  private collectibleSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  // ── Extracted manager classes ─────────────────────────────────────────────
+  /** Manages flow-water tile visuals and pontoon tile toggling. */
+  private flowWaterManager?: FlowWaterVisualManager;
+  /** Manages door loading, sprite creation, and animated state transitions. */
+  private doorManager?: DoorManager;
+  /** Manages jewel collectible loading, animation, and collection. */
+  private collectibleManager?: CollectibleManager;
+  /** Manages constraint-NPC sprites and puzzle-mode visibility toggling. */
+  private constraintNPCManager?: ConstraintNPCManager;
+  /** Manages regular NPC sprites, series states, and icon badges. */
+  private npcSpriteController?: NPCSpriteController;
 
   // Player start position management
   private playerStartManager?: PlayerStartManager;
@@ -486,34 +461,39 @@ export class OverworldScene extends Phaser.Scene {
     // Listen for series puzzle completion from BridgePuzzleScene
     this.events.on('seriesPuzzleCompleted', this.handleSeriesPuzzleCompleted, this);
 
-    // Register looping animations for collectible jewels
-    this.registerJewelAnimations();
+    // Create NPCSpriteController (needs map, gridMapper, seriesManager)
+    this.npcSpriteController = new NPCSpriteController(
+      this,
+      this.map,
+      this.gridMapper,
+      this.seriesManager,
+      this.tiledMapData,
+      (npc) => this.npcs.push(npc),
+      (interactable) => this.interactables.push(interactable),
+      (id, data) => this.currentSeriesPuzzleData.set(id, data),
+    );
 
     // Register looping idle animations for animated NPCs
-    registerNPCAnimations(this, this.npcAppearanceRegistry);
+    this.npcSpriteController.registerAnimations();
+
+    // Create CollectibleManager early so jewel animations can be registered
+    // (requires map/tiledMapData to be ready, but not pontoonTiles)
+    if (this.tiledMapData && this.map) {
+      this.collectibleManager = new CollectibleManager(
+        this,
+        this.tiledMapData,
+        this.map,
+        this.gameState,
+        () => this.overworldHUD,
+        (i) => this.interactables.push(i),
+        (pred) => { this.interactables = this.interactables.filter(i => !pred(i)); },
+      );
+      // Register looping animations for collectible jewels
+      this.collectibleManager.registerJewelAnimations();
+    }
 
     // Initialize overworld puzzle system
     this.initializeOverworldPuzzles();
-  }
-
-  /**
-   * Register looping animations for each jewel colour.
-   * Each 'jewel-<colour>' spritesheet was loaded with startFrame/endFrame so
-   * that frame 0 of the texture is always the first frame of that colour.
-   * All animations therefore use frames 0–2 at 5 fps (200 ms per frame).
-   */
-  private registerJewelAnimations(): void {
-    const jewel_colours = ['red', 'green', 'blue', 'yellow'];
-    for (const colour of jewel_colours) {
-      const textureKey = `jewel-${colour}`;
-      if (!this.textures.exists(textureKey)) continue;
-      this.anims.create({
-        key: `${textureKey}-anim`,
-        frames: this.anims.generateFrameNumbers(textureKey, { start: 0, end: 3 }),
-        frameRate: 5, // 200 ms per frame
-        repeat: -1,
-      });
-    }
   }
 
   private async initializeOverworldPuzzles(): Promise<void> {
@@ -612,7 +592,7 @@ export class OverworldScene extends Phaser.Scene {
    * water state has been computed in each FlowPuzzle constructor).
    */
   private applyInitialFlowPuzzleCollision(puzzles: Map<string, import('@model/puzzle/BridgePuzzle').BridgePuzzle>): void {
-    if (!this.tiledMapData) return;
+    if (!this.tiledMapData || !this.flowWaterManager) return;
 
     const tileW: number = this.tiledMapData.tilewidth ?? 32;
     const tileH: number = this.tiledMapData.tileheight ?? 32;
@@ -640,8 +620,7 @@ export class OverworldScene extends Phaser.Scene {
         console.log(`Applied initial water blocking for FlowPuzzle "${puzzleId}": ${wetWorldTiles.length} tiles blocked`);
       }
 
-      // Set initial pontoon states to match water level
-      this.updatePontoonVisuals(puzzle, puzzleBounds);
+      this.flowWaterManager.updatePontoonVisuals(puzzle, puzzleBounds);
     }
   }
 
@@ -651,43 +630,11 @@ export class OverworldScene extends Phaser.Scene {
    * Stored on the scene so the merged grid is only computed once at load time.
    */
   private buildMergedWaterLayer(): number[] | undefined {
-    if (!this.tiledMapData) return undefined;
-
-    const mapWidth: number = this.tiledMapData.width ?? 0;
-    const mapHeight: number = this.tiledMapData.height ?? 0;
-    const merged = new Array<number>(mapWidth * mapHeight).fill(0);
-
-    const waterLayers = TiledLayerUtils.findTileLayersByName(this.tiledMapData.layers, 'water');
-    console.log(`[MergedWater] Merging ${waterLayers.length} water layer(s) into master grid`);
-
-    for (const layer of waterLayers) {
-      const data: number[] = layer.data.data ?? [];
-      for (let i = 0; i < data.length; i++) {
-        if (data[i] && data[i] > 0) {
-          merged[i] = data[i]; // last-writer-wins; any non-zero value marks a water tile
-        }
-      }
-    }
-
-    const waterTileCount = merged.filter(v => v > 0).length;
-    console.log(`[MergedWater] Master grid has ${waterTileCount} water tiles`);
-    return merged;
-  }
-
-  /** Infer the edge direction of a flow-square that sits on the border of a puzzle region. */
-  private static inferEdgeDirection(
-    lx: number, ly: number, width: number, height: number
-  ): 'N' | 'S' | 'E' | 'W' {
-    if (ly === 0) return 'N';
-    if (ly === height - 1) return 'S';
-    if (lx === 0) return 'W';
-    if (lx === width - 1) return 'E';
-    // Fallback for interior edge outputs — treat as East (shouldn't occur for valid edge outputs)
-    return 'E';
+    return RiverChannelInitialiser.buildMergedWaterLayer(this.tiledMapData);
   }
 
   /**
-   * Wire up RiverChannelExtractor → WaterPropagationEngine → OverworldGameState for
+   * Wire up RiverChannelInitialiser → WaterPropagationEngine → OverworldGameState for
    * inter-puzzle water propagation.  Called once after all puzzles are loaded.
    *
    * Builds a `puzzleRegions` map from every FlowPuzzle's tile bounds and edge outputs,
@@ -737,7 +684,7 @@ export class OverworldScene extends Phaser.Scene {
             edgeTiles.push({
               x: lx,
               y: ly,
-              edge: OverworldScene.inferEdgeDirection(lx, ly, width, height),
+              edge: RiverChannelInitialiser.inferEdgeDirection(lx, ly, width, height),
             });
           }
         }
@@ -767,7 +714,7 @@ export class OverworldScene extends Phaser.Scene {
       ],
     };
 
-    const channels = RiverChannelExtractor.extractChannels(syntheticMapData, MERGED_LAYER_NAME, puzzleRegions);
+    const channels = RiverChannelInitialiser.extractChannels(syntheticMapData, MERGED_LAYER_NAME, puzzleRegions);
 
     console.log(`[RiverChannels] Extracted ${channels.length} river channel(s):`);
     for (const ch of channels) {
@@ -828,8 +775,8 @@ export class OverworldScene extends Phaser.Scene {
             if (wetTiles.length > 0) {
               this.collisionManager.applyFlowWaterCollision(wetTiles);
             }
-            this.updatePontoonVisuals(targetPuzzle, targetBounds);
-            this.updateFlowWaterVisuals(targetPuzzle, targetBounds);
+            this.flowWaterManager?.updatePontoonVisuals(targetPuzzle, targetBounds);
+            this.flowWaterManager?.updateFlowWaterVisuals(targetPuzzle, targetBounds);
           }
 
           // Queue for propagation if not already done
@@ -858,7 +805,7 @@ export class OverworldScene extends Phaser.Scene {
         for (let lx = 0; lx < puzzle.width; lx++) {
           if (puzzle.tileHasWater(lx, ly)) waterCount++;
           const key = `${originTileX + lx},${originTileY + ly}`;
-          const pontoon = this.pontoonTiles.get(key);
+          const pontoon = this.flowWaterManager?.pontoonTiles.get(key);
           if (pontoon) {
             if (pontoon.isHigh) pontoonHighCount++;
             else pontoonLowCount++;
@@ -873,143 +820,24 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   /**
-   * Update pontoon tiles within a FlowPuzzle's bounds to match the current water state.
-   *
-   * When a pontoon tile's position has water: ensure it shows the high-water (isHigh) variant
-   * and is WALKABLE. When dry: ensure it shows the low-water (!isHigh) variant and is
-   * WALKABLE_LOW.
-   *
-   * The tile is swapped on the Tiled "pontoons" layer using the stored toggleOffset, and the
-   * pontoonTiles registry entry is updated to reflect the new state.
+   * Update pontoon tile visuals for a FlowPuzzle.
+   * Delegated to {@link FlowWaterVisualManager}.
    */
-  private updatePontoonVisuals(puzzle: FlowPuzzle, puzzleBounds: { x: number; y: number }): void {
-    if (!this.tiledMapData) return;
-
-    const tileW: number = this.tiledMapData.tilewidth ?? 32;
-    const tileH: number = this.tiledMapData.tileheight ?? 32;
-    const originTileX = Math.floor(puzzleBounds.x / tileW);
-    const originTileY = Math.floor(puzzleBounds.y / tileH);
-
-    for (let ly = 0; ly < puzzle.height; ly++) {
-      for (let lx = 0; lx < puzzle.width; lx++) {
-        const tileX = originTileX + lx;
-        const tileY = originTileY + ly;
-        const key = `${tileX},${tileY}`;
-
-        const pontoon = this.pontoonTiles.get(key);
-        if (!pontoon) continue;
-
-        const waterHere = puzzle.tileHasWater(lx, ly);
-        const shouldBeHigh = waterHere;
-
-        // Always enforce the correct collision type — applyFlowWaterCollision may have
-        // set this tile to BLOCKED even if the pontoon is already in the right visual state.
-        // Never override tiles that are permanently BLOCKED by Tiled collision-layer properties.
-        const correctCollisionType = shouldBeHigh ? CollisionType.WALKABLE : CollisionType.WALKABLE_LOW;
-        if (!this.isPermanentlyBlocked(tileX, tileY)) {
-          this.setCollisionAt(tileX, tileY, correctCollisionType);
-        }
-
-        if (pontoon.isHigh === shouldBeHigh) continue; // already correct variant, no visual swap needed
-
-        // Swap to alternate variant
-        const newGID = pontoon.currentGID + pontoon.toggleOffset;
-
-        // Update the pontoons Phaser layer
-        const layerData = this.map.layers.find(l => l.name === pontoon.layerName);
-        if (layerData?.tilemapLayer) {
-          layerData.tilemapLayer.putTileAt(newGID, tileX, tileY);
-        }
-
-        // Update registry to reflect new state. The next toggle is the inverse offset.
-        pontoon.currentGID = newGID;
-        pontoon.isHigh = shouldBeHigh;
-        pontoon.toggleOffset = -pontoon.toggleOffset;
-      }
-    }
-  }
-
   /**
-   * Update the overworld water-tile visuals for a FlowPuzzle after it is exited.
-   *
-   * Tiles that no longer have water are visually dried up by removing their tile
-   * from the Tiled water layer (the GID is cached for restoration). Tiles that
-   * have water again get their original tile GID restored.
+   * Update overworld water-tile visuals for a FlowPuzzle after it is exited.
+   * Delegated to {@link FlowWaterVisualManager}.
    */
   public updateFlowWaterVisuals(puzzle: FlowPuzzle, puzzleBounds: { x: number; y: number }): void {
-    if (!this.tiledMapData) return;
-
-    const tileW: number = this.tiledMapData.tilewidth ?? 32;
-    const tileH: number = this.tiledMapData.tileheight ?? 32;
-    const originTileX = Math.floor(puzzleBounds.x / tileW);
-    const originTileY = Math.floor(puzzleBounds.y / tileH);
-
-    for (let ly = 0; ly < puzzle.height; ly++) {
-      for (let lx = 0; lx < puzzle.width; lx++) {
-        if (!puzzle.getFlowSquare(lx, ly)) continue; // only flow squares have water tiles
-        this.updateSingleFlowTileVisual(originTileX + lx, originTileY + ly, puzzle.tileHasWater(lx, ly));
-      }
-    }
+    this.flowWaterManager?.updateFlowWaterVisuals(puzzle, puzzleBounds);
   }
 
   /**
-   * Update the visual and collision state for a single flow tile on the overworld map.
-   * Handles both the Tiled water layer (removing/restoring the tile GID) and any
-   * pontoon at the same position.
-   *
-   * This is the per-tile building block used by both `updateFlowWaterVisuals` (bulk
-   * update after puzzle exit) and the `FlowPuzzleRenderer` tile-visual callback
-   * (per-tile wave animation during puzzle solving).
+   * Update visual and collision state for a single flow tile.
+   * Called by FlowPuzzleRenderer for per-tile wave animation during puzzle solving.
+   * Delegated to {@link FlowWaterVisualManager}.
    */
   public updateSingleFlowTileVisual(tileX: number, tileY: number, hasWater: boolean): void {
-    const key = `${tileX},${tileY}`;
-    const waterLayerData = this.findLayersBySuffix('water');
-
-    if (hasWater) {
-      // Restore the water tile if we previously removed it
-      const cached = this.waterTileGidCache.get(key);
-      if (cached) {
-        const ld = waterLayerData.find(l => l.name === cached.layerName);
-        if (ld?.tilemapLayer) {
-          ld.tilemapLayer.putTileAt(cached.gid, tileX, tileY);
-        }
-        this.waterTileGidCache.delete(key);
-      }
-    } else {
-      // Remove the water tile so the dried-up riverbed shows beneath it
-      if (!this.waterTileGidCache.has(key)) {
-        for (const ld of waterLayerData) {
-          const tile = ld.tilemapLayer?.getTileAt(tileX, tileY);
-          if (tile) {
-            this.waterTileGidCache.set(key, { gid: tile.index, layerName: ld.name });
-            ld.tilemapLayer!.removeTileAt(tileX, tileY);
-            break;
-          }
-        }
-      }
-    }
-
-    // Pontoon at this position (if any): always enforce correct collision and swap
-    // visual variant when the high/low state has changed.
-    // Skip pontoons on ALWAYS_HIGH or STAIRS tiles — they are immune to flow water overrides.
-    const pontoon = this.pontoonTiles.get(key);
-    const pontoonCollision = pontoon ? this.getCollisionAt(pontoon.tileX, pontoon.tileY) : undefined;
-    if (pontoon &&
-      pontoonCollision !== CollisionType.ALWAYS_HIGH &&
-      pontoonCollision !== CollisionType.STAIRS) {
-      const correctCollision = hasWater ? CollisionType.WALKABLE : CollisionType.WALKABLE_LOW;
-      this.setCollisionAt(tileX, tileY, correctCollision);
-      if (pontoon.isHigh !== hasWater) {
-        const newGID = pontoon.currentGID + pontoon.toggleOffset;
-        const layerData = this.map.layers.find(l => l.name === pontoon.layerName);
-        if (layerData?.tilemapLayer) {
-          layerData.tilemapLayer.putTileAt(newGID, tileX, tileY);
-        }
-        pontoon.currentGID = newGID;
-        pontoon.isHigh = hasWater;
-        pontoon.toggleOffset = -pontoon.toggleOffset;
-      }
-    }
+    this.flowWaterManager?.updateSingleFlowTileVisual(tileX, tileY, hasWater);
   }
 
   /**
@@ -1125,705 +953,126 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   /**
-   * Load NPCs from all "<anything>/npcs" object layers in the Tiled map
+   * Load NPCs from all `<anything>/npcs` object layers in the Tiled map, load
+   * puzzle series, load constraint NPCs, doors, and collectibles.
    */
   private loadNPCs(): void {
-    if (!this.map || !this.tiledMapData) return;
+    if (!this.map || !this.tiledMapData || !this.npcSpriteController) return;
+
+    // Create ConstraintNPCManager and DoorManager on first call (lazy, needs all deps)
+    if (!this.constraintNPCManager) {
+      this.constraintNPCManager = new ConstraintNPCManager(
+        this,
+        this.puzzleManager,
+        this.gridMapper,
+        this.gameState,
+        this.npcSpriteController.npcAppearanceRegistry,
+        this.tiledMapData,
+        (npc) => this.npcs.push(npc),
+        (npcId) => !!this.npcs.find(n => n.id === npcId),
+        (i) => this.interactables.push(i),
+      );
+    }
+
+    if (!this.doorManager) {
+      this.doorManager = new DoorManager(
+        this,
+        this.tiledMapData,
+        this.map,
+        this.collisionManager,
+        this.gameState,
+        this.cameraManager,
+        () => this.player ?? null,
+        () => this.playerController,
+      );
+    }
+
+    if (!this.collectibleManager) {
+      this.collectibleManager = new CollectibleManager(
+        this,
+        this.tiledMapData,
+        this.map,
+        this.gameState,
+        () => this.overworldHUD,
+        (i) => this.interactables.push(i),
+        (pred) => { this.interactables = this.interactables.filter(i => !pred(i)); },
+      );
+      this.collectibleManager.registerJewelAnimations();
+    }
 
     // Find all npcs object layers (including nested) in tiledMapData
     const npcsLayers = TiledLayerUtils.findObjectLayersByName(this.tiledMapData.layers, 'npcs');
 
     if (npcsLayers.length === 0) {
       console.log('No NPCs layers found in map');
-      return;
-    }
+    } else {
+      console.log(`Found ${npcsLayers.length} NPC layers`);
 
-    console.log(`Found ${npcsLayers.length} NPC layers`);
-
-    // Process all NPC layers
-    for (const layerInfo of npcsLayers) {
-      // Try both the full path and the simple name
-      let npcsLayer = this.map.getObjectLayer(layerInfo.fullPath);
-      if (!npcsLayer) {
-        npcsLayer = this.map.getObjectLayer(layerInfo.name);
-      }
-
-      if (!npcsLayer) {
-        console.warn(`Failed to get object layer: ${layerInfo.fullPath} or ${layerInfo.name}`);
-        continue;
-      }
-
-      console.log(`Loading NPCs from layer: ${layerInfo.fullPath}`);
-      this.loadNPCsFromLayer(npcsLayer, layerInfo.fullPath);
-    }
-
-    // Load series for NPCs and create icons (once after all NPCs loaded)
-    this.loadNPCSeries();
-
-    // Load constraint NPCs from overworld puzzles
-    this.loadConstraintNPCs();
-
-    // Load doors from object layers (once after all NPCs loaded)
-    this.loadDoors();
-
-    // Load collectibles from "collectibles" object layers
-    this.loadCollectibles();
-  }
-
-
-  /**
-   * Load NPCs from a specific object layer
-   */
-  private loadNPCsFromLayer(npcsLayer: Phaser.Tilemaps.ObjectLayer, layerName: string): void {
-    if (!npcsLayer.objects) {
-      console.warn(`No objects in layer: ${layerName}`);
-      return;
-    }
-
-    for (const obj of npcsLayer.objects) {
-      if (!obj.name || typeof obj.x !== 'number' || typeof obj.y !== 'number') {
-        console.warn(`Invalid NPC object in ${layerName}:`, obj);
-        continue;
-      }
-
-      // Convert pixel coordinates to tile coordinates
-      const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(obj.x, obj.y);
-
-      // Get properties from Tiled object
-      const properties = obj.properties as any[] | undefined;
-      const conversationFile = properties?.find((p: any) => p.name === 'conversation')?.value;
-      const conversationFileSolved = properties?.find((p: any) => p.name === 'conversationSolved')?.value;
-      const seriesFile = properties?.find((p: any) => p.name === 'series')?.value;
-      const language = properties?.find((p: any) => p.name === 'language')?.value || 'grass';
-      const appearanceId = properties?.find((p: any) => p.name === 'appearance')?.value || 'sailorNS';
-      const animate = properties?.find((p: any) => p.name === 'animate')?.value === true;
-
-      // Create NPC instance
-      // Use Tiled's unique object ID for npc.id to ensure uniqueness (multiple NPCs can share the same name)
-      const npc = new NPC(
-        String(obj.id),
-        obj.name,
-        tileX,
-        tileY,
-        language,
-        appearanceId,
-        conversationFile,
-        conversationFileSolved,
-        seriesFile,
-        undefined,
-        animate
-      );
-
-      this.npcs.push(npc);
-
-      // Add NPC to interactables list
-      this.interactables.push({
-        type: 'npc',
-        tileX,
-        tileY,
-        data: { npc }
-      });
-
-      // Create NPC sprite at world coordinates
-      // Tiled uses top-left for objects, so we need to add tileheight to get bottom position
-      const { x: worldX, y: worldY } = this.gridMapper.gridToWorld(tileX, tileY + 1); // Add 1 tile to match Tiled's top-left origin
-      const sprite = this.add.sprite(worldX, worldY, appearanceId);
-      sprite.setOrigin(0, 1); // Bottom-left origin to align with tile coordinates
-      sprite.setDepth(worldY); // Use Y-sorting for depth
-      this.npcSprites.set(npc.id, sprite);
-
-      // Add test marker for automated testing
-      if (isTestMode()) {
-        attachTestMarker(this, sprite, {
-          id: `npc-${npc.id}`,
-          testId: `npc-${npc.id}`,
-          width: this.tiledMapData.tilewidth,
-          height: this.tiledMapData.tileheight,
-          showBorder: true
-        });
-        console.log(`[TEST] Added test marker for NPC: ${npc.id} at tile (${tileX}, ${tileY}), world (${worldX}, ${worldY})`);
-      }
-
-      if (npc.animate) {
-        const animKey = getNPCIdleAnimationKey(appearanceId, this.npcAppearanceRegistry);
-        if (animKey) sprite.play(animKey);
-      }
-
-      console.log(`Loaded NPC: ${npc.name} at (${tileX}, ${tileY}), language: ${language}, conversation: ${conversationFile || 'none'}, series: ${seriesFile || 'none'}`);
-    }
-  }
-
-  /**
-   * Load puzzle series for NPCs that have them and create icons
-   */
-  private async loadNPCSeries(): Promise<void> {
-    for (const npc of this.npcs) {
-      if (!npc.hasSeries()) {
-        // NPC has no series, create state with null series
-        const state = new NPCSeriesState(npc, null);
-        this.npcSeriesStates.set(npc.id, state);
-        continue;
-      }
-
-      try {
-        // Load series JSON
-        const seriesPath = npc.getSeriesPath();
-        const response = await fetch(seriesPath);
-        if (!response.ok) {
-          console.warn(`Failed to load series for NPC ${npc.id}: ${response.statusText}`);
-          const state = new NPCSeriesState(npc, null);
-          this.npcSeriesStates.set(npc.id, state);
+      for (const layerInfo of npcsLayers) {
+        let npcsLayer = this.map.getObjectLayer(layerInfo.fullPath);
+        if (!npcsLayer) {
+          npcsLayer = this.map.getObjectLayer(layerInfo.name);
+        }
+        if (!npcsLayer) {
+          console.warn(`Failed to get object layer: ${layerInfo.fullPath} or ${layerInfo.name}`);
           continue;
         }
-
-        const seriesJson = await response.json();
-        const series = await this.seriesManager!.loadSeries(seriesJson);
-
-        // Store puzzle data for launching
-        if (seriesJson.puzzles) {
-          for (const puzzle of seriesJson.puzzles) {
-            if (puzzle.id && puzzle.puzzleData) {
-              this.currentSeriesPuzzleData.set(puzzle.id, puzzle.puzzleData);
-            }
-          }
-        }
-
-        // Create state with loaded series
-        const state = new NPCSeriesState(npc, series);
-        this.npcSeriesStates.set(npc.id, state);
-
-        // Create icon sprite if needed
-        this.updateNPCIcon(npc);
-
-        console.log(`Loaded series '${series.title}' for NPC ${npc.id}, icon state: ${state.getIconState()}`);
-      } catch (error) {
-        console.error(`Error loading series for NPC ${npc.id}:`, error);
-        const state = new NPCSeriesState(npc, null);
-        this.npcSeriesStates.set(npc.id, state);
+        console.log(`Loading NPCs from layer: ${layerInfo.fullPath}`);
+        this.npcSpriteController.loadNPCsFromLayer(npcsLayer, layerInfo.fullPath);
       }
+
+      // Load series for NPCs and create icons (once after all NPCs loaded)
+      this.npcSpriteController.loadNPCSeries(this.npcs);
     }
+
+    // Load constraint NPCs from overworld puzzles
+    this.constraintNPCManager.loadConstraintNPCs();
+
+    // Load doors from object layers
+    this.doorManager.loadDoors();
+
+    // Load collectibles from "collectibles" object layers
+    this.collectibleManager.loadCollectibles();
+  }
+
+
+  /**
+   * Collect a jewel.
+   * Delegated to {@link CollectibleManager}.
+   */
+  private collectJewel(collectibleId: string): void {
+    this.collectibleManager?.collectJewel(collectibleId);
   }
 
   /**
-   * Update or create icon for an NPC based on their series state
+   * Update or create icon for an NPC based on their series state.
+   * Delegated to {@link NPCSpriteController}.
    */
   private updateNPCIcon(npc: NPC): void {
-    const state = this.npcSeriesStates.get(npc.id);
-    if (!state) return;
-
-    const iconState = state.getIconState();
-    const npcSprite = this.npcSprites.get(npc.id);
-    if (!npcSprite) return;
-
-    // Remove existing icon if any
-    const existingIcon = this.npcIcons.get(npc.id);
-    if (existingIcon) {
-      existingIcon.destroy();
-      this.npcIcons.delete(npc.id);
-    }
-
-    // Create new icon if needed
-    if (iconState !== 'none') {
-      const iconKey = iconState === 'complete' ? NPCIconConfig.COMPLETE : NPCIconConfig.INCOMPLETE;
-      const icon = this.add.image(
-        npcSprite.x,
-        npcSprite.y + NPCIconConfig.ICON_OFFSET_Y,
-        iconKey
-      );
-      icon.setScale(NPCIconConfig.ICON_SCALE);
-      icon.setOrigin(0.5, 0.5);
-      icon.setDepth(npcSprite.depth + NPCIconConfig.ICON_DEPTH_OFFSET);
-      this.npcIcons.set(npc.id, icon);
-    }
+    this.npcSpriteController?.updateNPCIcon(npc);
   }
 
   /**
-   * Load constraint NPCs from overworld puzzles
-   * For each personified constraint, create an NPC that the player can interact with
-   */
-  private loadConstraintNPCs(): void {
-    if (!this.puzzleManager || !this.tiledMapData) return;
-
-    console.log('Loading constraint NPCs from overworld puzzles...');
-
-    const puzzles = this.puzzleManager.getAllPuzzles();
-    let constraintNPCCount = 0;
-
-    for (const [puzzleId, puzzle] of puzzles) {
-      // Skip puzzles with no constraints
-      if (!puzzle.constraints || puzzle.constraints.length === 0) continue;
-
-      for (const constraint of puzzle.constraints) {
-        // Skip non-personified constraints
-        if (!constraint.personified) continue;
-
-        // Get display items to find which islands this constraint applies to
-        const displayItems = constraint.getDisplayItems(puzzle);
-
-        for (const item of displayItems) {
-          // Resolve the overworld tile position for this constraint item.
-          // Items with an explicit position (e.g. MustHaveWaterConstraint,
-          // EnclosedAreaSizeConstraint) provide puzzle-relative coordinates directly.
-          // Island-based items (e.g. IslandBridgeCountConstraint) are looked up by ID.
-          let overworldTileX: number;
-          let overworldTileY: number;
-          let elementLabel: string;
-
-          // Get puzzle definition to convert puzzle coordinates to overworld coordinates
-          const puzzleDefinition = this.puzzleManager.getPuzzleDefinitionById(puzzleId);
-          if (!puzzleDefinition) {
-            console.warn(`Could not find puzzle definition for ${puzzleId}`);
-            continue;
-          }
-
-          // Puzzle bounds are in pixels, so convert to tiles first
-          const { x: puzzleTileX, y: puzzleTileY } = this.gridMapper.worldToGrid(puzzleDefinition.bounds.x, puzzleDefinition.bounds.y);
-
-          if (item.position) {
-            // Cell-based constraint — position is already puzzle-relative
-            overworldTileX = puzzleTileX + item.position.x;
-            overworldTileY = puzzleTileY + item.position.y;
-            elementLabel = item.elementID;
-          } else {
-            // Island-based constraint — look up island by ID
-            const island = puzzle.islands.find(i => i.id === item.elementID);
-            if (!island) {
-              console.warn(`Could not find island ${item.elementID} in puzzle ${puzzleId}`);
-              continue;
-            }
-            overworldTileX = puzzleTileX + island.x;
-            overworldTileY = puzzleTileY + island.y;
-            elementLabel = island.id;
-          }
-
-          // Generate a unique NPC ID from the constraint and element
-          const npcId = `constraint-${puzzleId}-${constraint.constructor.name}-${elementLabel}`;
-
-          // Check if this NPC already exists (avoid duplicates)
-          if (this.npcs.find(n => n.id === npcId)) {
-            continue;
-          }
-
-          // Get conversation files: per-island overrides take precedence over constraint defaults
-          const conversationFile = item.conversationFile ?? constraint.conversationFile;
-          const conversationFileSolved = item.conversationFileSolved ?? constraint.conversationFileSolved;
-
-          // Choose appearance: disguise sprite overrides the default for the constraint type
-          const appearanceId = item.disguiseSpriteKey ?? getNPCSpriteKey(item.constraintType);
-          const language = 'grass'; // Default language for constraint NPCs
-
-          // Build template variables for conversation substitution from the constraint's display item.
-          const conversationVariables = item.conversationVariables;
-
-          // Create NPC instance
-          const npc = new NPC(
-            npcId,
-            elementLabel, // Use element label as NPC name for easier debugging
-            overworldTileX,
-            overworldTileY,
-            language,
-            appearanceId,
-            conversationFile,
-            conversationFileSolved,
-            undefined, // No series for constraint NPCs
-            conversationVariables,
-            item.animate ?? false
-          );
-
-          this.npcs.push(npc);
-
-          // Add NPC to interactables list
-          this.interactables.push({
-            type: 'npc',
-            tileX: overworldTileX,
-            tileY: overworldTileY,
-            data: { npc }
-          });
-
-          // Create NPC sprite at world coordinates
-          const { x: worldX, y: worldY } = this.gridMapper.gridToWorld(overworldTileX, overworldTileY + 1);
-          const sprite = this.add.sprite(worldX, worldY, appearanceId);
-          sprite.setOrigin(0, 1);
-          sprite.setDepth(worldY);
-          this.npcSprites.set(npc.id, sprite);
-
-          // If this NPC has a disguise, record the solved sprite key so the texture
-          // can be flipped to the "revealed" appearance when the puzzle is solved.
-          if (item.disguiseSpriteKey && item.disguiseSpriteSolvedKey) {
-            this.constraintDisguiseKeys.set(npc.id, {
-              normalKey: item.disguiseSpriteKey,
-              solvedKey: item.disguiseSpriteSolvedKey,
-            });
-          }
-
-          // Add count overlay sprite for constraints that specify a requiredCount
-          if (item.requiredCount !== undefined && item.requiredCount >= 1 && item.requiredCount <= 8) {
-            const count = item.requiredCount;
-            if (count >= 1 && count <= 8) {
-              const numberSprite = this.add.sprite(
-                worldX + this.tiledMapData.tilewidth / 2,
-                worldY - this.tiledMapData.tileheight / 2,
-                'counts overlay',
-                count - 1 // Frame index is count-1 for numbers 1-8
-              );
-              numberSprite.setOrigin(0.5, 0.5);
-              numberSprite.setDepth(worldY + 1);
-              this.constraintNumberSprites.set(npc.id, numberSprite);
-            }
-          }
-
-          // Add compass overlay sprite for directional constraints
-          if (item.compassFrame !== undefined) {
-            const compassSprite = this.add.sprite(
-              worldX + this.tiledMapData.tilewidth / 2,
-              worldY - this.tiledMapData.tileheight / 2,
-              'compass overlay',
-              item.compassFrame
-            );
-            compassSprite.setOrigin(0.5, 0.5);
-            compassSprite.setDepth(worldY + 2);
-            this.constraintCompassSprites.set(npc.id, compassSprite);
-          }
-
-          // Add test marker for automated testing
-          if (isTestMode()) {
-            attachTestMarker(this, sprite, {
-              id: `npc-${npc.id}`,
-              testId: `npc-${npc.id}`,
-              width: this.tiledMapData.tilewidth,
-              height: this.tiledMapData.tileheight,
-              showBorder: true
-            });
-            console.log(`[TEST] Added test marker for constraint NPC: ${npc.id} at tile (${overworldTileX}, ${overworldTileY}), world (${worldX}, ${worldY})`);
-          }
-
-          if (npc.animate) {
-            const animKey = getNPCIdleAnimationKey(appearanceId, this.npcAppearanceRegistry);
-            if (animKey) sprite.play(animKey);
-          }
-
-          constraintNPCCount++;
-          console.log(`Loaded constraint NPC: ${npcId} at (${overworldTileX}, ${overworldTileY}), appearance: ${appearanceId}, conversation: ${conversationFile || 'none'}`);
-        }
-      }
-    }
-
-    console.log(`✓ Created ${constraintNPCCount} constraint NPCs from overworld puzzles`);
-  }
-
-  /**
-   * Hide constraint NPCs (and their number/compass sprites) for a specific puzzle.
-   * Called when entering puzzle mode so EmbeddedPuzzleRenderer's NPCs are visible.
+   * Hide constraint NPCs for a specific puzzle.
+   * Delegated to {@link ConstraintNPCManager}.
    */
   private hideConstraintNPCsForPuzzle(puzzleId: string): void {
-    const prefix = `constraint-${puzzleId}-`;
-
-    for (const [npcId, sprite] of this.npcSprites) {
-      if (npcId.startsWith(prefix)) {
-        sprite.setVisible(false);
-      }
-    }
-
-    for (const [npcId, numberSprite] of this.constraintNumberSprites) {
-      if (npcId.startsWith(prefix)) {
-        numberSprite.setVisible(false);
-      }
-    }
-
-    for (const [npcId, compassSprite] of this.constraintCompassSprites) {
-      if (npcId.startsWith(prefix)) {
-        compassSprite.setVisible(false);
-      }
-    }
-
-    console.log(`Hidden constraint NPCs for puzzle: ${puzzleId}`);
+    this.constraintNPCManager?.hideConstraintNPCsForPuzzle(puzzleId);
   }
 
   /**
-   * Show constraint NPCs (and their number/compass sprites) for a specific puzzle.
-   * Called when exiting puzzle mode to restore overworld NPCs.
+   * Show constraint NPCs for a specific puzzle.
+   * Delegated to {@link ConstraintNPCManager}.
    */
   private showConstraintNPCsForPuzzle(puzzleId: string): void {
-    const prefix = `constraint-${puzzleId}-`;
-    const isSolved = this.gameState.isPuzzleCompleted(puzzleId);
-
-    for (const [npcId, sprite] of this.npcSprites) {
-      if (npcId.startsWith(prefix)) {
-        sprite.setVisible(true);
-        // Update disguised NPCs to their "revealed" sprite once the puzzle is solved
-        const disguise = this.constraintDisguiseKeys.get(npcId);
-        if (disguise) {
-          sprite.setTexture(isSolved ? disguise.solvedKey : disguise.normalKey);
-        }
-      }
-    }
-
-    for (const [npcId, numberSprite] of this.constraintNumberSprites) {
-      if (npcId.startsWith(prefix)) {
-        numberSprite.setVisible(true);
-      }
-    }
-
-    for (const [npcId, compassSprite] of this.constraintCompassSprites) {
-      if (npcId.startsWith(prefix)) {
-        compassSprite.setVisible(true);
-      }
-    }
-
-    console.log(`Shown constraint NPCs for puzzle: ${puzzleId}`);
+    this.constraintNPCManager?.showConstraintNPCsForPuzzle(puzzleId);
   }
 
   /**
-   * Load doors from all "<anything>/doors" object layers in the Tiled map
-   */
-  private loadDoors(): void {
-    if (!this.map || !this.tiledMapData) return;
-
-    // Find all doors object layers (including nested) in tiledMapData
-    const doorsLayers = TiledLayerUtils.findObjectLayersByName(this.tiledMapData.layers, 'doors');
-
-    if (doorsLayers.length === 0) {
-      console.log('No doors layers found in map');
-      return;
-    }
-
-    console.log(`Found ${doorsLayers.length} doors layers`);
-
-    const tileWidth = this.tiledMapData.tilewidth || 32;
-    const tileHeight = this.tiledMapData.tileheight || 32;
-
-    // Process all doors layers
-    for (const layerInfo of doorsLayers) {
-      // Try both the full path and the simple name
-      let doorsLayer = this.map.getObjectLayer(layerInfo.fullPath);
-      if (!doorsLayer) {
-        doorsLayer = this.map.getObjectLayer(layerInfo.name);
-      }
-
-      if (!doorsLayer) {
-        console.warn(`Failed to get object layer: ${layerInfo.fullPath} or ${layerInfo.name}`);
-        continue;
-      }
-
-      console.log(`Loading doors from layer: ${layerInfo.fullPath}`);
-
-      for (const obj of doorsLayer.objects) {
-        try {
-          const door = Door.fromTiledObject(obj, tileWidth, tileHeight);
-          this.doors.push(door);
-
-          // Create door sprite(s) for visual representation
-          this.createDoorSprites(door);
-
-          console.log(`Loaded door: ${door.id} at positions:`, door.getPositions(),
-            door.seriesId ? `linked to series: ${door.seriesId}` : 'no series link',
-            door.spriteId ? `sprite: ${door.spriteId}` : 'no sprite',
-            `locked: ${door.isLocked()}`);
-        } catch (error) {
-          console.error('Error loading door from object:', obj, error);
-        }
-      }
-    }
-
-    // Register doors with collision manager
-    if (this.doors.length > 0) {
-      this.collisionManager.registerDoors(this.doors);
-      console.log(`Registered ${this.doors.length} doors with collision manager`);
-    }
-  }
-
-  /**
-   * Create a door sprite for visual representation.
-   * Uses a dedicated spritesheet (not the terrains tileset) with frame 0 = closed, final frame = open.
-   */
-  private createDoorSprites(door: Door): void {
-    if (!door.spriteId) {
-      console.warn(`Door ${door.id} has no spriteId, cannot create sprite`);
-      return;
-    }
-
-    const mapping = getDoorSpriteMapping(door.spriteId);
-    if (!mapping) {
-      console.warn(`Could not get sprite mapping for door ${door.id} with spriteId ${door.spriteId}`);
-      return;
-    }
-
-    const tileW = this.tiledMapData?.tilewidth ?? 32;
-    const tileH = this.tiledMapData?.tileheight ?? 32;
-
-    // Compute world-space centre of the door from its tile positions
-    const positions = door.getPositions();
-    const sumX = positions.reduce((acc, p) => acc + p.tileX, 0);
-    const sumY = positions.reduce((acc, p) => acc + p.tileY, 0);
-    const worldX = (sumX / positions.length + 0.5) * tileW;
-    const worldY = (sumY / positions.length + 0.5) * tileH;
-
-    const frame = door.isLocked() ? mapping.closedFrame : mapping.openFrame;
-    const sprite = this.add.sprite(worldX, worldY, mapping.textureKey, frame);
-    sprite.setOrigin(0.5, 0.5);
-    // Sort by the bottom edge of the southernmost tile so the player correctly
-    // appears in front when they walk south of the doorway.
-    const maxTileY = Math.max(...positions.map(p => p.tileY));
-    sprite.setDepth((maxTileY + 1) * tileH);
-    this.doorSprites.set(door.id, sprite);
-    console.log(`Door ${door.id}: spriteId=${door.spriteId}, locked=${door.isLocked()}, frame=${frame}, world=(${worldX}, ${worldY})`);
-  }
-
-  /**
-   * Update door sprite frame to reflect its current locked state.
-   */
-  private updateDoorSprite(door: Door): void {
-    if (!door.spriteId) {
-      return;
-    }
-
-    const mapping = getDoorSpriteMapping(door.spriteId);
-    if (!mapping) {
-      return;
-    }
-
-    const frame = door.isLocked() ? mapping.closedFrame : mapping.openFrame;
-    const sprite = this.doorSprites.get(door.id);
-    if (sprite) {
-      sprite.setFrame(frame);
-    }
-    console.log(`Updated door ${door.id} sprite to ${door.isLocked() ? 'closed' : 'open'} state (frame=${frame})`);
-  }
-
-  /**
-   * Helper: Find all layers matching a suffix pattern (e.g., "collision" matches "Beach/collision", "Forest/collision")
+   * Helper: Find all layers matching a suffix pattern.
    */
   private findLayersBySuffix(suffix: string): Phaser.Tilemaps.LayerData[] {
     return this.map.layers.filter(layer => TiledLayerUtils.getLayerSuffix(layer.name) === suffix);
-  }
-
-  /**
-   * Load collectibles from all "<anything>/collectibles" object layers in the Tiled map.
-   * Creates a Collectible model instance and an animated sprite for each object found.
-   */
-  private loadCollectibles(): void {
-    if (!this.map || !this.tiledMapData) return;
-
-    const collectiblesLayers = TiledLayerUtils.findObjectLayersByName(this.tiledMapData.layers, 'collectibles');
-
-    if (collectiblesLayers.length === 0) {
-      console.log('No collectibles layers found in map');
-      return;
-    }
-
-    console.log(`Found ${collectiblesLayers.length} collectibles layer(s)`);
-
-    const tileWidth = this.tiledMapData.tilewidth || 32;
-    const tileHeight = this.tiledMapData.tileheight || 32;
-
-    for (const layerInfo of collectiblesLayers) {
-      let layer = this.map.getObjectLayer(layerInfo.fullPath);
-      if (!layer) {
-        layer = this.map.getObjectLayer(layerInfo.name);
-      }
-      if (!layer) {
-        console.warn(`Failed to get collectibles layer: ${layerInfo.fullPath}`);
-        continue;
-      }
-
-      for (const obj of layer.objects) {
-        const collectible = Collectible.fromTiledObject(obj, tileWidth, tileHeight);
-        if (!collectible) {
-          console.warn(`Skipping invalid collectible object in ${layerInfo.fullPath}:`, obj);
-          continue;
-        }
-
-        this.collectibles.push(collectible);
-
-        // World pixel position: centre of tile
-        const worldX = collectible.tileX * tileWidth + tileWidth / 2;
-        const worldY = collectible.tileY * tileHeight + tileHeight / 2;
-
-        // Attempt to create a sprite using a key derived from the jewel colour.
-        // The animation is expected to be pre-defined (e.g. via Tiled tileset data).
-        // If the texture is not loaded we fall back to a plain rectangle for now.
-        const spriteKey = `jewel-${collectible.colour}`;
-        let sprite: Phaser.GameObjects.Sprite;
-
-        if (this.textures.exists(spriteKey)) {
-          sprite = this.add.sprite(worldX, worldY, spriteKey);
-          // Play the animation if one exists for this key
-          const animKey = `jewel-${collectible.colour}-anim`;
-          if (this.anims.exists(animKey)) {
-            sprite.play(animKey);
-          }
-        } else {
-          // Fallback: coloured rectangle rendered as a sprite (placeholder)
-          const colourMap: Record<string, number> = {
-            red: 0xff4444,
-            blue: 0x4444ff,
-            green: 0x44ff44,
-            yellow: 0xffff44,
-          };
-          const colour = colourMap[collectible.colour] ?? 0xffffff;
-          const gfx = this.make.graphics({ x: 0, y: 0 }, false);
-          gfx.fillStyle(colour, 1);
-          gfx.fillRect(0, 0, 16, 16);
-          const rt = this.add.renderTexture(worldX - 8, worldY - 8, 16, 16);
-          rt.draw(gfx);
-          rt.setDepth(worldY);
-          gfx.destroy();
-          // Use a sprite-like object handle; store the renderTexture under the same map
-          // by creating a transparent stand-in sprite at the correct position.
-          sprite = this.add.sprite(worldX, worldY, '__DEFAULT');
-          sprite.setVisible(false);
-          this.collectibleSprites.set(collectible.id, sprite);
-          console.log(`Collectible ${collectible.id} (${collectible.colour} jewel) loaded at (${collectible.tileX}, ${collectible.tileY}) — using placeholder`);
-          continue;
-        }
-
-        sprite.setDepth(worldY);
-        this.collectibleSprites.set(collectible.id, sprite);
-
-        // Register as interactable
-        this.interactables.push({
-          type: 'collectible',
-          tileX: collectible.tileX,
-          tileY: collectible.tileY,
-          data: { collectibleId: collectible.id },
-        });
-
-        console.log(`Loaded collectible: ${collectible.colour} jewel (id=${collectible.id}) at (${collectible.tileX}, ${collectible.tileY})`);
-      }
-    }
-
-    // Register interactables that use the real texture as collectible interactables
-    console.log(`Total collectibles loaded: ${this.collectibles.length}`);
-  }
-
-  /**
-   * Collect a jewel: update model state, remove its sprite from the world and
-   * interactables list, then refresh the overworld HUD.
-   */
-  private collectJewel(collectibleId: string): void {
-    const collectible = this.collectibles.find(c => c.id === collectibleId);
-    if (!collectible || collectible.collected) return;
-
-    collectible.collect();
-    this.gameState.collectJewel(collectible.colour);
-
-    // Remove sprite
-    const sprite = this.collectibleSprites.get(collectibleId);
-    if (sprite) {
-      sprite.destroy();
-      this.collectibleSprites.delete(collectibleId);
-    }
-
-    // Remove from interactables list
-    this.interactables = this.interactables.filter(
-      i => !(i.type === 'collectible' && i.data?.collectibleId === collectibleId)
-    );
-
-    // Update HUD
-    this.overworldHUD?.refreshJewelHUD();
-
-    emitTestEvent('jewel_collected', { colour: collectible.colour, id: collectibleId });
-    console.log(`Collected ${collectible.colour} jewel (id=${collectibleId}). Total: ${this.gameState.getJewelCount(collectible.colour)}`);
   }
 
   /**
@@ -2042,145 +1291,32 @@ export class OverworldScene extends Phaser.Scene {
   private setupCollisionDetection() {
     if (this.collisionLayers.length === 0) return;
 
-    // Initialize collision array and create separate layers
     const mapWidth = this.map.width;
     const mapHeight = this.map.height;
 
-    // Pre-build lookup maps from raw tiledMapData for ground/lowground visual layers.
-    // These layers carry stairs=true and lowground=true tile properties that the
-    // dedicated collision layer may not cover.
-    const stairsTiles = new Set<number>(); // flat index = y * mapWidth + x
-    const lowgroundTiles = new Set<number>();
+    const { collisionArray, permanentBlockedTiles, pontoonTiles } = CollisionInitialiser.buildCollisionData(
+      this.tiledMapData ?? {},
+      mapWidth,
+      mapHeight,
+      (x, y) => this.collisionLayers.map(layer => {
+        const tile = layer.getTileAt(x, y);
+        if (!tile || tile.index === -1) return null;
+        return { properties: tile.properties ?? undefined };
+      })
+    );
 
-    if (this.tiledMapData) {
-      const tilesets = this.tiledMapData.tilesets ?? [];
+    this.collisionArray = collisionArray;
+    this.permanentBlockedTiles = permanentBlockedTiles;
 
-      const groundLayers = TiledLayerUtils.findTileLayersByName(this.tiledMapData.layers, 'ground');
-      for (const layer of groundLayers) {
-        const data: number[] = layer.data.data ?? [];
-        for (let i = 0; i < data.length; i++) {
-          const props = TiledLayerUtils.getTileProperties(tilesets, data[i]);
-          if (props['stairs'] === true) stairsTiles.add(i);
-        }
-      }
-
-      const lowgroundLayers = TiledLayerUtils.findTileLayersByName(this.tiledMapData.layers, 'lowground');
-      for (const layer of lowgroundLayers) {
-        const data: number[] = layer.data.data ?? [];
-        for (let i = 0; i < data.length; i++) {
-          const props = TiledLayerUtils.getTileProperties(tilesets, data[i]);
-          if (props['lowground'] === true) lowgroundTiles.add(i);
-          // Stairs can also appear on the lowground layer
-          if (props['stairs'] === true) stairsTiles.add(i);
-        }
-      }
-      console.log(`Visual layer scan: ${stairsTiles.size} stairs tiles, ${lowgroundTiles.size} lowground tiles`);
-
-      // Scan all "pontoons" layers and build the pontoonTiles registry.
-      // Pontoon tiles start in the state defined by their tileset (isHigh / !isHigh) and their
-      // collision is set here to match; it will be updated at runtime as water levels change.
-      const pontoonLayers = TiledLayerUtils.findTileLayersByName(this.tiledMapData.layers, 'pontoons');
-      for (const layer of pontoonLayers) {
-        const data: number[] = layer.data.data ?? [];
-        for (let i = 0; i < data.length; i++) {
-          const gid = data[i];
-          if (!gid) continue;
-          const props = TiledLayerUtils.getTileProperties(tilesets, gid);
-          if (props['isPontoon'] !== true) continue;
-
-          const tileX = i % mapWidth;
-          const tileY = Math.floor(i / mapWidth);
-          const key = `${tileX},${tileY}`;
-          const isHigh = props['isHigh'] === true;
-          const toggleOffset = typeof props['toggleOffset'] === 'number' ? props['toggleOffset'] as number : 0;
-
-          this.pontoonTiles.set(key, {
-            tileX,
-            tileY,
-            currentGID: gid,
-            layerName: layer.fullPath,
-            isHigh,
-            toggleOffset,
-          });
-        }
-      }
-      console.log(`Pontoon scan: ${this.pontoonTiles.size} pontoon tiles registered`);
-    }
-
-    this.collisionArray = [];
-
-    for (let y = 0; y < mapHeight; y++) {
-      this.collisionArray[y] = [];
-
-      for (let x = 0; x < mapWidth; x++) {
-        // Collect tile data from all collision layers at this position.
-        // Return null for absent tiles (getTileAt returns null, or index === -1).
-        // Return a data object whose properties may be undefined (tile exists but
-        // carries no custom properties); CollisionTileClassifier handles that case.
-        const layerTiles = this.collisionLayers.map(collisionLayer => {
-          const tile = collisionLayer.getTileAt(x, y);
-          if (!tile || tile.index === -1) return null;
-          return { properties: tile.properties ?? undefined };
-        });
-
-        // Augment with visual-layer properties (stairs / lowground).
-        // These are injected as synthetic tile entries so the classifier can
-        // apply its existing priority rules without modification.
-        const flatIdx = y * mapWidth + x;
-        if (stairsTiles.has(flatIdx)) {
-          layerTiles.push({ properties: { stairs: true } });
-        } else if (lowgroundTiles.has(flatIdx)) {
-          // Only set walkable_low if not already overridden to STAIRS
-          layerTiles.push({ properties: { walkable_low: true } });
-        }
-
-        // Classify tile type using pure logic
-        const classification = CollisionTileClassifier.classifyTile(layerTiles);
-        this.collisionArray[y][x] = classification.collisionType;
-      }
-    }
-
-    console.log(`Collision system initialised: ${mapWidth}x${mapHeight}`);
-
-    // Debug: count collision tiles by type
-    let blockedCount = 0;
-    let walkableCount = 0;
-    let walkableLowCount = 0;
-    let stairsCount = 0;
-    let alwaysHighCount = 0;
-
-    for (let y = 0; y < mapHeight; y++) {
-      for (let x = 0; x < mapWidth; x++) {
-        const type = this.collisionArray[y][x];
-        if (type === CollisionType.BLOCKED) blockedCount++;
-        else if (type === CollisionType.WALKABLE) walkableCount++;
-        else if (type === CollisionType.WALKABLE_LOW) walkableLowCount++;
-        else if (type === CollisionType.STAIRS) stairsCount++;
-        else if (type === CollisionType.ALWAYS_HIGH) alwaysHighCount++;
-      }
-    }
-
-    console.log(`Collision tiles: BLOCKED=${blockedCount}, WALKABLE=${walkableCount}, WALKABLE_LOW=${walkableLowCount}, STAIRS=${stairsCount}, ALWAYS_HIGH=${alwaysHighCount}`);
-
-    // Record tiles that are permanently BLOCKED by Tiled collision-layer properties.
-    // Water propagation must never override these, even if water flows beneath them.
-    this.permanentBlockedTiles.clear();
-    for (let y = 0; y < mapHeight; y++) {
-      for (let x = 0; x < mapWidth; x++) {
-        if (this.collisionArray[y][x] === CollisionType.BLOCKED) {
-          this.permanentBlockedTiles.add(`${x},${y}`);
-        }
-      }
-    }
-
-    // Post-pass: apply pontoon collision, overriding whatever the main loop computed.
-    // Pontoons are not on collision layers so their positions default to WALKABLE;
-    // this pass enforces the correct type based on each tile's initial isHigh state.
-    for (const { tileX, tileY, isHigh } of this.pontoonTiles.values()) {
-      if (tileY >= 0 && tileY < mapHeight && tileX >= 0 && tileX < mapWidth) {
-        this.collisionArray[tileY][tileX] = isHigh ? CollisionType.WALKABLE : CollisionType.WALKABLE_LOW;
-      }
-    }
+    // Create FlowWaterVisualManager now that pontoonTiles are ready
+    this.flowWaterManager = new FlowWaterVisualManager(
+      this.map,
+      this.tiledMapData,
+      pontoonTiles,
+      (x, y) => this.getCollisionAt(x, y),
+      (x, y, t) => this.setCollisionAt(x, y, t),
+      (x, y) => this.isPermanentlyBlocked(x, y),
+    );
   }
 
   update(_time: number, delta: number) {
@@ -2434,7 +1570,7 @@ export class OverworldScene extends Phaser.Scene {
         }
       } else {
         // For series NPCs, check series state
-        const state = this.npcSeriesStates.get(npc.id);
+        const state = this.npcSpriteController?.npcSeriesStates.get(npc.id);
         useSolvedConversation = state?.isSeriesCompleted() ?? false;
       }
 
@@ -2456,12 +1592,7 @@ export class OverworldScene extends Phaser.Scene {
 
       // Apply conversation variable substitution (e.g. {{count}} → '2')
       if (npc.conversationVariables) {
-        const variables = npc.conversationVariables;
-        for (const node of Object.values(conversationSpec.nodes)) {
-          if (node.npc?.glyphs) {
-            node.npc.glyphs = node.npc.glyphs.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] ?? `{{${key}}}`);
-          }
-        }
+        ConversationVariableSubstitutor.applyTo(conversationSpec, npc.conversationVariables);
       }
 
       // Switch to conversation mode
@@ -2568,7 +1699,7 @@ export class OverworldScene extends Phaser.Scene {
     // If series is associated with an NPC, use their state
     let series = null;
     if (npc) {
-      const state = this.npcSeriesStates.get(npc.id);
+      const state = this.npcSpriteController?.npcSeriesStates.get(npc.id);
       series = state?.getSeries();
 
       if (series && series.id !== seriesId) {
@@ -2640,124 +1771,12 @@ export class OverworldScene extends Phaser.Scene {
     this.scene.launch('BridgePuzzleScene', { puzzleData, seriesMode: true });
   }
 
-  /**
-   * Synchronously apply a door state change: update the model, collision, sprite, and game state.
-   * Used by animateDoorChange() after the camera has panned and animation has played.
-   */
-  private applyDoorChange(door: Door, unlock: boolean): void {
-    if (unlock) {
-      door.unlock();
-      this.gameState.unlockDoor(door.id);
-    } else {
-      door.lock();
-      this.gameState.lockDoor(door.id);
-    }
-    this.collisionManager.updateDoorCollision(door);
-    this.updateDoorSprite(door);
-    console.log(`Door ${door.id} ${unlock ? 'unlocked' : 'locked'} successfully`);
-  }
-
-  /**
-   * Animate a door opening or closing:
-   *   1. Disable player movement and stop camera follow
-   *   2. Pan camera to the door
-   *   3. Play the opening animation sprite (if the spritesheet is loaded)
-   *   4. Apply the door state change (update model, collision, and tile sprite)
-   *   5. Pan camera back to the player
-   *   6. Resume camera follow and re-enable player movement
-   */
   private async animateDoorChange(door: Door, unlock: boolean): Promise<void> {
-    const PAN_DURATION = 800;
-    const tileW = this.tiledMapData?.tilewidth ?? 32;
-    const tileH = this.tiledMapData?.tileheight ?? 32;
-
-    // Compute world-space centre of the door from its tile positions
-    const positions = door.getPositions();
-    const sumX = positions.reduce((acc, p) => acc + p.tileX, 0);
-    const sumY = positions.reduce((acc, p) => acc + p.tileY, 0);
-    const doorWorldX = (sumX / positions.length + 0.5) * tileW;
-    const doorWorldY = (sumY / positions.length + 0.5) * tileH;
-
-    // Disable player movement and stop follow so we can freely pan
-    this.playerController?.setEnabled(false);
-    this.cameras.main.stopFollow();
-
-    try {
-      // Pan to the door
-      await new Promise<void>((resolve) => {
-        this.cameras.main.pan(doorWorldX, doorWorldY, PAN_DURATION, 'Power2', false, (_cam, progress) => {
-          if (progress === 1) resolve();
-        });
-      });
-
-      // Play the opening animation if the spritesheet is available
-      const mapping = getDoorSpriteMapping(door.spriteId);
-      if (mapping && this.textures.exists(mapping.animationKey)) {
-        const animKey = `${mapping.animationKey}-play`;
-
-        // Register animation lazily (idempotent: Phaser ignores duplicates)
-        if (!this.anims.exists(animKey)) {
-          this.anims.create({
-            key: animKey,
-            frames: this.anims.generateFrameNumbers(mapping.animationKey, {
-              start: 0,
-              end: mapping.frameCount - 1
-            }),
-            frameRate: 8,
-            repeat: 0
-          });
-        }
-
-        await new Promise<void>((resolve) => {
-          const doorSprite = this.doorSprites.get(door.id);
-          const targetSprite = doorSprite ?? this.add.sprite(doorWorldX, doorWorldY, mapping.textureKey, 0).setOrigin(0.5, 0.5);
-          const isTemporary = !doorSprite;
-          targetSprite.once('animationcomplete', () => {
-            if (isTemporary) targetSprite.destroy();
-            resolve();
-          });
-          targetSprite.play(animKey);
-        });
-      } else if (mapping) {
-        console.warn(`Door animation texture '${mapping.animationKey}' not loaded — skipping animation for door ${door.id}`);
-      }
-
-      // Apply the state change (model, collision, tile sprite)
-      this.applyDoorChange(door, unlock);
-
-    } finally {
-      // Pan back to the player and resume follow regardless of errors
-      if (this.player) {
-        const playerX = this.player.x;
-        const playerY = this.player.y;
-        await new Promise<void>((resolve) => {
-          this.cameras.main.pan(playerX, playerY, PAN_DURATION, 'Power2', false, (_cam, progress) => {
-            if (progress === 1) resolve();
-          });
-        });
-        this.cameras.main.startFollow(this.player);
-      }
-      this.playerController?.setEnabled(true);
-    }
+    await this.doorManager?.animateDoorChange(door, unlock);
   }
 
-  /**
-   * Unlock a door by ID immediately, without animation.
-   * Used for conversation-triggered unlocks and as an internal helper.
-   */
   private unlockDoor(doorId: string): void {
-    const door = this.doors.find(d => d.id === doorId);
-    if (!door) {
-      console.warn(`Door ${doorId} not found`);
-      return;
-    }
-
-    if (!door.isLocked()) {
-      console.log(`Door ${doorId} is already unlocked`);
-      return;
-    }
-
-    this.applyDoorChange(door, true);
+    this.doorManager?.unlockDoor(doorId);
   }
 
   /**
@@ -2809,7 +1828,7 @@ export class OverworldScene extends Phaser.Scene {
     if (this.currentSeries.isSeriesCompleted()) {
       console.log(`Series ${this.currentSeries.id} completed! Animating door unlock...`);
       // Find and animate the door associated with this series
-      const seriesDoor = this.doors.find(d => d.id === this.currentSeries.id);
+      const seriesDoor = this.doorManager?.doors.find(d => d.id === this.currentSeries!.id);
       if (seriesDoor && seriesDoor.isLocked()) {
         await this.animateDoorChange(seriesDoor, true);
       } else if (!seriesDoor) {
@@ -2818,7 +1837,7 @@ export class OverworldScene extends Phaser.Scene {
       }
 
       // Update NPC icon to show completion
-      for (const [npcId, state] of this.npcSeriesStates.entries()) {
+      for (const [npcId, state] of (this.npcSpriteController?.npcSeriesStates.entries() ?? [])) {
         if (state.getSeries()?.id === this.currentSeries.id) {
           const npc = this.npcs.find(n => n.id === npcId);
           if (npc) {
@@ -3028,7 +2047,7 @@ export class OverworldScene extends Phaser.Scene {
 
       // Animate overworld-puzzle-linked doors
       if (exitResult.wasSolved || exitResult.wasUnsolved) {
-        const linkedDoors = this.doors.filter(d => d.overworldPuzzleId === exitResult.puzzleId);
+        const linkedDoors = this.doorManager?.doors.filter(d => d.overworldPuzzleId === exitResult.puzzleId) ?? [];
         for (const door of linkedDoors) {
           if (exitResult.wasSolved && door.isLocked()) {
             console.log(`Animating unlock of door ${door.id} linked to overworld puzzle ${exitResult.puzzleId}`);
@@ -3043,7 +2062,7 @@ export class OverworldScene extends Phaser.Scene {
       // Animate series-puzzle-linked door if series is now complete
       if (success && this.currentSeries && this.currentSeries.isSeriesCompleted()) {
         console.log(`Series ${this.currentSeries.id} completed! Animating door unlock...`);
-        const seriesDoor = this.doors.find(d => d.id === this.currentSeries.id);
+        const seriesDoor = this.doorManager?.doors.find(d => d.id === this.currentSeries!.id);
         if (seriesDoor && seriesDoor.isLocked()) {
           await this.animateDoorChange(seriesDoor, true);
         } else if (!seriesDoor) {
@@ -3083,7 +2102,7 @@ export class OverworldScene extends Phaser.Scene {
       // Update NPC icons if series is associated
       if (success && this.currentSeries) {
         // Find the NPC associated with this series and update their icon
-        for (const [npcId, state] of this.npcSeriesStates.entries()) {
+        for (const [npcId, state] of (this.npcSpriteController?.npcSeriesStates.entries() ?? [])) {
           if (state.getSeries()?.id === this.currentSeries.id) {
             const npc = this.npcs.find(n => n.id === npcId);
             if (npc) {

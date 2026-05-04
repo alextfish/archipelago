@@ -195,6 +195,50 @@ export class CameraManager {
     }
 
     /**
+     * Smoothly pan the camera to a specific world position and back to a target
+     * object, temporarily stopping camera follow for the duration.
+     *
+     * Player movement is disabled by the caller (DoorManager) before this is
+     * called; the caller is also responsible for re-enabling it afterwards.
+     *
+     * @param worldX        Target world X to pan to.
+     * @param worldY        Target world Y to pan to.
+     * @param returnTarget  The object to pan back to once the callback completes
+     *                      (typically the player sprite).
+     * @param duration      Duration of each pan leg in milliseconds.
+     * @param onAtTarget    Async callback invoked once the camera has arrived at
+     *                      (worldX, worldY).  Awaited before panning back.
+     */
+    async panToWorldPositionAndBack(
+        worldX: number,
+        worldY: number,
+        returnTarget: { x: number; y: number },
+        duration: number,
+        onAtTarget: () => Promise<void>
+    ): Promise<void> {
+        const camera = this.scene.cameras.main;
+        camera.stopFollow();
+
+        try {
+            await new Promise<void>((resolve) => {
+                camera.pan(worldX, worldY, duration, 'Power2', false, (_cam, progress) => {
+                    if (progress === 1) resolve();
+                });
+            });
+
+            await onAtTarget();
+
+        } finally {
+            await new Promise<void>((resolve) => {
+                camera.pan(returnTarget.x, returnTarget.y, duration, 'Power2', false, (_cam, progress) => {
+                    if (progress === 1) resolve();
+                });
+            });
+            camera.startFollow(returnTarget as unknown as Phaser.GameObjects.GameObject);
+        }
+    }
+
+    /**
      * Clear stored state
      */
     reset(): void {
