@@ -4,9 +4,13 @@
  */
 
 export interface DoorSpriteMapping {
-    closed: number;
-    open: number;
-    /** Phaser texture key for the opening animation spritesheet */
+    /** Phaser texture key for the spritesheet (used for both static display and animation) */
+    textureKey: string;
+    /** Frame index within the spritesheet for the closed state */
+    closedFrame: number;
+    /** Frame index within the spritesheet for the open state */
+    openFrame: number;
+    /** Phaser animation key for the opening animation */
     animationKey: string;
     /** Frame width of each animation frame in pixels */
     frameWidth: number;
@@ -17,44 +21,49 @@ export interface DoorSpriteMapping {
 }
 
 /**
- * Door sprite mappings for the terrains tileset
- * These map from Tiled object spriteId properties to actual sprite indices
+ * Door sprite mappings for dedicated door spritesheets.
+ * Each spritesheet drives both the static closed/open display and the opening animation.
+ * Frame 0 = closed state, final frame = open state.
  */
 export const DoorSpriteRegistry: Record<string, DoorSpriteMapping> = {
     // Horizontal doors
     'forestDoorHClosed': {
-        closed: 30,
-        open: 31,
+        textureKey: 'forestDoorHOpening',
+        closedFrame: 0,
+        openFrame: 5,
         animationKey: 'forestDoorHOpening',
         frameWidth: 32,
         frameHeight: 32,
-        frameCount: 4
+        frameCount: 6
     },
     'forestDoorHOpen': {
-        closed: 30,
-        open: 31,
+        textureKey: 'forestDoorHOpening',
+        closedFrame: 0,
+        openFrame: 5,
         animationKey: 'forestDoorHOpening',
         frameWidth: 32,
         frameHeight: 32,
-        frameCount: 4
+        frameCount: 6
     },
 
     // Vertical doors
     'forestDoorVClosed': {
-        closed: 32,
-        open: 33,
+        textureKey: 'forestDoorVOpening',
+        closedFrame: 0,
+        openFrame: 5,
         animationKey: 'forestDoorVOpening',
         frameWidth: 32,
         frameHeight: 64,
-        frameCount: 4
+        frameCount: 6
     },
     'forestDoorVOpen': {
-        closed: 32,
-        open: 33,
+        textureKey: 'forestDoorVOpening',
+        closedFrame: 0,
+        openFrame: 5,
         animationKey: 'forestDoorVOpening',
         frameWidth: 32,
         frameHeight: 64,
-        frameCount: 4
+        frameCount: 6
     }
 };
 
@@ -73,7 +82,7 @@ export function getDoorSpriteMapping(spriteId: string | undefined): DoorSpriteMa
  * Get the sprite frame index for a door based on its sprite ID and locked state
  * @param spriteId The sprite ID from Tiled (e.g., "forestDoorHClosed")
  * @param isLocked Whether the door is currently locked
- * @returns The sprite frame index in the terrains tileset, or null if not found
+ * @returns The frame index within the door's dedicated spritesheet, or null if not found
  */
 export function getDoorSpriteFrame(spriteId: string | undefined, isLocked: boolean): number | null {
     if (!spriteId) {
@@ -86,5 +95,5 @@ export function getDoorSpriteFrame(spriteId: string | undefined, isLocked: boole
         return null;
     }
 
-    return isLocked ? mapping.closed : mapping.open;
+    return isLocked ? mapping.closedFrame : mapping.openFrame;
 }

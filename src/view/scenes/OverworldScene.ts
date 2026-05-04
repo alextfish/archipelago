@@ -21,7 +21,7 @@ import { FilePuzzleLoader, LocalStorageProgressStore } from '@model/series/Serie
 import { NPCIconConfig } from '@view/NPCIconConfig';
 import { Door } from '@model/overworld/Door';
 import { PlayerStartManager } from '@model/overworld/PlayerStartManager';
-import { getDoorSpriteFrame, getDoorSpriteMapping } from '@view/DoorSpriteRegistry';
+import { getDoorSpriteMapping } from '@view/DoorSpriteRegistry';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import { CollisionTileClassifier } from '@model/overworld/CollisionTileClassifier';
 import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
@@ -37,6 +37,12 @@ import { Collectible } from '@model/overworld/Collectible';
 import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
 import type { PlayerStartPosition } from '@model/overworld/PlayerStartManager';
 import { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
+
+/**
+ * Depth value for overhead layers (roofs, canopies, etc.) that should always
+ * render above Y-sorted world sprites. Must exceed any possible worldY value.
+ */
+const OVERHEAD_LAYER_DEPTH = 100_000;
 
 /**
  * Overworld scene for exploring the map and finding puzzles
@@ -123,7 +129,7 @@ export class OverworldScene extends Phaser.Scene {
 
   // Door system
   private doors: Door[] = [];
-  private doorSprites: Map<string, Phaser.Tilemaps.Tile> = new Map();
+  private doorSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
 
   // Collectible system
   private collectibles: Collectible[] = [];
@@ -1627,7 +1633,8 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   /**
-   * Create door sprites for visual representation
+   * Create a door sprite for visual representation.
+   * Uses a dedicated spritesheet (not the terrains tileset) with frame 0 = closed, final frame = open.
    */
   private createDoorSprites(door: Door): void {
     if (!door.spriteId) {
@@ -1635,106 +1642,52 @@ export class OverworldScene extends Phaser.Scene {
       return;
     }
 
-    // Get the appropriate sprite frame based on locked state (local frame within tileset)
-    const localFrameIndex = getDoorSpriteFrame(door.spriteId, door.isLocked());
-    if (localFrameIndex === null) {
-      console.warn(`Could not get sprite frame for door ${door.id} with spriteId ${door.spriteId}`);
+    const mapping = getDoorSpriteMapping(door.spriteId);
+    if (!mapping) {
+      console.warn(`Could not get sprite mapping for door ${door.id} with spriteId ${door.spriteId}`);
       return;
     }
 
-    // Get the terrains tileset
-    const terrainsTileset = this.map.getTileset('terrains');
-    if (!terrainsTileset) {
-      console.error('Could not find terrains tileset for door sprites');
-      return;
-    }
+    const tileW = this.tiledMapData?.tilewidth ?? 32;
+    const tileH = this.tiledMapData?.tileheight ?? 32;
 
-    // Convert local frame index to global tile index
-    // putTileAt expects a global index, so add the tileset's firstgid
-    const globalTileIndex = terrainsTileset.firstgid + localFrameIndex;
-    console.log(`Door ${door.id}: spriteId=${door.spriteId}, locked=${door.isLocked()}, localFrame=${localFrameIndex}, terrains.firstgid=${terrainsTileset.firstgid}, globalIndex=${globalTileIndex}`);
+    // Compute world-space centre of the door from its tile positions
+    const positions = door.getPositions();
+    const sumX = positions.reduce((acc, p) => acc + p.tileX, 0);
+    const sumY = positions.reduce((acc, p) => acc + p.tileY, 0);
+    const worldX = (sumX / positions.length + 0.5) * tileW;
+    const worldY = (sumY / positions.length + 0.5) * tileH;
 
-    // Find an appropriate layer to place the door sprite
-    // Doors should be on a layer that renders above ground but below player
-    // Prefer the buildings layer, fallback to obstacles, then any suitable layer
-    let targetLayer: Phaser.Tilemaps.TilemapLayer | null = null;
-
-    // Try buildings layer first (best for doors)
-    const buildingsLayer = this.map.getLayer('buildings');
-    if (buildingsLayer && buildingsLayer.tilemapLayer) {
-      targetLayer = buildingsLayer.tilemapLayer;
-    }
-
-    // Fallback: try obstacles layers
-    if (!targetLayer) {
-      const obstaclesLayers = this.findLayersBySuffix('obstacles');
-      if (obstaclesLayers.length > 0) {
-        const layerName = obstaclesLayers[0].name;
-        targetLayer = this.map.getLayer(layerName)?.tilemapLayer || null;
-      }
-    }
-
-    // Last resort: use any non-collision layer
-    if (!targetLayer) {
-      for (const layer of this.map.layers) {
-        if (!layer.name.includes('collision') && !layer.name.includes('bridges')) {
-          targetLayer = layer.tilemapLayer || null;
-          if (targetLayer) break;
-        }
-      }
-    }
-
-    if (!targetLayer) {
-      console.warn(`No suitable layer found for door sprites`);
-      return;
-    }
-
-    // Place a tile for each position the door occupies
-    for (const pos of door.getPositions()) {
-      const tile = targetLayer.putTileAt(globalTileIndex, pos.tileX, pos.tileY);
-      if (tile) {
-        tile.setCollision(false); // Collision is handled by collision array, not tile collision
-        // Store reference to update later
-        const key = `${door.id}-${pos.tileX}-${pos.tileY}`;
-        this.doorSprites.set(key, tile);
-        console.log(`  Placed door tile at (${pos.tileX}, ${pos.tileY}), collision in array: ${this.hasCollisionAt(pos.tileX, pos.tileY)}`);
-      }
-    }
+    const frame = door.isLocked() ? mapping.closedFrame : mapping.openFrame;
+    const sprite = this.add.sprite(worldX, worldY, mapping.textureKey, frame);
+    sprite.setOrigin(0.5, 0.5);
+    // Sort by the bottom edge of the southernmost tile so the player correctly
+    // appears in front when they walk south of the doorway.
+    const maxTileY = Math.max(...positions.map(p => p.tileY));
+    sprite.setDepth((maxTileY + 1) * tileH);
+    this.doorSprites.set(door.id, sprite);
+    console.log(`Door ${door.id}: spriteId=${door.spriteId}, locked=${door.isLocked()}, frame=${frame}, world=(${worldX}, ${worldY})`);
   }
 
   /**
-   * Update door sprite to reflect its current locked state
+   * Update door sprite frame to reflect its current locked state.
    */
   private updateDoorSprite(door: Door): void {
     if (!door.spriteId) {
       return;
     }
 
-    const localFrameIndex = getDoorSpriteFrame(door.spriteId, door.isLocked());
-    if (localFrameIndex === null) {
+    const mapping = getDoorSpriteMapping(door.spriteId);
+    if (!mapping) {
       return;
     }
 
-    // Get terrains tileset for firstgid
-    const terrainsTileset = this.map.getTileset('terrains');
-    if (!terrainsTileset) {
-      console.error('Could not find terrains tileset for door sprite update');
-      return;
+    const frame = door.isLocked() ? mapping.closedFrame : mapping.openFrame;
+    const sprite = this.doorSprites.get(door.id);
+    if (sprite) {
+      sprite.setFrame(frame);
     }
-
-    // Convert to global tile index
-    const globalTileIndex = terrainsTileset.firstgid + localFrameIndex;
-
-    // Update all tiles for this door
-    for (const pos of door.getPositions()) {
-      const key = `${door.id}-${pos.tileX}-${pos.tileY}`;
-      const tile = this.doorSprites.get(key);
-      if (tile) {
-        tile.index = globalTileIndex;
-      }
-    }
-
-    console.log(`Updated door ${door.id} sprite to ${door.isLocked() ? 'closed' : 'open'} state (localFrame=${localFrameIndex}, globalIndex=${globalTileIndex})`);
+    console.log(`Updated door ${door.id} sprite to ${door.isLocked() ? 'closed' : 'open'} state (frame=${frame})`);
   }
 
   /**
@@ -1952,7 +1905,7 @@ export class OverworldScene extends Phaser.Scene {
             ? layerData.properties.find((prop: any) => prop.name === 'renderAbovePlayer')
             : undefined;
           if (abovePlayerProp != null && (abovePlayerProp as any).value === true) {
-            layer.setDepth(10);
+            layer.setDepth(OVERHEAD_LAYER_DEPTH);
           }
           console.log(`Visual layer "${layerName}" created successfully`);
         } else {
@@ -2025,7 +1978,7 @@ export class OverworldScene extends Phaser.Scene {
           // Store all roofs layers
           this.roofsLayers.push(roofsLayer);
           // Set roof layer depth to appear above player (player is at default depth 0)
-          roofsLayer.setDepth(10);
+          roofsLayer.setDepth(OVERHEAD_LAYER_DEPTH);
           console.log(`Roofs layer "${layerData.name}" created successfully: depth=${roofsLayer.depth}, visible=${roofsLayer.visible}, alpha=${roofsLayer.alpha}`);
         } else {
           console.error(`Failed to create roofs layer "${layerData.name}" - createLayer returned null`);
@@ -2232,6 +2185,11 @@ export class OverworldScene extends Phaser.Scene {
 
   update(_time: number, delta: number) {
     this.tileAnimationManager?.update(delta);
+
+    // Update player depth for Y-sorting so sprites above/below sort correctly
+    if (this.player) {
+      this.player.setDepth(this.player.y);
+    }
 
     // Only handle player movement in exploration mode
     if (this.gameMode === 'exploration' && this.playerController) {
@@ -2751,13 +2709,14 @@ export class OverworldScene extends Phaser.Scene {
         }
 
         await new Promise<void>((resolve) => {
-          const animSprite = this.add.sprite(doorWorldX, doorWorldY, mapping.animationKey, 0);
-          animSprite.setOrigin(0.5, 0.5);
-          animSprite.once('animationcomplete', () => {
-            animSprite.destroy();
+          const doorSprite = this.doorSprites.get(door.id);
+          const targetSprite = doorSprite ?? this.add.sprite(doorWorldX, doorWorldY, mapping.textureKey, 0).setOrigin(0.5, 0.5);
+          const isTemporary = !doorSprite;
+          targetSprite.once('animationcomplete', () => {
+            if (isTemporary) targetSprite.destroy();
             resolve();
           });
-          animSprite.play(animKey);
+          targetSprite.play(animKey);
         });
       } else if (mapping) {
         console.warn(`Door animation texture '${mapping.animationKey}' not loaded — skipping animation for door ${door.id}`);
