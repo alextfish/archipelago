@@ -149,8 +149,14 @@ export class OverworldBridgeManager {
             }
 
             // Determine appropriate collision type for this tile.
+            // Preserve ALWAYS_HIGH — these island tiles are already walkable and must
+            // remain immune to applyFlowWaterCollision; downgrading to WALKABLE would
+            // allow wet-tile logic to subsequently block them.
             const collisionType = tileCollisionMap.get(tileKey) ?? CollisionType.WALKABLE;
-            this.collisionManager.setCollisionAt(tileX, tileY, collisionType);
+            const currentCollision = this.collisionManager.getCollisionAt(tileX, tileY);
+            if (currentCollision !== CollisionType.ALWAYS_HIGH) {
+                this.collisionManager.setCollisionAt(tileX, tileY, collisionType);
+            }
         }
 
         console.log(`OverworldBridgeManager: Baked ${bridges.length} bridges (${tilesPlaced} tiles placed) for puzzle ${puzzleId}`);
