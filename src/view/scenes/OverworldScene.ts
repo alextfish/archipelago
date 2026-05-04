@@ -489,7 +489,7 @@ export class OverworldScene extends Phaser.Scene {
         (pred) => { this.interactables = this.interactables.filter(i => !pred(i)); },
       );
       // Register looping animations for collectible jewels
-      this.collectibleManager.registerJewelAnimations();
+      this.collectibleManager.initialise();
     }
 
     // Initialize overworld puzzle system
@@ -665,35 +665,12 @@ export class OverworldScene extends Phaser.Scene {
       const pixelBounds = this.puzzleManager.getPuzzleBounds(puzzleId);
       if (!pixelBounds) continue;
 
-      const tileX = Math.floor(pixelBounds.x / tileW);
-      const tileY = Math.floor(pixelBounds.y / tileH);
-      const width = Math.round(pixelBounds.width / tileW);
-      const height = Math.round(pixelBounds.height / tileH);
-
-      const edgeTiles: { x: number; y: number; edge: 'N' | 'S' | 'E' | 'W' }[] = [];
-      for (let ly = 0; ly < puzzle.height; ly++) {
-        for (let lx = 0; lx < puzzle.width; lx++) {
-          const isBorder = lx === 0 || lx === puzzle.width - 1 || ly === 0 || ly === puzzle.height - 1;
-          if (!isBorder) continue;
-          const fs = puzzle.getFlowSquare(lx, ly);
-          // Only include border tiles that have at least one outgoing flow direction.
-          // Decorative water tiles (no directions) must not act as channel endpoints —
-          // they would cause the flood-fill to terminate at a tile that cannot propagate
-          // water into the puzzle, masking the real entry point further along.
-          if (fs && (fs.outgoing ?? []).length > 0) {
-            edgeTiles.push({
-              x: lx,
-              y: ly,
-              edge: RiverChannelInitialiser.inferEdgeDirection(lx, ly, width, height),
-            });
-          }
-        }
-      }
-
-      puzzleRegions.set(puzzleId, { bounds: { tileX, tileY, width, height }, edgeTiles });
+      const regionData = RiverChannelInitialiser.buildPuzzleRegionData(puzzle, pixelBounds, tileW, tileH);
+      puzzleRegions.set(puzzleId, regionData);
+      const { bounds, edgeTiles } = regionData;
       console.log(
-        `[RiverChannels] Puzzle "${puzzleId}": tile origin (${tileX},${tileY}) ` +
-        `${width}×${height}, ${edgeTiles.length} edge output(s)`
+        `[RiverChannels] Puzzle "${puzzleId}": tile origin (${bounds.tileX},${bounds.tileY}) ` +
+        `${bounds.width}×${bounds.height}, ${edgeTiles.length} edge output(s)`
       );
     }
 
@@ -997,7 +974,7 @@ export class OverworldScene extends Phaser.Scene {
         (i) => this.interactables.push(i),
         (pred) => { this.interactables = this.interactables.filter(i => !pred(i)); },
       );
-      this.collectibleManager.registerJewelAnimations();
+      this.collectibleManager.initialise();
     }
 
     // Find all npcs object layers (including nested) in tiledMapData

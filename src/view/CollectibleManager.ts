@@ -46,11 +46,21 @@ export class CollectibleManager {
     }
 
     /**
+     * Initialise collectible animations.  Call this once from `create()`.
+     * Internally registers looping Phaser animations for each jewel colour.
+     * As more collectible types are added, this method will register their
+     * animations too — callers never need updating.
+     */
+    initialise(): void {
+        this.registerJewelAnimations();
+    }
+
+    /**
      * Register looping Phaser animations for each jewel colour.
      * Each `jewel-<colour>` spritesheet uses startFrame/endFrame so frame 0 is
-     * always the first frame of that colour.  Call this once from `create()`.
+     * always the first frame of that colour.
      */
-    registerJewelAnimations(): void {
+    private registerJewelAnimations(): void {
         const colours = ['red', 'green', 'blue', 'yellow'];
         for (const colour of colours) {
             const textureKey = `jewel-${colour}`;

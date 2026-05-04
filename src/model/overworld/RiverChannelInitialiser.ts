@@ -2,6 +2,7 @@ import type { RiverChannel } from './RiverChannel';
 import type { GridKey } from '@model/puzzle/FlowTypes';
 import { gridKey } from '@model/puzzle/FlowTypes';
 import { TiledLayerUtils } from './TiledLayerUtils';
+import type { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
 
 /**
  * Extracts river channel connectivity from Tiled map layers, and provides
@@ -250,6 +251,53 @@ export class RiverChannelInitialiser {
   }
 
   // ── Helpers extracted from OverworldScene ──────────────────────────────────
+
+  /**
+   * Build the region descriptor for a single FlowPuzzle: tile-coordinate bounds
+   * and the list of border tiles that have at least one outgoing flow direction.
+   *
+   * Decorative water tiles (no outgoing directions) are intentionally excluded
+   * so the flood-fill used by `extractChannels` does not terminate at a tile
+   * that cannot propagate water into the puzzle.
+   *
+   * @param puzzle      The FlowPuzzle model.
+   * @param pixelBounds Pixel-coordinate bounding box of the puzzle on the map.
+   * @param tileW       Tile width in pixels.
+   * @param tileH       Tile height in pixels.
+   * @returns An object with tile-coordinate `bounds` and an `edgeTiles` array.
+   */
+  static buildPuzzleRegionData(
+    puzzle: FlowPuzzle,
+    pixelBounds: { x: number; y: number; width: number; height: number },
+    tileW: number,
+    tileH: number,
+  ): {
+    bounds: { tileX: number; tileY: number; width: number; height: number };
+    edgeTiles: { x: number; y: number; edge: 'N' | 'S' | 'E' | 'W' }[];
+  } {
+    const tileX = Math.floor(pixelBounds.x / tileW);
+    const tileY = Math.floor(pixelBounds.y / tileH);
+    const width = Math.round(pixelBounds.width / tileW);
+    const height = Math.round(pixelBounds.height / tileH);
+
+    const edgeTiles: { x: number; y: number; edge: 'N' | 'S' | 'E' | 'W' }[] = [];
+    for (let ly = 0; ly < puzzle.height; ly++) {
+      for (let lx = 0; lx < puzzle.width; lx++) {
+        const isBorder = lx === 0 || lx === puzzle.width - 1 || ly === 0 || ly === puzzle.height - 1;
+        if (!isBorder) continue;
+        const fs = puzzle.getFlowSquare(lx, ly);
+        if (fs && (fs.outgoing ?? []).length > 0) {
+          edgeTiles.push({
+            x: lx,
+            y: ly,
+            edge: RiverChannelInitialiser.inferEdgeDirection(lx, ly, width, height),
+          });
+        }
+      }
+    }
+
+    return { bounds: { tileX, tileY, width, height }, edgeTiles };
+  }
 
   /**
    * Build a single flat tile-data array by OR-merging all Tiled `water` layers.
