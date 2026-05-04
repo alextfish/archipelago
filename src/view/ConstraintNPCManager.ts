@@ -82,6 +82,9 @@ export class ConstraintNPCManager {
     loadConstraintNPCs(): void {
         console.log('Loading constraint NPCs from overworld puzzles...');
 
+        const tileW: number = this.tiledMapData?.tilewidth ?? 32;
+        const tileH: number = this.tiledMapData?.tileheight ?? 32;
+
         const puzzles = this.puzzleManager.getAllPuzzles();
         let constraintNPCCount = 0;
 
@@ -170,8 +173,6 @@ export class ConstraintNPCManager {
                     }
 
                     if (item.requiredCount !== undefined && item.requiredCount >= 1 && item.requiredCount <= 8) {
-                        const tileW: number = this.tiledMapData.tilewidth;
-                        const tileH: number = this.tiledMapData.tileheight;
                         const numberSprite = this.scene.add.sprite(
                             worldX + tileW / 2,
                             worldY - tileH / 2,
@@ -184,8 +185,6 @@ export class ConstraintNPCManager {
                     }
 
                     if (item.compassFrame !== undefined) {
-                        const tileW: number = this.tiledMapData.tilewidth;
-                        const tileH: number = this.tiledMapData.tileheight;
                         const compassSprite = this.scene.add.sprite(
                             worldX + tileW / 2,
                             worldY - tileH / 2,
@@ -201,8 +200,8 @@ export class ConstraintNPCManager {
                         attachTestMarker(this.scene, sprite, {
                             id: `npc-${npc.id}`,
                             testId: `npc-${npc.id}`,
-                            width: this.tiledMapData.tilewidth,
-                            height: this.tiledMapData.tileheight,
+                            width: tileW,
+                            height: tileH,
                             showBorder: true
                         });
                         console.log(`[TEST] Added test marker for constraint NPC: ${npc.id} at tile (${overworldTileX}, ${overworldTileY}), world (${worldX}, ${worldY})`);
