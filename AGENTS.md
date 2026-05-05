@@ -80,12 +80,36 @@ Prioritise: **Clarity → Testability → Architectural Consistency**
 
 The player's state can be:
 - Exploring the overworld
+- Exploring a building interior (a separate Tiled map running in `InteriorScene`)
 - Solving an overworld puzzle on a puzzle version of the overworld view
 - Talking to an NPC
 - Solving a BridgePuzzle on a separate screen
 - Translating in-game language on the translation mode overlay
 
 When the player solves an overworld puzzle, the bridges are added to the OverworldScene's collisionArray to make them walkable. The map read from Tiled contains a "collision" layer which we **NEVER CHANGE**.
+
+### Scene Transitions
+
+**NEVER use `scene.start()` during an active game session.** `scene.start()` calls `scene.stop()` on the current scene first, which destroys it and loses ALL in-memory state — `OverworldGameState`, `collisionArray`, the loaded tilemap, NPC positions, puzzle progress, everything.
+
+Always use `scene.sleep()` and `scene.wake()` (or `scene.launch()` for scenes not yet running) when transitioning between scenes during gameplay:
+
+```typescript
+// ✅ Correct: sleep the current scene, wake/launch the target
+this.scene.sleep('OverworldScene');
+this.scene.launch('InteriorScene', { mapKey, spawnID, gameState });
+
+// ✅ Correct: returning from a sub-scene
+this.scene.sleep('InteriorScene');
+this.scene.wake('OverworldScene');
+
+// ❌ WRONG: this destroys OverworldScene and all its state
+this.scene.start('InteriorScene');
+```
+
+`scene.start()` is **only** appropriate at the very top of the Phaser boot sequence (the first scene Phaser launches from `main.ts`). It must never be called once gameplay has begun.
+
+Overlay/HUD scenes (`OverworldHUDScene`, `TranslationModeScene`, `ConversationScene`) follow the same rule: use `scene.launch()` once and then `scene.sleep()` / `scene.wake()` for all subsequent toggling.
 
 ### Source Control
 

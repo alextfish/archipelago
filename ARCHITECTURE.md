@@ -666,6 +666,32 @@ class PuzzleLoader {
 }
 ```
 
+**`OverworldGameState` as the single cross-scene state container**:
+
+`OverworldGameState` is the authoritative store for all persistent player progress — collected jewels, unlocked doors, puzzle completion, translation dictionary, and (when the interior system is built) which interior the player is currently in and where. It is owned by `OverworldScene`, and **must be passed by reference** into any other scene that needs to read or write persistent state (e.g. `InteriorScene` receives it via `scene.init()` data). Never copy or reconstruct it across scene boundaries.
+
+When saving the game, always serialise via `OverworldGameState.exportState()`, which captures all fields above. On load, call `importState()` before any scene initialises its visuals, so that the correct starting location (overworld or interior) can be determined before any tilemap is rendered.
+
+### Scene Lifecycle Pattern
+
+**NEVER call `scene.start()` during an active game session.**
+
+`scene.start()` calls `scene.stop()` on the calling scene first. That destroys the scene, losing all in-memory state including `OverworldGameState`, the collision array, loaded tilemaps, and every live `GameObjects.Sprite`. This is catastrophic during gameplay.
+
+**Always use `scene.sleep()` / `scene.wake()` for in-game transitions:**
+
+```
+             scene.sleep('OverworldScene')
+OverworldScene  ──────────────────────────►  InteriorScene (scene.launch / scene.wake)
+               ◄──────────────────────────
+             scene.wake('OverworldScene')
+             scene.sleep('InteriorScene')
+```
+
+The same rule applies to every overlay (ConversationScene, TranslationModeScene, OverworldHUDScene, PuzzleHUDScene): launch them once at startup and use sleep/wake from that point on. This guarantees that `OverworldScene` and its owned `OverworldGameState` are never destroyed while the game is running, which in turn means that any scene which holds a reference to `OverworldGameState` can safely read and write it regardless of which scene is currently "active".
+
+`scene.start()` is only ever appropriate for the very first scene that Phaser launches from `main.ts`.
+
 ## Coding Standards
 
 ### Naming Conventions
@@ -796,6 +822,7 @@ placeBridge(start: string, end: string): PlacementResult {
 - **Don't** create large monolithic classes
 - **Don't** tightly couple unrelated modules
 - **Don't** commit code that breaks existing tests
+- **Don't** call `scene.start()` during an active game session — use `scene.sleep()` / `scene.wake()` instead (see [Scene Lifecycle Pattern](#scene-lifecycle-pattern))
 
 ## Conclusion
 
