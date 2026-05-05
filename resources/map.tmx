@@ -1,22 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="90" height="90" tilewidth="32" tileheight="32" infinite="0" nextlayerid="114" nextobjectid="123">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="90" height="90" tilewidth="32" tileheight="32" infinite="0" nextlayerid="141" nextobjectid="123">
  <editorsettings>
   <export target="overworld.json" format="json"/>
  </editorsettings>
- <tileset firstgid="1" name="beach" tilewidth="32" tileheight="32" tilecount="20" columns="10">
-  <image source="tilesets/beach.png" width="320" height="64"/>
-  <tile id="5">
-   <properties>
-    <property name="isIsland" type="bool" value="true"/>
-   </properties>
-  </tile>
-  <tile id="6">
-   <properties>
-    <property name="puzzleStart" type="bool" value="true"/>
-   </properties>
-  </tile>
- </tileset>
- <tileset firstgid="21" name="collision" tilewidth="32" tileheight="32" tilecount="10" columns="10">
+ <tileset firstgid="1" name="collision" tilewidth="32" tileheight="32" tilecount="10" columns="10">
   <image source="tilesets/collision.png" width="320" height="32"/>
   <tile id="0">
    <properties>
@@ -89,7 +76,7 @@
    </properties>
   </tile>
  </tileset>
- <tileset firstgid="31" name="terrains" tilewidth="32" tileheight="32" tilecount="72" columns="12">
+ <tileset firstgid="11" name="terrains" tilewidth="32" tileheight="32" tilecount="72" columns="12">
   <image source="tilesets/terrains.png" width="384" height="192"/>
   <tile id="5">
    <properties>
@@ -195,139 +182,7 @@
    </properties>
   </tile>
  </tileset>
- <tileset firstgid="103" name="SproutLandsGrassIslands" tilewidth="32" tileheight="32" tilecount="99" columns="11">
-  <image source="tilesets/SproutLandsGrassIslands.png" width="352" height="288"/>
-  <wangsets>
-   <wangset name="Land 2" type="corner" tile="-1">
-    <wangcolor name="water" color="#ff0000" tile="-1" probability="1"/>
-    <wangcolor name="b" color="#00ff00" tile="-1" probability="1"/>
-    <wangtile tileid="0" wangid="0,1,0,2,0,1,0,1"/>
-    <wangtile tileid="1" wangid="0,1,0,2,0,2,0,1"/>
-    <wangtile tileid="2" wangid="0,1,0,1,0,2,0,1"/>
-    <wangtile tileid="9" wangid="0,1,0,2,0,1,0,2"/>
-    <wangtile tileid="11" wangid="0,2,0,2,0,1,0,1"/>
-    <wangtile tileid="12" wangid="0,2,0,2,0,2,0,2"/>
-    <wangtile tileid="13" wangid="0,1,0,1,0,2,0,2"/>
-    <wangtile tileid="16" wangid="0,2,0,1,0,2,0,2"/>
-    <wangtile tileid="17" wangid="0,2,0,2,0,1,0,2"/>
-    <wangtile tileid="20" wangid="0,2,0,1,0,2,0,1"/>
-    <wangtile tileid="22" wangid="0,2,0,1,0,1,0,1"/>
-    <wangtile tileid="23" wangid="0,2,0,1,0,1,0,2"/>
-    <wangtile tileid="24" wangid="0,1,0,1,0,1,0,2"/>
-    <wangtile tileid="27" wangid="0,1,0,2,0,2,0,2"/>
-    <wangtile tileid="28" wangid="0,2,0,2,0,2,0,1"/>
-    <wangtile tileid="33" wangid="0,2,0,1,0,1,0,1"/>
-    <wangtile tileid="34" wangid="0,2,0,1,0,1,0,2"/>
-    <wangtile tileid="35" wangid="0,1,0,1,0,1,0,2"/>
-    <wangtile tileid="44" wangid="0,1,0,1,0,1,0,1"/>
-   </wangset>
-   <wangset name="Land 3" type="mixed" tile="-1">
-    <wangcolor name="water" color="#0000ff" tile="-1" probability="1"/>
-    <wangcolor name="land" color="#00ff00" tile="-1" probability="1"/>
-    <wangtile tileid="0" wangid="1,1,2,2,2,1,1,1"/>
-    <wangtile tileid="1" wangid="1,1,2,2,2,2,2,1"/>
-    <wangtile tileid="2" wangid="1,1,1,1,2,2,2,1"/>
-    <wangtile tileid="3" wangid="1,1,1,1,2,1,1,1"/>
-    <wangtile tileid="4" wangid="1,1,2,1,2,1,1,1"/>
-    <wangtile tileid="5" wangid="1,1,2,1,2,2,2,1"/>
-    <wangtile tileid="6" wangid="1,1,2,2,2,1,2,1"/>
-    <wangtile tileid="7" wangid="1,1,1,1,2,1,2,1"/>
-    <wangtile tileid="8" wangid="1,1,2,1,2,1,2,1"/>
-    <wangtile tileid="9" wangid="2,1,2,2,2,1,2,2"/>
-    <wangtile tileid="11" wangid="2,2,2,2,2,1,1,1"/>
-    <wangtile tileid="12" wangid="2,2,2,2,2,2,2,2"/>
-    <wangtile tileid="13" wangid="2,1,1,1,2,2,2,2"/>
-    <wangtile tileid="14" wangid="2,1,1,1,2,1,1,1"/>
-    <wangtile tileid="15" wangid="2,2,2,1,2,1,1,1"/>
-    <wangtile tileid="16" wangid="2,2,2,1,2,2,2,2"/>
-    <wangtile tileid="17" wangid="2,2,2,2,2,1,2,2"/>
-    <wangtile tileid="18" wangid="2,1,1,1,2,1,2,2"/>
-    <wangtile tileid="19" wangid="2,2,2,1,2,1,2,2"/>
-    <wangtile tileid="20" wangid="2,2,2,1,2,2,2,1"/>
-    <wangtile tileid="22" wangid="2,2,2,1,1,1,1,1"/>
-    <wangtile tileid="23" wangid="2,2,2,1,1,1,2,2"/>
-    <wangtile tileid="24" wangid="2,1,1,1,1,1,2,2"/>
-    <wangtile tileid="25" wangid="2,1,1,1,1,1,1,1"/>
-    <wangtile tileid="26" wangid="2,1,2,2,2,1,1,1"/>
-    <wangtile tileid="27" wangid="2,1,2,2,2,2,2,2"/>
-    <wangtile tileid="28" wangid="2,2,2,2,2,2,2,1"/>
-    <wangtile tileid="29" wangid="2,1,1,1,2,2,2,1"/>
-    <wangtile tileid="30" wangid="2,1,2,2,2,2,2,1"/>
-    <wangtile tileid="31" wangid="2,1,2,2,2,1,2,1"/>
-    <wangtile tileid="32" wangid="2,1,2,1,2,2,2,1"/>
-    <wangtile tileid="33" wangid="1,1,2,1,1,1,1,1"/>
-    <wangtile tileid="34" wangid="1,1,2,1,1,1,2,1"/>
-    <wangtile tileid="35" wangid="1,1,1,1,1,1,2,1"/>
-    <wangtile tileid="36" wangid="1,1,1,1,1,1,1,1"/>
-    <wangtile tileid="37" wangid="2,1,2,1,1,1,1,1"/>
-    <wangtile tileid="38" wangid="2,1,2,1,1,1,2,2"/>
-    <wangtile tileid="39" wangid="2,2,2,1,1,1,2,1"/>
-    <wangtile tileid="40" wangid="2,1,1,1,1,1,2,1"/>
-    <wangtile tileid="41" wangid="2,1,2,1,1,1,2,1"/>
-    <wangtile tileid="42" wangid="2,2,2,1,2,1,2,1"/>
-    <wangtile tileid="43" wangid="2,1,2,1,2,1,2,2"/>
-    <wangtile tileid="47" wangid="1,1,1,1,1,1,1,1"/>
-    <wangtile tileid="48" wangid="2,1,2,1,2,1,1,1"/>
-    <wangtile tileid="49" wangid="2,1,2,1,2,2,2,2"/>
-    <wangtile tileid="50" wangid="2,2,2,2,2,1,2,1"/>
-    <wangtile tileid="51" wangid="2,1,1,1,2,1,2,1"/>
-    <wangtile tileid="52" wangid="2,1,2,1,2,1,2,1"/>
-   </wangset>
-   <wangset name="Land 1" type="edge" tile="-1">
-    <wangcolor name="water" color="#0000ff" tile="-1" probability="1"/>
-    <wangcolor name="land" color="#00ff00" tile="-1" probability="1"/>
-    <wangtile tileid="0" wangid="0,0,2,0,2,0,0,0"/>
-    <wangtile tileid="1" wangid="0,0,2,0,2,0,2,0"/>
-    <wangtile tileid="2" wangid="0,0,0,0,2,0,2,0"/>
-    <wangtile tileid="3" wangid="0,0,1,0,2,0,0,0"/>
-    <wangtile tileid="4" wangid="1,0,2,0,2,0,1,0"/>
-    <wangtile tileid="5" wangid="1,0,2,0,2,0,2,0"/>
-    <wangtile tileid="6" wangid="1,0,2,0,2,0,2,0"/>
-    <wangtile tileid="7" wangid="1,0,1,0,2,0,2,0"/>
-    <wangtile tileid="8" wangid="0,0,2,0,2,0,2,0"/>
-    <wangtile tileid="9" wangid="2,0,2,0,2,0,2,0"/>
-    <wangtile tileid="11" wangid="2,0,2,0,2,0,0,0"/>
-    <wangtile tileid="12" wangid="2,0,2,0,2,0,2,0"/>
-    <wangtile tileid="13" wangid="2,0,0,0,2,0,2,0"/>
-    <wangtile tileid="14" wangid="2,0,0,0,2,0,0,0"/>
-    <wangtile tileid="15" wangid="2,0,2,0,2,0,1,0"/>
-    <wangtile tileid="16" wangid="2,0,2,0,2,0,2,0"/>
-    <wangtile tileid="17" wangid="2,0,2,0,2,0,2,0"/>
-    <wangtile tileid="18" wangid="2,0,1,0,2,0,2,0"/>
-    <wangtile tileid="19" wangid="2,0,2,0,2,0,2,0"/>
-    <wangtile tileid="20" wangid="2,0,2,0,2,0,2,0"/>
-    <wangtile tileid="22" wangid="2,0,2,0,0,0,0,0"/>
-    <wangtile tileid="23" wangid="2,0,2,0,0,0,2,0"/>
-    <wangtile tileid="24" wangid="2,0,0,0,0,0,2,0"/>
-    <wangtile tileid="25" wangid="2,0,0,0,0,0,0,0"/>
-    <wangtile tileid="26" wangid="2,0,2,0,2,0,1,0"/>
-    <wangtile tileid="27" wangid="2,0,2,0,2,0,2,0"/>
-    <wangtile tileid="28" wangid="2,0,2,0,2,0,2,0"/>
-    <wangtile tileid="29" wangid="2,0,1,0,2,0,2,0"/>
-    <wangtile tileid="30" wangid="2,0,2,0,2,0,2,0"/>
-    <wangtile tileid="31" wangid="2,0,2,0,2,0,2,0"/>
-    <wangtile tileid="32" wangid="2,0,2,0,2,0,2,0"/>
-    <wangtile tileid="33" wangid="1,0,2,0,1,0,1,0"/>
-    <wangtile tileid="34" wangid="1,0,2,0,1,0,2,0"/>
-    <wangtile tileid="35" wangid="1,0,1,0,1,0,2,0"/>
-    <wangtile tileid="36" wangid="1,0,1,0,1,0,1,0"/>
-    <wangtile tileid="37" wangid="2,0,2,0,1,0,1,0"/>
-    <wangtile tileid="38" wangid="2,0,2,0,1,0,2,0"/>
-    <wangtile tileid="39" wangid="2,0,2,0,1,0,2,0"/>
-    <wangtile tileid="40" wangid="2,0,1,0,1,0,2,0"/>
-    <wangtile tileid="41" wangid="2,0,2,0,0,0,2,0"/>
-    <wangtile tileid="42" wangid="2,0,2,0,2,0,2,0"/>
-    <wangtile tileid="43" wangid="2,0,2,0,2,0,2,0"/>
-    <wangtile tileid="47" wangid="1,0,1,0,1,0,1,0"/>
-    <wangtile tileid="48" wangid="2,0,2,0,2,0,0,0"/>
-    <wangtile tileid="49" wangid="2,0,2,0,2,0,0,0"/>
-    <wangtile tileid="50" wangid="2,0,0,0,2,0,2,0"/>
-    <wangtile tileid="51" wangid="2,0,0,0,2,0,2,0"/>
-    <wangtile tileid="52" wangid="2,0,2,0,2,0,2,0"/>
-   </wangset>
-  </wangsets>
- </tileset>
- <tileset firstgid="202" name="water directions" tilewidth="32" tileheight="32" tilecount="32" columns="8">
+ <tileset firstgid="83" name="water directions" tilewidth="32" tileheight="32" tilecount="32" columns="8">
   <image source="tilesets/water directions.png" width="256" height="128"/>
   <tile id="0">
    <properties>
@@ -618,7 +473,7 @@
    </properties>
   </tile>
  </tileset>
- <tileset firstgid="234" name="exterior" tilewidth="32" tileheight="32" tilecount="243" columns="9">
+ <tileset firstgid="115" name="exterior" tilewidth="32" tileheight="32" tilecount="243" columns="9">
   <image source="tilesets/exterior.png" width="288" height="864"/>
   <wangsets>
    <wangset name="Path" type="edge" tile="-1">
@@ -659,7 +514,7 @@
    </wangset>
   </wangsets>
  </tileset>
- <tileset firstgid="477" name="jewels" tilewidth="32" tileheight="32" tilecount="16" columns="4">
+ <tileset firstgid="358" name="jewels" tilewidth="32" tileheight="32" tilecount="16" columns="4">
   <image source="sprites/jewels.png" width="128" height="128"/>
   <tile id="1">
    <properties>
@@ -697,16 +552,16 @@
    </animation>
   </tile>
  </tileset>
- <tileset firstgid="493" name="CraftpixGrass" tilewidth="32" tileheight="32" tilecount="195" columns="15">
+ <tileset firstgid="374" name="CraftpixGrass" tilewidth="32" tileheight="32" tilecount="195" columns="15">
   <image source="tilesets/CraftpixGrass.png" width="496" height="416"/>
  </tileset>
- <tileset firstgid="688" name="DeepForest" tilewidth="32" tileheight="32" tilecount="624" columns="26">
+ <tileset firstgid="569" name="DeepForest" tilewidth="32" tileheight="32" tilecount="624" columns="26">
   <image source="tilesets/DeepForest.png" width="832" height="768"/>
  </tileset>
- <tileset firstgid="1312" name="GrassDetails" tilewidth="32" tileheight="32" tilecount="88" columns="11">
+ <tileset firstgid="1193" name="GrassDetails" tilewidth="32" tileheight="32" tilecount="88" columns="11">
   <image source="tilesets/ground_grass_details.png" width="352" height="256"/>
  </tileset>
- <tileset firstgid="1400" name="Raft" tilewidth="32" tileheight="32" tilecount="560" columns="20">
+ <tileset firstgid="1281" name="Raft" tilewidth="32" tileheight="32" tilecount="560" columns="20">
   <image source="tilesets/Raft-idle-by-Sevarihk.png" width="652" height="896"/>
   <tile id="0">
    <properties>
@@ -735,7 +590,7 @@
    </properties>
   </tile>
  </tileset>
- <tileset firstgid="1960" name="sand-waterfalls" tilewidth="32" tileheight="32" tilecount="324" columns="27">
+ <tileset firstgid="1841" name="sand-waterfalls" tilewidth="32" tileheight="32" tilecount="324" columns="27">
   <image source="tilesets/sand-waterfalls.png" width="864" height="384"/>
   <tile id="30">
    <properties>
@@ -792,7 +647,7 @@
    </wangset>
   </wangsets>
  </tileset>
- <tileset firstgid="2284" name="pier" tilewidth="32" tileheight="32" tilecount="16" columns="4">
+ <tileset firstgid="2165" name="pier" tilewidth="32" tileheight="32" tilecount="16" columns="4">
   <image source="tilesets/pier.png" width="128" height="128"/>
   <tile id="4">
    <animation>
@@ -819,6 +674,125 @@
    </animation>
   </tile>
  </tileset>
+ <tileset firstgid="2181" source="tilesets/roads/Road1_32x32_wang.tsx"/>
+ <group id="114" name="Forest">
+  <layer id="127" name="lowground" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="117" name="water" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="116" name="ground" width="90" height="90">
+   <properties>
+    <property name="autoRender" type="bool" value="false"/>
+   </properties>
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="126" name="path" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJzt1rsKwjAYgNGMfXkXwdtSUSzuinibVFx8KiNEkNIGK12Ec+AfSjN9TdOGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPAfZkUIyzhlnEWacdG+fpi5RzenTMuzzr25xZbTlp6HLzpXcc384z0ZeDat7rHNpKHPMdNsnfpudO3k1XpUa7ZvaFilfbvT92fX1PD9bayfG6t4vdW3N5f0L/JI3ct0RmgMAAAA9O0JoDcdAg==
+  </data>
+  </layer>
+  <layer id="119" name="decorations" width="90" height="90">
+   <properties>
+    <property name="autoRender" type="bool" value="false"/>
+   </properties>
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="120" name="obstacles" width="90" height="90">
+   <properties>
+    <property name="autoRender" type="bool" value="false"/>
+   </properties>
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <objectgroup id="125" name="npcs"/>
+  <layer id="118" name="collision" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="124" name="pontoons" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <objectgroup id="115" name="puzzles"/>
+  <layer id="122" name="roofs" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <objectgroup id="123" name="roof hide zones"/>
+ </group>
+ <group id="128" name="Template">
+  <layer id="129" name="lowground" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="130" name="water" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="131" name="ground" width="90" height="90">
+   <properties>
+    <property name="autoRender" type="bool" value="false"/>
+   </properties>
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="132" name="path" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="133" name="decorations" width="90" height="90">
+   <properties>
+    <property name="autoRender" type="bool" value="false"/>
+   </properties>
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="134" name="obstacles" width="90" height="90">
+   <properties>
+    <property name="autoRender" type="bool" value="false"/>
+   </properties>
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <objectgroup id="135" name="npcs"/>
+  <layer id="136" name="collision" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="137" name="pontoons" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <objectgroup id="138" name="puzzles"/>
+  <layer id="139" name="roofs" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <objectgroup id="140" name="roof hide zones"/>
+ </group>
  <objectgroup id="3" name="sceneTransitions">
   <object id="8" name="player start" x="1984" y="1728" width="32" height="32">
    <properties>
@@ -826,7 +800,7 @@
     <property name="id" value="forest"/>
    </properties>
   </object>
-  <object id="50" name="player start" x="1440" y="2624" width="32" height="32">
+  <object id="50" name="player start" x="608" y="2304" width="32" height="32">
    <properties>
     <property name="default" type="bool" value="false"/>
     <property name="id" value="beach"/>
@@ -845,4 +819,9 @@
    </properties>
   </object>
  </objectgroup>
+ <layer id="121" name="edges" width="90" height="90" opacity="0.4">
+  <data encoding="base64" compression="zlib">
+   eJztm+uO4yAMhaOqXc2+/wvPn4mW8fpyDDYQ4JMQoZDYnLouRMl1zclrtAMbsLLGr6JIbTr+ImOkcXSM5cfqIHpxx1wtXQe1X8P7p9A29xnXj5wfAdWZ052r0e8HtV3LW6hpv9WmWkdj6cW10XGo3RY4nTVttVjnxkfBxTOSn+nnWp7XbLZixbM0Tvs8Q+feRP/nWfkV6b+YMU9mh3XFaI7G+RyN8zka53M0zkdb00l7S22NGeWTZ49ljdfm0gPNjrUmz/QVtS2dY/kqxU5W0dD29to9gAis30yNztm/wVpWjmfpGiPw6JyRnzXbpV3rHO38w2FF/ixUDv8TrcsTdKbxQI/Lfq6m/Uh87aYz9U/Ts6ZG7bbyRJ298avVqN1WnqizVkvHM+j8d+Jy++iJT0/+1nSJZPZ4HsXRuQ+76Txqv7Cbzhkgc5b+f6XP0HXPbnj/B2vX8ai9ldHmjujM7TNpP2LLolx7XcUxV3Njy/YopPnPFM+arkjdgw9QrNx7tz3r+Mj87InnSxiL8iG15xyE7Hw6Ip7p+QhenT0a30TlU+vaXqw8bOVrD+XvHBlbS9Y67CnrDTSeWzS+8exnPNd8AojOqMbI72lXnS08GlOyn8XxlPegUuqo5WdPvqBaz/QcwwzP50fkjJtS66Pzb7Jy89H5N5HxXHJ0/kdEfpb2SUdnnBV15mKLHkt9XBshYn8i7U9n1vli2lrNHXuI0pnb+8+sMxe/kpaS/h4i45m2Z9b5YtpWLZ2PEHlf4ynrulE6R+wHuXu0s+o8I959yio6c/P25HTkep7+m9XiuTa31OaFLJ297z1Z70HdbekdogidafxqtXU9b79Gps7e8SvEc+26TnsnDNGZe79Sen+yRmdP/CL5OeL+Rs0+pVVnpL5ZYb3Rsu/W9NPyrfV+ZGt+zuDcr8snOz+j5TO4fCUVVMuW9YaHXnZG247Yd7c837e6zq37xZvWZylX19nixDMOl5OjfWh9JngVncs6w4ejc594bmUVnct6hA+z2Mm0feJ5nG10PxP13OTo/Z5VoqiN5whG31uwmCE/R7CTzi05upWddC7r3hyd+7CLzqPZRecTzzpH5z6c9XMfVtF5pG2ESP+OzjKz+4cy+zxm9w9l9nlk+0f34tz+nPpQ9qPrmJp5WL6gvn8p/S3+ebD08vZbdjygvli+IX6Mimfa1uaC3J9qiWd6DRqf0njO7kidubq237LjoTWeuevMFs/aHHrmZ+0zKb6leNf8mP1/GmX2eWT69w3kIRji
+  </data>
+ </layer>
 </map>

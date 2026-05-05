@@ -146,7 +146,12 @@ export class OverworldBridgeManager {
 
                     const tileKey = `${tileX},${tileY}`;
                     const collisionType = tileCollisionMap.get(tileKey) ?? CollisionType.WALKABLE;
-                    this.collisionManager.setCollisionAt(tileX, tileY, collisionType);
+                    // Preserve ALWAYS_HIGH — these island tiles are already walkable and must
+                    // remain immune to applyFlowWaterCollision; downgrading to WALKABLE would
+                    // allow wet-tile logic to subsequently block them.
+                    if (this.collisionManager.getCollisionAt(tileX, tileY) !== CollisionType.ALWAYS_HIGH) {
+                        this.collisionManager.setCollisionAt(tileX, tileY, collisionType);
+                    }
                 }
             } else {
                 const gridX = bridge.start.x;
@@ -180,7 +185,12 @@ export class OverworldBridgeManager {
 
                     const tileKey = `${tileX},${tileY}`;
                     const collisionType = tileCollisionMap.get(tileKey) ?? CollisionType.WALKABLE;
-                    this.collisionManager.setCollisionAt(tileX, tileY, collisionType);
+                    // Preserve ALWAYS_HIGH — these island tiles are already walkable and must
+                    // remain immune to applyFlowWaterCollision; downgrading to WALKABLE would
+                    // allow wet-tile logic to subsequently block them.
+                    if (this.collisionManager.getCollisionAt(tileX, tileY) !== CollisionType.ALWAYS_HIGH) {
+                        this.collisionManager.setCollisionAt(tileX, tileY, collisionType);
+                    }
                 }
             }
         }
