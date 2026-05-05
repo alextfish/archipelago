@@ -45,6 +45,29 @@ export class OverworldGameState {
     /** Tracks all currently-displayed glyph sets for Translation Mode. */
     readonly glyphTracker: ActiveGlyphTracker = new ActiveGlyphTracker();
 
+    // -----------------------------------------------------------------------
+    // Interior scene tracking (for save/restore across cold starts)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Map key of the interior the player is currently inside, or undefined when
+     * the player is in the overworld.  Persisted so that a cold-start reload can
+     * resume inside the correct building.
+     */
+    private currentInteriorID?: string;
+
+    /**
+     * Player pixel-X when the overworld was last left to enter an interior.
+     * Used by OverworldScene to restore the player's position on return.
+     */
+    private interiorReturnX?: number;
+
+    /**
+     * Player pixel-Y when the overworld was last left to enter an interior.
+     * Used by OverworldScene to restore the player's position on return.
+     */
+    private interiorReturnY?: number;
+
     /**
      * Set the currently active overworld puzzle
      */
@@ -183,6 +206,46 @@ export class OverworldGameState {
     }
 
     // -----------------------------------------------------------------------
+    // Interior scene tracking
+    // -----------------------------------------------------------------------
+
+    /**
+     * Mark the player as having entered an interior building.
+     *
+     * @param interiorID  Map key of the interior (e.g. `'house'`).
+     * @param returnX     Overworld pixel-X where the player stood before entering.
+     * @param returnY     Overworld pixel-Y where the player stood before entering.
+     */
+    setCurrentInterior(interiorID: string, returnX: number, returnY: number): void {
+        this.currentInteriorID = interiorID;
+        this.interiorReturnX = returnX;
+        this.interiorReturnY = returnY;
+    }
+
+    /** Mark the player as having returned to the overworld. */
+    clearCurrentInterior(): void {
+        this.currentInteriorID = undefined;
+        this.interiorReturnX = undefined;
+        this.interiorReturnY = undefined;
+    }
+
+    /** Returns the interior map key if the player is inside a building, else undefined. */
+    getCurrentInteriorID(): string | undefined {
+        return this.currentInteriorID;
+    }
+
+    /**
+     * Returns the overworld position the player should be placed at on return
+     * from an interior, or undefined if no interior is recorded.
+     */
+    getInteriorReturnPosition(): { x: number; y: number } | undefined {
+        if (this.interiorReturnX === undefined || this.interiorReturnY === undefined) {
+            return undefined;
+        }
+        return { x: this.interiorReturnX, y: this.interiorReturnY };
+    }
+
+    // -----------------------------------------------------------------------
     // Jewel collection
     // -----------------------------------------------------------------------
 
@@ -266,6 +329,11 @@ export class OverworldGameState {
         this.flowPuzzleOutputs.clear();
         this.flowPuzzleInputs.clear();
         this.overworldWaterState.clear();
+
+        // Reset interior tracking
+        this.currentInteriorID = undefined;
+        this.interiorReturnX = undefined;
+        this.interiorReturnY = undefined;
     }
     
     /**
@@ -400,6 +468,9 @@ export class OverworldGameState {
         flowPuzzleInputs: Record<string, { x: number; y: number }[]>;
         overworldWaterState: string[];
         translationDictionary: Record<string, string>;
+        currentInteriorID?: string;
+        interiorReturnX?: number;
+        interiorReturnY?: number;
     } {
         const puzzleProgressObj: Record<string, any> = {};
         for (const [id, puzzle] of this.puzzleProgress) {
@@ -427,6 +498,9 @@ export class OverworldGameState {
                     ([frame, text]) => [String(frame), text]
                 )
             ),
+            currentInteriorID: this.currentInteriorID,
+            interiorReturnX: this.interiorReturnX,
+            interiorReturnY: this.interiorReturnY,
         };
     }
 
@@ -443,6 +517,9 @@ export class OverworldGameState {
         flowPuzzleInputs?: Record<string, { x: number; y: number }[]>;
         overworldWaterState?: string[];
         translationDictionary?: Record<string, string>;
+        currentInteriorID?: string;
+        interiorReturnX?: number;
+        interiorReturnY?: number;
     }): void {
         console.log('OverworldGameState: Importing state');
 
@@ -469,6 +546,11 @@ export class OverworldGameState {
                 this.translationDictionary.setTranslation(Number(frameStr), text);
             }
         }
+
+        // Interior tracking
+        this.currentInteriorID = state.currentInteriorID;
+        this.interiorReturnX = state.interiorReturnX;
+        this.interiorReturnY = state.interiorReturnY;
 
         // Note: puzzleProgress would need to be reconstructed as BridgePuzzle objects
         // This is left as a future enhancement when persistence is fully implemented

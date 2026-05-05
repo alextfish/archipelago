@@ -33,6 +33,7 @@ export class OverworldHUDScene extends Phaser.Scene {
 
     private warpDialog: Phaser.GameObjects.Container | null = null;
     private dialogOpen: boolean = false;
+    private warpButton: Phaser.GameObjects.Text | null = null;
 
     private jewelHUDElements: Map<string, {
         sprite: Phaser.GameObjects.Image;
@@ -79,10 +80,10 @@ export class OverworldHUDScene extends Phaser.Scene {
         });
 
         // Warp button – sits immediately right of the book icon
-        const warpButton = this.add.text(BOOK_ICON_X + BOOK_ICON_WIDTH, TOP_BUTTON_Y, '⚡', { fontSize: '28px' });
-        warpButton.setDepth(200);
-        warpButton.setInteractive({ useHandCursor: true });
-        warpButton.on('pointerdown', () => {
+        this.warpButton = this.add.text(BOOK_ICON_X + BOOK_ICON_WIDTH, TOP_BUTTON_Y, '⚡', { fontSize: '28px' });
+        this.warpButton.setDepth(200);
+        this.warpButton.setInteractive({ useHandCursor: true });
+        this.warpButton.on('pointerdown', () => {
             if (this.dialogOpen) {
                 this.hideWarpDialog();
             } else {
@@ -166,6 +167,11 @@ export class OverworldHUDScene extends Phaser.Scene {
             els.sprite.setVisible(visible);
             els.text.setVisible(visible);
         }
+    }
+
+    /** Show or hide the warp (⚡) button (e.g. hide while in a building interior). */
+    setWarpButtonVisible(visible: boolean): void {
+        this.warpButton?.setVisible(visible);
     }
 
     /**

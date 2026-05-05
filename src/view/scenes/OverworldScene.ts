@@ -39,6 +39,7 @@ import { CollectibleManager } from '@view/CollectibleManager';
 import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
 import { NPCSpriteController } from '@view/NPCSpriteController';
 import { ConversationVariableSubstitutor } from '@model/conversation/ConversationVariableSubstitutor';
+import { PortalManager } from '@view/PortalManager';
 
 /**
  * Depth value for overhead layers (roofs, canopies, etc.) that should always
@@ -109,6 +110,13 @@ export class OverworldScene extends Phaser.Scene {
   private constraintNPCManager?: ConstraintNPCManager;
   /** Manages regular NPC sprites, series states, and icon badges. */
   private npcSpriteController?: NPCSpriteController;
+
+  // Portal (scene-transition hotspot) system
+  private portalManager?: PortalManager;
+  /** Tile-keyed callbacks fired when the player first steps onto a tile. */
+  private readonly stepHotspots: Map<string, () => void> = new Map();
+  /** Tile key of the last tile the step-hotspot system was checked against. */
+  private lastCheckedTile: string = '';
 
   // Player start position management
   private playerStartManager?: PlayerStartManager;
@@ -383,6 +391,14 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   create() {
+    // Load persisted game state from localStorage (best-effort; no-op if absent)
+    this.loadGameState();
+
+    // Listen for the wake event so we can handle returns from InteriorScene
+    this.events.on('wake', (_sys: unknown, data?: { returnPlayerX?: number; returnPlayerY?: number }) => {
+      this.onWake(data);
+    });
+
     // Wait for map loading if needed
     if (!this.cache.tilemap.exists('overworldMap')) {
       console.log('Waiting for map to load...');
@@ -580,6 +596,40 @@ export class OverworldScene extends Phaser.Scene {
       // TODO: remove — temporary starting jewel to verify HUD visibility
       this.gameState.collectJewel('green');
       this.overworldHUD?.refreshJewelHUD();
+
+      // Load portals from the Tiled map and register them as step hotspots
+      this.portalManager = new PortalManager(
+        this,
+        this.tiledMapData,
+        this.map,
+        this.gameState,
+        this.seriesManager,
+        () => this.player ?? null,
+        () => this.playerController,
+        () => this.overworldHUD,
+        (tx, ty, cb) => this.registerStepHotspot(tx, ty, cb),
+        () => this.saveGameState(),
+      );
+      this.portalManager.loadPortals();
+
+      // If a cold-start restore placed the player inside a building, launch it now
+      const resumeInteriorID = this.gameState.getCurrentInteriorID();
+      if (resumeInteriorID) {
+        console.log(`[OverworldScene] Resuming inside interior "${resumeInteriorID}"`);
+        this.playerController?.setEnabled(false);
+        this.overworldHUD?.setWarpButtonVisible(false);
+        const returnPos = this.gameState.getInteriorReturnPosition();
+        this.scene.launch('InteriorScene', {
+          mapKey: resumeInteriorID,
+          spawnID: undefined,
+          savedX: returnPos?.x,
+          savedY: returnPos?.y,
+          gameState: this.gameState,
+          seriesManager: this.seriesManager,
+          saveStateCallback: () => this.saveGameState(),
+        });
+        this.scene.sleep('OverworldScene');
+      }
 
     } catch (error) {
       console.error('Failed to initialize overworld puzzles:', error);
@@ -1308,6 +1358,9 @@ export class OverworldScene extends Phaser.Scene {
     if (this.gameMode === 'exploration' && this.playerController) {
       this.playerController.update();
 
+      // Check step hotspots (e.g. portal entrances) — fires at most once per new tile
+      this.checkStepHotspots();
+
       // Update interaction cursor based on player position
       if (this.interactionCursor && this.tiledMapData && this.player) {
         const playerPos = this.playerController.getPosition();
@@ -1324,6 +1377,87 @@ export class OverworldScene extends Phaser.Scene {
       if (this.roofManager && this.player) {
         this.roofManager.update(this.player.x, this.player.y);
       }
+    }
+  }
+
+  /**
+   * Register a tile-based step hotspot.
+   * The callback fires exactly once the first time the player steps onto the
+   * named tile.  PortalManager (and other managers) use this to trigger
+   * automatic scene transitions without needing to poll on every frame.
+   */
+  public registerStepHotspot(tileX: number, tileY: number, callback: () => void): void {
+    this.stepHotspots.set(`${tileX},${tileY}`, callback);
+  }
+
+  /**
+   * Check whether the player has moved onto a new tile that has a registered
+   * step hotspot, and fire the callback if so.
+   * Called every exploration-mode frame, but each hotspot fires at most once
+   * per tile entry (tracking via {@link lastCheckedTile}).
+   */
+  private checkStepHotspots(): void {
+    if (!this.player || !this.tiledMapData) return;
+    const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
+    const tileKey = `${tileX},${tileY}`;
+    if (tileKey !== this.lastCheckedTile) {
+      this.lastCheckedTile = tileKey;
+      const callback = this.stepHotspots.get(tileKey);
+      if (callback) callback();
+    }
+  }
+
+  /**
+   * Called when OverworldScene wakes (e.g. after returning from InteriorScene).
+   * Repositions the player, re-enables movement, and restores the warp button.
+   */
+  private onWake(data?: { returnPlayerX?: number; returnPlayerY?: number }): void {
+    // Re-enable the player controller if it was disabled for a scene transition
+    this.playerController?.setEnabled(true);
+
+    // Reposition the player at the tile they stood on before entering the building
+    if (data?.returnPlayerX !== undefined && data?.returnPlayerY !== undefined) {
+      this.player?.setPosition(data.returnPlayerX, data.returnPlayerY);
+    }
+
+    // Clear the "inside interior" flag now that we're back in the overworld
+    this.gameState.clearCurrentInterior();
+
+    // Show the warp button again
+    this.overworldHUD?.setWarpButtonVisible(true);
+
+    // Persist the cleared interior state
+    this.saveGameState();
+
+    // Reset step-hotspot tracking so the player doesn't immediately re-enter
+    // the portal they just exited if they happen to be on or near it.
+    this.lastCheckedTile = '';
+
+    console.log('[OverworldScene] Woke from interior; player controls restored');
+  }
+
+  // ── Persistence helpers ───────────────────────────────────────────────────
+
+  /** Persist the current game state to localStorage. */
+  public saveGameState(): void {
+    try {
+      const data = this.gameState.exportState();
+      localStorage.setItem('archipelago_game_state', JSON.stringify(data));
+    } catch (e) {
+      console.warn('[OverworldScene] Failed to save game state:', e);
+    }
+  }
+
+  /** Load previously persisted game state from localStorage (best-effort). */
+  private loadGameState(): void {
+    try {
+      const saved = localStorage.getItem('archipelago_game_state');
+      if (saved) {
+        this.gameState.importState(JSON.parse(saved));
+        console.log('[OverworldScene] Game state loaded from localStorage');
+      }
+    } catch (e) {
+      console.warn('[OverworldScene] Failed to load game state:', e);
     }
   }
 

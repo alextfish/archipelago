@@ -90,26 +90,9 @@ When the player solves an overworld puzzle, the bridges are added to the Overwor
 
 ### Scene Transitions
 
-**NEVER use `scene.start()` during an active game session.** `scene.start()` calls `scene.stop()` on the current scene first, which destroys it and loses ALL in-memory state — `OverworldGameState`, `collisionArray`, the loaded tilemap, NPC positions, puzzle progress, everything.
+**Never call `scene.start()` after gameplay begins** — it destroys the current scene and all in-memory state; it is only valid for the very first scene launched from `main.ts`.
 
-Always use `scene.sleep()` and `scene.wake()` (or `scene.launch()` for scenes not yet running) when transitioning between scenes during gameplay:
-
-```typescript
-// ✅ Correct: sleep the current scene, wake/launch the target
-this.scene.sleep('OverworldScene');
-this.scene.launch('InteriorScene', { mapKey, spawnID, gameState });
-
-// ✅ Correct: returning from a sub-scene
-this.scene.sleep('InteriorScene');
-this.scene.wake('OverworldScene');
-
-// ❌ WRONG: this destroys OverworldScene and all its state
-this.scene.start('InteriorScene');
-```
-
-`scene.start()` is **only** appropriate at the very top of the Phaser boot sequence (the first scene Phaser launches from `main.ts`). It must never be called once gameplay has begun.
-
-Overlay/HUD scenes (`OverworldHUDScene`, `TranslationModeScene`, `ConversationScene`) follow the same rule: use `scene.launch()` once and then `scene.sleep()` / `scene.wake()` for all subsequent toggling.
+Always use `scene.sleep()` / `scene.wake()` (or `scene.launch()` for a first-time start), including for overlay scenes such as `OverworldHUDScene`, `TranslationModeScene`, and `ConversationScene`.
 
 ### Source Control
 
