@@ -623,15 +623,10 @@ export class InteriorScene extends Phaser.Scene {
                 ConversationVariableSubstitutor.applyTo(conversationSpec, npc.conversationVariables);
             }
 
-            this.playerController?.stopAndIdle();
-            this.playerController?.setEnabled(false);
-
             const conversationScene = this.scene.get('ConversationScene') as
                 (ConversationScene & { startConversation: Function; events: Phaser.Events.EventEmitter }) | null;
             if (!conversationScene) {
-                console.error('[InteriorScene] ConversationScene not found');
-                this.playerController?.setEnabled(true);
-                return;
+                throw new Error('[InteriorScene] ConversationScene not found');
             }
 
             conversationScene.setGlyphTracker(this.gameState.glyphTracker);
@@ -643,6 +638,10 @@ export class InteriorScene extends Phaser.Scene {
             conversationScene.events.on('conversationEffects', (effects: any[]) => {
                 this.handleConversationEffects(effects, npc);
             });
+
+            // All setup complete — now disable player movement and launch conversation
+            this.playerController?.stopAndIdle();
+            this.playerController?.setEnabled(false);
 
             if (!this.scene.isActive('ConversationScene')) {
                 conversationScene.events.once('create', () => {
@@ -744,8 +743,8 @@ export class InteriorScene extends Phaser.Scene {
         }
 
         // Hide jewel HUD while solving, listen for completion
-        const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | undefined;
-        (hud as any)?.setJewelHUDVisible?.(false);
+        const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
+        hud?.setJewelHUDVisible(false);
 
         // Listen for series completion (BridgePuzzleScene emits to 'InteriorScene')
         this.events.once('seriesPuzzleCompleted', (data: { puzzleId: string; success: boolean }) => {
@@ -760,8 +759,8 @@ export class InteriorScene extends Phaser.Scene {
     }
 
     private handleSeriesPuzzleCompleted(data: { puzzleId: string; success: boolean }): void {
-        const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | undefined;
-        (hud as any)?.setJewelHUDVisible?.(true);
+        const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
+        hud?.setJewelHUDVisible(true);
 
         if (!this.currentSeries || !data.success) return;
 

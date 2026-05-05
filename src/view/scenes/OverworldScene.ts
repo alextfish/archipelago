@@ -612,7 +612,13 @@ export class OverworldScene extends Phaser.Scene {
       );
       this.portalManager.loadPortals();
 
-      // If a cold-start restore placed the player inside a building, launch it now
+    } catch (error) {
+      console.error('Failed to initialize overworld puzzles:', error);
+    }
+
+    // Cold-start interior resume — runs after puzzle init completes (or even if
+    // parts of it failed) so the player can still re-enter their building.
+    try {
       const resumeInteriorID = this.gameState.getCurrentInteriorID();
       if (resumeInteriorID) {
         console.log(`[OverworldScene] Resuming inside interior "${resumeInteriorID}"`);
@@ -630,9 +636,8 @@ export class OverworldScene extends Phaser.Scene {
         });
         this.scene.sleep('OverworldScene');
       }
-
     } catch (error) {
-      console.error('Failed to initialize overworld puzzles:', error);
+      console.error('[OverworldScene] Failed to resume inside interior on cold start:', error);
     }
   }
 
@@ -1429,9 +1434,15 @@ export class OverworldScene extends Phaser.Scene {
     // Persist the cleared interior state
     this.saveGameState();
 
-    // Reset step-hotspot tracking so the player doesn't immediately re-enter
-    // the portal they just exited if they happen to be on or near it.
-    this.lastCheckedTile = '';
+    // Reset step-hotspot tracking to the current tile so the player doesn't
+    // immediately re-trigger the portal they just exited if it happens to be
+    // on or near their return position.
+    if (this.player && this.tiledMapData) {
+      const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
+      this.lastCheckedTile = `${tileX},${tileY}`;
+    } else {
+      this.lastCheckedTile = '';
+    }
 
     console.log('[OverworldScene] Woke from interior; player controls restored');
   }
