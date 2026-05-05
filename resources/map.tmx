@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="90" height="90" tilewidth="32" tileheight="32" infinite="0" nextlayerid="141" nextobjectid="123">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="90" height="90" tilewidth="32" tileheight="32" infinite="0" nextlayerid="142" nextobjectid="123">
  <editorsettings>
   <export target="overworld.json" format="json"/>
  </editorsettings>
@@ -552,16 +552,14 @@
    </animation>
   </tile>
  </tileset>
- <tileset firstgid="374" name="CraftpixGrass" tilewidth="32" tileheight="32" tilecount="195" columns="15">
-  <image source="tilesets/CraftpixGrass.png" width="496" height="416"/>
- </tileset>
- <tileset firstgid="569" name="DeepForest" tilewidth="32" tileheight="32" tilecount="624" columns="26">
+ <tileset firstgid="374" source="tilesets/to_process/CraftpixGrass.tsx"/>
+ <tileset firstgid="1180" name="DeepForest" tilewidth="32" tileheight="32" tilecount="624" columns="26">
   <image source="tilesets/DeepForest.png" width="832" height="768"/>
  </tileset>
- <tileset firstgid="1193" name="GrassDetails" tilewidth="32" tileheight="32" tilecount="88" columns="11">
+ <tileset firstgid="1804" name="GrassDetails" tilewidth="32" tileheight="32" tilecount="88" columns="11">
   <image source="tilesets/ground_grass_details.png" width="352" height="256"/>
  </tileset>
- <tileset firstgid="1281" name="Raft" tilewidth="32" tileheight="32" tilecount="560" columns="20">
+ <tileset firstgid="1892" name="Raft" tilewidth="32" tileheight="32" tilecount="560" columns="20">
   <image source="tilesets/Raft-idle-by-Sevarihk.png" width="652" height="896"/>
   <tile id="0">
    <properties>
@@ -590,7 +588,7 @@
    </properties>
   </tile>
  </tileset>
- <tileset firstgid="1841" name="sand-waterfalls" tilewidth="32" tileheight="32" tilecount="324" columns="27">
+ <tileset firstgid="2452" name="sand-waterfalls" tilewidth="32" tileheight="32" tilecount="324" columns="27">
   <image source="tilesets/sand-waterfalls.png" width="864" height="384"/>
   <tile id="30">
    <properties>
@@ -647,7 +645,7 @@
    </wangset>
   </wangsets>
  </tileset>
- <tileset firstgid="2165" name="pier" tilewidth="32" tileheight="32" tilecount="16" columns="4">
+ <tileset firstgid="2776" name="pier" tilewidth="32" tileheight="32" tilecount="16" columns="4">
   <image source="tilesets/pier.png" width="128" height="128"/>
   <tile id="4">
    <animation>
@@ -674,7 +672,8 @@
    </animation>
   </tile>
  </tileset>
- <tileset firstgid="2181" source="tilesets/roads/Road1_32x32_wang.tsx"/>
+ <tileset firstgid="2792" source="tilesets/roads/Road1_32x32_wang.tsx"/>
+ <tileset firstgid="2872" source="tilesets/to_process/Ground_moss_32x32_partial_edge_wang.tsx"/>
  <group id="114" name="Forest">
   <layer id="127" name="lowground" width="90" height="90">
    <data encoding="base64" compression="zlib">
@@ -696,7 +695,12 @@
   </layer>
   <layer id="126" name="path" width="90" height="90">
    <data encoding="base64" compression="zlib">
-   eJzt1rsKwjAYgNGMfXkXwdtSUSzuinibVFx8KiNEkNIGK12Ec+AfSjN9TdOGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPAfZkUIyzhlnEWacdG+fpi5RzenTMuzzr25xZbTlp6HLzpXcc384z0ZeDat7rHNpKHPMdNsnfpudO3k1XpUa7ZvaFilfbvT92fX1PD9bayfG6t4vdW3N5f0L/JI3ct0RmgMAAAA9O0JoDcdAg==
+   eJzt1rsKwjAAQNFUFEs7K+JrUnHx/3/LRfA1GCEilKZYcRHOgQwlmS55NAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACA/3CvQhjVIRRxDNO4VPn1p445+lnV+bl1xxz97GLLW2bfLj7oXMY1g/p9To7OQNY+9rm29Fl2dK5S34k938uz9bnRet7SsEz7dqbv17ap4ettbN4b4/g91fdnNulf5JC6F+mO0BgAAAD4tQfhswu2
+  </data>
+  </layer>
+  <layer id="141" name="walls" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJzt0rFKQmEcxuGzn4tqNqgcvIP25owmU6TWmmuMQKjIIJDjtfkX3yCCQheDeB74cfg8i7zfaRoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOC7w7ZpDtq//hf/T682Pa5O8pxUw5yP8lv/y/vPs7vYzXntdVGNq9uqq25ynqRpdVVdpvU9nNp5J6Pa665apLf0ml6qZfa/zv7r3c+qga239lFbPbWb5+MPu73nDrq0zF3c23lrz/lm57/sNsu7Wb7xB/sCAAAAAMBerABL/ied
   </data>
   </layer>
   <layer id="119" name="decorations" width="90" height="90">

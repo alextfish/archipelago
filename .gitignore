@@ -10,6 +10,7 @@ lerna-debug.log*
 # Test output
 test-*.txt
 temp/
+resources/tilesets/to_process/craftpix-net-*/
 
 node_modules
 dist

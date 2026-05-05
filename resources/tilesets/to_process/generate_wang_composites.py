@@ -297,6 +297,7 @@ def build_output_tsx(
     image_path: str,
     variant_count: int,
     meta: TilesetMeta,
+    wangset_name: str,
 ) -> None:
     tile_width = meta.tile_width * 2
     tile_height = meta.tile_height * 2
@@ -330,7 +331,7 @@ def build_output_tsx(
         wangsets,
         'wangset',
         {
-            'name': 'Unnamed Set',
+            'name': wangset_name,
             'type': 'edge',
             'tile': '-1',
         },
@@ -383,6 +384,7 @@ def main() -> None:
 
     meta = parse_tileset_meta(args.tsx)
     lookup = parse_wang_lookup(args.tsx)
+    wangset_name = os.path.splitext(os.path.basename(args.tsx))[0]
 
     print(f'Using TSX metadata from: {args.tsx}')
     print('Row order is binary URDL from 0000 to 1111.')
@@ -403,6 +405,7 @@ def main() -> None:
             image_path=output_path,
             variant_count=args.variants,
             meta=meta,
+            wangset_name=wangset_name,
         )
         print(
             f'  OK: {os.path.basename(image_path)} -> {output_path} and {tsx_output_path}'
