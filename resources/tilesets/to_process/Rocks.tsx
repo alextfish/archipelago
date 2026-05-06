@@ -3,8 +3,8 @@
  <image source="../../../../../../../../Documents/Creations/Archipelago/Downloads/Craftpix.net/Incoming/Rocky/PNG/Ground_moss.png" width="320" height="256"/>
  <wangsets>
   <wangset name="Unnamed Set" type="corner" tile="-1">
-   <wangcolor name="top" color="#ff0000" tile="-1" probability="1"/>
-   <wangcolor name="side" color="#ffff00" tile="-1" probability="1"/>
+   <wangcolor name="flat rock" color="#ff0000" tile="-1" probability="1"/>
+   <wangcolor name="side rock" color="#ffff00" tile="-1" probability="1"/>
    <wangtile tileid="0" wangid="0,1,0,2,0,2,0,2"/>
    <wangtile tileid="1" wangid="0,2,0,2,0,2,0,1"/>
    <wangtile tileid="2" wangid="0,1,0,0,0,2,0,2"/>
