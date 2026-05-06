@@ -37,7 +37,7 @@
 
         canvas {
             width: 384px;
-            height: 384px;
+            height: 512px;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
             border: 2px solid rgba(29, 42, 47, 0.18);
@@ -54,14 +54,14 @@
 </head>
 <body>
     <main>
-        <canvas id="preview" width="96" height="96"></canvas>
+        <canvas id="preview" width="96" height="128"></canvas>
         <p id="label">Frame 1 / 6</p>
     </main>
     <script>
         const frameCount = 6;
         const frameDurationMs = 200;
         const frameWidth = 96;
-        const frameHeight = 96;
+        const frameHeight = 128;
         const image = new Image();
         const canvas = document.getElementById('preview');
         const label = document.getElementById('label');

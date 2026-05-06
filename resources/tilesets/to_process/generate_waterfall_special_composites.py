@@ -43,6 +43,9 @@ FIXED_TILE_OVERRIDES = {
         'bottom_right': 25,
     },
 }
+DUPLICATE_TILE_SOURCES = {
+    'lower_centre_waterfall': 'bottom_centre_waterfall',
+}
 ATLAS_LAYOUT = [
     'top_left_waterfall',
     'top_centre_waterfall',
@@ -53,6 +56,9 @@ ATLAS_LAYOUT = [
     'bottom_left_waterfall',
     'bottom_centre_waterfall',
     'bottom_right_waterfall',
+    'lower_left_waterfall',
+    'lower_centre_waterfall',
+    'lower_right_waterfall',
 ]
 ATLAS_COLUMNS = 3
 
@@ -186,6 +192,16 @@ def build_base_recipes() -> dict[str, list[list[str]]]:
             ['flat water', 'flat water', 'flat water'],
             ['flat water', 'flat water', 'flat water'],
         ],
+        'lower_left_waterfall': [
+            ['side rock', 'side rock', 'side water'],
+            ['flat water', 'flat water', 'flat water'],
+            ['flat water', 'flat water', 'flat water'],
+        ],
+        'lower_centre_waterfall': [
+            ['side water', 'side water', 'side water'],
+            ['flat water', 'flat water', 'flat water'],
+            ['flat water', 'flat water', 'flat water'],
+        ],
     }
 
     for name, grid in list(recipes.items()):
@@ -307,19 +323,25 @@ def build_atlas(recipes: dict[str, list[list[str]]], waterfall_lookup: dict[tupl
     manifest_tiles: list[dict[str, object]] = []
     picker = SignaturePicker()
     waterfall_tiles_by_id = build_waterfall_tile_index(waterfall_lookup)
+    selected_tiles_by_name: dict[str, dict[str, SourceTile]] = {}
 
     base_tile_maps: list[tuple[str, dict[str, tuple[str, str, str, str]], dict[str, SourceTile], list[list[str]]]] = []
     for tile_name in ATLAS_LAYOUT:
         grid = recipes[tile_name]
         signatures = quadrant_signatures(grid)
-        selected_tiles = {
-            quadrant_name: (
-                pick_overridden_tile(tile_name, quadrant_name, signature, waterfall_tiles_by_id)
-                or pick_source_tile(signature, waterfall_lookup, rocks_lookup, picker)
-            )
-            for quadrant_name, signature in signatures.items()
-        }
+        duplicate_source_name = DUPLICATE_TILE_SOURCES.get(tile_name)
+        if duplicate_source_name is not None:
+            selected_tiles = selected_tiles_by_name[duplicate_source_name].copy()
+        else:
+            selected_tiles = {
+                quadrant_name: (
+                    pick_overridden_tile(tile_name, quadrant_name, signature, waterfall_tiles_by_id)
+                    or pick_source_tile(signature, waterfall_lookup, rocks_lookup, picker)
+                )
+                for quadrant_name, signature in signatures.items()
+            }
 
+        selected_tiles_by_name[tile_name] = selected_tiles.copy()
         base_tile_maps.append((tile_name, signatures, selected_tiles, grid))
 
     for frame_index in range(FRAME_COUNT):

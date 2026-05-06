@@ -23,15 +23,13 @@
    <wangtile tileid="29" wangid="0,1,0,1,0,2,0,2"/>
    <wangtile tileid="30" wangid="0,2,0,2,0,1,0,1"/>
    <wangtile tileid="31" wangid="0,2,0,2,0,2,0,2"/>
-   <wangtile tileid="32" wangid="0,2,0,2,0,2,0,2"/>
    <wangtile tileid="33" wangid="0,4,0,2,0,2,0,3"/>
    <wangtile tileid="34" wangid="0,4,0,2,0,2,0,4"/>
    <wangtile tileid="35" wangid="0,3,0,2,0,2,0,4"/>
    <wangtile tileid="37" wangid="0,3,0,1,0,1,0,3"/>
    <wangtile tileid="38" wangid="0,3,0,1,0,1,0,3"/>
-   <wangtile tileid="39" wangid="0,2,0,2,0,2,0,2"/>
-   <wangtile tileid="40" wangid="0,2,0,2,0,2,0,2"/>
-   <wangtile tileid="41" wangid="0,2,0,2,0,2,0,2"/>
+   <wangtile tileid="39" wangid="0,3,0,2,0,2,0,3"/>
+   <wangtile tileid="40" wangid="0,3,0,2,0,2,0,3"/>
   </wangset>
  </wangsets>
 </tileset>
