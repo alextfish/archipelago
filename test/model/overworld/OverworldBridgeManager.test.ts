@@ -43,12 +43,16 @@ const puzzleBounds = { x: 0, y: 0, width: 7 * 32, height: 7 * 32 } as any;
 
 describe('OverworldBridgeManager', () => {
     let bridgesLayer: ReturnType<typeof makeBridgesLayer>;
-    let collisionManager: { setCollisionAt: ReturnType<typeof vi.fn> };
+    let collisionManager: { setCollisionAt: ReturnType<typeof vi.fn>; getCollisionAt: ReturnType<typeof vi.fn> };
     let manager: OverworldBridgeManager;
 
     beforeEach(() => {
         bridgesLayer = makeBridgesLayer();
-        collisionManager = { setCollisionAt: vi.fn() };
+        collisionManager = {
+            setCollisionAt: vi.fn(),
+            // Default: no tile has ALWAYS_HIGH, so setCollisionAt is always called
+            getCollisionAt: vi.fn().mockReturnValue(CollisionType.WALKABLE),
+        };
         manager = new OverworldBridgeManager(
             bridgesLayer as any,
             mockTiledMapData,
