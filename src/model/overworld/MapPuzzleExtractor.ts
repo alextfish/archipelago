@@ -332,8 +332,10 @@ export class MapPuzzleExtractor {
                 const localX = tx - puzzleOriginTileX;
                 const localY = ty - puzzleOriginTileY;
 
-                const rawOutgoing = TiledLayerUtils.flowDirectionsFromProperties(props);
-                const outgoing: Direction[] = orderedDirectionsNSEW(rawOutgoing);
+                // orderedDirectionsNSEW deduplicates and puts directions in NSEW order.
+                const outgoing: Direction[] = orderedDirectionsNSEW(
+                    TiledLayerUtils.flowDirectionsFromProperties(props)
+                );
 
                 flowSquares.push({
                     x: localX,

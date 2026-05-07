@@ -149,17 +149,20 @@ export class TiledLayerUtils {
 
     /**
      * Read the four flow-direction booleans from a tile's properties and return
-     * them as an unordered `Direction[]`.
+     * them as a `Direction[]` in the order N, S, E, W (only including directions
+     * whose property is truthy).
      *
      * This is a shared helper used by both {@link WaterDirectionReader} (which
      * reads world-space water layers) and {@link MapPuzzleExtractor} (which
      * reads puzzle-local water layers).  Keeping the extraction in one place
      * avoids drift between the two call-sites.
      *
+     * Note: the returned array is **not** in canonical NSEW order — call
+     * `orderedDirectionsNSEW` on the result if deduplication and canonical
+     * ordering are required.
+     *
      * @param props - Properties object as returned by {@link getTileProperties}.
      * @returns Array of the direction characters that are `true` in `props`.
-     *   The array is in NSEW order; call `orderedDirectionsNSEW` if you need
-     *   deduplication and canonical ordering.
      */
     static flowDirectionsFromProperties(props: TiledTileProperties): Array<'N' | 'S' | 'E' | 'W'> {
         const dirs: Array<'N' | 'S' | 'E' | 'W'> = [];
