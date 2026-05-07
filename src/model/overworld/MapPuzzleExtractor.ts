@@ -334,8 +334,8 @@ export class MapPuzzleExtractor {
 
                 const rawOutgoing: Direction[] = [];
                 if (props.flowNorth) rawOutgoing.push('N');
-                if (props.flowEast) rawOutgoing.push('E');
                 if (props.flowSouth) rawOutgoing.push('S');
+                if (props.flowEast) rawOutgoing.push('E');
                 if (props.flowWest) rawOutgoing.push('W');
                 const outgoing: Direction[] = orderedDirectionsNSEW(rawOutgoing);
 
