@@ -1,6 +1,6 @@
 import { TiledLayerUtils } from './TiledLayerUtils';
 import { gridKey, directionKeyNSEW } from '@model/puzzle/FlowTypes';
-import type { GridKey, Direction } from '@model/puzzle/FlowTypes';
+import type { GridKey } from '@model/puzzle/FlowTypes';
 
 /**
  * Reads flow direction data for overworld water tiles from Tiled map JSON.
@@ -47,11 +47,7 @@ export class WaterDirectionReader {
 
                 const props = TiledLayerUtils.getTileProperties(tilesets, gid);
 
-                const rawDirections: Direction[] = [];
-                if (props.flowNorth) rawDirections.push('N');
-                if (props.flowSouth) rawDirections.push('S');
-                if (props.flowEast) rawDirections.push('E');
-                if (props.flowWest) rawDirections.push('W');
+                const rawDirections = TiledLayerUtils.flowDirectionsFromProperties(props);
 
                 // Skip decorative tiles that carry no flow direction.
                 if (rawDirections.length === 0) continue;

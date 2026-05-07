@@ -146,4 +146,27 @@ export class TiledLayerUtils {
         if (idx < 0 || idx >= layerData.length) return 0;
         return layerData[idx] ?? 0;
     }
+
+    /**
+     * Read the four flow-direction booleans from a tile's properties and return
+     * them as an unordered `Direction[]`.
+     *
+     * This is a shared helper used by both {@link WaterDirectionReader} (which
+     * reads world-space water layers) and {@link MapPuzzleExtractor} (which
+     * reads puzzle-local water layers).  Keeping the extraction in one place
+     * avoids drift between the two call-sites.
+     *
+     * @param props - Properties object as returned by {@link getTileProperties}.
+     * @returns Array of the direction characters that are `true` in `props`.
+     *   The array is in NSEW order; call `orderedDirectionsNSEW` if you need
+     *   deduplication and canonical ordering.
+     */
+    static flowDirectionsFromProperties(props: TiledTileProperties): Array<'N' | 'S' | 'E' | 'W'> {
+        const dirs: Array<'N' | 'S' | 'E' | 'W'> = [];
+        if (props.flowNorth) dirs.push('N');
+        if (props.flowSouth) dirs.push('S');
+        if (props.flowEast)  dirs.push('E');
+        if (props.flowWest)  dirs.push('W');
+        return dirs;
+    }
 }

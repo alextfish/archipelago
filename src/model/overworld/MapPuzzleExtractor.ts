@@ -332,11 +332,7 @@ export class MapPuzzleExtractor {
                 const localX = tx - puzzleOriginTileX;
                 const localY = ty - puzzleOriginTileY;
 
-                const rawOutgoing: Direction[] = [];
-                if (props.flowNorth) rawOutgoing.push('N');
-                if (props.flowSouth) rawOutgoing.push('S');
-                if (props.flowEast) rawOutgoing.push('E');
-                if (props.flowWest) rawOutgoing.push('W');
+                const rawOutgoing = TiledLayerUtils.flowDirectionsFromProperties(props);
                 const outgoing: Direction[] = orderedDirectionsNSEW(rawOutgoing);
 
                 flowSquares.push({

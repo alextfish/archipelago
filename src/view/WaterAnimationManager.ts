@@ -23,7 +23,17 @@ import { WaterFlowAnimationCalculator } from '@model/overworld/WaterFlowAnimatio
  * View layer — imports Phaser.
  */
 export class WaterAnimationManager {
-    /** Texture key for the water-directions spritesheet loaded in preload. */
+    /**
+     * Texture key used when loading and referencing the water-directions spritesheet.
+     *
+     * The key deliberately uses a hyphen (`'water-directions'`) rather than
+     * the space found in the tileset filename (`'water directions.png'`).
+     * In Phaser the key and the file path are independent strings: the key is
+     * used throughout the game code to reference the loaded texture, while the
+     * file path is only used during `preload`.  Using a hyphen avoids accidental
+     * key collisions with the Tiled-tileset texture (also named `'water directions'`)
+     * that the tilemap loader registers separately.
+     */
     static readonly TEXTURE_KEY = 'water-directions';
 
     private readonly sprites: Map<GridKey, Phaser.GameObjects.Image>;
