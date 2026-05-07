@@ -18,6 +18,23 @@ const OPPOSITE: Record<Direction, Direction> = {
   W: 'E'
 };
 
+const DIRECTION_TOKEN_BY_SET_KEY: ReadonlyMap<string, string> = new Map([
+  ['N', 'N'],
+  ['E', 'E'],
+  ['S', 'S'],
+  ['W', 'W'],
+  ['N,S', 'NS'],
+  ['E,W', 'EW'],
+  ['N,E', 'NE'],
+  ['N,W', 'NW'],
+  ['E,S', 'SE'],
+  ['S,W', 'SW'],
+  ['N,E,S', 'NSE'],
+  ['N,S,W', 'NSW'],
+  ['N,E,W', 'NEW'],
+  ['E,S,W', 'SEW']
+]);
+
 /**
  * Computes flow animation keys from water-direction tiles with 2-step pruning.
  */
@@ -180,23 +197,10 @@ export class WaterFlowAnimationCalculator {
   }
 
   private static directionsToken(directions: Direction[]): string | null {
-    const set = new Set(directions);
-    if (set.size === 0 || set.size > 3) return null;
-    if (set.size === 1) return directions[0];
-    if (set.size === 2) {
-      if (set.has('N') && set.has('S')) return 'NS';
-      if (set.has('E') && set.has('W')) return 'EW';
-      if (set.has('N') && set.has('E')) return 'NE';
-      if (set.has('N') && set.has('W')) return 'NW';
-      if (set.has('S') && set.has('E')) return 'SE';
-      if (set.has('S') && set.has('W')) return 'SW';
-      return null;
-    }
-
-    if (!set.has('N')) return 'SEW';
-    if (!set.has('E')) return 'NSW';
-    if (!set.has('S')) return 'NEW';
-    if (!set.has('W')) return 'NSE';
-    return null;
+    const unique = Array.from(new Set(directions));
+    if (unique.length === 0 || unique.length > 3) return null;
+    const ordered = DIRECTION_ORDER.filter(d => unique.includes(d));
+    const key = ordered.join(',');
+    return DIRECTION_TOKEN_BY_SET_KEY.get(key) ?? null;
   }
 }

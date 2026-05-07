@@ -1108,7 +1108,7 @@ export class OverworldScene extends Phaser.Scene {
    */
   private setupVisualLayers(tilesets: Phaser.Tilemaps.Tileset[]) {
     console.log('Setting up visual layers...');
-    let currentVisualDepth = 1;
+    let nextVisualLayerDepth = 1;
 
     // Check all layers in the map
     for (const layerData of this.map.layers) {
@@ -1140,7 +1140,7 @@ export class OverworldScene extends Phaser.Scene {
           if (abovePlayerProp != null && (abovePlayerProp as any).value === true) {
             layer.setDepth(OVERHEAD_LAYER_DEPTH);
           } else {
-            layer.setDepth(currentVisualDepth++);
+            layer.setDepth(nextVisualLayerDepth++);
           }
           console.log(`Visual layer "${layerName}" created successfully`);
         } else {

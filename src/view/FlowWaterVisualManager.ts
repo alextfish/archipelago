@@ -97,27 +97,26 @@ export class FlowWaterVisualManager {
 
         if (hasAnimatedWater) {
             this.waterAnimationManager?.setTileVisible(tileX, tileY, hasWater);
+            return;
         }
 
-        if (!hasAnimatedWater) {
-            if (hasWater) {
-                const cached = this.waterTileGidCache.get(key);
-                if (cached) {
-                    const ld = waterLayerData.find(l => l.name === cached.layerName);
-                    if (ld?.tilemapLayer) {
-                        ld.tilemapLayer.putTileAt(cached.gid, tileX, tileY);
-                    }
-                    this.waterTileGidCache.delete(key);
+        if (hasWater) {
+            const cached = this.waterTileGidCache.get(key);
+            if (cached) {
+                const ld = waterLayerData.find(l => l.name === cached.layerName);
+                if (ld?.tilemapLayer) {
+                    ld.tilemapLayer.putTileAt(cached.gid, tileX, tileY);
                 }
-            } else {
-                if (!this.waterTileGidCache.has(key)) {
-                    for (const ld of waterLayerData) {
-                        const tile = ld.tilemapLayer?.getTileAt(tileX, tileY);
-                        if (tile) {
-                            this.waterTileGidCache.set(key, { gid: tile.index, layerName: ld.name });
-                            ld.tilemapLayer!.removeTileAt(tileX, tileY);
-                            break;
-                        }
+                this.waterTileGidCache.delete(key);
+            }
+        } else {
+            if (!this.waterTileGidCache.has(key)) {
+                for (const ld of waterLayerData) {
+                    const tile = ld.tilemapLayer?.getTileAt(tileX, tileY);
+                    if (tile) {
+                        this.waterTileGidCache.set(key, { gid: tile.index, layerName: ld.name });
+                        ld.tilemapLayer!.removeTileAt(tileX, tileY);
+                        break;
                     }
                 }
             }
