@@ -5,6 +5,11 @@ import { WaterFlowAnimationCalculator } from '@model/overworld/WaterFlowAnimatio
 import type { GridKey } from '@model/puzzle/FlowTypes';
 import { gridKey } from '@model/puzzle/FlowTypes';
 
+const WATER_ANIMATION_FRAME_WIDTH = 32;
+const WATER_ANIMATION_FRAME_HEIGHT = 32;
+const WATER_ANIMATION_LAST_FRAME = 5;
+const WATER_ANIMATION_FRAME_RATE = 10;
+
 /**
  * Replaces static water-direction tiles with animated water sprites.
  */
@@ -26,8 +31,8 @@ export class WaterAnimationManager {
     for (const animationKey of WaterFlowAnimationCalculator.allAnimationKeys()) {
       if (scene.textures.exists(animationKey)) continue;
       scene.load.spritesheet(animationKey, `resources/tilesets/flow/${animationKey}.png`, {
-        frameWidth: 32,
-        frameHeight: 32
+        frameWidth: WATER_ANIMATION_FRAME_WIDTH,
+        frameHeight: WATER_ANIMATION_FRAME_HEIGHT
       });
     }
   }
@@ -87,8 +92,8 @@ export class WaterAnimationManager {
     if (this.scene.anims.exists(animationKey)) return;
     this.scene.anims.create({
       key: animationKey,
-      frames: this.scene.anims.generateFrameNumbers(animationKey, { start: 0, end: 5 }),
-      frameRate: 10,
+      frames: this.scene.anims.generateFrameNumbers(animationKey, { start: 0, end: WATER_ANIMATION_LAST_FRAME }),
+      frameRate: WATER_ANIMATION_FRAME_RATE,
       repeat: -1
     });
   }
