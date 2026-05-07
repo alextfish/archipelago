@@ -45,13 +45,27 @@ export class WaterFlowAnimationCalculator {
     const result = new Map<GridKey, string>();
 
     for (const [tileKey, tile] of tiles) {
-      const incoming = this.getIncomingDirections(tileKey, tiles).filter(incomingDir =>
-        this.isIncomingValid(tileKey, incomingDir, tiles)
-      );
+      let incoming = this.getIncomingDirections(tileKey, tiles);
+      let outgoing = this.getOutgoingDirections(tileKey, tile, incoming, tiles);
+
+      while (true) {
+        const filteredIncoming = this.isIncomingValid(tileKey, incoming, tiles)
+          ? incoming
+          : [];
+        const filteredOutgoing = this.getOutgoingDirections(tileKey, tile, filteredIncoming, tiles);
+
+        if (filteredIncoming.length === incoming.length && filteredOutgoing.length === outgoing.length) {
+          incoming = filteredIncoming;
+          outgoing = filteredOutgoing;
+          break;
+        }
+
+        incoming = filteredIncoming;
+        outgoing = filteredOutgoing;
+      }
 
       if (incoming.length === 0) continue;
 
-      const outgoing = this.getOutgoingDirections(tileKey, tile, incoming, tiles);
       if (outgoing.length === 0) continue;
 
       const incomingToken = this.directionsToken(incoming);
@@ -108,13 +122,12 @@ export class WaterFlowAnimationCalculator {
     incoming: Direction[],
     tiles: Map<GridKey, WaterDirectionTile>
   ): Direction[] {
+    const excludedOutgoing = new Set(incoming);
     const valid = new Set<Direction>();
-    for (const incomingDir of incoming) {
-      for (const outgoingDir of tile.outgoing) {
-        if (outgoingDir === incomingDir) continue;
-        if (this.isOutgoingValid(tileKey, outgoingDir, tiles)) {
-          valid.add(outgoingDir);
-        }
+    for (const outgoingDir of tile.outgoing) {
+      if (excludedOutgoing.has(outgoingDir)) continue;
+      if (this.isOutgoingValid(tileKey, outgoingDir, tiles)) {
+        valid.add(outgoingDir);
       }
     }
     return DIRECTION_ORDER.filter(d => valid.has(d));
@@ -122,14 +135,15 @@ export class WaterFlowAnimationCalculator {
 
   private static isIncomingValid(
     tileKey: GridKey,
-    incomingDir: Direction,
+    incoming: Direction[],
     tiles: Map<GridKey, WaterDirectionTile>
   ): boolean {
     const tile = tiles.get(tileKey);
     if (!tile) return false;
 
+    const excludedOutgoing = new Set(incoming);
     for (const outgoingDir of tile.outgoing) {
-      if (outgoingDir === incomingDir) continue;
+      if (excludedOutgoing.has(outgoingDir)) continue;
       if (this.isOutgoingValid(tileKey, outgoingDir, tiles)) {
         return true;
       }

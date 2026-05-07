@@ -41,7 +41,24 @@ describe('WaterFlowAnimationCalculator', () => {
     expect(result.has(gridKey(1, 1))).toBe(false);
   });
 
+  it('never emits animation keys with overlapping incoming and outgoing directions', () => {
+    const tiles = new Map([
+      [gridKey(1, 0), tile(1, 0, ['S'])],
+      [gridKey(0, 1), tile(0, 1, ['E', 'W'])],
+      [gridKey(1, 1), tile(1, 1, ['S', 'W'])],
+      [gridKey(1, 2), tile(1, 2, ['S'])],
+      [gridKey(1, 3), tile(1, 3, ['S'])],
+      [gridKey(-1, 1), tile(-1, 1, ['W'])],
+      [gridKey(-2, 1), tile(-2, 1, ['W'])]
+    ]);
+
+    const result = WaterFlowAnimationCalculator.calculateAnimationByTile(tiles);
+    expect(result.get(gridKey(1, 1))).toBe('flow_NW-to-S');
+  });
+
   it('enumerates all disjoint in/out animation keys', () => {
+    // 4 single-direction inputs + 6 two-direction inputs + 4 three-direction inputs,
+    // each paired with any non-empty disjoint output subset, yields 50 combinations.
     const keys = WaterFlowAnimationCalculator.allAnimationKeys();
     expect(keys).toHaveLength(50);
     expect(keys).toContain('flow_N-to-W');
