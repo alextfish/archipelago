@@ -34,6 +34,8 @@ import type { PlayerStartPosition } from '@model/overworld/PlayerStartManager';
 import { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 import { CollisionInitialiser } from '@model/overworld/CollisionInitialiser';
 import { FlowWaterVisualManager } from '@view/FlowWaterVisualManager';
+import { WaterAnimationManager } from '@view/WaterAnimationManager';
+import { WaterDirectionReader } from '@model/overworld/WaterDirectionReader';
 import { DoorManager } from '@view/DoorManager';
 import { CollectibleManager } from '@view/CollectibleManager';
 import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
@@ -101,6 +103,8 @@ export class OverworldScene extends Phaser.Scene {
   // ── Extracted manager classes ─────────────────────────────────────────────
   /** Manages flow-water tile visuals and pontoon tile toggling. */
   private flowWaterManager?: FlowWaterVisualManager;
+  /** Manages the overlay of animated direction sprites for flowing water tiles. */
+  private waterAnimationManager?: WaterAnimationManager;
   /** Manages door loading, sprite creation, and animated state transitions. */
   private doorManager?: DoorManager;
   /** Manages jewel collectible loading, animation, and collection. */
@@ -208,6 +212,13 @@ export class OverworldScene extends Phaser.Scene {
     this.load.spritesheet('forestDoorVOpening', 'resources/sprites/forestDoorVOpening.png', {
       frameWidth: 32,
       frameHeight: 64
+    });
+
+    // Load the water-directions tileset as a spritesheet so WaterAnimationManager
+    // can create per-tile directional overlay images from individual frames.
+    this.load.spritesheet(WaterAnimationManager.TEXTURE_KEY, 'resources/tilesets/water directions.png', {
+      frameWidth: 32,
+      frameHeight: 32,
     });
 
     // Load TMX file asynchronously, then load embedded tilesets
@@ -1285,6 +1296,19 @@ export class OverworldScene extends Phaser.Scene {
     this.collisionArray = collisionArray;
     this.permanentBlockedTiles = permanentBlockedTiles;
 
+    // Build the water-direction map from the Tiled map data.  This is a
+    // pure-model operation, so it happens before any view construction.
+    const waterDirectionMap = WaterDirectionReader.readDirections(this.tiledMapData);
+
+    // Create the overlay sprite manager — one directional image per flowing
+    // water tile.  It is passed to FlowWaterVisualManager so both layers stay
+    // in sync as water state changes during puzzle solving.
+    this.waterAnimationManager = new WaterAnimationManager(
+      this,
+      this.tiledMapData?.tilewidth ?? 32,
+      waterDirectionMap,
+    );
+
     // Create FlowWaterVisualManager now that pontoonTiles are ready
     this.flowWaterManager = new FlowWaterVisualManager(
       this.map,
@@ -1293,6 +1317,7 @@ export class OverworldScene extends Phaser.Scene {
       (x, y) => this.getCollisionAt(x, y),
       (x, y, t) => this.setCollisionAt(x, y, t),
       (x, y) => this.isPermanentlyBlocked(x, y),
+      this.waterAnimationManager,
     );
   }
 

@@ -3,6 +3,7 @@ import type { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
 import { CollisionType } from '@model/overworld/CollisionTypes';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import type { PontoonTileData } from '@model/overworld/CollisionInitialiser';
+import type { WaterAnimationManager } from '@view/WaterAnimationManager';
 
 /**
  * Manages the visual synchronisation of overworld water tiles and pontoon tiles
@@ -36,6 +37,13 @@ export class FlowWaterVisualManager {
     private readonly setCollisionAt: (tileX: number, tileY: number, type: CollisionType) => void;
     private readonly isPermanentlyBlocked: (tileX: number, tileY: number) => boolean;
 
+    /**
+     * Optional animated-overlay manager that keeps direction-indicator sprites
+     * in sync with the water state of each tile.  When provided,
+     * {@link updateSingleFlowTileVisual} forwards every visibility change to it.
+     */
+    private readonly waterAnimationManager?: WaterAnimationManager;
+
     constructor(
         map: Phaser.Tilemaps.Tilemap,
         tiledMapData: any,
@@ -43,6 +51,7 @@ export class FlowWaterVisualManager {
         getCollisionAt: (tileX: number, tileY: number) => CollisionType,
         setCollisionAt: (tileX: number, tileY: number, type: CollisionType) => void,
         isPermanentlyBlocked: (tileX: number, tileY: number) => boolean,
+        waterAnimationManager?: WaterAnimationManager,
     ) {
         this.map = map;
         this.tiledMapData = tiledMapData;
@@ -50,6 +59,7 @@ export class FlowWaterVisualManager {
         this.getCollisionAt = getCollisionAt;
         this.setCollisionAt = setCollisionAt;
         this.isPermanentlyBlocked = isPermanentlyBlocked;
+        this.waterAnimationManager = waterAnimationManager;
     }
 
     /**
@@ -111,6 +121,9 @@ export class FlowWaterVisualManager {
                 }
             }
         }
+
+        // Keep the animation overlay in sync with the new water state.
+        this.waterAnimationManager?.setWaterVisible(tileX, tileY, hasWater);
 
         // Pontoon at this position (if any).
         // Skip pontoons on ALWAYS_HIGH or STAIRS tiles — immune to flow water overrides.
