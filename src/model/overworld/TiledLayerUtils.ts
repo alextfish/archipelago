@@ -1,3 +1,5 @@
+import type { Direction } from '@model/puzzle/FlowTypes';
+
 /**
  * Utilities for working with Tiled map layer data structures.
  * These are pure functions with no Phaser dependency, making them unit-testable.
@@ -159,4 +161,3 @@ export class TiledLayerUtils {
         return layerData[idx] ?? 0;
     }
 }
-import type { Direction } from '@model/puzzle/FlowTypes';
