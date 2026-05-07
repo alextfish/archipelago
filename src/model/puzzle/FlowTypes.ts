@@ -34,9 +34,17 @@ export interface FlowSquareSpec {
  * Duplicate directions are ignored.
  */
 export function directionKeyNSEW(directions: readonly Direction[] | undefined): string {
-  if (!directions || directions.length === 0) return '';
+  return orderedDirectionsNSEW(directions).join('');
+}
+
+/**
+ * Returns directions in canonical NSEW order.
+ * Duplicate directions are ignored.
+ */
+export function orderedDirectionsNSEW(directions: readonly Direction[] | undefined): Direction[] {
+  if (!directions || directions.length === 0) return [];
   const set = new Set<Direction>(directions);
-  return DIRECTION_ORDER_NSEW.filter(direction => set.has(direction)).join('');
+  return DIRECTION_ORDER_NSEW.filter(direction => set.has(direction));
 }
 
 export interface FlowPuzzleSpec {

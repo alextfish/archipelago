@@ -3,7 +3,7 @@ import type { PuzzleSpec } from '@model/puzzle/BridgePuzzle';
 import type { Island } from '@model/puzzle/Island';
 import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
 import type { Direction, FlowPuzzleSpec, FlowSquareSpec } from '@model/puzzle/FlowTypes';
-import { directionKeyNSEW } from '@model/puzzle/FlowTypes';
+import { orderedDirectionsNSEW } from '@model/puzzle/FlowTypes';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 
 /**
@@ -337,7 +337,7 @@ export class MapPuzzleExtractor {
                 if (props.flowEast) rawOutgoing.push('E');
                 if (props.flowSouth) rawOutgoing.push('S');
                 if (props.flowWest) rawOutgoing.push('W');
-                const outgoing: Direction[] = directionKeyNSEW(rawOutgoing).split('') as Direction[];
+                const outgoing: Direction[] = orderedDirectionsNSEW(rawOutgoing);
 
                 flowSquares.push({
                     x: localX,
