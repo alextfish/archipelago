@@ -27,9 +27,11 @@ export class FlowWaterVisualManager {
     readonly pontoonTiles: Map<string, PontoonTileData>;
 
     /**
-     * Cache of GIDs removed from the water Tiled layer to make river tiles look
-     * dry. Keyed by `"tileX,tileY"`. The entry is deleted when the GID is
-     * restored.
+     * Cache of GIDs removed from the water Tiled layer.
+     *
+     * The directional "water directions" tiles are removed from the tilemap and
+     * replaced by animated sprite overlays managed by WaterAnimationManager.
+     * Keyed by `"tileX,tileY"`.
      */
     private readonly waterTileGidCache: Map<string, { gid: number; layerName: string }> = new Map();
 
@@ -66,9 +68,8 @@ export class FlowWaterVisualManager {
      * Update the overworld water-tile visuals for a FlowPuzzle after it is
      * exited.
      *
-     * Tiles that no longer have water are visually dried up by removing their
-     * tile from the Tiled water layer (GID cached for restoration). Tiles that
-     * have water again get their original GID restored.
+     * Directional water tiles are removed from the Tiled layer and replaced by
+     * animated water sprites while the tile has water.
      */
     updateFlowWaterVisuals(puzzle: FlowPuzzle, puzzleBounds: { x: number; y: number }): void {
         if (!this.tiledMapData) return;
@@ -100,24 +101,15 @@ export class FlowWaterVisualManager {
         const key = `${tileX},${tileY}`;
         const waterLayerData = this.findLayersBySuffix('water');
 
-        if (hasWater) {
-            const cached = this.waterTileGidCache.get(key);
-            if (cached) {
-                const ld = waterLayerData.find(l => l.name === cached.layerName);
-                if (ld?.tilemapLayer) {
-                    ld.tilemapLayer.putTileAt(cached.gid, tileX, tileY);
-                }
-                this.waterTileGidCache.delete(key);
-            }
-        } else {
-            if (!this.waterTileGidCache.has(key)) {
-                for (const ld of waterLayerData) {
-                    const tile = ld.tilemapLayer?.getTileAt(tileX, tileY);
-                    if (tile) {
-                        this.waterTileGidCache.set(key, { gid: tile.index, layerName: ld.name });
-                        ld.tilemapLayer!.removeTileAt(tileX, tileY);
-                        break;
-                    }
+        // Hide static directional tile art in the tilemap. The animated overlay
+        // is the only visible water representation while high water is active.
+        if (!this.waterTileGidCache.has(key)) {
+            for (const ld of waterLayerData) {
+                const tile = ld.tilemapLayer?.getTileAt(tileX, tileY);
+                if (tile) {
+                    this.waterTileGidCache.set(key, { gid: tile.index, layerName: ld.name });
+                    ld.tilemapLayer!.removeTileAt(tileX, tileY);
+                    break;
                 }
             }
         }
@@ -143,6 +135,26 @@ export class FlowWaterVisualManager {
                 pontoon.currentGID = newGID;
                 pontoon.isHigh = hasWater;
                 pontoon.toggleOffset = -pontoon.toggleOffset;
+            }
+        }
+    }
+
+    /**
+     * Ensure the static directional tile at (tileX, tileY) is removed from the
+     * water layer without touching collision state.
+     *
+     * Used during scene setup so static arrows are never visible.
+     */
+    hideDirectionalWaterTileOnly(tileX: number, tileY: number): void {
+        const key = `${tileX},${tileY}`;
+        if (this.waterTileGidCache.has(key)) return;
+        const waterLayerData = this.findLayersBySuffix('water');
+        for (const ld of waterLayerData) {
+            const tile = ld.tilemapLayer?.getTileAt(tileX, tileY);
+            if (tile) {
+                this.waterTileGidCache.set(key, { gid: tile.index, layerName: ld.name });
+                ld.tilemapLayer!.removeTileAt(tileX, tileY);
+                break;
             }
         }
     }

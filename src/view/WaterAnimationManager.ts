@@ -1,101 +1,92 @@
 import Phaser from 'phaser';
 import { gridKey, parseGridKey } from '@model/puzzle/FlowTypes';
 import type { GridKey } from '@model/puzzle/FlowTypes';
-import { WaterFlowAnimationCalculator } from '@model/overworld/WaterFlowAnimationCalculator';
+import type { WaterTileAnimationPlan } from '@model/overworld/WaterFlowAnimationCalculator';
 
 /**
- * Manages an overlay of Phaser images that visualise the flow direction of
- * overworld water tiles.
+ * Manages animated overworld-water sprites.
  *
- * At construction time a `Phaser.GameObjects.Image` is created at the centre
- * of every tile in the supplied direction map, using the correct frame from
- * the `'water-directions'` spritesheet (the same PNG as the Tiled
- * `water directions` tileset, loaded as a spritesheet in
- * {@link OverworldScene.preload}).  Frame indices are calculated by
- * {@link WaterFlowAnimationCalculator.frameIndexForDirections} so each sprite
- * automatically shows the arrow(s) matching that tile's flow direction.
- *
- * The sprites are shown while their tile has water and hidden while it is
- * drained.  Call {@link setWaterVisible} whenever
- * {@link FlowWaterVisualManager.updateSingleFlowTileVisual} changes a tile's
- * water state so both layers stay in sync.
- *
- * View layer — imports Phaser.
+ * Unlike the previous static directional-tile overlay, this manager renders
+ * animated water frames only. The crude directional tiles from
+ * `water directions.png` should remain hidden while high water is shown.
  */
 export class WaterAnimationManager {
-    /**
-     * Texture key used when loading and referencing the water-directions spritesheet.
-     *
-     * The key deliberately uses a hyphen (`'water-directions'`) rather than
-     * the space found in the tileset filename (`'water directions.png'`).
-     * In Phaser the key and the file path are independent strings: the key is
-     * used throughout the game code to reference the loaded texture, while the
-     * file path is only used during `preload`.  Using a hyphen avoids accidental
-     * key collisions with the Tiled-tileset texture (also named `'water directions'`)
-     * that the tilemap loader registers separately.
-     */
-    static readonly TEXTURE_KEY = 'water-directions';
+    /** Animated 32x32 water spritesheet key loaded in OverworldScene.preload(). */
+    static readonly TEXTURE_KEY = 'water-animated';
 
-    private readonly sprites: Map<GridKey, Phaser.GameObjects.Image>;
+    private readonly sprites: Map<GridKey, Phaser.GameObjects.Sprite>;
 
     /**
-     * @param scene        The Phaser scene to add sprites to.
-     * @param tileSize     Width (and height) of one tile in pixels.
-     * @param directionMap Map returned by {@link WaterDirectionReader.readDirections}:
-     *                     world-tile GridKey → canonical NSEW direction key.
-     * @param depth        Render depth for all overlay sprites (default: 1, so
-     *                     they sit just above the base tilemap layer depth 0).
+     * @param scene              The Phaser scene.
+     * @param tileSize           Width and height of one world tile in pixels.
+     * @param animationPlanByTile Per-tile animation plan from WaterFlowAnimationCalculator.
+     * @param layerDepthByTile   Depth to use per tile (must match owning water layer).
      */
     constructor(
         scene: Phaser.Scene,
         tileSize: number,
-        directionMap: ReadonlyMap<GridKey, string>,
-        depth = 1,
+        animationPlanByTile: ReadonlyMap<GridKey, WaterTileAnimationPlan>,
+        layerDepthByTile: ReadonlyMap<GridKey, number>,
     ) {
-        this.sprites = new Map<GridKey, Phaser.GameObjects.Image>();
+        this.sprites = new Map<GridKey, Phaser.GameObjects.Sprite>();
 
-        for (const [key, directionKey] of directionMap.entries()) {
+        this.registerAnimations(scene, animationPlanByTile);
+
+        for (const [key, plan] of animationPlanByTile.entries()) {
             const { x, y } = parseGridKey(key);
-            const frame = WaterFlowAnimationCalculator.frameIndexForDirections(directionKey);
             const worldX = x * tileSize + tileSize / 2;
             const worldY = y * tileSize + tileSize / 2;
+            const depth = layerDepthByTile.get(key) ?? 1;
 
-            const image = scene.add.image(worldX, worldY, WaterAnimationManager.TEXTURE_KEY, frame);
-            image.setDepth(depth);
-            // Visible by default: map loads with water in its initial state.
-            image.setVisible(true);
-
-            this.sprites.set(key, image);
+            const sprite = scene.add.sprite(worldX, worldY, WaterAnimationManager.TEXTURE_KEY, plan.frameSequence[0]);
+            sprite.setDepth(depth);
+            sprite.play(plan.animationKey);
+            sprite.setVisible(true);
+            this.sprites.set(key, sprite);
         }
     }
 
     /**
-     * Show or hide the directional overlay sprite for the tile at (tileX, tileY).
-     *
-     * This should be called every time
-     * {@link FlowWaterVisualManager.updateSingleFlowTileVisual} changes the
-     * water state of the same tile, so the two layers stay in sync.
-     *
-     * If no sprite exists for the given position (e.g. because the tile has no
-     * flow direction) the call is a no-op.
-     *
-     * @param tileX   World tile X coordinate.
-     * @param tileY   World tile Y coordinate.
-     * @param visible `true` = water present (show sprite); `false` = drained (hide).
+     * Show or hide the animated water sprite for the tile at (tileX, tileY).
      */
     setWaterVisible(tileX: number, tileY: number, visible: boolean): void {
         const key = gridKey(tileX, tileY);
         const sprite = this.sprites.get(key);
-        if (sprite) {
-            sprite.setVisible(visible);
+        if (!sprite) return;
+        sprite.setVisible(visible);
+        if (visible) {
+            if (!sprite.anims.isPlaying) sprite.anims.resume();
+        } else {
+            sprite.anims.pause();
         }
     }
 
-    /** Destroy all overlay sprites managed by this instance. */
+    /** Destroy all managed sprites. */
     destroy(): void {
         for (const sprite of this.sprites.values()) {
             sprite.destroy();
         }
         this.sprites.clear();
+    }
+
+    private registerAnimations(
+        scene: Phaser.Scene,
+        animationPlanByTile: ReadonlyMap<GridKey, WaterTileAnimationPlan>,
+    ): void {
+        const seen = new Set<string>();
+
+        for (const plan of animationPlanByTile.values()) {
+            if (seen.has(plan.animationKey)) continue;
+            seen.add(plan.animationKey);
+
+            if (scene.anims.exists(plan.animationKey)) continue;
+
+            scene.anims.create({
+                key: plan.animationKey,
+                frames: plan.frameSequence.map((frame) => ({ key: WaterAnimationManager.TEXTURE_KEY, frame })),
+                frameRate: 6,
+                repeat: -1,
+            });
+        }
     }
 }

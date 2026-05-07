@@ -22,6 +22,8 @@ import { Door } from '@model/overworld/Door';
 import { PlayerStartManager } from '@model/overworld/PlayerStartManager';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
+import { parseGridKey } from '@model/puzzle/FlowTypes';
+import type { GridKey } from '@model/puzzle/FlowTypes';
 import { RiverChannelInitialiser } from '@model/overworld/RiverChannelInitialiser';
 import { WaterPropagationEngine } from '@model/overworld/WaterPropagationEngine';
 import type { TranslationModeScene } from '@view/scenes/TranslationModeScene';
@@ -36,6 +38,7 @@ import { CollisionInitialiser } from '@model/overworld/CollisionInitialiser';
 import { FlowWaterVisualManager } from '@view/FlowWaterVisualManager';
 import { WaterAnimationManager } from '@view/WaterAnimationManager';
 import { WaterDirectionReader } from '@model/overworld/WaterDirectionReader';
+import { WaterFlowAnimationCalculator } from '@model/overworld/WaterFlowAnimationCalculator';
 import { DoorManager } from '@view/DoorManager';
 import { CollectibleManager } from '@view/CollectibleManager';
 import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
@@ -91,6 +94,8 @@ export class OverworldScene extends Phaser.Scene {
 
   // Tile animations
   private tileAnimationManager?: TileAnimationManager;
+  /** Explicit depth assignment for auto-render layers. */
+  private autoRenderLayerDepthByName: Map<string, number> = new Map();
 
   // Roof hiding system
   private roofManager?: RoofManager;
@@ -214,9 +219,8 @@ export class OverworldScene extends Phaser.Scene {
       frameHeight: 64
     });
 
-    // Load the water-directions tileset as a spritesheet so WaterAnimationManager
-    // can create per-tile directional overlay images from individual frames.
-    this.load.spritesheet(WaterAnimationManager.TEXTURE_KEY, 'resources/tilesets/water directions.png', {
+    // Animated overworld water spritesheet used by WaterAnimationManager.
+    this.load.spritesheet(WaterAnimationManager.TEXTURE_KEY, 'resources/tilesets/sand-waterfalls.png', {
       frameWidth: 32,
       frameHeight: 32,
     });
@@ -1113,6 +1117,8 @@ export class OverworldScene extends Phaser.Scene {
    */
   private setupVisualLayers(tilesets: Phaser.Tilemaps.Tileset[]) {
     console.log('Setting up visual layers...');
+    this.autoRenderLayerDepthByName.clear();
+    let nextAutoRenderDepth = 1;
 
     // Check all layers in the map
     for (const layerData of this.map.layers) {
@@ -1143,6 +1149,10 @@ export class OverworldScene extends Phaser.Scene {
             : undefined;
           if (abovePlayerProp != null && (abovePlayerProp as any).value === true) {
             layer.setDepth(OVERHEAD_LAYER_DEPTH);
+          } else {
+            layer.setDepth(nextAutoRenderDepth);
+            this.autoRenderLayerDepthByName.set(layerName, nextAutoRenderDepth);
+            nextAutoRenderDepth += 1;
           }
           console.log(`Visual layer "${layerName}" created successfully`);
         } else {
@@ -1299,14 +1309,15 @@ export class OverworldScene extends Phaser.Scene {
     // Build the water-direction map from the Tiled map data.  This is a
     // pure-model operation, so it happens before any view construction.
     const waterDirectionMap = WaterDirectionReader.readDirections(this.tiledMapData);
+    const animationPlanByTile = WaterFlowAnimationCalculator.calculateTileAnimationPlans(waterDirectionMap);
+    const waterLayerDepthByTile = this.buildWaterLayerDepthByTile(waterDirectionMap);
 
-    // Create the overlay sprite manager — one directional image per flowing
-    // water tile.  It is passed to FlowWaterVisualManager so both layers stay
-    // in sync as water state changes during puzzle solving.
+    // Create animated overlay sprites for flowing water tiles.
     this.waterAnimationManager = new WaterAnimationManager(
       this,
       this.tiledMapData?.tilewidth ?? 32,
-      waterDirectionMap,
+      animationPlanByTile,
+      waterLayerDepthByTile,
     );
 
     // Create FlowWaterVisualManager now that pontoonTiles are ready
@@ -1319,6 +1330,34 @@ export class OverworldScene extends Phaser.Scene {
       (x, y) => this.isPermanentlyBlocked(x, y),
       this.waterAnimationManager,
     );
+
+    // Ensure static directional tiles are never visible under high water.
+    for (const key of waterDirectionMap.keys()) {
+      const { x, y } = parseGridKey(key);
+      this.flowWaterManager.hideDirectionalWaterTileOnly(x, y);
+    }
+  }
+
+  private buildWaterLayerDepthByTile(
+    waterDirectionMap: ReadonlyMap<GridKey, string>,
+  ): Map<GridKey, number> {
+    const result = new Map<GridKey, number>();
+    const waterLayers = this.map.layers.filter(
+      (layer) => TiledLayerUtils.getLayerSuffix(layer.name) === 'water'
+    );
+
+    for (const key of waterDirectionMap.keys()) {
+      const { x, y } = parseGridKey(key);
+      let chosenDepth = 1;
+      for (const layer of waterLayers) {
+        const tile = layer.tilemapLayer?.getTileAt(x, y);
+        if (!tile || tile.index === -1) continue;
+        chosenDepth = layer.tilemapLayer?.depth ?? this.autoRenderLayerDepthByName.get(layer.name) ?? chosenDepth;
+      }
+      result.set(key, chosenDepth);
+    }
+
+    return result;
   }
 
   update(_time: number, delta: number) {
