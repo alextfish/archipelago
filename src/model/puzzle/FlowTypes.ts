@@ -2,6 +2,7 @@ import type { Island } from "./Island";
 import type { BridgeTypeSpec } from "./BridgePuzzle";
 
 export type Direction = "N" | "S" | "E" | "W";
+export const DIRECTION_ORDER_NSEW: readonly Direction[] = ['N', 'S', 'E', 'W'];
 
 /**
  * Branded GridKey to make coordinate keys explicit in the type system.
@@ -26,6 +27,16 @@ export interface FlowSquareSpec {
   rocky?: boolean;        // bridges can cross but water doesn't flow through
   pontoon?: boolean;      // fixed floating pontoon tile (walkable when baked)
   isSource?: boolean;     // source of water
+}
+
+/**
+ * Builds a stable direction key in canonical NSEW order from any direction list.
+ * Duplicate directions are ignored.
+ */
+export function directionKeyNSEW(directions: readonly Direction[] | undefined): string {
+  if (!directions || directions.length === 0) return '';
+  const set = new Set<Direction>(directions);
+  return DIRECTION_ORDER_NSEW.filter(direction => set.has(direction)).join('');
 }
 
 export interface FlowPuzzleSpec {

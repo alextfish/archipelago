@@ -2,7 +2,8 @@ import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import type { PuzzleSpec } from '@model/puzzle/BridgePuzzle';
 import type { Island } from '@model/puzzle/Island';
 import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
-import type { FlowPuzzleSpec, FlowSquareSpec } from '@model/puzzle/FlowTypes';
+import type { Direction, FlowPuzzleSpec, FlowSquareSpec } from '@model/puzzle/FlowTypes';
+import { directionKeyNSEW } from '@model/puzzle/FlowTypes';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 
 /**
@@ -331,11 +332,12 @@ export class MapPuzzleExtractor {
                 const localX = tx - puzzleOriginTileX;
                 const localY = ty - puzzleOriginTileY;
 
-                const outgoing: Array<'N' | 'S' | 'E' | 'W'> = [];
-                if (props.flowNorth) outgoing.push('N');
-                if (props.flowSouth) outgoing.push('S');
-                if (props.flowEast) outgoing.push('E');
-                if (props.flowWest) outgoing.push('W');
+                const rawOutgoing: Direction[] = [];
+                if (props.flowNorth) rawOutgoing.push('N');
+                if (props.flowEast) rawOutgoing.push('E');
+                if (props.flowSouth) rawOutgoing.push('S');
+                if (props.flowWest) rawOutgoing.push('W');
+                const outgoing: Direction[] = directionKeyNSEW(rawOutgoing).split('') as Direction[];
 
                 flowSquares.push({
                     x: localX,
