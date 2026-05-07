@@ -28,6 +28,18 @@ export interface TiledTileProperties {
 
 export class TiledLayerUtils {
     /**
+     * Convert Tiled tile properties to flow-direction list.
+     */
+    static flowDirectionsFromProperties(props: TiledTileProperties): Direction[] {
+        const outgoing: Direction[] = [];
+        if (props.flowNorth) outgoing.push('N');
+        if (props.flowSouth) outgoing.push('S');
+        if (props.flowEast) outgoing.push('E');
+        if (props.flowWest) outgoing.push('W');
+        return outgoing;
+    }
+
+    /**
      * Extract the suffix from a layer name: the part after the last '/'.
      * e.g. "Beach/collision" → "collision", "Forest/npcs" → "npcs", "water" → "water"
      */
@@ -147,3 +159,4 @@ export class TiledLayerUtils {
         return layerData[idx] ?? 0;
     }
 }
+import type { Direction } from '@model/puzzle/FlowTypes';

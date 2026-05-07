@@ -34,6 +34,7 @@ import type { PlayerStartPosition } from '@model/overworld/PlayerStartManager';
 import { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 import { CollisionInitialiser } from '@model/overworld/CollisionInitialiser';
 import { FlowWaterVisualManager } from '@view/FlowWaterVisualManager';
+import { WaterAnimationManager } from '@view/WaterAnimationManager';
 import { DoorManager } from '@view/DoorManager';
 import { CollectibleManager } from '@view/CollectibleManager';
 import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
@@ -101,6 +102,8 @@ export class OverworldScene extends Phaser.Scene {
   // ── Extracted manager classes ─────────────────────────────────────────────
   /** Manages flow-water tile visuals and pontoon tile toggling. */
   private flowWaterManager?: FlowWaterVisualManager;
+  /** Replaces static water-direction tiles with animated flow sprites. */
+  private waterAnimationManager?: WaterAnimationManager;
   /** Manages door loading, sprite creation, and animated state transitions. */
   private doorManager?: DoorManager;
   /** Manages jewel collectible loading, animation, and collection. */
@@ -138,6 +141,8 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   preload() {
+    WaterAnimationManager.preloadAll(this);
+
     // Load external tilesets (these reference images outside the map file)
     this.load.image('beachTileset', 'resources/tilesets/beach.png');
     this.load.image('grassTileset', 'resources/tilesets/SproutLandsGrassIslands.png');
@@ -406,6 +411,7 @@ export class OverworldScene extends Phaser.Scene {
 
     // Auto-create all visual layers
     this.setupVisualLayers(tilesets);
+    this.waterAnimationManager = new WaterAnimationManager(this, this.map, this.tiledMapData);
 
     // Create collision layers
     this.setupCollisionLayer(tilesets);
@@ -1102,6 +1108,7 @@ export class OverworldScene extends Phaser.Scene {
    */
   private setupVisualLayers(tilesets: Phaser.Tilemaps.Tileset[]) {
     console.log('Setting up visual layers...');
+    let nextVisualDepth = 1;
 
     // Check all layers in the map
     for (const layerData of this.map.layers) {
@@ -1132,6 +1139,8 @@ export class OverworldScene extends Phaser.Scene {
             : undefined;
           if (abovePlayerProp != null && (abovePlayerProp as any).value === true) {
             layer.setDepth(OVERHEAD_LAYER_DEPTH);
+          } else {
+            layer.setDepth(nextVisualDepth++);
           }
           console.log(`Visual layer "${layerName}" created successfully`);
         } else {
@@ -1293,6 +1302,7 @@ export class OverworldScene extends Phaser.Scene {
       (x, y) => this.getCollisionAt(x, y),
       (x, y, t) => this.setCollisionAt(x, y, t),
       (x, y) => this.isPermanentlyBlocked(x, y),
+      this.waterAnimationManager,
     );
   }
 

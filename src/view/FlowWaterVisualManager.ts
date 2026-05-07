@@ -3,6 +3,7 @@ import type { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
 import { CollisionType } from '@model/overworld/CollisionTypes';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import type { PontoonTileData } from '@model/overworld/CollisionInitialiser';
+import type { WaterAnimationManager } from '@view/WaterAnimationManager';
 
 /**
  * Manages the visual synchronisation of overworld water tiles and pontoon tiles
@@ -35,6 +36,7 @@ export class FlowWaterVisualManager {
     private readonly getCollisionAt: (tileX: number, tileY: number) => CollisionType;
     private readonly setCollisionAt: (tileX: number, tileY: number, type: CollisionType) => void;
     private readonly isPermanentlyBlocked: (tileX: number, tileY: number) => boolean;
+    private readonly waterAnimationManager?: WaterAnimationManager;
 
     constructor(
         map: Phaser.Tilemaps.Tilemap,
@@ -43,6 +45,7 @@ export class FlowWaterVisualManager {
         getCollisionAt: (tileX: number, tileY: number) => CollisionType,
         setCollisionAt: (tileX: number, tileY: number, type: CollisionType) => void,
         isPermanentlyBlocked: (tileX: number, tileY: number) => boolean,
+        waterAnimationManager?: WaterAnimationManager,
     ) {
         this.map = map;
         this.tiledMapData = tiledMapData;
@@ -50,6 +53,7 @@ export class FlowWaterVisualManager {
         this.getCollisionAt = getCollisionAt;
         this.setCollisionAt = setCollisionAt;
         this.isPermanentlyBlocked = isPermanentlyBlocked;
+        this.waterAnimationManager = waterAnimationManager;
     }
 
     /**
@@ -89,24 +93,31 @@ export class FlowWaterVisualManager {
     updateSingleFlowTileVisual(tileX: number, tileY: number, hasWater: boolean): void {
         const key = `${tileX},${tileY}`;
         const waterLayerData = this.findLayersBySuffix('water');
+        const hasAnimatedWater = this.waterAnimationManager?.hasAnimationAt(tileX, tileY) ?? false;
 
-        if (hasWater) {
-            const cached = this.waterTileGidCache.get(key);
-            if (cached) {
-                const ld = waterLayerData.find(l => l.name === cached.layerName);
-                if (ld?.tilemapLayer) {
-                    ld.tilemapLayer.putTileAt(cached.gid, tileX, tileY);
+        if (hasAnimatedWater) {
+            this.waterAnimationManager?.setTileVisible(tileX, tileY, hasWater);
+        }
+
+        if (!hasAnimatedWater) {
+            if (hasWater) {
+                const cached = this.waterTileGidCache.get(key);
+                if (cached) {
+                    const ld = waterLayerData.find(l => l.name === cached.layerName);
+                    if (ld?.tilemapLayer) {
+                        ld.tilemapLayer.putTileAt(cached.gid, tileX, tileY);
+                    }
+                    this.waterTileGidCache.delete(key);
                 }
-                this.waterTileGidCache.delete(key);
-            }
-        } else {
-            if (!this.waterTileGidCache.has(key)) {
-                for (const ld of waterLayerData) {
-                    const tile = ld.tilemapLayer?.getTileAt(tileX, tileY);
-                    if (tile) {
-                        this.waterTileGidCache.set(key, { gid: tile.index, layerName: ld.name });
-                        ld.tilemapLayer!.removeTileAt(tileX, tileY);
-                        break;
+            } else {
+                if (!this.waterTileGidCache.has(key)) {
+                    for (const ld of waterLayerData) {
+                        const tile = ld.tilemapLayer?.getTileAt(tileX, tileY);
+                        if (tile) {
+                            this.waterTileGidCache.set(key, { gid: tile.index, layerName: ld.name });
+                            ld.tilemapLayer!.removeTileAt(tileX, tileY);
+                            break;
+                        }
                     }
                 }
             }
