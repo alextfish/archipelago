@@ -122,10 +122,10 @@ export class WaterFlowAnimationCalculator {
     incoming: Direction[],
     tiles: Map<GridKey, WaterDirectionTile>
   ): Direction[] {
-    const excludedOutgoing = new Set(incoming);
+    const incomingSet = new Set(incoming);
     const valid = new Set<Direction>();
     for (const outgoingDir of tile.outgoing) {
-      if (excludedOutgoing.has(outgoingDir)) continue;
+      if (incomingSet.has(outgoingDir)) continue;
       if (this.isOutgoingValid(tileKey, outgoingDir, tiles)) {
         valid.add(outgoingDir);
       }
@@ -141,9 +141,9 @@ export class WaterFlowAnimationCalculator {
     const tile = tiles.get(tileKey);
     if (!tile) return false;
 
-    const excludedOutgoing = new Set(incoming);
+    const incomingSet = new Set(incoming);
     for (const outgoingDir of tile.outgoing) {
-      if (excludedOutgoing.has(outgoingDir)) continue;
+      if (incomingSet.has(outgoingDir)) continue;
       if (this.isOutgoingValid(tileKey, outgoingDir, tiles)) {
         return true;
       }
