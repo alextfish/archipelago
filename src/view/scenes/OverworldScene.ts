@@ -173,11 +173,7 @@ export class OverworldScene extends Phaser.Scene {
       frameHeight: 32
     });
 
-    // Load compass overlay spritesheet for directional constraint NPCs
-    this.load.spritesheet('compass overlay', 'resources/sprites/compass_overlay.png', {
-      frameWidth: 32,
-      frameHeight: 32
-    });
+    // Compass overlay art is not finalised yet, so do not queue the texture here.
 
     // Load NPC icon sprites
     this.load.image(NPCIconConfig.INCOMPLETE, 'resources/sprites/icon-incomplete.png');

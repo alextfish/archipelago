@@ -61,11 +61,7 @@ export function loadNPCSprites(loader: Phaser.Loader.LoaderPlugin): void {
 
     loader.image('LyubaCleric', 'resources/sprites/LyubaCleric.png');
 
-    // Compass overlay spritesheet — four frames: north (0), east (1), south (2), west (3)
-    loader.spritesheet('compass overlay', 'resources/sprites/compass_overlay.png', {
-        frameWidth: 32,
-        frameHeight: 32
-    });
+    // Compass overlay art is not finalised yet, so do not queue the texture here.
 
     // Background characters
     loader.image('Mage1', 'resources/sprites/Mage1.png');

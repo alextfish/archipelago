@@ -409,13 +409,8 @@ export class MapPuzzleExtractor {
             console.log(`Extracting islands for ${definition.id} from ${islandLayers.length} tile layers (global search)`);
         }
 
-        islandLayers.forEach(layer => {
-            console.log(`  Checking layer: ${layer.name}`);
-        });
-
         for (const layer of islandLayers) {
             const layerIslands = this.extractIslandsFromLayer(layer, definition, tiledMap, islandTileIDs);
-            console.log(`  Found ${layerIslands.length} islands in layer ${layer.name}`);
             islands.push(...layerIslands);
         }
 
@@ -474,7 +469,7 @@ export class MapPuzzleExtractor {
                     const relativeX = x - puzzleStartX;
                     const relativeY = y - puzzleStartY;
 
-                    console.log(`    Found island tile ${tileID} at world (${x},${y}) -> puzzle (${relativeX},${relativeY})`);
+                    //console.log(`    Found island tile ${tileID} at world (${x},${y}) -> puzzle (${relativeX},${relativeY})`);
 
                     islands.push({
                         id: `island_${relativeX}_${relativeY}`,

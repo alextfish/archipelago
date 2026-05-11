@@ -33,11 +33,7 @@ export class IslandMapScene extends Phaser.Scene {
             frameWidth: 32,
             frameHeight: 32
         });
-        // Load compass overlay spritesheet for directional constraint NPCs
-        this.load.spritesheet('compass overlay', 'resources/sprites/compass_overlay.png', {
-            frameWidth: 32,
-            frameHeight: 32
-        });
+        // Compass overlay art is not finalised yet, so do not queue the texture here.
         // Load NPC sprites for constraint feedback display
         loadNPCSprites(this.load);
         console.log('IslandMapScene: preload() finished');
