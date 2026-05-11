@@ -34,6 +34,9 @@ import type { PlayerStartPosition } from '@model/overworld/PlayerStartManager';
 import { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 import { CollisionInitialiser } from '@model/overworld/CollisionInitialiser';
 import { FlowWaterVisualManager } from '@view/FlowWaterVisualManager';
+import { WaterDisplayManifestReader } from '@model/overworld/WaterDisplayManifestReader';
+import { WaterAnimationManager } from '@view/WaterAnimationManager';
+import { FLOW_ANIMATION_KEYS } from '@view/FlowAnimationAssetRegistry';
 import { DoorManager } from '@view/DoorManager';
 import { CollectibleManager } from '@view/CollectibleManager';
 import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
@@ -94,13 +97,15 @@ export class OverworldScene extends Phaser.Scene {
   private roofManager?: RoofManager;
   private roofsLayers: Phaser.Tilemaps.TilemapLayer[] = [];
 
-  /** Merged tile data from all Tiled `water` layers — built once at load time and used by
+  /** Merged tile data from all Tiled `waterflow` layers — built once at load time and used by
    * RiverChannelInitialiser to trace inter-puzzle river channels. */
   private mergedWaterLayerData?: number[];
 
   // ── Extracted manager classes ─────────────────────────────────────────────
   /** Manages flow-water tile visuals and pontoon tile toggling. */
   private flowWaterManager?: FlowWaterVisualManager;
+  /** Manages animated overlays for directed visual water tiles. */
+  private waterAnimationManager?: WaterAnimationManager;
   /** Manages door loading, sprite creation, and animated state transitions. */
   private doorManager?: DoorManager;
   /** Manages jewel collectible loading, animation, and collection. */
@@ -205,6 +210,13 @@ export class OverworldScene extends Phaser.Scene {
       frameWidth: 32,
       frameHeight: 64
     });
+
+    for (const key of FLOW_ANIMATION_KEYS) {
+      this.load.spritesheet(key, `resources/tilesets/flow/${key}.png`, {
+        frameWidth: 32,
+        frameHeight: 32
+      });
+    }
 
     // Load TMX file asynchronously, then load embedded tilesets
     this.loadTmxFile();
@@ -538,7 +550,7 @@ export class OverworldScene extends Phaser.Scene {
       // flowing water before solving the puzzle.
       this.applyInitialFlowPuzzleCollision(puzzles);
 
-      // Merge all `water` Tiled layers into a single master grid, then wire up
+      // Merge all `waterflow` Tiled layers into a single master grid, then wire up
       // RiverChannelExtractor / WaterPropagationEngine so that downstream puzzles
       // (e.g. flowPuzzle2) receive edge inputs from upstream sources (e.g. flowPuzzle1).
       this.mergedWaterLayerData = this.buildMergedWaterLayer();
@@ -617,12 +629,13 @@ export class OverworldScene extends Phaser.Scene {
       }
 
       this.flowWaterManager.updatePontoonVisuals(puzzle, puzzleBounds);
+      this.flowWaterManager.updateFlowWaterVisuals(puzzle, puzzleBounds);
     }
   }
 
   /**
-   * Build a single flat tile-data array by OR-merging all Tiled `water` layers.
-   * Any position that is non-zero in any water layer is non-zero in the result.
+   * Build a single flat tile-data array by OR-merging all Tiled `waterflow` layers.
+   * Any position that is non-zero in any waterflow layer is non-zero in the result.
    * Stored on the scene so the merged grid is only computed once at load time.
    */
   private buildMergedWaterLayer(): number[] | undefined {
@@ -1280,15 +1293,23 @@ export class OverworldScene extends Phaser.Scene {
 
     this.collisionArray = collisionArray;
     this.permanentBlockedTiles = permanentBlockedTiles;
+    const waterDisplayManifest = WaterDisplayManifestReader.build(this.tiledMapData ?? {});
+    this.waterAnimationManager = new WaterAnimationManager(
+      this,
+      this.map,
+      waterDisplayManifest.entries.values(),
+    );
 
     // Create FlowWaterVisualManager now that pontoonTiles are ready
     this.flowWaterManager = new FlowWaterVisualManager(
       this.map,
       this.tiledMapData,
+      waterDisplayManifest,
       pontoonTiles,
       (x, y) => this.getCollisionAt(x, y),
       (x, y, t) => this.setCollisionAt(x, y, t),
       (x, y) => this.isPermanentlyBlocked(x, y),
+      this.waterAnimationManager,
     );
   }
 

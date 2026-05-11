@@ -300,8 +300,8 @@ export class RiverChannelInitialiser {
   }
 
   /**
-   * Build a single flat tile-data array by OR-merging all Tiled `water` layers.
-   * Any position that is non-zero in any water layer is non-zero in the result.
+   * Build a single flat tile-data array by OR-merging all Tiled `waterflow` layers.
+   * Any position that is non-zero in any waterflow layer is non-zero in the result.
    *
    * @param tiledMapData - Raw Tiled JSON map object.
    * @returns Merged array of length `mapWidth * mapHeight`, or `undefined` if
@@ -314,8 +314,8 @@ export class RiverChannelInitialiser {
     const mapHeight: number = tiledMapData.height ?? 0;
     const merged = new Array<number>(mapWidth * mapHeight).fill(0);
 
-    const waterLayers = TiledLayerUtils.findTileLayersByName(tiledMapData.layers ?? [], 'water');
-    console.log(`[MergedWater] Merging ${waterLayers.length} water layer(s) into master grid`);
+    const waterLayers = TiledLayerUtils.findTileLayersByName(tiledMapData.layers ?? [], 'waterflow');
+    console.log(`[MergedWater] Merging ${waterLayers.length} waterflow layer(s) into master grid`);
 
     for (const layer of waterLayers) {
       const data: number[] = layer.data.data ?? [];

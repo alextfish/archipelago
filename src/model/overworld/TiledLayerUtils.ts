@@ -2,6 +2,7 @@
  * Utilities for working with Tiled map layer data structures.
  * These are pure functions with no Phaser dependency, making them unit-testable.
  */
+import type { Direction } from '@model/puzzle/FlowTypes';
 
 export interface TiledObjectLayerResult {
     /** The layer's own name (e.g. "npcs") */
@@ -145,5 +146,17 @@ export class TiledLayerUtils {
         const idx = tileY * mapWidth + tileX;
         if (idx < 0 || idx >= layerData.length) return 0;
         return layerData[idx] ?? 0;
+    }
+
+    /**
+     * Extract flow direction flags from Tiled tile properties.
+     */
+    static flowDirectionsFromProperties(props: TiledTileProperties): Direction[] {
+        const directions: Direction[] = [];
+        if (props.flowNorth) directions.push('N');
+        if (props.flowSouth) directions.push('S');
+        if (props.flowEast) directions.push('E');
+        if (props.flowWest) directions.push('W');
+        return directions;
     }
 }

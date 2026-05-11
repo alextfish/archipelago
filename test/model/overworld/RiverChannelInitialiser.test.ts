@@ -102,7 +102,7 @@ describe('RiverChannelInitialiser.buildMergedWaterLayer', () => {
     expect(RiverChannelInitialiser.buildMergedWaterLayer(null)).toBeUndefined();
   });
 
-  it('returns an all-zero array when there are no water layers', () => {
+  it('returns an all-zero array when there are no waterflow layers', () => {
     const tiledMapData = {
       width: 3,
       height: 2,
@@ -115,12 +115,12 @@ describe('RiverChannelInitialiser.buildMergedWaterLayer', () => {
     expect(result!.every(v => v === 0)).toBe(true);
   });
 
-  it('merges tiles from a single water layer', () => {
+  it('merges tiles from a single waterflow layer', () => {
     const tiledMapData = {
       width: 4,
       height: 1,
       layers: [{
-        name: 'Forest/water',
+        name: 'Forest/waterflow',
         type: 'tilelayer',
         data: [0, 5, 0, 7],
       }],
@@ -130,14 +130,14 @@ describe('RiverChannelInitialiser.buildMergedWaterLayer', () => {
     expect(result).toEqual([0, 5, 0, 7]);
   });
 
-  it('merges tiles from multiple water layers (last-writer-wins)', () => {
-    // Two water layers; layer B overwrites layer A where both are non-zero.
+  it('merges tiles from multiple waterflow layers (last-writer-wins)', () => {
+    // Two waterflow layers; layer B overwrites layer A where both are non-zero.
     const tiledMapData = {
       width: 3,
       height: 1,
       layers: [
-        { name: 'Forest/water', type: 'tilelayer', data: [1, 2, 0] },
-        { name: 'Beach/water',  type: 'tilelayer', data: [0, 9, 3] },
+        { name: 'Forest/waterflow', type: 'tilelayer', data: [1, 2, 0] },
+        { name: 'Beach/waterflow',  type: 'tilelayer', data: [0, 9, 3] },
       ],
     };
 
@@ -153,7 +153,7 @@ describe('RiverChannelInitialiser.buildMergedWaterLayer', () => {
       width: 5,
       height: 1,
       layers: [{
-        name: 'Forest/water',
+        name: 'Forest/waterflow',
         type: 'tilelayer',
         data: [0, 1, 0, 1, 1],
       }],
