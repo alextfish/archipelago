@@ -28,9 +28,6 @@ export class FlowWaterVisualManager {
     /** Pontoon tile registry populated at map-load time by CollisionInitialiser. */
     readonly pontoonTiles: Map<string, PontoonTileData>;
 
-    /** Tracks wet/dry state so animation input inference can rely on current world state. */
-    private readonly wetTileKeys: Set<string> = new Set();
-
     private readonly getCollisionAt: (tileX: number, tileY: number) => CollisionType;
     private readonly setCollisionAt: (tileX: number, tileY: number, type: CollisionType) => void;
     private readonly isPermanentlyBlocked: (tileX: number, tileY: number) => boolean;
@@ -177,16 +174,15 @@ export class FlowWaterVisualManager {
         if (!tileLayer) return;
 
         if (hasWater) {
-            this.wetTileKeys.add(key);
             if (manifestEntry.visualHasFlowDirections) {
                 if (manifestEntry.visualGID) {
                     tileLayer.putTileAt(manifestEntry.visualGID, tileX, tileY);
                 }
-                this.waterAnimationManager?.setTileWet(key, true);
+                this.waterAnimationManager?.setTileWaterState(key, true);
                 return;
             }
 
-            this.waterAnimationManager?.setTileWet(key, false);
+            this.waterAnimationManager?.setTileWaterState(key, false);
 
             const gidToShow = manifestEntry.visualGID ?? manifestEntry.fallbackWaterGID;
             if (gidToShow) {
@@ -195,9 +191,8 @@ export class FlowWaterVisualManager {
             return;
         }
 
-        this.wetTileKeys.delete(key);
         tileLayer.removeTileAt(tileX, tileY);
-        this.waterAnimationManager?.setTileWet(key, false);
+        this.waterAnimationManager?.setTileWaterState(key, false);
     }
 
 }

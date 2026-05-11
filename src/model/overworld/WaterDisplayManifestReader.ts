@@ -20,7 +20,7 @@ export interface WaterDisplayManifest {
 }
 
 /**
- * Builds a per-tile manifest combining logical `*/waterflow` and visual `*/water` layers.
+ * Builds a per-tile manifest combining logical waterflow and visual water layers.
  */
 export class WaterDisplayManifestReader {
     static build(tiledMapData: any): WaterDisplayManifest {
@@ -118,10 +118,13 @@ export class WaterDisplayManifestReader {
     }
 
     private static hash(input: string): number {
-        let h = 2166136261;
+        // FNV-1a 32-bit hash for stable pseudo-random fallback tile selection.
+        // We hash the tile identity rather than using direct coordinate modulo so
+        // nearby tiles do not repeat obvious patterns when selecting fallback art.
+        let h = 2166136261; // FNV offset basis
         for (let i = 0; i < input.length; i++) {
             h ^= input.charCodeAt(i);
-            h = Math.imul(h, 16777619);
+            h = Math.imul(h, 16777619); // FNV prime
         }
         return h >>> 0;
     }

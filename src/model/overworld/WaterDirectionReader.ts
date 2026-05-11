@@ -10,7 +10,7 @@ export interface WaterVisualDirectionTile {
 }
 
 /**
- * Reads flow-direction metadata from visual `*/water` layers.
+ * Reads flow-direction metadata from visual water layers (layer suffix: "water").
  */
 export class WaterDirectionReader {
     static readVisualWaterDirections(tiledMapData: any): Map<string, WaterVisualDirectionTile> {

@@ -19,6 +19,8 @@ export class WaterAnimationManager {
     ) {
         for (const entry of manifestEntries) {
             if (!entry.visualHasFlowDirections) continue;
+            // Animation asset naming uses "incoming-to-outgoing"; we use logical outgoing
+            // as the incoming side and the authored visual flow directions as outgoing.
             const animationKey = WaterFlowAnimationCalculator.calculateAnimationKey(
                 entry.logicOutgoing,
                 entry.visualOutgoing
@@ -27,8 +29,10 @@ export class WaterAnimationManager {
 
             this.ensureAnimationCreated(animationKey);
 
-            const x = this.map.tileToWorldX(entry.tileX) + this.map.tileWidth / 2;
-            const y = this.map.tileToWorldY(entry.tileY) + this.map.tileHeight / 2;
+            const worldX = this.map.tileToWorldX(entry.tileX);
+            const worldY = this.map.tileToWorldY(entry.tileY);
+            const x = (worldX ?? (entry.tileX * this.map.tileWidth)) + this.map.tileWidth / 2;
+            const y = (worldY ?? (entry.tileY * this.map.tileHeight)) + this.map.tileHeight / 2;
             const sprite = this.scene.add.sprite(x, y, animationKey, 0);
             sprite.setOrigin(0.5, 0.5);
             sprite.setVisible(false);
@@ -39,7 +43,7 @@ export class WaterAnimationManager {
         }
     }
 
-    setTileWet(tileKey: string, wet: boolean): void {
+    setTileWaterState(tileKey: string, wet: boolean): void {
         const sprite = this.spritesByTileKey.get(tileKey);
         if (!sprite) return;
 

@@ -307,10 +307,15 @@ export class MapPuzzleExtractor {
         }
 
         // Prefer the waterflow layer in the same region group if available.
+        const layersWithParentPath = waterflowLayers.map(layer => ({
+            layer,
+            parentPath: this.parentPath(layer.fullPath),
+        }));
         const regionWaterflow = definition.regionGroup
-            ? waterflowLayers.find(l => this.parentPath(l.fullPath) === definition.regionGroup)
-            : waterflowLayers.find(l => this.parentPath(l.fullPath) === '');
-        const waterflowLayer = regionWaterflow ?? waterflowLayers[0];
+            ? layersWithParentPath.find(l => l.parentPath === definition.regionGroup)?.layer
+            : layersWithParentPath.find(l => l.parentPath === '')?.layer;
+        const waterflowLayer = regionWaterflow ?? layersWithParentPath[0]?.layer;
+        if (!waterflowLayer) return [];
 
         const tileData: number[] = (waterflowLayer.data.data ?? waterflowLayer.data) as number[];
         const tilesets: any[] = (tiledMap.tilesets ?? []) as any[];
