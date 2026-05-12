@@ -90,7 +90,7 @@ The editor exports puzzles in this format:
 
 ## Limitations (MVP)
 
-- BridgeMustCoverIslandConstraint configuration per bridge type is not implemented
+- BridgeMustCoverIslandConstraint is listed, but dedicated per-bridge-type configuration UI is not implemented yet
 - No undo/redo functionality
 - Limited validation of puzzle correctness
 
