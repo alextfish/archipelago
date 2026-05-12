@@ -1879,6 +1879,12 @@ var PuzzleEditor = class {
       this.tool = "bridge";
       this.updateToolButtons();
     });
+    document.getElementById("removeBridgeBtn")?.addEventListener("click", () => {
+      this.tool = "removeBridge";
+      this.bridgePlacementStart = null;
+      this.updateToolButtons();
+      this.renderAll();
+    });
     document.getElementById("puzzleId")?.addEventListener("change", (e) => {
       this.puzzle.id = e.target.value;
     });
@@ -2027,6 +2033,8 @@ var PuzzleEditor = class {
       this.removeIsland(gridX, gridY);
     } else if (this.tool === "bridge") {
       this.handleBridgePlacement(gridX, gridY);
+    } else if (this.tool === "removeBridge") {
+      this.handleBridgeRemoval(gridX, gridY);
     }
   }
   handleBridgePlacement(gridX, gridY) {
@@ -2054,6 +2062,22 @@ var PuzzleEditor = class {
       this.testBridges.push({ start, end, bridgeTypeId: this.selectedBridgeTypeId });
       this.bridgePlacementStart = null;
       this.renderAll();
+    }
+  }
+  handleBridgeRemoval(gridX, gridY) {
+    if (this.testBridges.length === 0) return;
+    for (let i = this.testBridges.length - 1; i >= 0; i--) {
+      const bridge = this.testBridges[i];
+      const minX = Math.min(bridge.start.x, bridge.end.x);
+      const maxX = Math.max(bridge.start.x, bridge.end.x);
+      const minY = Math.min(bridge.start.y, bridge.end.y);
+      const maxY = Math.max(bridge.start.y, bridge.end.y);
+      const onBridge = bridge.start.x === bridge.end.x ? gridX === bridge.start.x && gridY >= minY && gridY <= maxY : gridY === bridge.start.y && gridX >= minX && gridX <= maxX;
+      if (!onBridge) continue;
+      this.testBridges.splice(i, 1);
+      this.bridgePlacementStart = null;
+      this.renderAll();
+      return;
     }
   }
   addIsland(x, y) {
@@ -2224,6 +2248,7 @@ var PuzzleEditor = class {
     if (this.tool === "island") document.getElementById("addIslandBtn")?.classList.add("active");
     else if (this.tool === "remove") document.getElementById("removeIslandBtn")?.classList.add("active");
     else if (this.tool === "bridge") document.getElementById("addBridgeBtn")?.classList.add("active");
+    else if (this.tool === "removeBridge") document.getElementById("removeBridgeBtn")?.classList.add("active");
   }
   renderAll() {
     this.renderGrid();
@@ -2248,7 +2273,8 @@ var PuzzleEditor = class {
       ctx.lineTo(width * this.cellSize, gy * this.cellSize);
       ctx.stroke();
     }
-    this.renderConstraintLabels();
+    const constraintItems = getConstraintGridItems(this.puzzle.constraints, this.puzzle.islands);
+    this.renderConstraintHighlights(constraintItems);
     this.renderTestBridges();
     if (this.bridgePlacementStart) {
       const px = (this.bridgePlacementStart.x - 0.5) * this.cellSize;
@@ -2275,17 +2301,21 @@ var PuzzleEditor = class {
       ctx.textBaseline = "middle";
       ctx.fillText(island.id, ix, iy);
     });
+    this.renderConstraintBadges(constraintItems);
   }
-  renderConstraintLabels() {
-    const items = getConstraintGridItems(this.puzzle.constraints, this.puzzle.islands);
+  groupConstraintLabelsByPosition(items) {
     const byPos = /* @__PURE__ */ new Map();
     for (const item of items) {
       const key = `${item.x},${item.y}`;
       if (!byPos.has(key)) byPos.set(key, []);
       byPos.get(key).push(item.label);
     }
+    return byPos;
+  }
+  renderConstraintHighlights(items) {
+    const byPos = this.groupConstraintLabelsByPosition(items);
     const ctx = this.ctx;
-    byPos.forEach((labels, key) => {
+    byPos.forEach((_labels, key) => {
       const [gx, gy] = key.split(",").map(Number);
       const cx = (gx - 0.5) * this.cellSize;
       const cy = (gy - 0.5) * this.cellSize;
@@ -2295,6 +2325,16 @@ var PuzzleEditor = class {
       ctx.strokeStyle = "rgba(255, 150, 0, 0.4)";
       ctx.lineWidth = 1;
       ctx.strokeRect(cx - half, cy - half, this.cellSize, this.cellSize);
+    });
+  }
+  renderConstraintBadges(items) {
+    const byPos = this.groupConstraintLabelsByPosition(items);
+    const ctx = this.ctx;
+    byPos.forEach((labels, key) => {
+      const [gx, gy] = key.split(",").map(Number);
+      const cx = (gx - 0.5) * this.cellSize;
+      const cy = (gy - 0.5) * this.cellSize;
+      const half = this.cellSize / 2;
       ctx.font = "bold 10px monospace";
       ctx.textAlign = "center";
       labels.forEach((label, idx) => {

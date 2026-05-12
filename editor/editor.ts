@@ -260,7 +260,7 @@ class PuzzleEditor {
     private ctx: CanvasRenderingContext2D;
     private puzzle: PuzzleData;
     private cellSize = 60;
-    private tool: 'island' | 'remove' | 'bridge' = 'island';
+    private tool: 'island' | 'remove' | 'bridge' | 'removeBridge' = 'island';
     private selectedBridgeTypeId: string | null = null;
     private testBridges: TestBridge[] = [];
     private bridgePlacementStart: { x: number; y: number } | null = null;
@@ -306,6 +306,12 @@ class PuzzleEditor {
         document.getElementById('addBridgeBtn')?.addEventListener('click', () => {
             this.tool = 'bridge';
             this.updateToolButtons();
+        });
+        document.getElementById('removeBridgeBtn')?.addEventListener('click', () => {
+            this.tool = 'removeBridge';
+            this.bridgePlacementStart = null;
+            this.updateToolButtons();
+            this.renderAll();
         });
 
         // Puzzle info
@@ -488,6 +494,8 @@ class PuzzleEditor {
             this.removeIsland(gridX, gridY);
         } else if (this.tool === 'bridge') {
             this.handleBridgePlacement(gridX, gridY);
+        } else if (this.tool === 'removeBridge') {
+            this.handleBridgeRemoval(gridX, gridY);
         }
     }
 
@@ -519,6 +527,27 @@ class PuzzleEditor {
             this.testBridges.push({ start, end, bridgeTypeId: this.selectedBridgeTypeId });
             this.bridgePlacementStart = null;
             this.renderAll();
+        }
+    }
+
+    private handleBridgeRemoval(gridX: number, gridY: number) {
+        if (this.testBridges.length === 0) return;
+
+        for (let i = this.testBridges.length - 1; i >= 0; i--) {
+            const bridge = this.testBridges[i];
+            const minX = Math.min(bridge.start.x, bridge.end.x);
+            const maxX = Math.max(bridge.start.x, bridge.end.x);
+            const minY = Math.min(bridge.start.y, bridge.end.y);
+            const maxY = Math.max(bridge.start.y, bridge.end.y);
+            const onBridge = bridge.start.x === bridge.end.x
+                ? gridX === bridge.start.x && gridY >= minY && gridY <= maxY
+                : gridY === bridge.start.y && gridX >= minX && gridX <= maxX;
+            if (!onBridge) continue;
+
+            this.testBridges.splice(i, 1);
+            this.bridgePlacementStart = null;
+            this.renderAll();
+            return;
         }
     }
 
@@ -716,6 +745,7 @@ class PuzzleEditor {
         if (this.tool === 'island') document.getElementById('addIslandBtn')?.classList.add('active');
         else if (this.tool === 'remove') document.getElementById('removeIslandBtn')?.classList.add('active');
         else if (this.tool === 'bridge') document.getElementById('addBridgeBtn')?.classList.add('active');
+        else if (this.tool === 'removeBridge') document.getElementById('removeBridgeBtn')?.classList.add('active');
     }
 
     private renderAll() {
@@ -746,8 +776,10 @@ class PuzzleEditor {
             ctx.stroke();
         }
 
-        // Constraint cell highlights and labels
-        this.renderConstraintLabels();
+        const constraintItems = getConstraintGridItems(this.puzzle.constraints, this.puzzle.islands);
+
+        // Constraint cell highlights
+        this.renderConstraintHighlights(constraintItems);
 
         // Test bridges
         this.renderTestBridges();
@@ -783,32 +815,46 @@ class PuzzleEditor {
             ctx.textBaseline = 'middle';
             ctx.fillText(island.id, ix, iy);
         });
+
+        // Draw labels above islands/bridges so bridge-count badges stay visible
+        this.renderConstraintBadges(constraintItems);
     }
 
-    private renderConstraintLabels() {
-        const items = getConstraintGridItems(this.puzzle.constraints, this.puzzle.islands);
-
-        // Group labels by cell position
+    private groupConstraintLabelsByPosition(items: Array<{ x: number; y: number; label: string }>): Map<string, string[]> {
         const byPos = new Map<string, string[]>();
         for (const item of items) {
             const key = `${item.x},${item.y}`;
             if (!byPos.has(key)) byPos.set(key, []);
             byPos.get(key)!.push(item.label);
         }
+        return byPos;
+    }
 
+    private renderConstraintHighlights(items: Array<{ x: number; y: number; label: string }>) {
+        const byPos = this.groupConstraintLabelsByPosition(items);
+        const ctx = this.ctx;
+        byPos.forEach((_labels, key) => {
+            const [gx, gy] = key.split(',').map(Number);
+            const cx = (gx - 0.5) * this.cellSize;
+            const cy = (gy - 0.5) * this.cellSize;
+            const half = this.cellSize / 2;
+
+            ctx.fillStyle = 'rgba(255, 193, 7, 0.15)';
+            ctx.fillRect(cx - half, cy - half, this.cellSize, this.cellSize);
+            ctx.strokeStyle = 'rgba(255, 150, 0, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(cx - half, cy - half, this.cellSize, this.cellSize);
+        });
+    }
+
+    private renderConstraintBadges(items: Array<{ x: number; y: number; label: string }>) {
+        const byPos = this.groupConstraintLabelsByPosition(items);
         const ctx = this.ctx;
         byPos.forEach((labels, key) => {
             const [gx, gy] = key.split(',').map(Number);
             const cx = (gx - 0.5) * this.cellSize;
             const cy = (gy - 0.5) * this.cellSize;
             const half = this.cellSize / 2;
-
-            // Soft yellow highlight for constrained cells
-            ctx.fillStyle = 'rgba(255, 193, 7, 0.15)';
-            ctx.fillRect(cx - half, cy - half, this.cellSize, this.cellSize);
-            ctx.strokeStyle = 'rgba(255, 150, 0, 0.4)';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(cx - half, cy - half, this.cellSize, this.cellSize);
 
             // Draw labels stacked at the top of the cell
             ctx.font = 'bold 10px monospace';
