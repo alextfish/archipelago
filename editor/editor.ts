@@ -816,7 +816,7 @@ class PuzzleEditor {
             ctx.fillText(island.id, ix, iy);
         });
 
-        // Draw labels above islands/bridges so bridge-count badges stay visible
+        // Draw constraint badges after islands so labels like B=3 remain visible
         this.renderConstraintBadges(constraintItems);
     }
 
