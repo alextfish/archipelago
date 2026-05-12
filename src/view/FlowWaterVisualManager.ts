@@ -159,6 +159,25 @@ export class FlowWaterVisualManager {
         }
     }
 
+    /**
+     * Replace non-display directional placeholder tiles (from the "water directions"
+     * tileset) with deterministic fallback water art so arrows are never visible.
+     *
+     * Also fills logic-backed tiles with fallback art when no authored visual tile exists.
+     * Dynamic FlowPuzzle updates still override these tiles as puzzle water changes.
+     */
+    normaliseStaticWaterTiles(): void {
+        for (const entry of this.displayManifest.entries.values()) {
+            const layerData = this.map.layers.find(layer => layer.name === entry.targetWaterLayerName);
+            const tileLayer = layerData?.tilemapLayer;
+            if (!tileLayer) continue;
+
+            const shouldUseFallback = entry.visualIsDirectionOnly || !entry.visualGID;
+            if (!shouldUseFallback || !entry.fallbackWaterGID) continue;
+            tileLayer.putTileAt(entry.fallbackWaterGID, entry.tileX, entry.tileY);
+        }
+    }
+
     // ── Private helpers ──────────────────────────────────────────────────────
 
     private updateWaterDisplayForTile(

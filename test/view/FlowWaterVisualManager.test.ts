@@ -115,4 +115,43 @@ describe('FlowWaterVisualManager water display composition', () => {
     expect(removeTileAt).toHaveBeenCalledWith(0, 0);
     expect(animationManager.setTileWaterState).toHaveBeenCalledWith('0,0', false);
   });
+
+  it('normalises direction-only and missing-visual tiles to fallback water art', () => {
+    const manifest: WaterDisplayManifest = {
+      entries: new Map([
+        ['0,0', {
+          key: '0,0',
+          tileX: 0,
+          tileY: 0,
+          logicLayerName: '',
+          targetWaterLayerName: 'River/water',
+          logicOutgoing: [],
+          visualGID: 201,
+          visualOutgoing: ['E'],
+          visualHasFlowDirections: true,
+          visualIsDirectionOnly: true,
+          fallbackWaterGID: 50,
+        }],
+        ['1,0', {
+          key: '1,0',
+          tileX: 1,
+          tileY: 0,
+          logicLayerName: 'River/waterflow',
+          targetWaterLayerName: 'River/water',
+          logicOutgoing: ['E'],
+          visualGID: undefined,
+          visualOutgoing: [],
+          visualHasFlowDirections: false,
+          visualIsDirectionOnly: false,
+          fallbackWaterGID: 51,
+        }],
+      ]),
+    };
+
+    const { manager, putTileAt } = makeManager(manifest);
+    manager.normaliseStaticWaterTiles();
+
+    expect(putTileAt).toHaveBeenNthCalledWith(1, 50, 0, 0);
+    expect(putTileAt).toHaveBeenNthCalledWith(2, 51, 1, 0);
+  });
 });

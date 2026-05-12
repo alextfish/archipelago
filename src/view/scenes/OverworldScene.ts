@@ -1311,6 +1311,7 @@ export class OverworldScene extends Phaser.Scene {
       (x, y) => this.isPermanentlyBlocked(x, y),
       this.waterAnimationManager,
     );
+    this.flowWaterManager.normaliseStaticWaterTiles();
   }
 
   update(_time: number, delta: number) {

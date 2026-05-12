@@ -36,7 +36,7 @@ export class WaterAnimationManager {
             const sprite = this.scene.add.sprite(x, y, animationKey, 0);
             sprite.setOrigin(0.5, 0.5);
             sprite.setVisible(false);
-            sprite.setDepth(1);
+            sprite.setDepth(this.resolveWaterLayerDepth(entry.targetWaterLayerName));
 
             this.spritesByTileKey.set(entry.key, sprite);
             this.animationByTileKey.set(entry.key, animationKey);
@@ -66,5 +66,10 @@ export class WaterAnimationManager {
             frameRate: FLOW_FRAME_RATE,
             repeat: -1,
         });
+    }
+
+    private resolveWaterLayerDepth(targetLayerName: string): number {
+        const layerData = this.map.layers.find(layer => layer.name === targetLayerName);
+        return layerData?.tilemapLayer?.depth ?? 0;
     }
 }

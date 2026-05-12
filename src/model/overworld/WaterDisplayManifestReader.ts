@@ -89,6 +89,40 @@ export class WaterDisplayManifestReader {
             }
         }
 
+        // Include visual-only direction placeholders so they can be normalised
+        // into fallback water art (arrows should never render directly).
+        for (const visualLayer of waterLayers) {
+            const groupPath = this.parentPath(visualLayer.fullPath);
+            const visualData: number[] = visualLayer.data?.data ?? visualLayer.data ?? [];
+            for (let i = 0; i < visualData.length; i++) {
+                if (entries.has(`${i % mapWidth},${Math.floor(i / mapWidth)}`)) continue;
+                const visualGID = visualData[i] ?? 0;
+                if (visualGID <= 0) continue;
+                if (!this.isWaterDirectionsTile(tiledMapData.tilesets, visualGID)) continue;
+
+                const tileX = i % mapWidth;
+                const tileY = Math.floor(i / mapWidth);
+                const key = `${tileX},${tileY}`;
+                const visualProps = TiledLayerUtils.getTileProperties(tiledMapData.tilesets, visualGID);
+                const visualOutgoing = TiledLayerUtils.flowDirectionsFromProperties(visualProps);
+                const fallbackWaterGID = this.pickStableFallbackWaterGID(tileX, tileY, groupPath, waterGIDs);
+
+                entries.set(key, {
+                    tileX,
+                    tileY,
+                    key,
+                    logicLayerName: '',
+                    targetWaterLayerName: visualLayer.fullPath,
+                    logicOutgoing: [],
+                    visualGID,
+                    visualOutgoing,
+                    visualHasFlowDirections: visualOutgoing.length > 0,
+                    visualIsDirectionOnly: true,
+                    fallbackWaterGID
+                });
+            }
+        }
+
         return { entries };
     }
 
