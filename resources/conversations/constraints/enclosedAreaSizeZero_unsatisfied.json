@@ -1,0 +1,18 @@
+{
+  "id": "enclosedAreaSizeZero_unsatisfied",
+  "start": "main",
+  "nodes": {
+    "main": {
+      "npc": {
+        "expression": "neutral",
+        "glyphs": "want no enclosed area"
+      },
+      "choices": [
+        {
+          "text": "Leave",
+          "end": true
+        }
+      ]
+    }
+  }
+}

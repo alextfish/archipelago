@@ -3,14 +3,25 @@ import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import { PuzzleController } from '@controller/PuzzleController';
 import type { PuzzleHost } from '@controller/PuzzleHost';
 import { Environment } from '@helpers/Environment';
-import puzzleData from '../../data/puzzles/simple4IslandPuzzle.json';
+import { emitTestEvent } from '@helpers/TestEvents';
+import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
+import type { IslandMapScene } from '@view/scenes/IslandMapScene';
 
 export class BridgePuzzleScene extends Phaser.Scene {
     private puzzle: BridgePuzzle | null = null;
     private controller: PuzzleController | null = null;
+    private puzzleData: any = null;
+    private seriesMode: boolean = false;
 
     constructor() {
         super({ key: 'BridgePuzzleScene' });
+    }
+
+    init(data?: { puzzleData?: any; seriesMode?: boolean }) {
+        if (data) {
+            this.puzzleData = data.puzzleData || null;
+            this.seriesMode = data.seriesMode || false;
+        }
     }
 
     preload() {
@@ -21,9 +32,36 @@ export class BridgePuzzleScene extends Phaser.Scene {
         });
     }
 
-    create() {
-        // Instantiate BridgePuzzle from spec
-        this.puzzle = new BridgePuzzle(puzzleData);
+    async create() {
+        let puzzleData;
+
+        // Use passed puzzle data if available (series mode), otherwise fetch default
+        if (this.puzzleData) {
+            puzzleData = this.puzzleData;
+            console.log('BridgePuzzleScene: Using provided puzzle data (series mode)');
+        } else {
+            // Fetch puzzle data from public directory
+            const response = await fetch('data/puzzles/simple4IslandPuzzle.json');
+            puzzleData = await response.json();
+            console.log('BridgePuzzleScene: Loaded default puzzle data');
+        }
+
+        try {
+            // Instantiate BridgePuzzle from spec
+            console.log('[BridgePuzzleScene] About to create BridgePuzzle from data:', puzzleData);
+            this.puzzle = new BridgePuzzle(puzzleData);
+            console.log('[BridgePuzzleScene] BridgePuzzle created successfully, id:', this.puzzle.id);
+
+            // Emit test event for automation (especially for series mode)
+            if (this.seriesMode) {
+                console.log(`[BridgePuzzleScene] Emitting puzzle_entered event for puzzle: ${this.puzzle.id}`);
+                emitTestEvent('puzzle_entered', { puzzleId: this.puzzle.id, seriesMode: true });
+                console.log('[BridgePuzzleScene] puzzle_entered event emitted');
+            }
+        } catch (error) {
+            console.error('[BridgePuzzleScene] Error creating BridgePuzzle:', error);
+            throw error;
+        }
 
         // Launch the IslandMapScene and pass it the puzzle
         console.log('BridgePuzzleScene: Launching IslandMapScene');
@@ -43,32 +81,27 @@ export class BridgePuzzleScene extends Phaser.Scene {
         const rendererProxy = this.createRendererProxy();
         this.controller = new PuzzleController(this.puzzle, rendererProxy, host);
 
-        // Launch the HUD scene which owns the sidebar UI. We'll communicate via
-        // scene events (clean separation between world and UI).
-        this.scene.launch('PuzzleHUDScene');
-        const hud = this.scene.get('PuzzleHUDScene');
+        // Show HUD using PuzzleHUDManager for proper setup (background, etc.)
+        PuzzleHUDManager.getInstance().enterPuzzle(this, this.controller, 'bridge');
 
-        // Wait until the HUD scene has finished initialising (it emits 'ready')
-        // before sending initial types/counts. This avoids racing where the
-        // BridgePuzzleScene emits events before PuzzleHUDScene.create() runs.
+        // Emit bridge types and counts for HUD
         const bridgeTypes = this.puzzle.getAvailableBridgeTypes();
         const counts = this.puzzle.availableCounts();
-        this.events.once('hudReady', () => {
-            this.events.emit('setTypes', bridgeTypes);
-            console.log('Sent bridge types to HUD:', bridgeTypes);
-            hud.events.emit('updateCounts', counts);
-            if (this.controller?.currentBridgeType) {
-                hud.events.emit('setSelectedType', this.controller.currentBridgeType.id);
-            }
-        });
+        this.events.emit('setTypes', bridgeTypes);
+        console.log('Sent bridge types to HUD:', bridgeTypes);
+        this.events.emit('updateCounts', counts);
+        if (this.controller?.currentBridgeType) {
+            this.events.emit('setSelectedType', this.controller.currentBridgeType.id);
+        }
 
         // Listen for HUD events (user actions)
+        const hud = this.scene.get('PuzzleHUDScene');
         hud.events.on('typeSelected', (typeId: string) => {
             const type = this.puzzle?.inventory.bridges.find(b => b.type.id === typeId)?.type;
             if (type) {
                 this.controller?.selectBridgeType(type);
                 // Notify HUD to update visual selection
-                hud.events.emit('setSelectedType', typeId);
+                this.events.emit('setSelectedType', typeId);
             }
         });
         hud.events.on('exit', () => this.controller?.exitPuzzle(false));
@@ -150,21 +183,20 @@ export class BridgePuzzleScene extends Phaser.Scene {
     }
 
     private createRendererProxy() {
-        const mapScene = this.scene.get('IslandMapScene');
+        const mapScene = this.scene.get('IslandMapScene') as IslandMapScene;
 
-        // Create a mock gridMapper that forwards coordinate conversion to IslandMapScene
+        // Delegate grid-to-world mapping to IslandMapScene's own GridToWorldMapper so
+        // the cell size and any offset are never duplicated here.
         const gridMapperProxy = {
             gridToWorld: (gridX: number, gridY: number) => {
-                // This needs to be synchronous, so we'll use a temporary solution
-                // For now, let's use the 32px cell size directly (matching IslandMapScene)
-                const cellSize = 32;
-                return { x: gridX * cellSize, y: gridY * cellSize };
+                return mapScene.getGridMapper()?.gridToWorld(gridX, gridY)
+                    ?? { x: gridX * 32, y: gridY * 32 };
             },
             worldToGrid: (worldX: number, worldY: number) => {
-                const cellSize = 32;
-                return { x: Math.floor(worldX / cellSize), y: Math.floor(worldY / cellSize) };
+                return mapScene.getGridMapper()?.worldToGrid(worldX, worldY)
+                    ?? { x: Math.floor(worldX / 32), y: Math.floor(worldY / 32) };
             },
-            getCellSize: () => 32
+            getCellSize: () => mapScene.getGridMapper()?.getCellSize() ?? 32
         };
 
         return {
@@ -177,6 +209,9 @@ export class BridgePuzzleScene extends Phaser.Scene {
             },
             previewBridge: (bridge: any, opts: any) => {
                 mapScene.events.emit('previewBridge', bridge, opts);
+            },
+            hidePreview: () => {
+                mapScene.events.emit('hidePreview');
             },
             setPlacing: (isPlacing: boolean) => {
                 mapScene.events.emit('setPlacing', isPlacing);
@@ -195,6 +230,12 @@ export class BridgePuzzleScene extends Phaser.Scene {
             },
             clearHighlights: () => {
                 mapScene.events.emit('clearHighlights');
+            },
+            showConstraintFeedback: (items: any[], puzzle: any) => {
+                mapScene.events.emit('showConstraintFeedback', items, puzzle);
+            },
+            hideConstraintFeedback: () => {
+                mapScene.events.emit('hideConstraintFeedback');
             },
             update: (dt: number) => {
                 mapScene.events.emit('updateRenderer', dt);
@@ -297,9 +338,13 @@ export class BridgePuzzleScene extends Phaser.Scene {
             },
             onPuzzleSolved: () => {
                 try { console.log('[PuzzleHost] onPuzzleSolved called (forwarding to HUD)'); } catch (e) { }
-                // Forward solved notification to the HUD scene so the overlay is drawn in UI space
-                const hud = this.scene.get('PuzzleHUDScene');
-                hud.events.emit('puzzleSolved');
+                // Forward solved notification to show "Puzzle Solved!" overlay
+                this.events.emit('puzzleSolved');
+                // Delay exit to allow message to be visible for 1.5 seconds
+                setTimeout(() => {
+                    console.log('[BridgePuzzleScene] Auto-exiting puzzle after delay');
+                    this.controller?.exitPuzzle(true);
+                }, 1500);
             },
             onPuzzleExited: (success: boolean) => this.onPuzzleExited(success),
             onNoBridgeTypeAvailable: (typeId: string) => this.onNoBridgeTypeAvailable(typeId),
@@ -318,8 +363,29 @@ export class BridgePuzzleScene extends Phaser.Scene {
     }
 
     onPuzzleExited(success: boolean): void {
-        // Log result (no overworld yet)
         console.log(`Puzzle exited: ${success ? 'solved' : 'unsolved'}`);
+
+        // If in series mode and puzzle was solved, notify OverworldScene
+        if (this.seriesMode && success && this.puzzle) {
+            console.log(`[BridgePuzzleScene] Series puzzle ${this.puzzle.id} completed, notifying OverworldScene`);
+            const overworldScene = this.scene.get('OverworldScene');
+            if (overworldScene) {
+                // Emit event that OverworldScene can listen for
+                overworldScene.events.emit('seriesPuzzleCompleted', {
+                    puzzleId: this.puzzle.id,
+                    success: true
+                });
+            }
+        }
+
+        // Hide HUD using PuzzleHUDManager
+        PuzzleHUDManager.getInstance().exitPuzzle();
+
+        // Stop IslandMapScene
+        this.scene.stop('IslandMapScene');
+
+        // Stop this scene
+        this.scene.stop();
     }
 
     onNoBridgeTypeAvailable(typeId: string): void {

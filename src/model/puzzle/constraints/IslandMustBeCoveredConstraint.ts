@@ -1,7 +1,7 @@
 import type { BridgePuzzle } from '../BridgePuzzle';
 import { Constraint } from './Constraint';
 import type { ConstraintResult } from './ConstraintResult';
-import type { Island } from '../Island';
+import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
 
 /**
  * Constraint for Ruins puzzle type: Islands with a "must_be_covered" marker
@@ -18,7 +18,7 @@ export class IslandMustBeCoveredConstraint extends Constraint {
     this.islandId = islandId;
   }
 
-  static fromSpec(params: { islandId: string; [key: string]: any }): IslandMustBeCoveredConstraint {
+  static fromSpec(params: { islandId: string;[key: string]: any }): IslandMustBeCoveredConstraint {
     return new IslandMustBeCoveredConstraint(params.islandId);
   }
 
@@ -64,5 +64,14 @@ export class IslandMustBeCoveredConstraint extends Constraint {
       message: ok ? undefined : `Island ${this.islandId} at (${island.x}, ${island.y}) must be covered by a bridge`,
       glyphMessage: ok ? undefined : "no bridge over island"
     };
+  }
+
+  protected override getCoreDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    const result = this.check(puzzle);
+    return [{
+      elementID: this.islandId,
+      glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "good"),
+      constraintType: 'IslandMustBeCoveredConstraint',
+    }];
   }
 }

@@ -1,0 +1,18 @@
+{
+  "id": "islandVisibility_satisfied",
+  "start": "main",
+  "nodes": {
+    "main": {
+      "npc": {
+        "expression": "happy",
+        "glyphs": "{{count}} island connected exclamation happy"
+      },
+      "choices": [
+        {
+          "text": "Leave",
+          "end": true
+        }
+      ]
+    }
+  }
+}

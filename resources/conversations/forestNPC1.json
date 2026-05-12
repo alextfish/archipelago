@@ -1,0 +1,38 @@
+{
+  "id": "forestNPC1",
+  "npcId": "npcForestSeries1",
+  "start": "intro",
+  "nodes": {
+    "intro": {
+      "npc": {
+        "expression": "neutral",
+        "glyphs": "you build bridge question"
+      },
+      "choices": [
+        {
+          "text": "I'll help",
+          "next": "helpAccepted"
+        },
+        {
+          "text": "Leave",
+          "end": true
+        }
+      ]
+    },
+    "helpAccepted": {
+      "npc": {
+        "expression": "happy",
+        "glyphs": "good happy"
+      },
+      "choices": [
+        {
+          "text": "Build",
+          "effects": [
+            { "type": "startSeries", "seriesId": "forestSeries1" }
+          ],
+          "end": true
+        }
+      ]
+    }
+  }
+}

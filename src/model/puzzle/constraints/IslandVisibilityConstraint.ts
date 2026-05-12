@@ -1,6 +1,7 @@
 import type { BridgePuzzle } from '../BridgePuzzle';
 import { Constraint } from './Constraint';
 import type { ConstraintResult } from './ConstraintResult';
+import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
 import type { Island } from '../Island';
 
 /**
@@ -13,6 +14,9 @@ import type { Island } from '../Island';
  *    connecting them with no gaps
  */
 export class IslandVisibilityConstraint extends Constraint {
+  override readonly conversationFile = 'constraints/islandVisibility_unsatisfied.json';
+  override readonly conversationFileSolved = 'constraints/islandVisibility_satisfied.json';
+
   private islandId: string;
   private expectedCount: number;
 
@@ -22,10 +26,10 @@ export class IslandVisibilityConstraint extends Constraint {
     this.expectedCount = expectedCount;
   }
 
-  static fromSpec(params: { 
-    islandId: string; 
+  static fromSpec(params: {
+    islandId: string;
     count: number;
-    [key: string]: any 
+    [key: string]: any
   }): IslandVisibilityConstraint {
     return new IslandVisibilityConstraint(params.islandId, params.count);
   }
@@ -49,16 +53,16 @@ export class IslandVisibilityConstraint extends Constraint {
     let glyphMessage: string | undefined;
     if (!ok) {
       if (actualCount < this.expectedCount) {
-        glyphMessage = "not-enough island connected";
+        glyphMessage = "see not-enough island";
       } else {
-        glyphMessage = "too-many island connected";
+        glyphMessage = "see too-many island";
       }
     }
 
     return {
       satisfied: ok,
       affectedElements: ok ? Array.from(visibleIslands) : [this.islandId, ...Array.from(visibleIslands)],
-      message: ok ? undefined : 
+      message: ok ? undefined :
         `Island ${this.islandId} requires ${this.expectedCount} visible islands, but has ${actualCount}`,
       glyphMessage
     };
@@ -66,7 +70,7 @@ export class IslandVisibilityConstraint extends Constraint {
 
   private countVisibleIslands(puzzle: BridgePuzzle, sourceIsland: Island): Set<string> {
     const visibleIslands = new Set<string>();
-    
+
     // Check all four directions: up, down, left, right
     const directions = [
       { dx: 0, dy: -1, name: 'up' },
@@ -77,9 +81,9 @@ export class IslandVisibilityConstraint extends Constraint {
 
     for (const dir of directions) {
       const islandsInDirection = this.findVisibleIslandsInDirection(
-        puzzle, 
-        sourceIsland, 
-        dir.dx, 
+        puzzle,
+        sourceIsland,
+        dir.dx,
         dir.dy
       );
       islandsInDirection.forEach(id => visibleIslands.add(id));
@@ -106,13 +110,13 @@ export class IslandVisibilityConstraint extends Constraint {
       currentY += dy;
 
       // Check bounds
-      if (currentX <= 0 || currentX >= puzzle.width || currentY <= 0 || currentY >= puzzle.height) {
+      if (currentX < 0 || currentX >= puzzle.width || currentY < 0 || currentY >= puzzle.height) {
         break;
       }
 
       // Find island at current position
       const islandAtPosition = puzzle.islands.find(i => i.x === currentX && i.y === currentY);
-      
+
       if (!islandAtPosition) {
         // No island at this position, continue stepping
         continue;
@@ -120,7 +124,7 @@ export class IslandVisibilityConstraint extends Constraint {
 
       // Found an island - check if there's a bridge connecting to previous island
       const bridgeExists = this.hasBridgeBetween(puzzle, previousIsland, islandAtPosition);
-      
+
       if (!bridgeExists) {
         // No bridge connection, stop searching in this direction
         break;
@@ -142,15 +146,25 @@ export class IslandVisibilityConstraint extends Constraint {
     return puzzle.placedBridges.some(bridge => {
       if (!bridge.start || !bridge.end) return false;
 
-      const connects1to2 = 
+      const connects1to2 =
         (bridge.start.x === island1.x && bridge.start.y === island1.y &&
-         bridge.end.x === island2.x && bridge.end.y === island2.y);
+          bridge.end.x === island2.x && bridge.end.y === island2.y);
 
-      const connects2to1 = 
+      const connects2to1 =
         (bridge.start.x === island2.x && bridge.start.y === island2.y &&
-         bridge.end.x === island1.x && bridge.end.y === island1.y);
+          bridge.end.x === island1.x && bridge.end.y === island1.y);
 
       return connects1to2 || connects2to1;
     });
+  }
+
+  protected override getCoreDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    const result = this.check(puzzle);
+    return [{
+      elementID: this.islandId,
+      glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "good"),
+      constraintType: 'IslandVisibilityConstraint',
+      requiredCount: this.expectedCount, conversationVariables: { count: String(this.expectedCount) },
+    }];
   }
 }

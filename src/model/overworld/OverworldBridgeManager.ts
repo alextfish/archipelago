@@ -2,16 +2,7 @@ import Phaser from 'phaser';
 import type { Bridge } from '@model/puzzle/Bridge';
 import type { OverworldGameState } from './OverworldGameState';
 import { BridgeSpriteFrames } from '@view/BridgeSpriteFrameRegistry';
-
-/**
- * Tracks which directions have bridges at a tile
- */
-interface TileConnections {
-    north: boolean;
-    east: boolean;
-    south: boolean;
-    west: boolean;
-}
+import { CollisionType } from './CollisionManager';
 
 /**
  * Manages rendering of completed puzzle bridges to the overworld tilemap.
@@ -19,31 +10,65 @@ interface TileConnections {
  */
 export class OverworldBridgeManager {
     private static readonly BRIDGES_LAYER_NAME = 'bridges';
+    private static readonly BRIDGE_TILESET_IMAGE = 'SproutLandsGrassIslands.png';
 
-    private tilesetFirstGid: number = 0;
+    private bridgeTilesetFirstGid: number = 0;
+
+    // Tile positions placed by bakePuzzleBridges, keyed by puzzleId.
+    // Used to reliably clear exactly the baked tiles on puzzle re-entry.
+    private bakedTilePositions: Map<string, Array<{ tileX: number; tileY: number }>> = new Map();
 
     constructor(
-        private map: Phaser.Tilemaps.Tilemap,
         private bridgesLayer: Phaser.Tilemaps.TilemapLayer,
-        private collisionLayer: Phaser.Tilemaps.TilemapLayer,
-        private collisionArray: boolean[][],
-        private tiledMapData: any
+        private tiledMapData: any,
+        private collisionManager: any // OverworldScene that has setCollisionAt method
     ) {
-        // Find the firstgid of the SproutLandsGrassIslands tileset
-        const tileset = this.map.getTileset('SproutLandsGrassIslands');
-        if (tileset) {
-            this.tilesetFirstGid = tileset.firstgid;
-            console.log(`OverworldBridgeManager: SproutLandsGrassIslands tileset firstgid = ${this.tilesetFirstGid}`);
+        // Find the bridge tileset by searching for the image filename
+        this.bridgeTilesetFirstGid = this.findBridgeTilesetFirstGid();
+        if (this.bridgeTilesetFirstGid > 0) {
+            // fine
         } else {
-            console.error('OverworldBridgeManager: Could not find SproutLandsGrassIslands tileset!');
+            console.error(`OverworldBridgeManager: Could not find tileset with image ${OverworldBridgeManager.BRIDGE_TILESET_IMAGE}`);
         }
+    }
+
+    /**
+     * Find the firstgid of the bridge tileset by searching for its image filename
+     */
+    private findBridgeTilesetFirstGid(): number {
+        // Search through all tilesets in the tiledMapData
+        if (!this.tiledMapData?.tilesets) {
+            console.warn('OverworldBridgeManager: No tilesets found in tiledMapData');
+            return 0;
+        }
+
+        for (const tilesetData of this.tiledMapData.tilesets) {
+            // Check if the tileset's image ends with our bridge tileset filename
+            if (tilesetData.image && tilesetData.image.endsWith(OverworldBridgeManager.BRIDGE_TILESET_IMAGE)) {
+                console.log(`OverworldBridgeManager: Found bridge tileset '${tilesetData.name}' with image ${tilesetData.image}`);
+                return tilesetData.firstgid;
+            }
+        }
+
+        return 0;
     }
 
     /**
      * Render completed puzzle bridges to the bridges layer
      * and update collision array to make them walkable.
-     * 
-     * Uses junction tiles when multiple bridges meet at the same tile.
+     *
+     * Each bridge is rendered tile-by-tile using the same start/middle/end/single
+     * frame logic as the overworld puzzle view, so the baked appearance exactly
+     * matches what the player saw while solving the puzzle.  Double-bridge frames
+     * (DOUBLE_BRIDGE_OFFSET) are used when two bridges share the same island pair.
+     *
+     * Single bridges (only one bridge between a pair of islands) receive narrow-passage
+     * collision on their body tiles (the squares strictly between the two island endpoints):
+     * - Vertical single bridges → NARROW_NS (passable north/south only)
+     * - Horizontal single bridges → NARROW_EW (passable east/west only)
+     * When multiple bridges span the same island pair every tile (including body tiles) is
+     * given full WALKABLE collision.
+     * Island endpoint tiles are always given full WALKABLE collision regardless.
      */
     bakePuzzleBridges(puzzleId: string, puzzleBounds: Phaser.Geom.Rectangle, bridges: Bridge[]): void {
         console.log(`OverworldBridgeManager: Baking ${bridges.length} bridges for puzzle ${puzzleId}`);
@@ -55,8 +80,29 @@ export class OverworldBridgeManager {
             return;
         }
 
-        // Phase 1: Collect all bridge segments and their connections at each tile
-        const tileConnectionsMap = new Map<string, TileConnections>();
+        // Check layer properties
+        const layerData = this.bridgesLayer.layer;
+        console.log(`  Layer dimensions: ${layerData.width}x${layerData.height}`);
+        console.log(`  Layer has data array: ${!!layerData.data}, length: ${layerData.data?.length}`);
+        if (layerData.data && layerData.data.length > 0) {
+            console.log(`  First row exists: ${!!layerData.data[0]}, length: ${layerData.data[0]?.length}`);
+        }
+
+        // Count how many bridges span each island pair so we know whether to use
+        // double-bridge frames and full WALKABLE or narrow-passage collision on body tiles.
+        const bridgeCountPerPair = this.countBridgesPerIslandPair(bridges);
+        const tileCollisionMap = this.buildTileCollisionMap(bridges, puzzleBounds, bridgeCountPerPair);
+
+        const tileWidth = this.tiledMapData.tilewidth as number;
+        const tileHeight = this.tiledMapData.tileheight as number;
+
+        // Ensure the position-tracking array exists for this puzzle.
+        if (!this.bakedTilePositions.has(puzzleId)) {
+            this.bakedTilePositions.set(puzzleId, []);
+        }
+        const bakedPositions = this.bakedTilePositions.get(puzzleId)!;
+
+        let tilesPlaced = 0;
 
         for (const bridge of bridges) {
             if (!bridge.start || !bridge.end) {
@@ -64,40 +110,88 @@ export class OverworldBridgeManager {
                 continue;
             }
 
-            // Add connections for this bridge
-            this.collectBridgeConnections(bridge, puzzleBounds, tileConnectionsMap);
-        }
+            const isHorizontal = bridge.start.y === bridge.end.y;
+            const pairKey = this.islandPairKey(bridge);
+            const isDouble = (bridgeCountPerPair.get(pairKey) ?? 1) > 1;
 
-        console.log(`  Collected connections for ${tileConnectionsMap.size} unique tiles`);
+            if (isHorizontal) {
+                const gridY = bridge.start.y;
+                const startX = Math.min(bridge.start.x, bridge.end.x);
+                const endX = Math.max(bridge.start.x, bridge.end.x);
+                const segCount = endX - startX + 1;
+                const tileY = Math.floor((puzzleBounds.y + gridY * tileHeight) / tileHeight);
 
-        // Phase 2: Place appropriate tiles based on collected connections
-        let tilesPlaced = 0;
-        for (const [tileKey, connections] of tileConnectionsMap.entries()) {
-            const [tileX, tileY] = tileKey.split(',').map(Number);
+                for (let gridX = startX; gridX <= endX; gridX++) {
+                    const i = gridX - startX;
+                    const tileX = Math.floor((puzzleBounds.x + gridX * tileWidth) / tileWidth);
 
-            // Determine which sprite frame to use based on connections
-            const tileIndex = this.getTileIndexForConnections(connections);
+                    let baseFrame: number;
+                    if (segCount === 1) {
+                        baseFrame = BridgeSpriteFrames.H_BRIDGE_SINGLE;
+                    } else if (i === 0) {
+                        baseFrame = BridgeSpriteFrames.H_BRIDGE_LEFT;
+                    } else if (i === segCount - 1) {
+                        baseFrame = BridgeSpriteFrames.H_BRIDGE_RIGHT;
+                    } else {
+                        baseFrame = BridgeSpriteFrames.H_BRIDGE_CENTRE;
+                    }
+                    const tileIndex = isDouble ? baseFrame + BridgeSpriteFrames.DOUBLE_BRIDGE_OFFSET : baseFrame;
+                    const gid = this.bridgeTilesetFirstGid + tileIndex;
 
-            // Convert texture frame index to tilemap GID
-            const gid = this.tilesetFirstGid + tileIndex;
+                    const tile = this.bridgesLayer.putTileAt(gid, tileX, tileY);
+                    if (tile) {
+                        tilesPlaced++;
+                        bakedPositions.push({ tileX, tileY });
+                    }
 
-            // Add bridge visual to bridges layer
-            const tile = this.bridgesLayer.putTileAt(gid, tileX, tileY);
-            if (tile) {
-                tilesPlaced++;
-                console.log(`    Placed junction tile frame=${tileIndex} -> GID=${gid} at (${tileX}, ${tileY}) with connections: ${this.connectionsToString(connections)}`);
-            }
+                    const tileKey = `${tileX},${tileY}`;
+                    const collisionType = tileCollisionMap.get(tileKey) ?? CollisionType.WALKABLE;
+                    // Preserve ALWAYS_HIGH — these island tiles are already walkable and must
+                    // remain immune to applyFlowWaterCollision; downgrading to WALKABLE would
+                    // allow wet-tile logic to subsequently block them.
+                    if (this.collisionManager.getCollisionAt(tileX, tileY) !== CollisionType.ALWAYS_HIGH) {
+                        this.collisionManager.setCollisionAt(tileX, tileY, collisionType);
+                    }
+                }
+            } else {
+                const gridX = bridge.start.x;
+                const startY = Math.min(bridge.start.y, bridge.end.y);
+                const endY = Math.max(bridge.start.y, bridge.end.y);
+                const segCount = endY - startY + 1;
+                const tileX = Math.floor((puzzleBounds.x + gridX * tileWidth) / tileWidth);
 
-            // Remove collision from the collision layer at this position
-            const collisionTile = this.collisionLayer.getTileAt(tileX, tileY);
-            if (collisionTile) {
-                collisionTile.setCollision(false, false, false, false);
-            }
+                for (let gridY = startY; gridY <= endY; gridY++) {
+                    const i = gridY - startY;
+                    const tileY = Math.floor((puzzleBounds.y + gridY * tileHeight) / tileHeight);
 
-            // Make walkable by updating collision array
-            if (tileY >= 0 && tileY < this.collisionArray.length &&
-                tileX >= 0 && tileX < this.collisionArray[tileY].length) {
-                this.collisionArray[tileY][tileX] = false;
+                    let baseFrame: number;
+                    if (segCount === 1) {
+                        baseFrame = BridgeSpriteFrames.V_BRIDGE_SINGLE;
+                    } else if (i === 0) {
+                        baseFrame = BridgeSpriteFrames.V_BRIDGE_TOP;
+                    } else if (i === segCount - 1) {
+                        baseFrame = BridgeSpriteFrames.V_BRIDGE_BOTTOM;
+                    } else {
+                        baseFrame = BridgeSpriteFrames.V_BRIDGE_MIDDLE;
+                    }
+                    const tileIndex = isDouble ? baseFrame + BridgeSpriteFrames.DOUBLE_BRIDGE_OFFSET : baseFrame;
+                    const gid = this.bridgeTilesetFirstGid + tileIndex;
+
+                    const tile = this.bridgesLayer.putTileAt(gid, tileX, tileY);
+                    if (tile) {
+                        tilesPlaced++;
+                        bakedPositions.push({ tileX, tileY });
+                    }
+
+                    const tileKey = `${tileX},${tileY}`;
+                    const collisionType = tileCollisionMap.get(tileKey) ?? CollisionType.WALKABLE;
+                    // Preserve ALWAYS_HIGH — these island tiles are already walkable and must
+                    // remain immune to applyFlowWaterCollision; downgrading to WALKABLE would
+                    // allow wet-tile logic to subsequently block them.
+                    if (this.collisionManager.getCollisionAt(tileX, tileY) !== CollisionType.ALWAYS_HIGH) {
+                        this.collisionManager.setCollisionAt(tileX, tileY, collisionType);
+                    }
+                }
             }
         }
 
@@ -105,125 +199,118 @@ export class OverworldBridgeManager {
     }
 
     /**
-     * Collect bridge connections at each tile position
+     * Build a normalised island-pair key for a bridge, independent of direction.
+     * Two bridges between the same pair of islands will produce the same key.
      */
-    private collectBridgeConnections(
-        bridge: Bridge,
+    private islandPairKey(bridge: Bridge): string {
+        if (!bridge.start || !bridge.end) return '';
+        const ax = bridge.start.x, ay = bridge.start.y;
+        const bx = bridge.end.x, by = bridge.end.y;
+        // Normalise so the lexically smaller endpoint always comes first.
+        if (ay < by || (ay === by && ax < bx)) {
+            return `${ax},${ay}-${bx},${by}`;
+        }
+        return `${bx},${by}-${ax},${ay}`;
+    }
+
+    /**
+     * Return a map from normalised island-pair key to the number of bridges that
+     * span that pair.  Only bridges with both start and end positions are counted.
+     */
+    private countBridgesPerIslandPair(bridges: Bridge[]): Map<string, number> {
+        const counts = new Map<string, number>();
+        for (const bridge of bridges) {
+            if (!bridge.start || !bridge.end) continue;
+            const key = this.islandPairKey(bridge);
+            counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
+        return counts;
+    }
+
+    /**
+     * Build a map from tile key ("tileX,tileY") to CollisionType for every tile
+     * covered by the given bridges.
+     *
+     * The entire map is constructed in a single pass over bridges (O(bridges × span)),
+     * rather than per-tile queries over all bridges.
+     *
+     * Rules, in priority order:
+     * - Island endpoint tiles → WALKABLE (always)
+     * - Body tiles of a multi-span bridge → WALKABLE
+     * - Body tiles of a single-span bridge → NARROW_NS (vertical) or NARROW_EW (horizontal)
+     * - WALKABLE is never downgraded: once a tile is set to WALKABLE by any bridge, later
+     *   bridges cannot make it narrow (e.g. a junction tile touched by two perpendicular
+     *   single-span bridges stays WALKABLE).
+     */
+    private buildTileCollisionMap(
+        bridges: Bridge[],
         puzzleBounds: Phaser.Geom.Rectangle,
-        tileConnectionsMap: Map<string, TileConnections>
-    ): void {
-        if (!bridge.start || !bridge.end) return;
+        bridgeCountPerPair: Map<string, number>
+    ): Map<string, CollisionType> {
+        const tileWidth = this.tiledMapData.tilewidth as number;
+        const tileHeight = this.tiledMapData.tileheight as number;
+        const collisionMap = new Map<string, CollisionType>();
 
-        const tileWidth = this.tiledMapData.tilewidth;
-        const tileHeight = this.tiledMapData.tileheight;
+        const setCollision = (key: string, type: CollisionType): void => {
+            // WALKABLE wins — never downgrade a tile that is already fully walkable.
+            if (collisionMap.get(key) === CollisionType.WALKABLE) return;
+            collisionMap.set(key, type);
+        };
 
-        // Determine if horizontal or vertical
-        const isHorizontal = bridge.start.y === bridge.end.y;
+        for (const bridge of bridges) {
+            if (!bridge.start || !bridge.end) continue;
 
-        if (isHorizontal) {
-            // Horizontal bridge
-            const y = bridge.start.y;
+            const isHorizontal = bridge.start.y === bridge.end.y;
             const startX = Math.min(bridge.start.x, bridge.end.x);
             const endX = Math.max(bridge.start.x, bridge.end.x);
-
-            for (let gridX = startX; gridX <= endX; gridX++) {
-                const worldX = puzzleBounds.x + gridX * 32;
-                const worldY = puzzleBounds.y + y * 32;
-                const tileX = Math.floor(worldX / tileWidth);
-                const tileY = Math.floor(worldY / tileHeight);
-                const tileKey = `${tileX},${tileY}`;
-
-                if (!tileConnectionsMap.has(tileKey)) {
-                    tileConnectionsMap.set(tileKey, { north: false, east: false, south: false, west: false });
-                }
-
-                const connections = tileConnectionsMap.get(tileKey)!;
-
-                // Mark connections based on position in bridge
-                if (gridX > startX) connections.west = true;  // Has segment to the west
-                if (gridX < endX) connections.east = true;    // Has segment to the east
-            }
-        } else {
-            // Vertical bridge
-            const x = bridge.start.x;
             const startY = Math.min(bridge.start.y, bridge.end.y);
             const endY = Math.max(bridge.start.y, bridge.end.y);
 
-            for (let gridY = startY; gridY <= endY; gridY++) {
-                const worldX = puzzleBounds.x + x * 32;
-                const worldY = puzzleBounds.y + gridY * 32;
-                const tileX = Math.floor(worldX / tileWidth);
-                const tileY = Math.floor(worldY / tileHeight);
-                const tileKey = `${tileX},${tileY}`;
+            const pairKey = this.islandPairKey(bridge);
+            const isMultiSpan = (bridgeCountPerPair.get(pairKey) ?? 1) > 1;
+            const narrowType = isHorizontal ? CollisionType.NARROW_EW : CollisionType.NARROW_NS;
 
-                if (!tileConnectionsMap.has(tileKey)) {
-                    tileConnectionsMap.set(tileKey, { north: false, east: false, south: false, west: false });
+            if (isHorizontal) {
+                const tileY = Math.floor((puzzleBounds.y + startY * tileHeight) / tileHeight);
+                for (let gridX = startX; gridX <= endX; gridX++) {
+                    const tileX = Math.floor((puzzleBounds.x + gridX * tileWidth) / tileWidth);
+                    const key = `${tileX},${tileY}`;
+                    const isEndpoint = (gridX === startX || gridX === endX);
+                    setCollision(key, isEndpoint || isMultiSpan ? CollisionType.WALKABLE : narrowType);
                 }
-
-                const connections = tileConnectionsMap.get(tileKey)!;
-
-                // Mark connections based on position in bridge
-                if (gridY > startY) connections.north = true;  // Has segment to the north
-                if (gridY < endY) connections.south = true;    // Has segment to the south
+            } else {
+                const tileX = Math.floor((puzzleBounds.x + startX * tileWidth) / tileWidth);
+                for (let gridY = startY; gridY <= endY; gridY++) {
+                    const tileY = Math.floor((puzzleBounds.y + gridY * tileHeight) / tileHeight);
+                    const key = `${tileX},${tileY}`;
+                    const isEndpoint = (gridY === startY || gridY === endY);
+                    setCollision(key, isEndpoint || isMultiSpan ? CollisionType.WALKABLE : narrowType);
+                }
             }
         }
+
+        return collisionMap;
     }
 
     /**
-     * Determine the appropriate tile index based on which directions have connections
+     * Remove exactly the tiles that were baked for this puzzle and reset their collision.
+     * Called when re-entering a previously-solved puzzle so no baked tiles linger
+     * underneath the dynamic puzzle renderer.
      */
-    private getTileIndexForConnections(connections: TileConnections): number {
-        const { north, east, south, west } = connections;
-        const count = [north, east, south, west].filter(Boolean).length;
-
-        // Four-way junction
-        if (count === 4) {
-            return BridgeSpriteFrames.BRIDGE_JUNCTION_N_E_W_S;
+    clearBakedTiles(puzzleId: string): void {
+        const positions = this.bakedTilePositions.get(puzzleId);
+        if (!positions || positions.length === 0) {
+            console.log(`OverworldBridgeManager: No baked tile positions recorded for puzzle ${puzzleId}`);
+            return;
         }
 
-        // Three-way junctions
-        if (count === 3) {
-            if (!north) return BridgeSpriteFrames.BRIDGE_JUNCTION_E_W_S;
-            if (!east) return BridgeSpriteFrames.BRIDGE_JUNCTION_N_W_S;
-            if (!south) return BridgeSpriteFrames.BRIDGE_JUNCTION_E_W_N;
-            if (!west) return BridgeSpriteFrames.BRIDGE_JUNCTION_N_E_S;
+        console.log(`OverworldBridgeManager: Clearing ${positions.length} baked tiles for puzzle ${puzzleId}`);
+
+        for (const { tileX, tileY } of positions) {
+            this.bridgesLayer.removeTileAt(tileX, tileY);
         }
 
-        // Corner (two perpendicular connections)
-        if (count === 2) {
-            if (north && east) return BridgeSpriteFrames.BRIDGE_CORNER_N_E;
-            if (north && west) return BridgeSpriteFrames.BRIDGE_CORNER_N_W;
-            if (south && east) return BridgeSpriteFrames.BRIDGE_CORNER_E_S;
-            if (south && west) return BridgeSpriteFrames.BRIDGE_CORNER_W_S;
-
-            // Straight bridge segment (two opposite connections)
-            if (north && south) return BridgeSpriteFrames.V_BRIDGE_MIDDLE;
-            if (east && west) return BridgeSpriteFrames.H_BRIDGE_CENTRE;
-        }
-
-        // Single connection (endpoint)
-        if (count === 1) {
-            // For vertical bridges: if north connection, this is the bottom end; if south connection, this is the top end
-            if (north) return BridgeSpriteFrames.V_BRIDGE_BOTTOM;
-            if (south) return BridgeSpriteFrames.V_BRIDGE_TOP;
-            if (east) return BridgeSpriteFrames.H_BRIDGE_LEFT;
-            if (west) return BridgeSpriteFrames.H_BRIDGE_RIGHT;
-        }
-
-        // No connections (shouldn't happen, but default to single tile)
-        return BridgeSpriteFrames.H_BRIDGE_SINGLE;
-    }
-
-    /**
-     * Convert connections to a readable string for debugging
-     */
-    private connectionsToString(connections: TileConnections): string {
-        const dirs: string[] = [];
-        if (connections.north) dirs.push('N');
-        if (connections.east) dirs.push('E');
-        if (connections.south) dirs.push('S');
-        if (connections.west) dirs.push('W');
-        return dirs.join('');
+        this.bakedTilePositions.delete(puzzleId);
     }
 
     /**
@@ -244,34 +331,13 @@ export class OverworldBridgeManager {
 
         console.log(`  Clearing tiles from (${minTileX},${minTileY}) to (${maxTileX},${maxTileY})`);
 
-        // Get the immutable collision layer to restore original values
-        const collisionLayer = this.map.getLayer('collision');
-        if (!collisionLayer) {
-            console.error('OverworldBridgeManager: No collision layer found in tilemap!');
-            return;
-        }
-
-        // Clear bridge tiles and restore collision
+        // Remove any bridge tiles from the visual layer.
+        // Collision restoration is handled separately by CollisionManager (restoreOriginalCollision
+        // and applyFlowWaterCollision) so that the puzzle entry/exit snapshot mechanism stays
+        // consistent and flow-tile walkability is correctly managed.
         for (let tileY = minTileY; tileY <= maxTileY; tileY++) {
             for (let tileX = minTileX; tileX <= maxTileX; tileX++) {
-                // Remove bridge tile
                 this.bridgesLayer.removeTileAt(tileX, tileY);
-
-                // Restore original collision from Tiled map's collision layer
-                const collisionTile = collisionLayer.tilemapLayer.getTileAt(tileX, tileY);
-                const hasCollision = collisionTile !== null;
-
-                // Restore collision on the physics collision layer
-                const physicsCollisionTile = this.collisionLayer.getTileAt(tileX, tileY);
-                if (physicsCollisionTile && hasCollision) {
-                    physicsCollisionTile.setCollision(true, true, true, true);
-                    console.log(`    Restored collision at (${tileX}, ${tileY})`);
-                }
-
-                if (tileY >= 0 && tileY < this.collisionArray.length &&
-                    tileX >= 0 && tileX < this.collisionArray[tileY].length) {
-                    this.collisionArray[tileY][tileX] = hasCollision;
-                }
             }
         }
 

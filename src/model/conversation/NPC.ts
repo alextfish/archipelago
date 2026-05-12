@@ -14,9 +14,13 @@ export class NPC {
     readonly name: string;
     readonly tileX: number;
     readonly tileY: number;
-    readonly language: string;           // 'grass' or 'fire'
-    readonly conversationFile?: string;  // Filename in resources/conversations/
-    readonly appearanceId: string;       // ID for looking up sprite in registry
+    readonly language: string;                  // 'grass' or 'fire'
+    readonly conversationFile?: string;         // Filename in resources/conversations/
+    readonly conversationFileSolved?: string;   // Conversation after series solved
+    readonly seriesFile?: string;               // Filename in src/data/series/
+    readonly appearanceId: string;              // ID for looking up sprite in registry
+    readonly conversationVariables?: Record<string, string>;  // Template variables for conversation glyphs
+    readonly animate: boolean;                  // Whether the NPC should play its idle animation
 
     constructor(
         id: string,
@@ -25,7 +29,11 @@ export class NPC {
         tileY: number,
         language: string,
         appearanceId: string,
-        conversationFile?: string
+        conversationFile?: string,
+        conversationFileSolved?: string,
+        seriesFile?: string,
+        conversationVariables?: Record<string, string>,
+        animate: boolean = false
     ) {
         this.id = id;
         this.name = name;
@@ -34,22 +42,51 @@ export class NPC {
         this.language = language;
         this.appearanceId = appearanceId;
         this.conversationFile = conversationFile;
+        this.conversationFileSolved = conversationFileSolved;
+        this.seriesFile = seriesFile;
+        this.conversationVariables = conversationVariables;
+        this.animate = animate;
     }
 
     /**
      * Check if this NPC has a conversation
      */
     hasConversation(): boolean {
-        return this.conversationFile !== undefined;
+        return this.conversationFile !== undefined || this.conversationFileSolved !== undefined;
+    }
+
+    /**
+     * Check if this NPC has a puzzle series
+     */
+    hasSeries(): boolean {
+        return this.seriesFile !== undefined;
     }
 
     /**
      * Get the full path to the conversation JSON file
+     * @param seriesSolved - Whether the series is solved (to select appropriate conversation)
      */
-    getConversationPath(): string {
-        if (!this.conversationFile) {
+    getConversationPath(seriesSolved: boolean = false): string {
+        const file = seriesSolved && this.conversationFileSolved
+            ? this.conversationFileSolved
+            : this.conversationFile;
+
+        if (!file) {
             throw new Error(`NPC ${this.id} has no conversation file`);
         }
-        return `resources/conversations/${this.conversationFile}`;
+        return `resources/conversations/${file}`;
+    }
+
+    /**
+     * Get the full path to the series JSON file
+     */
+    getSeriesPath(): string {
+        if (!this.seriesFile) {
+            throw new Error(`NPC ${this.id} has no series file`);
+        }
+        // Series files should be in public/data/series/ for runtime fetching
+        // Add .json extension if not present
+        const filename = this.seriesFile.endsWith('.json') ? this.seriesFile : `${this.seriesFile}.json`;
+        return `data/series/${filename}`;
     }
 }

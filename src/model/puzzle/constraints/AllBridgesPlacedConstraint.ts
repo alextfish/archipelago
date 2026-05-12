@@ -4,6 +4,8 @@ import type { ConstraintResult } from './ConstraintResult';
 
 
 export class AllBridgesPlacedConstraint extends Constraint {
+  override readonly personified: boolean = false;
+
   static fromSpec(_params: { [key: string]: any }): AllBridgesPlacedConstraint {
     return new AllBridgesPlacedConstraint();
   }

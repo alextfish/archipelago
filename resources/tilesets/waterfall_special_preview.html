@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Waterfall Preview</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --paper: #f3efe4;
+            --ink: #1d2a2f;
+            --accent: #2a8db8;
+            --panel: #fffaf0;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background:
+                radial-gradient(circle at top, rgba(42, 141, 184, 0.18), transparent 35%),
+                linear-gradient(180deg, #e4dfd2 0%, var(--paper) 100%);
+            color: var(--ink);
+            font-family: Georgia, 'Times New Roman', serif;
+        }
+
+        main {
+            display: grid;
+            gap: 12px;
+            justify-items: center;
+            padding: 24px;
+            border: 1px solid rgba(29, 42, 47, 0.12);
+            background: rgba(255, 250, 240, 0.9);
+            box-shadow: 0 16px 40px rgba(29, 42, 47, 0.14);
+        }
+
+        canvas {
+            width: 384px;
+            height: 512px;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            border: 2px solid rgba(29, 42, 47, 0.18);
+            background: #000;
+        }
+
+        p {
+            margin: 0;
+            font-size: 14px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <canvas id="preview" width="96" height="128"></canvas>
+        <p id="label">Frame 1 / 6</p>
+    </main>
+    <script>
+        const frameCount = 6;
+        const frameDurationMs = 200;
+        const frameWidth = 96;
+        const frameHeight = 128;
+        const image = new Image();
+        const canvas = document.getElementById('preview');
+        const label = document.getElementById('label');
+        const context = canvas.getContext('2d');
+        let frameIndex = 0;
+
+        function drawFrame() {
+            context.clearRect(0, 0, frameWidth, frameHeight);
+            context.drawImage(image, 0, frameIndex * frameHeight, frameWidth, frameHeight, 0, 0, frameWidth, frameHeight);
+            label.textContent = `Frame ${frameIndex + 1} / 6`;
+        }
+
+        image.addEventListener('load', () => {
+            drawFrame();
+            window.setInterval(() => {
+                frameIndex = (frameIndex + 1) % frameCount;
+                drawFrame();
+            }, frameDurationMs);
+        });
+
+        image.src = 'waterfall_special_32x32.png';
+    </script>
+</body>
+</html>

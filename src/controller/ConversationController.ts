@@ -8,12 +8,16 @@ import type { ConversationSpec, ConversationEffect } from '@model/conversation/C
 import type { NPC } from '@model/conversation/NPC';
 import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
 import { NPCAppearanceRegistry } from '@model/conversation/NPCAppearanceRegistry';
+import { emitTestEvent } from '@helpers/TestEvents';
 
 export interface ConversationHost {
     /**
-     * Display NPC dialogue with glyphs
+     * Display NPC dialogue with glyphs.
+     * @param glyphFramesByRow Array of sentences; each sentence is an array of
+     *   frame indices.  Multi-sentence speech bubbles are rendered with one row
+     *   per sentence.
      */
-    displayNPCLine(expression: string, glyphFrames: number[], language: string): void;
+    displayNPCLine(expression: string, glyphFramesByRow: number[][], language: string, customFrame?: string): void;
 
     /**
      * Display player choice options
@@ -42,6 +46,8 @@ export class ConversationController {
     private glyphRegistry: LanguageGlyphRegistry;
     private appearanceRegistry: NPCAppearanceRegistry;
     private currentNPC: NPC | null = null;
+    private currentConversationId: string | null = null;
+    private hostCleanupCalled: boolean = false;
 
     constructor(
         host: ConversationHost,
@@ -55,9 +61,14 @@ export class ConversationController {
 
     /**
      * Start a conversation with an NPC
-     * Conversations always reset to the beginning, even if previously completed
+     * Conversations always reset to the beginning, even if previously completed.
+     *
+     * @param spec        The conversation specification.
+     * @param npc         The NPC being spoken to.
+     * @param startNodeId Optional override for the starting node (used when a
+     *                    condition evaluator has already picked the right branch).
      */
-    startConversation(spec: ConversationSpec, npc: NPC): void {
+    startConversation(spec: ConversationSpec, npc: NPC, startNodeId?: string): void {
         if (this.state && !this.state.isEnded()) {
             console.warn('Starting new conversation while previous one is still active');
         }
@@ -65,8 +76,17 @@ export class ConversationController {
         console.log(`ConversationController: Starting conversation with ${npc.name}, spec:`, spec);
 
         // Always create a fresh state - conversations reset each time
-        this.state = new ConversationState(spec);
+        this.state = new ConversationState(spec, startNodeId);
         this.currentNPC = npc;
+        this.currentConversationId = spec.id;
+        this.hostCleanupCalled = false;
+
+        // Emit test event
+        emitTestEvent('conversation_started', {
+            conversationId: spec.id,
+            npcId: spec.npcId,
+            npcName: npc.name
+        });
 
         // Display the first node
         this.displayCurrentNode();
@@ -108,15 +128,14 @@ export class ConversationController {
                 if (node.npc) {
                     console.log('ConversationController: Displaying final node, will wait for dismissal');
                     this.displayCurrentNode();
-                    // Don't call onConversationEnd yet - wait for player to dismiss
+                    // Don't end yet - wait for player to dismiss by calling endConversation()
                     return;
                 }
             }
 
             // No transition to new node, or no final NPC line - end immediately
             console.log('ConversationController: Ending conversation immediately');
-            this.host.hideConversation();
-            this.host.onConversationEnd();
+            this.endConversation();
         } else {
             // Display next node
             this.displayCurrentNode();
@@ -138,13 +157,13 @@ export class ConversationController {
 
         // Display NPC line if present
         if (node.npc) {
-            const glyphFrames = this.glyphRegistry.parseGlyphs(
+            const glyphFramesByRow = this.glyphRegistry.parseGlyphsPerSentence(
                 this.currentNPC.language,
                 node.npc.glyphs
             );
 
-            console.log(`ConversationController: Displaying NPC line with ${glyphFrames.length} glyphs`);
-            this.host.displayNPCLine(expression, glyphFrames, this.currentNPC.language);
+            console.log(`ConversationController: Displaying NPC line with ${glyphFramesByRow.length} sentence(s)`);
+            this.host.displayNPCLine(expression, glyphFramesByRow, this.currentNPC.language, node.npc.frame);
         }
 
         // Always display choices (even if empty) to clear old buttons
@@ -159,18 +178,31 @@ export class ConversationController {
 
     /**
      * End the current conversation
+     * Emits test event, calls host cleanup methods (if not already called), and clears internal state
      */
     endConversation(): void {
         if (!this.state) {
             return;
         }
 
-        this.host.hideConversation();
-        this.host.onConversationEnd();
+        // Emit test event before clearing state
+        emitTestEvent('conversation_ended', {
+            conversationId: this.currentConversationId,
+            npcId: this.currentNPC?.id,
+            completed: this.state.isEnded()
+        });
+
+        // Call host cleanup methods if not already called
+        if (!this.hostCleanupCalled) {
+            this.host.hideConversation();
+            this.host.onConversationEnd();
+        }
 
         // Clear state
         this.state = null;
         this.currentNPC = null;
+        this.currentConversationId = null;
+        this.hostCleanupCalled = false;
     }
 
     /**
@@ -216,5 +248,26 @@ export class ConversationController {
      */
     getAppearanceRegistry(): NPCAppearanceRegistry {
         return this.appearanceRegistry;
+    }
+
+    /**
+     * Move keyboard focus to the next choice on the current node
+     */
+    focusNextChoice(): void {
+        this.state?.focusNextChoice();
+    }
+
+    /**
+     * Move keyboard focus to the previous choice on the current node
+     */
+    focusPreviousChoice(): void {
+        this.state?.focusPreviousChoice();
+    }
+
+    /**
+     * Get the index of the currently keyboard-focused choice, or null if none
+     */
+    getFocusedChoiceIndex(): number | null {
+        return this.state?.getFocusedChoiceIndex() ?? null;
     }
 }

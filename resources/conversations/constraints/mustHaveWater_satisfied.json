@@ -1,0 +1,18 @@
+{
+  "id": "mustHaveWater_satisfied",
+  "start": "main",
+  "nodes": {
+    "main": {
+      "npc": {
+        "expression": "happy",
+        "glyphs": "good water"
+      },
+      "choices": [
+        {
+          "text": "Leave",
+          "end": true
+        }
+      ]
+    }
+  }
+}

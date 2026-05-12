@@ -1,0 +1,18 @@
+{
+  "id": "islandVisibility_unsatisfied",
+  "start": "main",
+  "nodes": {
+    "main": {
+      "npc": {
+        "expression": "neutral",
+        "glyphs": "me want see {{count}} island"
+      },
+      "choices": [
+        {
+          "text": "Leave",
+          "end": true
+        }
+      ]
+    }
+  }
+}

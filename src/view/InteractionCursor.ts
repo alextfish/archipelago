@@ -3,7 +3,7 @@ import Phaser from 'phaser';
 /**
  * Type of interactable object
  */
-export type InteractableType = 'puzzle' | 'npc' | 'lever';
+export type InteractableType = 'puzzle' | 'npc' | 'lever' | 'collectible';
 
 /**
  * Represents an interactable object in the world

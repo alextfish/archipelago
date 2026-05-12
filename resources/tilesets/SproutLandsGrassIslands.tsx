@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<tileset version="1.10" tiledversion="1.11.2" name="SproutLandsGrassIslands" tilewidth="32" tileheight="32" tilecount="77" columns="11">
- <image source="SproutLandsGrassIslands.png" width="353" height="224"/>
+<tileset version="1.10" tiledversion="1.11.2" name="SproutLandsGrassIslands" tilewidth="32" tileheight="32" tilecount="99" columns="11">
+ <image source="SproutLandsGrassIslands.png" width="352" height="288"/>
  <wangsets>
   <wangset name="Land 2" type="corner" tile="-1">
    <wangcolor name="water" color="#ff0000" tile="-1" probability="1"/>

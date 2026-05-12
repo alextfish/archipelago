@@ -4,6 +4,9 @@ import { PuzzleHUDScene } from "@view/scenes/PuzzleHUDScene";
 import { IslandMapScene } from "@view/scenes/IslandMapScene";
 import { OverworldScene } from "@view/scenes/OverworldScene";
 import { ConversationScene } from "@view/scenes/ConversationScene";
+import { TranslationModeScene } from "@view/scenes/TranslationModeScene";
+import { OverworldHUDScene } from "@view/scenes/OverworldHUDScene";
+import { getPlayerPosition, getNPCSpriteStatus } from "@helpers/TestEvents";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -15,14 +18,15 @@ const config: Phaser.Types.Core.GameConfig = {
   render: {
     antialias: false
   },
-  physics: {
-    default: 'arcade',
-    arcade: {
-      gravity: { x: 0, y: 0 },  // No gravity for top-down view
-      debug: false
-    }
+  dom: {
+    createContainer: true,
   },
-  scene: [OverworldScene, ConversationScene, BridgePuzzleScene, PuzzleHUDScene, IslandMapScene],
+  scene: [OverworldScene, ConversationScene, BridgePuzzleScene, PuzzleHUDScene, IslandMapScene, OverworldHUDScene, TranslationModeScene],
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+// Expose game instance and test helpers to window for E2E tests
+(window as any).game = game;
+(window as any).getPlayerPosition = getPlayerPosition;
+(window as any).getNPCSpriteStatus = getNPCSpriteStatus;

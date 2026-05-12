@@ -1,6 +1,7 @@
 import type { BridgePuzzle } from '../BridgePuzzle';
 import { Constraint } from './Constraint';
 import type { ConstraintResult } from './ConstraintResult';
+import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
 import type { Island } from '../Island';
 
 /**
@@ -15,6 +16,8 @@ import type { Island } from '../Island';
  * - "adjacent": total count of bridges passing directly adjacent (one cell away) in any direction
  */
 export class IslandPassingBridgeCountConstraint extends Constraint {
+  override readonly conversationFile = 'constraints/islandPassingBridgeCount_unsatisfied.json';
+  override readonly conversationFileSolved = 'constraints/islandPassingBridgeCount_satisfied.json';
   private islandId: string;
   private direction: 'above' | 'below' | 'left' | 'right' | 'adjacent';
   private expectedCount: number;
@@ -26,11 +29,11 @@ export class IslandPassingBridgeCountConstraint extends Constraint {
     this.expectedCount = expectedCount;
   }
 
-  static fromSpec(params: { 
-    islandId: string; 
+  static fromSpec(params: {
+    islandId: string;
     direction: string;
     count: number;
-    [key: string]: any 
+    [key: string]: any
   }): IslandPassingBridgeCountConstraint {
     return new IslandPassingBridgeCountConstraint(params.islandId, params.direction, params.count);
   }
@@ -64,7 +67,7 @@ export class IslandPassingBridgeCountConstraint extends Constraint {
     return {
       satisfied: ok,
       affectedElements: ok ? passingBridges.map(b => b.id) : [this.islandId, ...passingBridges.map(b => b.id)],
-      message: ok ? undefined : 
+      message: ok ? undefined :
         `Island ${this.islandId} requires ${this.expectedCount} bridges passing ${this.direction}, but has ${actualCount}`,
       glyphMessage
     };
@@ -77,14 +80,14 @@ export class IslandPassingBridgeCountConstraint extends Constraint {
       if (!bridge.start || !bridge.end) continue;
 
       // Skip bridges connected to this island
-      const connectedToIsland = 
+      const connectedToIsland =
         (bridge.start.x === island.x && bridge.start.y === island.y) ||
         (bridge.end.x === island.x && bridge.end.y === island.y);
-      
+
       if (connectedToIsland) continue;
 
       const passes = this.bridgePassesInDirection(
-        bridge as { start: { x: number; y: number }; end: { x: number; y: number } }, 
+        bridge as { start: { x: number; y: number }; end: { x: number; y: number } },
         island
       );
       if (passes) {
@@ -146,5 +149,44 @@ export class IslandPassingBridgeCountConstraint extends Constraint {
     }
 
     return false;
+  }
+
+  /** Maps direction to the glyph word used in speech bubble messages. */
+  private directionGlyphWord(): string {
+    switch (this.direction) {
+      case 'above': return 'above';
+      case 'below': return 'below';
+      case 'left': return 'left-of';
+      case 'right': return 'right-of';
+      case 'adjacent': return 'adjacent';
+    }
+  }
+
+  /** Maps direction to the compass_overlay frame index (0=N, 1=E, 2=S, 3=W, 5=adjacent). */
+  private directionCompassFrame(): number {
+    switch (this.direction) {
+      case 'above': return 0;
+      case 'right': return 1;
+      case 'below': return 2;
+      case 'left': return 3;
+      case 'adjacent': return 5;
+    }
+  }
+
+  protected override getCoreDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    const island = puzzle.islands.find(i => i.id === this.islandId);
+    if (!island) return [];
+    const result = this.check(puzzle);
+    const compassFrame = this.directionCompassFrame();
+    const conversationVariables = { count: String(this.expectedCount), direction: this.directionGlyphWord() };
+    if (result.satisfied) {
+      return [{ elementID: this.islandId, glyphMessage: "good", constraintType: 'IslandPassingBridgeCountConstraint', requiredCount: this.expectedCount, compassFrame, conversationVariables }];
+    }
+    const dirWord = this.directionGlyphWord();
+    const passingBridges = this.findPassingBridges(puzzle, island);
+    const actualCount = passingBridges.length;
+    const prefix = actualCount < this.expectedCount ? "not-enough" : "too-many";
+    const glyphMessage = `${prefix} bridge ${dirWord} island`;
+    return [{ elementID: this.islandId, glyphMessage, constraintType: 'IslandPassingBridgeCountConstraint', requiredCount: this.expectedCount, compassFrame, conversationVariables }];
   }
 }

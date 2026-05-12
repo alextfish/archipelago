@@ -2,6 +2,7 @@
 import type { BridgeType } from "@model/puzzle/BridgeType";
 import type { BridgePuzzle } from "../model/puzzle/BridgePuzzle";
 import type { Bridge } from "@model/puzzle/Bridge";
+import type { ConstraintDisplayItem } from "@model/puzzle/constraints/ConstraintDisplayItem";
 
 export interface PuzzleRenderer {
   /** Called once when session begins to let renderer create sprites. */
@@ -23,6 +24,15 @@ export interface PuzzleRenderer {
   highlightViolations(ids: string[]): void;
   flashInvalidPlacement(start: { x: number; y: number }, end: { x: number; y: number }): void;
   clearHighlights(): void;
+
+  /**
+   * Show constraint feedback: an NPC sprite and speech bubble next to each
+   * constrained element. Called whenever all bridges are placed.
+   */
+  showConstraintFeedback(items: ConstraintDisplayItem[], puzzle: BridgePuzzle): void;
+  /** Hide constraint feedback (called when not all bridges are placed). */
+  hideConstraintFeedback(): void;
+
   /** Per-frame update if needed for animations. */
   update(dt: number): void;
   /** Tear down (remove sprites) */
@@ -91,19 +101,6 @@ export function normalizeRenderOrder(start: { x: number; y: number }, end: { x: 
     // vertical: lower (greater y) should be start
     if (start.y >= end.y) return { start, end };
     return { start: { x: end.x, y: end.y }, end: { x: start.x, y: start.y } };
-  }
-}
-
-
-function getBridgeColour(colour?: string): number {
-  // Convert colour name to hex colour
-  switch (colour?.toLowerCase()) {
-    case 'black': return 0x000000;
-    case 'red': return 0xff0000;
-    case 'blue': return 0x0000ff;
-    case 'yellow': return 0xffff00;
-    case 'green': return 0x00ff00;
-    default: return 0x000000;
   }
 }
 

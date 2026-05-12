@@ -12,11 +12,20 @@ import type { ConversationSpec, ConversationEffect } from '@model/conversation/C
 import type { NPC } from '@model/conversation/NPC';
 import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
 import { NPCAppearanceRegistry } from '@model/conversation/NPCAppearanceRegistry';
+import { attachTestMarker, isTestMode } from '@helpers/TestMarkers';
+import { loadNPCSprites } from '../NPCSpriteHelper';
+import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
 
 export class ConversationScene extends Phaser.Scene implements ConversationHost {
     private controller: ConversationController | null = null;
     private glyphRegistry: LanguageGlyphRegistry;
     private appearanceRegistry: NPCAppearanceRegistry;
+    /** Optional glyph tracker injected by OverworldScene for Translation Mode. */
+    private glyphTracker: ActiveGlyphTracker | null = null;
+
+    // Debounce for confirm key to prevent rapid-fire advancement
+    private lastConfirmTime = 0;
+    private readonly CONFIRM_DEBOUNCE_MS = 300;
 
     // UI elements
     private overlay: Phaser.GameObjects.Rectangle | null = null;
@@ -34,13 +43,28 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     private readonly CHOICE_HEIGHT = 60;
     private readonly CHOICE_SPACING = 20;
     private readonly CHOICE_WIDTH = 280; // Narrower for horizontal layout
-    private readonly PORTRAIT_SCALE = 4;
+    private readonly PORTRAIT_SIZE = 96;
+    private readonly PORTRAIT_SCALE = 2;
     private readonly PORTRAIT_PADDING = 20;
 
     constructor() {
         super({ key: 'ConversationScene' });
         this.glyphRegistry = new LanguageGlyphRegistry();
         this.appearanceRegistry = new NPCAppearanceRegistry();
+    }
+
+    /**
+     * Wire up an ActiveGlyphTracker so that speech bubbles register their
+     * glyphs for Translation Mode.  Call this from OverworldScene before
+     * (or when) launching a conversation.
+     */
+    setGlyphTracker(tracker: ActiveGlyphTracker): void {
+        this.glyphTracker = tracker;
+        // If the speech bubble already exists (scene was already created),
+        // pass the tracker to it immediately.
+        if (this.speechBubble) {
+            this.speechBubble.setGlyphTracker(tracker);
+        }
     }
 
     /**
@@ -56,20 +80,8 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
             });
         }
 
-        // Load NPC sprites (sailorNS and sailorEW)
-        // TODO: Load these based on which NPCs are in the game
-        const npcAppearances = ['sailorNS', 'sailorEW'];
-        for (const appearanceId of npcAppearances) {
-            if (this.appearanceRegistry.hasAppearance(appearanceId)) {
-                const spritePath = this.appearanceRegistry.getSpritePath(appearanceId);
-                if (!this.textures.exists(appearanceId)) {
-                    this.load.spritesheet(appearanceId, spritePath, {
-                        frameWidth: 32,
-                        frameHeight: 32,
-                    });
-                }
-            }
-        }
+        // Load all NPC spritesheets and face portraits
+        loadNPCSprites(this.load);
     }
 
     /**
@@ -91,15 +103,27 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         // Create speech bubble
         this.speechBubble = new SpeechBubble(this, this.TILESET_KEY);
         this.speechBubble.setDepth(10);
+        // If a tracker was provided before create() was called, wire it up now
+        if (this.glyphTracker) {
+            this.speechBubble.setGlyphTracker(this.glyphTracker);
+        }
+
+        // Set up keyboard navigation for choices
+        this.setupKeyboardNavigation();
 
         // Initially hidden
         this.setVisible(false);
     }
 
     /**
-     * Start a conversation with an NPC
+     * Start a conversation with an NPC.
+     *
+     * @param spec        The conversation specification.
+     * @param npc         The NPC being spoken to.
+     * @param startNodeId Optional override for the starting node (used when a
+     *                    condition evaluator has already resolved the branch).
      */
-    startConversation(spec: ConversationSpec, npc: NPC): void {
+    startConversation(spec: ConversationSpec, npc: NPC, startNodeId?: string): void {
         console.log('ConversationScene: startConversation called', { spec, npc });
 
         this.currentNPC = npc;
@@ -127,30 +151,50 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
 
         // Start conversation through controller
         console.log('ConversationScene: Starting conversation through controller');
-        this.controller.startConversation(spec, npc);
+        this.controller.startConversation(spec, npc, startNodeId);
 
         console.log('ConversationScene: startConversation complete');
     }    /**
      * ConversationHost interface: Display NPC line
      */
-    displayNPCLine(expression: string, glyphFrames: number[], language: string): void {
-        console.log('ConversationScene: displayNPCLine called', { expression, glyphFrames: glyphFrames.length, language });
+    displayNPCLine(expression: string, glyphFramesByRow: number[][], language: string, customFrame?: string): void {
+        console.log('ConversationScene: displayNPCLine called', { expression, sentenceCount: glyphFramesByRow.length, language, customFrame });
 
         if (!this.speechBubble) return;
 
         // Create/update speech bubble with 2x scale
-        this.speechBubble.create(glyphFrames, language, this.glyphRegistry, this.SPEECH_BUBBLE_SCALE);
+        this.speechBubble.create(glyphFramesByRow, language, this.glyphRegistry, this.SPEECH_BUBBLE_SCALE);
 
-        // Center the speech bubble horizontally (accounting for scale)
-        const bubbleWidth = (glyphFrames.length + 2) * 32 * this.SPEECH_BUBBLE_SCALE;
+        // Width is determined by the longest sentence; height by the number of sentences
+        const maxSentenceLength = glyphFramesByRow.reduce((max, row) => Math.max(max, row.length), 0);
+        const bubbleWidth = (maxSentenceLength + 2) * 32 * this.SPEECH_BUBBLE_SCALE;
         const bubbleX = (this.scale.width - bubbleWidth) / 2;
         this.speechBubble.setPosition(bubbleX, this.SPEECH_BUBBLE_Y);
         this.speechBubble.setVisible(true);
 
         console.log('ConversationScene: Speech bubble displayed');
 
-        // TODO: Update NPC sprite expression
-        // For now, we'll implement sprite display later
+        // Update NPC portrait
+        if (this.npcPortrait && this.currentNPC) {
+            let frameKey = customFrame;
+
+            // If no custom frame provided, try to get face texture from appearance registry
+            if (!frameKey) {
+                const faceKey = this.appearanceRegistry.getFaceTextureKey(
+                    this.currentNPC.appearanceId,
+                    expression
+                );
+
+                // Only use face texture if it exists
+                if (faceKey && this.textures.exists(faceKey)) {
+                    frameKey = faceKey;
+                }
+            }
+
+            if (frameKey) {
+                this.updatePortraitFrame(this.npcPortrait, frameKey);
+            }
+        }
     }
 
     /**
@@ -178,6 +222,20 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
             );
             button.setDepth(10);
             this.choiceButtons.push(button);
+
+            // Add test marker for automation
+            if (isTestMode()) {
+                attachTestMarker(this, button, {
+                    id: 'choice-leave',
+                    testId: 'choice-leave',
+                    width: this.CHOICE_WIDTH,
+                    height: this.CHOICE_HEIGHT,
+                    showBorder: true,
+                    onClick: () => this.onContinueClicked()
+                });
+                console.log('[TEST] Added test marker for Leave button');
+            }
+
             console.log('ConversationScene: [Leave] button created');
             return;
         }
@@ -201,8 +259,28 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
             button.setDepth(10);
             this.choiceButtons.push(button);
 
+            // Add test marker for automation
+            if (isTestMode()) {
+                // Normalize choice text to create a valid ID (remove spaces, special chars)
+                const normalizedText = choice.text.toLowerCase().replace(/[^a-z0-9]/g, '-');
+                attachTestMarker(this, button, {
+                    id: `choice-${choice.index}-${normalizedText}`,
+                    testId: `choice-${normalizedText}`,
+                    width: this.CHOICE_WIDTH,
+                    height: this.CHOICE_HEIGHT,
+                    showBorder: true,
+                    onClick: () => this.onChoiceSelected(choice.index)
+                });
+                console.log(`[TEST] Added test marker for choice: "${choice.text}" (choice-${normalizedText})`);
+            }
+
             currentX += this.CHOICE_WIDTH + this.CHOICE_SPACING;
         }
+
+        // Auto-focus the first choice so E/SPACE immediately selects it without
+        // requiring the player to press Left/Right first.
+        this.controller?.focusNextChoice();
+        this.updateChoiceFocus();
 
         console.log('ConversationScene: Choice buttons created');
     }
@@ -226,6 +304,9 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
      */
     private onContinueClicked(): void {
         console.log('ConversationScene: Continue button clicked, ending conversation');
+        if (this.controller) {
+            this.controller.endConversation(); // Emit test event and clear state
+        }
         this.hideConversation();
         this.onConversationEnd();
     }
@@ -266,6 +347,7 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
      */
     onConversationEnd(): void {
         console.log('ConversationScene: onConversationEnd called');
+
         // Notify overworld that conversation has ended
         this.events.emit('conversationEnded');
     }
@@ -301,6 +383,60 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     forceEndConversation(): void {
         if (this.controller) {
             this.controller.forceEnd();
+        }
+    }
+
+    /**
+     * Set up keyboard listeners for navigating and selecting conversation choices.
+     * LEFT/RIGHT arrows cycle focus; E or SPACE confirms the focused choice.
+     */
+    private setupKeyboardNavigation(): void {
+        if (!this.input.keyboard) return;
+
+        this.input.keyboard.on('keydown-LEFT', () => {
+            if (!this.controller?.isActive()) return;
+            this.controller.focusPreviousChoice();
+            this.updateChoiceFocus();
+        });
+
+        this.input.keyboard.on('keydown-RIGHT', () => {
+            if (!this.controller?.isActive()) return;
+            this.controller.focusNextChoice();
+            this.updateChoiceFocus();
+        });
+
+        for (const key of ['keydown-E', 'keydown-SPACE']) {
+            this.input.keyboard.on(key, () => this.onConfirmKey());
+        }
+    }
+
+    /**
+     * Handle E or SPACE key press: select focused choice, or trigger leave if only
+     * the leave button is showing.
+     */
+    private onConfirmKey(): void {
+        const now = Date.now();
+        if (now - this.lastConfirmTime < this.CONFIRM_DEBOUNCE_MS) return;
+        this.lastConfirmTime = now;
+
+        const focusedIndex = this.controller?.isActive()
+            ? this.controller.getFocusedChoiceIndex()
+            : null;
+
+        if (focusedIndex !== null) {
+            this.onChoiceSelected(focusedIndex);
+        } else if (this.choiceButtons.length === 1) {
+            this.onContinueClicked();
+        }
+    }
+
+    /**
+     * Update choice button highlight colours to reflect the current keyboard focus.
+     */
+    private updateChoiceFocus(): void {
+        const focusedIndex = this.controller?.getFocusedChoiceIndex() ?? null;
+        for (let i = 0; i < this.choiceButtons.length; i++) {
+            this.choiceButtons[i].setFocused(i === focusedIndex);
         }
     }
 
@@ -341,9 +477,9 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         // Create player portrait (top right)
         // TODO: Get player sprite key from game state
         this.playerPortrait = this.createPortrait(
-            'builder', // Player sprite key
+            'player_face', // Player sprite key
             0, // neutral frame
-            this.scale.width - this.PORTRAIT_PADDING - (32 * this.PORTRAIT_SCALE),
+            this.scale.width - this.PORTRAIT_PADDING - (this.PORTRAIT_SIZE * this.PORTRAIT_SCALE),
             this.PORTRAIT_PADDING
         );
     }
@@ -355,7 +491,7 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         const container = this.add.container(x, y);
 
         // Create border background (slightly larger than sprite)
-        const spriteSize = 32 * this.PORTRAIT_SCALE;
+        const spriteSize = this.PORTRAIT_SIZE * this.PORTRAIT_SCALE;
         const borderPadding = 4;
         const borderSize = spriteSize + (borderPadding * 2);
 
@@ -379,5 +515,16 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         container.setDepth(15); // Above other UI elements
 
         return container;
+    }
+
+    /**
+     * Update portrait to use a different sprite frame
+     */
+    private updatePortraitFrame(portrait: Phaser.GameObjects.Container, spriteKey: string): void {
+        // Get the sprite from the container (index 1, after the border)
+        const sprite = portrait.getAt(1) as Phaser.GameObjects.Sprite;
+        if (sprite) {
+            sprite.setTexture(spriteKey, 0);
+        }
     }
 }

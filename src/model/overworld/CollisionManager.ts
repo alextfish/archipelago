@@ -1,16 +1,31 @@
 import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import type { Bridge } from '@model/puzzle/Bridge';
 import type { OverworldScene } from '@view/scenes/OverworldScene';
+import type { Door } from '@model/overworld/Door';
+import { CollisionType } from '@model/overworld/CollisionTypes';
+
+// Re-export CollisionType so existing callers that import it from this module continue to work.
+export { CollisionType } from '@model/overworld/CollisionTypes';
 
 /**
- * Manages dynamic collision updates for overworld puzzles
- * Converts puzzle bridges to overworld collision tiles and restores original state
+ * Manages **runtime** collision state for the overworld during gameplay.
+ *
+ * Responsibilities:
+ * - Storing and restoring the original collision state when the player enters / exits a puzzle
+ * - Applying WALKABLE collision for newly placed bridges; restoring it when bridges are removed
+ * - Updating collision for doors when they are locked or unlocked
+ *
+ * This is a stateful object with a live reference to OverworldScene.
+ * It is distinct from CollisionTileClassifier, which is a pure, stateless helper used
+ * once at map-load time to read tile properties from Tiled and build the initial
+ * collision arrays.
  */
 export class CollisionManager {
     private overworldScene: OverworldScene;
-    private originalCollision: Map<string, boolean> = new Map();
+    private originalCollision: Map<string, CollisionType> = new Map();
     private puzzleBounds: Phaser.Geom.Rectangle | null = null;
     private tileSize: number = 32;
+    private doors: Door[] = [];
 
     constructor(overworldScene: OverworldScene) {
         this.overworldScene = overworldScene;
@@ -43,14 +58,22 @@ export class CollisionManager {
         console.log('CollisionManager: Restoring original collision');
 
         // Restore all stored collision states
-        for (const [key, originalCollision] of this.originalCollision) {
+        for (const [key, originalCollisionType] of this.originalCollision) {
             const [x, y] = key.split(',').map(Number);
-            this.overworldScene.setCollisionAt(x, y, originalCollision);
+            this.overworldScene.setCollisionAt(x, y, originalCollisionType);
         }
 
         // Clear stored state
         this.originalCollision.clear();
         this.puzzleBounds = null;
+    }
+
+    /**
+     * Set collision type at a specific tile position.
+     * Updates both the collision array and the appropriate collision layers.
+     */
+    setCollisionAt(tileX: number, tileY: number, collisionType: CollisionType): void {
+        this.overworldScene.setCollisionAt(tileX, tileY, collisionType);
     }
 
     /**
@@ -81,8 +104,8 @@ export class CollisionManager {
         // Restore original collision for each tile
         for (const { tileX, tileY } of bridgeTiles) {
             const key = `${tileX},${tileY}`;
-            const originalCollision = this.originalCollision.get(key) || false;
-            this.overworldScene.setCollisionAt(tileX, tileY, originalCollision);
+            const originalCollisionType = this.originalCollision.get(key) ?? CollisionType.WALKABLE;
+            this.overworldScene.setCollisionAt(tileX, tileY, originalCollisionType);
         }
     }
 
@@ -97,8 +120,8 @@ export class CollisionManager {
         for (let tileY = startTileY; tileY < endTileY; tileY++) {
             for (let tileX = startTileX; tileX < endTileX; tileX++) {
                 const key = `${tileX},${tileY}`;
-                const originalCollision = this.overworldScene.hasCollisionAt(tileX, tileY);
-                this.originalCollision.set(key, originalCollision);
+                const originalCollisionType = this.overworldScene.getCollisionAt(tileX, tileY);
+                this.originalCollision.set(key, originalCollisionType);
             }
         }
 
@@ -113,9 +136,9 @@ export class CollisionManager {
         // Get all tile positions for this bridge
         const bridgeTiles = this.getBridgeTilePositions(bridge, puzzleBounds);
 
-        // Set collision for each tile
+        // Set walkable for each tile (bridges are always upper layer)
         for (const { tileX, tileY } of bridgeTiles) {
-            this.overworldScene.setCollisionAt(tileX, tileY, true);
+            this.overworldScene.setCollisionAt(tileX, tileY, CollisionType.WALKABLE);
         }
     }
 
@@ -159,5 +182,84 @@ export class CollisionManager {
         }
 
         return positions;
+    }
+
+    /**
+     * Register doors and set their initial collision state
+     */
+    registerDoors(doors: Door[]): void {
+        console.log(`CollisionManager: Registering ${doors.length} doors`);
+        this.doors = doors;
+        this.updateDoorCollisions();
+    }
+
+    /**
+     * Update collision for all doors based on their locked state
+     */
+    updateDoorCollisions(): void {
+        console.log(`CollisionManager: Updating collision for ${this.doors.length} doors`);
+        for (const door of this.doors) {
+            this.updateDoorCollision(door);
+        }
+    }
+
+    /**
+     * Update collision for a specific door
+     */
+    updateDoorCollision(door: Door): void {
+        const locked = door.isLocked();
+        // Locked doors are blocked, unlocked doors are walkable
+        const collisionType = locked ? CollisionType.BLOCKED : CollisionType.WALKABLE;
+        console.log(`CollisionManager: Updating door ${door.id} collision: locked=${locked}, type=${collisionType}`);
+        for (const pos of door.getPositions()) {
+            this.overworldScene.setCollisionAt(pos.tileX, pos.tileY, collisionType);
+            console.log(`  Set collision at (${pos.tileX}, ${pos.tileY}) to ${collisionType}`);
+        }
+    }
+
+    /**
+     * Apply collision overrides for a solved FlowPuzzle.
+     * Tiles where water is still flowing become BLOCKED (impassable).
+     * Tiles that have dried up are left at their restored original state (WALKABLE_LOW).
+     * Call AFTER restoreOriginalCollision() so the base state is correct.
+     *
+     * @param wetWorldTiles - World tile coordinates where water is still actively flowing
+     */
+    applyFlowWaterCollision(wetWorldTiles: ReadonlyArray<{ tileX: number; tileY: number }>): void {
+        for (const { tileX, tileY } of wetWorldTiles) {
+            const current = this.overworldScene.getCollisionAt(tileX, tileY);
+            if (current !== CollisionType.ALWAYS_HIGH && current !== CollisionType.STAIRS) {
+                this.overworldScene.setCollisionAt(tileX, tileY, CollisionType.BLOCKED);
+            }
+        }
+        console.log(`CollisionManager: Blocked ${wetWorldTiles.length} wet flow tiles`);
+    }
+
+    /**
+     * Reset a set of flow square tiles to WALKABLE_LOW.
+     * Called on puzzle entry before storeOriginalCollision() snapshots the region, so that
+     * the snapshot captures the correct base state for riverbeds (WALKABLE_LOW when dry).
+     * Without this, if water was blocked at map load the snapshot would capture BLOCKED
+     * and restoreOriginalCollision() would leave dried-up riverbeds impassable after a solve.
+     *
+     * @param flowTiles - World tile coordinates of all flow squares in the puzzle
+     */
+    resetFlowTilesToWalkableLow(flowTiles: ReadonlyArray<{ tileX: number; tileY: number }>): void {
+        for (const { tileX, tileY } of flowTiles) {
+            const current = this.overworldScene.getCollisionAt(tileX, tileY);
+            if (current !== CollisionType.ALWAYS_HIGH &&
+                current !== CollisionType.STAIRS &&
+                !this.overworldScene.isPermanentlyBlocked(tileX, tileY)) {
+                this.overworldScene.setCollisionAt(tileX, tileY, CollisionType.WALKABLE_LOW);
+            }
+        }
+        console.log(`CollisionManager: Reset ${flowTiles.length} flow tiles to WALKABLE_LOW`);
+    }
+
+    /**
+     * Get all registered doors
+     */
+    getDoors(): readonly Door[] {
+        return this.doors;
     }
 }

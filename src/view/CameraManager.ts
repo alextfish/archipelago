@@ -99,9 +99,12 @@ export class CameraManager {
         console.log(`  Puzzle bounds: ${puzzleBounds.width}x${puzzleBounds.height}, with padding: ${paddedBounds.width}x${paddedBounds.height}`);
         console.log(`  Camera viewport: ${camera.width}x${camera.height}, current zoom: ${camera.zoom}`);
 
-        // Create transition promise
-        return new Promise<void>((resolve) => {
-            // Pan to center of puzzle
+        // Run the pan + zoom animations and wait for both to reach their end.
+        // camera.pan() tracks the world centre dynamically each frame as zoom
+        // changes, so it correctly centres on the target point even while
+        // zoomTo() is animating simultaneously.  The promise resolves when the
+        // pan effect fires its completion callback (progress === 1).
+        await new Promise<void>((resolve) => {
             camera.pan(centerX, centerY, duration, 'Power2', false, (_camera, progress) => {
                 if (progress === 1) {
                     resolve();
@@ -111,11 +114,22 @@ export class CameraManager {
             // Zoom to fit puzzle
             camera.zoomTo(targetZoom, duration, 'Power2');
         });
+
+        // Snap to the exact final position.  In low-frame-rate environments
+        // (e.g. headless CI) the pan effect's final update can run before the
+        // zoom effect has committed the target zoom for that frame, leaving
+        // scrollX/scrollY slightly off.  Setting zoom and centreOn() explicitly
+        // here guarantees the camera lands exactly where we need it.
+        camera.setZoom(targetZoom);
+        camera.centerOn(centerX, centerY);
+        console.log(`CameraManager: Snapped camera to (${centerX}, ${centerY}) zoom=${camera.zoom} scroll=(${camera.scrollX.toFixed(0)}, ${camera.scrollY.toFixed(0)})`);
     }
 
     /**
-     * Return camera to original overworld view
-     * Note: The caller should resume camera follow after this completes
+     * Return camera to original overworld view.
+     * Tweens scrollX/scrollY directly to the stored position (independent of
+     * current zoom) while simultaneously restoring the zoom level.
+     * Note: The caller should resume camera follow after this completes.
      */
     async transitionToOverworld(duration: number = 1000): Promise<void> {
         if (!this.originalBounds) {
@@ -125,15 +139,23 @@ export class CameraManager {
 
         const camera = this.scene.cameras.main;
 
-        console.log(`CameraManager: Returning to overworld at zoom ${this.originalZoom}`);
+        console.log(`CameraManager: Returning to overworld at zoom ${this.originalZoom}, centre (${this.originalCenterX}, ${this.originalCenterY})`);
 
         return new Promise<void>((resolve) => {
-            // Just zoom back - the caller will resume camera follow which will handle positioning
-            camera.zoomTo(this.originalZoom, duration, 'Power2', false, (_camera, progress) => {
-                if (progress === 1) {
-                    resolve();
-                }
+            // Tween scrollX/scrollY directly rather than using camera.pan().
+            // camera.pan() bakes its target scroll using the zoom at call-time, so
+            // calling it while the zoom is still at the (potentially very different)
+            // puzzle zoom would land at the wrong position.  Direct scroll tweening
+            // is zoom-independent and always arrives at exactly the stored position.
+            this.scene.tweens.add({
+                targets: camera,
+                scrollX: this.originalX,
+                scrollY: this.originalY,
+                duration,
+                ease: 'Power2',
+                onComplete: () => resolve()
             });
+            camera.zoomTo(this.originalZoom, duration, 'Power2');
         });
     }
 
@@ -170,6 +192,50 @@ export class CameraManager {
      */
     isInPuzzleView(): boolean {
         return this.originalBounds !== null;
+    }
+
+    /**
+     * Smoothly pan the camera to a specific world position and back to a target
+     * object, temporarily stopping camera follow for the duration.
+     *
+     * Player movement is disabled by the caller (DoorManager) before this is
+     * called; the caller is also responsible for re-enabling it afterwards.
+     *
+     * @param worldX        Target world X to pan to.
+     * @param worldY        Target world Y to pan to.
+     * @param returnTarget  The object to pan back to once the callback completes
+     *                      (typically the player sprite).
+     * @param duration      Duration of each pan leg in milliseconds.
+     * @param onAtTarget    Async callback invoked once the camera has arrived at
+     *                      (worldX, worldY).  Awaited before panning back.
+     */
+    async panToWorldPositionAndBack(
+        worldX: number,
+        worldY: number,
+        returnTarget: { x: number; y: number },
+        duration: number,
+        onAtTarget: () => Promise<void>
+    ): Promise<void> {
+        const camera = this.scene.cameras.main;
+        camera.stopFollow();
+
+        try {
+            await new Promise<void>((resolve) => {
+                camera.pan(worldX, worldY, duration, 'Power2', false, (_cam, progress) => {
+                    if (progress === 1) resolve();
+                });
+            });
+
+            await onAtTarget();
+
+        } finally {
+            await new Promise<void>((resolve) => {
+                camera.pan(returnTarget.x, returnTarget.y, duration, 'Power2', false, (_cam, progress) => {
+                    if (progress === 1) resolve();
+                });
+            });
+            camera.startFollow(returnTarget as unknown as Phaser.GameObjects.GameObject);
+        }
     }
 
     /**

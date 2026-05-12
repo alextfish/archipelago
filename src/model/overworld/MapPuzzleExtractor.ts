@@ -1,6 +1,9 @@
 import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import type { PuzzleSpec } from '@model/puzzle/BridgePuzzle';
 import type { Island } from '@model/puzzle/Island';
+import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
+import type { FlowPuzzleSpec, FlowSquareSpec } from '@model/puzzle/FlowTypes';
+import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 
 /**
  * Represents a puzzle definition extracted from a Tiled map
@@ -9,6 +12,8 @@ export interface MapPuzzleDefinition {
     readonly id: string;
     readonly bounds: { x: number; y: number; width: number; height: number };
     readonly metadata: Record<string, string>; // Custom properties from Tiled object
+    readonly regionGroup?: string; // The region group this puzzle belongs to (e.g., "Beach", "Forest")
+    readonly puzzleClass?: string; // The Tiled object's "Class" field (e.g. "FlowPuzzle")
 }
 
 /**
@@ -26,11 +31,14 @@ export interface TileLayerConfig {
  */
 export interface MapLayer {
     readonly name: string;
-    readonly type: 'tilelayer' | 'objectgroup';
+    readonly type: 'tilelayer' | 'objectgroup' | 'group';
+    readonly visible?: boolean;
+    readonly opacity?: number;
     readonly width?: number;
     readonly height?: number;
     readonly data?: number[];
     readonly objects?: MapObject[];
+    readonly layers?: MapLayer[]; // For group layers
 }
 
 /**
@@ -44,7 +52,35 @@ export interface MapObject {
     readonly y: number;
     readonly width: number;
     readonly height: number;
+    readonly visible?: boolean;
+    readonly rotation?: number;
     readonly properties?: Array<{ name: string; value: any; type: string }>;
+}
+
+/**
+ * Represents a tile property from a Tiled tileset
+ */
+export interface TileProperty {
+    readonly name: string;
+    readonly type: string;
+    readonly value: any;
+}
+
+/**
+ * Represents a tile definition in a tileset with custom properties
+ */
+export interface TileData {
+    readonly id: number;
+    readonly properties?: TileProperty[];
+}
+
+/**
+ * Represents a tileset referenced in a Tiled map
+ */
+export interface TilesetData {
+    readonly firstgid: number;
+    readonly name: string;
+    readonly tiles?: TileData[];
 }
 
 /**
@@ -56,6 +92,7 @@ export interface TiledMapData {
     readonly tilewidth: number;
     readonly tileheight: number;
     readonly layers: MapLayer[];
+    readonly tilesets?: TilesetData[];
 }
 
 /**
@@ -63,33 +100,127 @@ export interface TiledMapData {
  * Coordinates are grid-based and relative to puzzle bounds (0,0 = top-left of puzzle area)
  */
 export class MapPuzzleExtractor {
+    private cachedIslandTileIDs: number[] | null = null;
+
     constructor(private readonly tileConfig: TileLayerConfig) { }
 
     /**
-     * Extract all puzzle definitions from the 'puzzles' object layer
+     * Extract all puzzle definitions from all region-prefixed puzzles object layers
+     * (e.g., "Beach/puzzles", "Forest/puzzles")
      */
     extractPuzzleDefinitions(tiledMap: TiledMapData): MapPuzzleDefinition[] {
-        const puzzleLayer = this.findObjectLayer(tiledMap, 'puzzles');
-        if (!puzzleLayer) {
-            console.warn('No "puzzles" object layer found in map');
+        // Find all puzzles object layers, including those nested in groups
+        const puzzleLayers = this.findAllLayersBySuffix(tiledMap.layers, 'puzzles').filter(
+            layer => layer.type === 'objectgroup'
+        );
+
+        if (puzzleLayers.length === 0) {
+            console.warn('No "*/puzzles" object layers found in map');
             return [];
         }
 
-        console.log(`Found puzzles layer with ${puzzleLayer.objects?.length || 0} objects`);
+        console.log(`Found ${puzzleLayers.length} puzzle layers`);
 
-        // Debug: show all objects in the puzzles layer
-        if (puzzleLayer.objects) {
-            puzzleLayer.objects.forEach((obj, i) => {
-                console.log(`  Object ${i}: name="${obj.name}", type="${obj.type || 'none'}", x=${obj.x}, y=${obj.y}, w=${obj.width}, h=${obj.height}`);
-                console.log(`    Properties:`, obj.properties);
-            });
+        const allDefinitions: MapPuzzleDefinition[] = [];
+
+        for (const puzzleLayer of puzzleLayers) {
+            console.log(`Processing puzzle layer: ${puzzleLayer.name} with ${puzzleLayer.objects?.length || 0} objects`);
+
+            // Use parent group as region (e.g., layer in "Forest" group → region="Forest")
+            const regionGroup = puzzleLayer.parentGroup;
+            console.log(`  Region group: ${regionGroup || 'none'}`);
+
+            // Debug: show all objects in the puzzles layer
+            if (puzzleLayer.objects) {
+                puzzleLayer.objects.forEach((obj, i) => {
+                    console.log(`  Object ${i}: name="${obj.name}", type="${obj.type || 'none'}", x=${obj.x}, y=${obj.y}, w=${obj.width}, h=${obj.height}`);
+                    console.log(`    Properties:`, obj.properties);
+                });
+            }
+
+            const definitions = puzzleLayer.objects
+                ?.filter(obj => obj.type === 'puzzle' ||
+                    obj.type === 'FlowPuzzle' ||
+                    obj.name?.startsWith('puzzle_') ||
+                    obj.name?.toLowerCase().includes('puzzle'))
+                .map(obj => this.createPuzzleDefinition(obj, regionGroup)) || [];
+
+            allDefinitions.push(...definitions);
         }
 
-        return puzzleLayer.objects
-            ?.filter(obj => obj.type === 'puzzle' ||
-                obj.name?.startsWith('puzzle_') ||
-                obj.name?.toLowerCase().includes('puzzle'))
-            .map(obj => this.createPuzzleDefinition(obj)) || [];
+        return allDefinitions;
+    }
+
+    /**
+     * Helper: Get the layer suffix (everything after the last '/')
+     */
+    private getLayerSuffix(layerName: string): string {
+        const lastSlash = layerName.lastIndexOf('/');
+        return lastSlash >= 0 ? layerName.substring(lastSlash + 1) : layerName;
+    }
+
+    /**
+     * Recursively find all layers matching a suffix, even if nested in groups
+     * Returns layers with their parent group name tracked
+     */
+    private findAllLayersBySuffix(layers: MapLayer[], suffix: string, parentGroupName?: string): Array<MapLayer & { parentGroup?: string }> {
+        const result: Array<MapLayer & { parentGroup?: string }> = [];
+
+        for (const layer of layers) {
+            // Check if this layer matches the suffix
+            if (this.getLayerSuffix(layer.name) === suffix) {
+                // Add parent group info to the layer
+                result.push({ ...layer, parentGroup: parentGroupName });
+            }
+
+            // If this is a group layer, recursively search its children
+            if (layer.type === 'group' && layer.layers) {
+                result.push(...this.findAllLayersBySuffix(layer.layers, suffix, layer.name));
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Extract dynamic island tile IDs from tilesets based on isIsland property.
+     * Falls back to hard-coded config if no tiles have the isIsland property.
+     */
+    private extractIslandTileIDs(tiledMap: TiledMapData): number[] {
+        if (!tiledMap.tilesets) {
+            console.warn('No tilesets found in map, using hard-coded island tile IDs');
+            return this.tileConfig.islandTileIDs;
+        }
+
+        const islandTileIDs: number[] = [];
+
+        for (const tileset of tiledMap.tilesets) {
+            if (!tileset.tiles) {
+                continue;
+            }
+
+            for (const tile of tileset.tiles) {
+                // Check if this tile has the isIsland property set to true
+                const isIslandProperty = tile.properties?.find(
+                    prop => prop.name === 'isIsland' && prop.type === 'bool'
+                );
+
+                if (isIslandProperty && isIslandProperty.value === true) {
+                    // Global tile ID = tileset firstgid + local tile id
+                    const globalTileID = tileset.firstgid + tile.id;
+                    islandTileIDs.push(globalTileID);
+                    console.log(`Found island tile: ${tileset.name} tile ${tile.id} -> global ID ${globalTileID}`);
+                }
+            }
+        }
+
+        if (islandTileIDs.length === 0) {
+            console.warn('No tiles with isIsland=true found, using hard-coded island tile IDs');
+            return this.tileConfig.islandTileIDs;
+        }
+
+        console.log(`Using ${islandTileIDs.length} dynamically detected island tile IDs: [${islandTileIDs.join(', ')}]`);
+        return islandTileIDs;
     }
 
     /**
@@ -103,9 +234,11 @@ export class MapPuzzleExtractor {
         const puzzleHeightInTiles = Math.ceil(definition.bounds.height / tiledMap.tileheight);
 
         const islands = this.extractIslands(definition, tiledMap);
-        const constraints = this.extractConstraints(definition, tiledMap);
+        const constraints = this.extractConstraints(definition, tiledMap, islands);
         const bridgeTypes = this.extractBridgeTypes(definition);
         const maxNumBridges = this.calculateMaxBridges(definition);
+
+        const givesFeedback = definition.metadata.givesFeedback !== 'false';
 
         const puzzleSpec: PuzzleSpec = {
             id: definition.id,
@@ -117,20 +250,128 @@ export class MapPuzzleExtractor {
             islands,
             bridgeTypes,
             constraints,
-            maxNumBridges
+            maxNumBridges,
+            givesFeedback
         };
 
         return new BridgePuzzle(puzzleSpec);
     }
 
     /**
-     * Create a puzzle definition from a Tiled map object
+     * Convert a map puzzle definition to a FlowPuzzle by reading the water tile layer
+     * in the puzzle's region group.
      */
-    private createPuzzleDefinition(obj: MapObject): MapPuzzleDefinition {
+    createFlowPuzzle(
+        definition: MapPuzzleDefinition,
+        tiledMap: TiledMapData
+    ): FlowPuzzle {
+        const puzzleWidthInTiles = Math.ceil(definition.bounds.width / tiledMap.tilewidth);
+        const puzzleHeightInTiles = Math.ceil(definition.bounds.height / tiledMap.tileheight);
+
+        const islands = this.extractIslands(definition, tiledMap);
+        const constraints = this.extractConstraints(definition, tiledMap, islands);
+        const bridgeTypes = this.extractBridgeTypes(definition);
+        const maxNumBridges = this.calculateMaxBridges(definition);
+
+        const flowSquares = this.extractFlowSquares(definition, tiledMap);
+
+        const spec: FlowPuzzleSpec = {
+            id: definition.id,
+            type: definition.metadata.type || 'overworld',
+            size: { width: puzzleWidthInTiles, height: puzzleHeightInTiles },
+            islands,
+            bridgeTypes,
+            constraints,
+            maxNumBridges,
+            flowSquares
+        };
+
+        return new FlowPuzzle(spec);
+    }
+
+    /**
+     * Extract flow square data from the "water" tile layer within the puzzle's bounds.
+     * Returns local (puzzle-relative) coordinates and direction flags.
+     */
+    private extractFlowSquares(
+        definition: MapPuzzleDefinition,
+        tiledMap: TiledMapData
+    ): FlowSquareSpec[] {
+        const waterLayers = TiledLayerUtils.findTileLayersByName(
+            tiledMap.layers as any[],
+            'water'
+        );
+        if (waterLayers.length === 0) {
+            console.warn(`No water layer found for FlowPuzzle ${definition.id}`);
+            return [];
+        }
+
+        // Prefer the water layer in the same region group if available
+        const regionWater = definition.regionGroup
+            ? waterLayers.find(l => l.fullPath.startsWith(definition.regionGroup!))
+            : undefined;
+        const waterLayer = regionWater ?? waterLayers[0];
+
+        const tileData: number[] = waterLayer.data.data as number[];
+        const tilesets: any[] = (tiledMap.tilesets ?? []) as any[];
+
+        const puzzleOriginTileX = Math.floor(definition.bounds.x / tiledMap.tilewidth);
+        const puzzleOriginTileY = Math.floor(definition.bounds.y / tiledMap.tileheight);
+        const puzzleWidthInTiles = Math.ceil(definition.bounds.width / tiledMap.tilewidth);
+        const puzzleHeightInTiles = Math.ceil(definition.bounds.height / tiledMap.tileheight);
+
+        const flowSquares: FlowSquareSpec[] = [];
+
+        for (let ty = puzzleOriginTileY; ty < puzzleOriginTileY + puzzleHeightInTiles; ty++) {
+            for (let tx = puzzleOriginTileX; tx < puzzleOriginTileX + puzzleWidthInTiles; tx++) {
+                const gid = TiledLayerUtils.getGIDAt(tileData, tiledMap.width, tx, ty);
+                if (gid === 0) continue;
+
+                const props = TiledLayerUtils.getTileProperties(tilesets, gid);
+                const localX = tx - puzzleOriginTileX;
+                const localY = ty - puzzleOriginTileY;
+
+                const outgoing: Array<'N' | 'S' | 'E' | 'W'> = [];
+                if (props.flowNorth) outgoing.push('N');
+                if (props.flowSouth) outgoing.push('S');
+                if (props.flowEast) outgoing.push('E');
+                if (props.flowWest) outgoing.push('W');
+
+                flowSquares.push({
+                    x: localX,
+                    y: localY,
+                    outgoing,
+                    isSource: !!props.source,
+                    rocky: false,
+                    obstacle: false,
+                    pontoon: false
+                });
+
+                // Warn about border flow squares with no flow directions — these block
+                // edge-input propagation and are almost always a Tiled authoring error.
+                const isBorder = localX === 0 || localY === 0
+                    || localX === puzzleWidthInTiles - 1
+                    || localY === puzzleHeightInTiles - 1;
+                if (isBorder && outgoing.length === 0 && !props.source) {
+                    console.warn(
+                        `[FlowSquare] "${definition.id}" border tile at local (${localX},${localY}) ` +
+                        `world (${tx},${ty}) has GID ${gid} with NO flow directions — ` +
+                        `edge inputs here will not propagate into the puzzle`
+                    );
+                }
+            }
+        }
+
+        console.log(`Extracted ${flowSquares.length} flow squares for puzzle ${definition.id}`);
+        return flowSquares;
+    }
+    private createPuzzleDefinition(obj: MapObject, regionGroup?: string): MapPuzzleDefinition {
         const metadata = this.extractObjectProperties(obj);
 
         return {
             id: obj.name || `puzzle_${obj.id}`,
+            regionGroup,
+            puzzleClass: obj.type || undefined,
             bounds: {
                 x: obj.x,
                 y: obj.y,
@@ -147,19 +388,29 @@ export class MapPuzzleExtractor {
     private extractIslands(definition: MapPuzzleDefinition, tiledMap: TiledMapData): Island[] {
         const islands: Island[] = [];
 
-        // Check relevant tile layers for island tiles
-        const islandLayers = ['terrain', 'islands', 'puzzle_elements', 'beach'] // Added 'beach' layer
-            .map(name => this.findTileLayer(tiledMap, name))
-            .filter(Boolean) as MapLayer[];
+        // Extract dynamic island tile IDs from tilesets (cached on first use)
+        if (this.cachedIslandTileIDs === null) {
+            this.cachedIslandTileIDs = this.extractIslandTileIDs(tiledMap);
+        }
+        const islandTileIDs = this.cachedIslandTileIDs;
 
-        console.log(`Extracting islands for ${definition.id} from ${islandLayers.length} tile layers`);
-        islandLayers.forEach(layer => {
-            console.log(`  Checking layer: ${layer.name}`);
-        });
+        // Check relevant tile layers for island tiles
+        let islandLayers: MapLayer[];
+        if (definition.regionGroup) {
+            // Region-specific search: only check the "ground" layer within this region
+            const groundLayer = this.findLayerInRegion(tiledMap, definition.regionGroup, 'ground');
+            islandLayers = groundLayer ? [groundLayer] : [];
+            console.log(`Extracting islands for ${definition.id} from region ${definition.regionGroup}`);
+        } else {
+            // Fallback: global search for backward compatibility
+            islandLayers = ['terrain', 'islands', 'puzzle_elements', 'ground']
+                .map(name => this.findTileLayer(tiledMap, name))
+                .filter(Boolean) as MapLayer[];
+            console.log(`Extracting islands for ${definition.id} from ${islandLayers.length} tile layers (global search)`);
+        }
 
         for (const layer of islandLayers) {
-            const layerIslands = this.extractIslandsFromLayer(layer, definition, tiledMap);
-            console.log(`  Found ${layerIslands.length} islands in layer ${layer.name}`);
+            const layerIslands = this.extractIslandsFromLayer(layer, definition, tiledMap, islandTileIDs);
             islands.push(...layerIslands);
         }
 
@@ -169,6 +420,9 @@ export class MapPuzzleExtractor {
                 island.id = `${definition.id}_island_${index + 1}`;
             }
         });
+
+        // Apply island constraints from constraint objects in the puzzles layer
+        this.applyIslandConstraintsFromObjects(islands, definition, tiledMap);
 
         console.log(`Total islands found for ${definition.id}: ${islands.length}`);
         return islands;
@@ -180,7 +434,8 @@ export class MapPuzzleExtractor {
     private extractIslandsFromLayer(
         layer: MapLayer,
         definition: MapPuzzleDefinition,
-        tiledMap: TiledMapData
+        tiledMap: TiledMapData,
+        islandTileIDs: number[]
     ): Island[] {
         if (!layer.data || !layer.width || !layer.height) {
             return [];
@@ -195,9 +450,9 @@ export class MapPuzzleExtractor {
         const puzzleEndX = puzzleStartX + Math.ceil(definition.bounds.width / tilewidth);
         const puzzleEndY = puzzleStartY + Math.ceil(definition.bounds.height / tileheight);
 
-        console.log(`    Checking puzzle ${definition.id} in layer ${layer.name}`);
-        console.log(`    Puzzle bounds: tile (${puzzleStartX},${puzzleStartY}) to (${puzzleEndX},${puzzleEndY})`);
-        console.log(`    Looking for island tile IDs: [${this.tileConfig.islandTileIDs.join(', ')}]`);
+        // console.log(`    Checking puzzle ${definition.id} in layer ${layer.name}`);
+        // console.log(`    Puzzle bounds: tile (${puzzleStartX},${puzzleStartY}) to (${puzzleEndX},${puzzleEndY})`);
+        // console.log(`    Looking for island tile IDs: [${islandTileIDs.join(', ')}]`);
 
         // Scan the puzzle area for island tiles
         let tilesChecked = 0;
@@ -208,13 +463,13 @@ export class MapPuzzleExtractor {
                 const tileID = layer.data[tileIndex];
                 tilesChecked++;
 
-                if (this.tileConfig.islandTileIDs.includes(tileID)) {
+                if (islandTileIDs.includes(tileID)) {
                     tilesFound++;
                     // Convert to puzzle-relative coordinates
                     const relativeX = x - puzzleStartX;
                     const relativeY = y - puzzleStartY;
 
-                    console.log(`    Found island tile ${tileID} at world (${x},${y}) -> puzzle (${relativeX},${relativeY})`);
+                    //console.log(`    Found island tile ${tileID} at world (${x},${y}) -> puzzle (${relativeX},${relativeY})`);
 
                     islands.push({
                         id: `island_${relativeX}_${relativeY}`,
@@ -225,7 +480,7 @@ export class MapPuzzleExtractor {
             }
         }
 
-        console.log(`    Checked ${tilesChecked} tiles, found ${tilesFound} islands`);
+        //console.log(`    Checked ${tilesChecked} tiles, found ${tilesFound} islands`);
 
         return islands;
     }
@@ -233,7 +488,7 @@ export class MapPuzzleExtractor {
     /**
      * Extract constraints from puzzle metadata and special tiles
      */
-    private extractConstraints(definition: MapPuzzleDefinition, tiledMap: TiledMapData): Array<{ type: string; params?: any }> {
+    private extractConstraints(definition: MapPuzzleDefinition, tiledMap: TiledMapData, islands: Island[]): Array<{ type: string; params?: any }> {
         const constraints: Array<{ type: string; params?: any }> = [];
 
         // Parse constraints from object metadata
@@ -246,6 +501,44 @@ export class MapPuzzleExtractor {
         if (constraints.length === 0) {
             constraints.push({ type: 'AllBridgesPlacedConstraint' });
         }
+
+        // Auto-add IslandBridgeCountConstraint if any islands have num_bridges constraints
+        const hasIslandBridgeConstraints = islands.some(island =>
+            island.constraints?.some(c => c.startsWith('num_bridges='))
+        );
+        if (hasIslandBridgeConstraints && !constraints.some(c => c.type === 'IslandBridgeCountConstraint')) {
+            constraints.push({ type: 'IslandBridgeCountConstraint' });
+            console.log(`Auto-added IslandBridgeCountConstraint to puzzle ${definition.id} (islands have num_bridges constraints)`);
+        }
+
+        // Auto-add one IslandDirectionalBridgeConstraint per island that has directional_constraint=
+        for (const island of islands) {
+            const rule = island.constraints?.find(c => c.startsWith('directional_constraint='));
+            if (!rule) continue;
+            const constraintType = rule.split('=')[1];
+            constraints.push({
+                type: 'IslandDirectionalBridgeConstraint',
+                params: { islandId: island.id, constraintType }
+            });
+            console.log(`Auto-added IslandDirectionalBridgeConstraint(${constraintType}) for island ${island.id} in puzzle ${definition.id}`);
+        }
+
+        // Auto-add one IslandVisibilityConstraint per island that has num_visible=
+        for (const island of islands) {
+            const rule = island.constraints?.find(c => c.startsWith('num_visible='));
+            if (!rule) continue;
+            const count = parseInt(rule.split('=')[1]);
+            if (!isNaN(count)) {
+                constraints.push({
+                    type: 'IslandVisibilityConstraint',
+                    params: { islandId: island.id, count }
+                });
+                console.log(`Auto-added IslandVisibilityConstraint(${count}) for island ${island.id} in puzzle ${definition.id}`);
+            }
+        }
+
+        // Add cell-level constraints (MustHaveWater, EnclosedAreaSize) from Tiled objects
+        constraints.push(...this.extractCellConstraintsFromObjects(definition, tiledMap));
 
         return constraints;
     }
@@ -339,21 +632,14 @@ export class MapPuzzleExtractor {
         const bridgeTypes: Array<{ id: string; colour?: string; length?: number; count?: number; width?: number; style?: string }> = [];
         const metadata = definition.metadata;
 
-        // Parse bridges="3,3,3" or "3, 3, 3" format (common TMX format)
+        // Parse bridges="3,3,3" or "3, 3, 3" format (common TMX format),
+        // with optional "+" suffix for StrutBridges (e.g. "3,2,3+,4+")
         if (metadata.bridges) {
-            const lengths = metadata.bridges.split(',').map(s => parseInt(s.trim()));
-            const lengthCounts = this.countOccurrences(lengths);
-
-            for (const [length, count] of lengthCounts) {
-                bridgeTypes.push({
-                    id: `fixed_${length}`,
-                    colour: metadata.bridge_colour || '#8B4513',
-                    length,
-                    count,
-                    width: 1,
-                    style: 'wooden'
-                });
-            }
+            const parsed = BridgePuzzle.parseBridgesString(
+                metadata.bridges,
+                metadata.bridge_colour || '#8B4513'
+            );
+            bridgeTypes.push(...parsed);
         }
         // Fallback: Parse bridge_lengths="4,3,3,2,2,2" format (legacy)
         else if (metadata.bridge_lengths) {
@@ -429,21 +715,47 @@ export class MapPuzzleExtractor {
     }
 
     /**
-     * Find an object layer by name
+     * Find a tile layer by name, searching recursively through groups
      */
-    private findObjectLayer(tiledMap: TiledMapData, layerName: string): MapLayer | null {
-        return tiledMap.layers.find(layer =>
-            layer.type === 'objectgroup' && layer.name === layerName
-        ) || null;
+    private findTileLayer(tiledMap: TiledMapData, layerName: string): MapLayer | null {
+        return this.findLayerByName(tiledMap.layers, layerName, 'tilelayer');
     }
 
     /**
-     * Find a tile layer by name
+     * Recursively find a layer by name and type
      */
-    private findTileLayer(tiledMap: TiledMapData, layerName: string): MapLayer | null {
-        return tiledMap.layers.find(layer =>
-            layer.type === 'tilelayer' && layer.name === layerName
-        ) || null;
+    private findLayerByName(layers: MapLayer[], layerName: string, layerType: 'tilelayer' | 'objectgroup' | 'group'): MapLayer | null {
+        for (const layer of layers) {
+            // Check if this layer matches
+            if (layer.type === layerType && layer.name === layerName) {
+                return layer;
+            }
+
+            // If this is a group layer, recursively search its children
+            if (layer.type === 'group' && layer.layers) {
+                const found = this.findLayerByName(layer.layers, layerName, layerType);
+                if (found) return found;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Find a layer within a specific region group
+     * E.g., find "ground" tilelayer within the "Beach" region group,
+     * or find "puzzles" objectgroup within the "Forest" region group
+     */
+    private findLayerInRegion(tiledMap: TiledMapData, regionName: string, layerName: string, layerType: 'tilelayer' | 'objectgroup' = 'tilelayer'): MapLayer | null {
+        // Find the region group first
+        const regionGroup = this.findLayerByName(tiledMap.layers, regionName, 'group');
+        if (!regionGroup || !regionGroup.layers) {
+            console.warn(`Region group "${regionName}" not found`);
+            return null;
+        }
+
+        // Find the layer within the region
+        return this.findLayerByName(regionGroup.layers, layerName, layerType);
     }
 
     /**
@@ -470,6 +782,16 @@ export class MapPuzzleExtractor {
     }
 
     /**
+     * Returns true when the constraint_type property indicates a cell-level constraint
+     * (MustHaveWater, EnclosedAreaSize) that does not require a matching island.
+     * Used by applyIslandConstraintsFromObjects to suppress spurious "no island" warnings
+     * and by extractCellConstraintsFromObjects to identify objects to process.
+     */
+    private isCellLevelConstraintType(constraintType: string | undefined): boolean {
+        return constraintType === 'MustHaveWater' || constraintType === 'EnclosedAreaSize';
+    }
+
+    /**
      * Count occurrences of each value in an array
      */
     private countOccurrences<T>(array: T[]): Map<T, number> {
@@ -478,5 +800,210 @@ export class MapPuzzleExtractor {
             counts.set(item, (counts.get(item) || 0) + 1);
         }
         return counts;
+    }
+
+    /**
+     * Find and apply island constraints from constraint objects in region-specific puzzles layer
+     */
+    private applyIslandConstraintsFromObjects(
+        islands: Island[],
+        definition: MapPuzzleDefinition,
+        tiledMap: TiledMapData
+    ): void {
+        // Find puzzles layers based on region
+        let puzzleLayers: MapLayer[];
+        if (definition.regionGroup) {
+            // Region-specific: only check the "puzzles" layer within this region
+            const puzzlesLayer = this.findLayerInRegion(tiledMap, definition.regionGroup, 'puzzles', 'objectgroup');
+            puzzleLayers = puzzlesLayer ? [puzzlesLayer] : [];
+        } else {
+            // Fallback: global search for backward compatibility
+            puzzleLayers = this.findAllLayersBySuffix(tiledMap.layers, 'puzzles');
+        }
+
+        puzzleLayers = puzzleLayers.filter(layer => layer.type === 'objectgroup');
+
+        if (puzzleLayers.length === 0) {
+            return;
+        }
+
+        // Find constraint objects within this puzzle's bounds
+        const { tilewidth, tileheight } = tiledMap;
+        const puzzleStartX = Math.floor(definition.bounds.x / tilewidth);
+        const puzzleStartY = Math.floor(definition.bounds.y / tileheight);
+
+        for (const puzzleLayer of puzzleLayers) {
+            if (!puzzleLayer.objects) continue;
+
+            const constraintObjects = puzzleLayer.objects.filter(obj => {
+                const props = this.extractObjectProperties(obj);
+                if (props.constraint !== 'true') return false;
+
+                // Check if constraint is within this puzzle's bounds
+                const objTileX = Math.floor(obj.x / tilewidth);
+                const objTileY = Math.floor(obj.y / tileheight);
+                const relativeTileX = objTileX - puzzleStartX;
+                const relativeTileY = objTileY - puzzleStartY;
+
+                const puzzleWidthInTiles = Math.ceil(definition.bounds.width / tilewidth);
+                const puzzleHeightInTiles = Math.ceil(definition.bounds.height / tileheight);
+
+                return relativeTileX >= 0 && relativeTileX < puzzleWidthInTiles &&
+                    relativeTileY >= 0 && relativeTileY < puzzleHeightInTiles;
+            });
+
+            console.log(`Found ${constraintObjects.length} constraint objects in layer "${puzzleLayer.name}" for puzzle ${definition.id}`);
+
+            // Apply constraints to matching islands
+            for (const constraintObj of constraintObjects) {
+                const objTileX = Math.floor(constraintObj.x / tilewidth);
+                const objTileY = Math.floor(constraintObj.y / tileheight);
+                const relativeTileX = objTileX - puzzleStartX;
+                const relativeTileY = objTileY - puzzleStartY;
+
+                // Parse constraint properties
+                const props = this.extractObjectProperties(constraintObj);
+
+                // Cell-level constraints (MustHaveWater, EnclosedAreaSize) don't need a
+                // matching island — they are handled by extractCellConstraintsFromObjects.
+                const cellLevel = this.isCellLevelConstraintType(props.constraint_type);
+
+                // Find island at this position
+                const island = islands.find(i => i.x === relativeTileX && i.y === relativeTileY);
+                if (!island) {
+                    if (!cellLevel) {
+                        console.warn(`Constraint object at puzzle-relative (${relativeTileX}, ${relativeTileY}) has no matching island`);
+                    }
+                    continue;
+                }
+
+                const constraints: string[] = [];
+
+                // Check for num_bridges property
+                if (props.num_bridges) {
+                    const numBridges = parseInt(props.num_bridges);
+                    if (!isNaN(numBridges)) {
+                        constraints.push(`num_bridges=${numBridges}`);
+                        console.log(`Applied num_bridges=${numBridges} constraint to island ${island.id}`);
+                    }
+                }
+
+                // Check for directional_constraint property
+                if (props.directional_constraint) {
+                    constraints.push(`directional_constraint=${props.directional_constraint}`);
+                    console.log(`Applied directional_constraint=${props.directional_constraint} constraint to island ${island.id}`);
+                }
+
+                // Check for num_visible property
+                if (props.num_visible) {
+                    const numVisible = parseInt(props.num_visible);
+                    if (!isNaN(numVisible)) {
+                        constraints.push(`num_visible=${numVisible}`);
+                        console.log(`Applied num_visible=${numVisible} constraint to island ${island.id}`);
+                    }
+                }
+
+                // Disguise sprite and conversation overrides apply to any constraint type
+                if (props.disguise_sprite) {
+                    constraints.push(`disguise_sprite=${props.disguise_sprite}`);
+                    console.log(`Applied disguise_sprite=${props.disguise_sprite} to island ${island.id}`);
+                }
+                if (props.disguise_sprite_solved) {
+                    constraints.push(`disguise_sprite_solved=${props.disguise_sprite_solved}`);
+                    console.log(`Applied disguise_sprite_solved=${props.disguise_sprite_solved} to island ${island.id}`);
+                }
+                if (props.conversation_file) {
+                    constraints.push(`conversation_file=${props.conversation_file}`);
+                    console.log(`Applied conversation_file=${props.conversation_file} to island ${island.id}`);
+                }
+                if (props.conversation_file_solved) {
+                    constraints.push(`conversation_file_solved=${props.conversation_file_solved}`);
+                    console.log(`Applied conversation_file_solved=${props.conversation_file_solved} to island ${island.id}`);
+                }
+
+                // Add constraints to island
+                if (constraints.length > 0) {
+                    island.constraints = island.constraints || [];
+                    island.constraints.push(...constraints);
+                }
+
+                // Propagate animate flag regardless of other constraint properties
+                if (props.animate === 'true') {
+                    island.constraints = island.constraints || [];
+                    if (!island.constraints.includes('animate=true')) {
+                        island.constraints.push('animate=true');
+                        console.log(`Applied animate=true to island ${island.id}`);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Extract cell-level constraints (MustHaveWater, EnclosedAreaSize) from Tiled objects
+     * in the puzzles layer.  Unlike island constraints, these apply to arbitrary grid cells
+     * and are returned as constraint specs rather than being stored on islands.
+     */
+    private extractCellConstraintsFromObjects(
+        definition: MapPuzzleDefinition,
+        tiledMap: TiledMapData
+    ): Array<{ type: string; params?: any }> {
+        const constraints: Array<{ type: string; params?: any }> = [];
+
+        // Find the puzzles layer(s) for this puzzle's region
+        let puzzleLayers: MapLayer[];
+        if (definition.regionGroup) {
+            const puzzlesLayer = this.findLayerInRegion(tiledMap, definition.regionGroup, 'puzzles', 'objectgroup');
+            puzzleLayers = puzzlesLayer ? [puzzlesLayer] : [];
+        } else {
+            puzzleLayers = this.findAllLayersBySuffix(tiledMap.layers, 'puzzles');
+        }
+        puzzleLayers = puzzleLayers.filter(layer => layer.type === 'objectgroup');
+
+        if (puzzleLayers.length === 0) return constraints;
+
+        const { tilewidth, tileheight } = tiledMap;
+        const puzzleStartX = Math.floor(definition.bounds.x / tilewidth);
+        const puzzleStartY = Math.floor(definition.bounds.y / tileheight);
+        const puzzleWidthInTiles = Math.ceil(definition.bounds.width / tilewidth);
+        const puzzleHeightInTiles = Math.ceil(definition.bounds.height / tileheight);
+
+        for (const puzzleLayer of puzzleLayers) {
+            if (!puzzleLayer.objects) continue;
+
+            for (const obj of puzzleLayer.objects) {
+                const props = this.extractObjectProperties(obj);
+                if (props.constraint !== 'true') continue;
+
+                // Only handle cell-level constraint types here
+                if (!this.isCellLevelConstraintType(props.constraint_type)) continue;
+                const constraintType = props.constraint_type;
+
+                // Check whether the object lies within this puzzle's bounds
+                const objTileX = Math.floor(obj.x / tilewidth);
+                const objTileY = Math.floor(obj.y / tileheight);
+                const relX = objTileX - puzzleStartX;
+                const relY = objTileY - puzzleStartY;
+
+                if (relX < 0 || relX >= puzzleWidthInTiles || relY < 0 || relY >= puzzleHeightInTiles) continue;
+
+                if (constraintType === 'MustHaveWater') {
+                    constraints.push({
+                        type: 'MustHaveWaterConstraint',
+                        params: { x: relX, y: relY }
+                    });
+                    console.log(`Added MustHaveWaterConstraint at puzzle-relative (${relX}, ${relY}) in puzzle ${definition.id}`);
+                } else if (constraintType === 'EnclosedAreaSize') {
+                    const size = parseInt(props.size ?? '0');
+                    constraints.push({
+                        type: 'EnclosedAreaSizeConstraint',
+                        params: { x: relX, y: relY, size: isNaN(size) ? 0 : size }
+                    });
+                    console.log(`Added EnclosedAreaSizeConstraint(size=${size}) at puzzle-relative (${relX}, ${relY}) in puzzle ${definition.id}`);
+                }
+            }
+        }
+
+        return constraints;
     }
 }

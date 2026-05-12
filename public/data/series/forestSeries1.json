@@ -1,0 +1,34 @@
+{
+  "id": "forestSeries1",
+  "title": "Forest Bridge Counting",
+  "description": "Learn to build bridges with counting constraints in the forest",
+  "puzzles": [
+    {
+      "id": "forest-puzzle-1",
+      "title": "First Count",
+      "description": "Some islands need a specific number of bridges",
+      "puzzleData": {
+        "id": "forest-1",
+        "type": "standard",
+        "size": { "width": 6, "height": 4 },
+        "islands": [
+          { "id": "A", "x": 1, "y": 1 },
+          { "id": "B", "x": 5, "y": 1, "constraints": ["num_bridges=2"] },
+          { "id": "C", "x": 1, "y": 5 },
+          { "id": "D", "x": 5, "y": 5 }
+        ],
+        "bridgeTypes": [
+          { "id": "wood1", "colour": "#8B4513", "length": 4, "count": 1 },
+          { "id": "wood2", "colour": "#8B4513", "length": 4, "count": 1 },
+          { "id": "wood3", "colour": "#8B4513", "length": 4, "count": 1 }
+        ],
+        "constraints": [
+          { "type": "AllBridgesPlacedConstraint" },
+          { "type": "IslandBridgeCountConstraint" }
+        ],
+        "maxNumBridges": 3
+      },
+      "hint": "Island B needs exactly 2 bridges connected to it"
+    }
+  ]
+}

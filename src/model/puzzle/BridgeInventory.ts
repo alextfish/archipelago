@@ -1,6 +1,7 @@
 // model/BridgeInventory.ts
 import type { Bridge } from "./Bridge";
 import type { BridgeType } from "./BridgeType";
+import { StrutBridge } from "./StrutBridge";
 
 export class BridgeInventory {
   private allBridges: Bridge[] = [];
@@ -9,10 +10,20 @@ export class BridgeInventory {
     let counter = 0;
     for (const t of types) {
       for (let i = 0; i < t.count; i++) {
-        this.allBridges.push({
-          id: `b${++counter}`,
-          type: { id: t.id, colour: t.colour, width: t.width, style: t.style, length: t.length },
-        });
+        const bridgeType: BridgeType = {
+          id: t.id,
+          colour: t.colour,
+          width: t.width,
+          style: t.style,
+          length: t.length,
+          mustCoverIsland: t.mustCoverIsland,
+          canCoverIsland: t.canCoverIsland,
+        };
+        if (t.mustCoverIsland) {
+          this.allBridges.push(new StrutBridge(`b${++counter}`, bridgeType));
+        } else {
+          this.allBridges.push({ id: `b${++counter}`, type: bridgeType });
+        }
       }
     }
   }

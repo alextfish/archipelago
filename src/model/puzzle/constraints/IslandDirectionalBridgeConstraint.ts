@@ -1,6 +1,7 @@
 import type { BridgePuzzle } from '../BridgePuzzle';
 import { Constraint } from './Constraint';
 import type { ConstraintResult } from './ConstraintResult';
+import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
 import type { Island } from '../Island';
 import type { Bridge } from '../Bridge';
 
@@ -18,6 +19,9 @@ import type { Bridge } from '../Bridge';
  *   (but can be unconnected, singly connected, or have mixed connections)
  */
 export class IslandDirectionalBridgeConstraint extends Constraint {
+  override readonly conversationFile = 'constraints/islandDirectionalBridge_unsatisfied.json';
+  override readonly conversationFileSolved = 'constraints/islandDirectionalBridge_satisfied.json';
+
   private islandId: string;
   private constraintType: 'double_horizontal' | 'double_vertical' | 'double_any_direction' | 'no_double_any_direction';
 
@@ -27,10 +31,10 @@ export class IslandDirectionalBridgeConstraint extends Constraint {
     this.constraintType = constraintType as any;
   }
 
-  static fromSpec(params: { 
-    islandId: string; 
+  static fromSpec(params: {
+    islandId: string;
     constraintType: string;
-    [key: string]: any 
+    [key: string]: any
   }): IslandDirectionalBridgeConstraint {
     return new IslandDirectionalBridgeConstraint(params.islandId, params.constraintType);
   }
@@ -135,5 +139,14 @@ export class IslandDirectionalBridgeConstraint extends Constraint {
     }
 
     return counts;
+  }
+
+  protected override getCoreDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    const result = this.check(puzzle);
+    return [{
+      elementID: this.islandId,
+      glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "good"),
+      constraintType: 'IslandDirectionalBridgeConstraint',
+    }];
   }
 }

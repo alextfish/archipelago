@@ -5,6 +5,8 @@ import type { ConstraintResult } from './ConstraintResult';
 // Ensures bridges of a specific type match their required length
 
 export class BridgeLengthConstraint extends Constraint {
+    override readonly personified: boolean = false;
+
     private typeId: string;
     private expectedLength: number;
 

@@ -1,0 +1,831 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="90" height="90" tilewidth="32" tileheight="32" infinite="0" nextlayerid="142" nextobjectid="123">
+ <editorsettings>
+  <export target="overworld.json" format="json"/>
+ </editorsettings>
+ <tileset firstgid="1" name="collision" tilewidth="32" tileheight="32" tilecount="10" columns="10">
+  <image source="tilesets/collision.png" width="320" height="32"/>
+  <tile id="0">
+   <properties>
+    <property name="blocksBridge" type="bool" value="false"/>
+    <property name="collides" type="bool" value="false"/>
+    <property name="walkable" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="1">
+   <properties>
+    <property name="blocksBridge" type="bool" value="false"/>
+    <property name="collides" type="bool" value="true"/>
+    <property name="walkable" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="2">
+   <properties>
+    <property name="blocksBridge" type="bool" value="true"/>
+    <property name="collides" type="bool" value="true"/>
+    <property name="walkable" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="3">
+   <properties>
+    <property name="alwaysHigh" type="bool" value="true"/>
+    <property name="blocksBridge" type="bool" value="false"/>
+    <property name="collides" type="bool" value="false"/>
+    <property name="walkable" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="4">
+   <properties>
+    <property name="blocksBridge" type="bool" value="false"/>
+    <property name="collides" type="bool" value="false"/>
+    <property name="walkable" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="5">
+   <properties>
+    <property name="blocksBridge" type="bool" value="false"/>
+    <property name="collides" type="bool" value="true"/>
+    <property name="walkable" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="6">
+   <properties>
+    <property name="blocksBridge" type="bool" value="true"/>
+    <property name="collides" type="bool" value="false"/>
+    <property name="walkable" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="7">
+   <properties>
+    <property name="blocksBridge" type="bool" value="false"/>
+    <property name="collides" type="bool" value="true"/>
+    <property name="walkable" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="8">
+   <properties>
+    <property name="walkable" type="bool" value="false"/>
+    <property name="walkable_low" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="9">
+   <properties>
+    <property name="stairs" type="bool" value="true"/>
+    <property name="walkable" type="bool" value="true"/>
+    <property name="walkable_low" type="bool" value="true"/>
+   </properties>
+  </tile>
+ </tileset>
+ <tileset firstgid="11" name="terrains" tilewidth="32" tileheight="32" tilecount="72" columns="12">
+  <image source="tilesets/terrains.png" width="384" height="192"/>
+  <tile id="5">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="6">
+   <properties>
+    <property name="puzzleStart" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="11">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="17">
+   <properties>
+    <property name="isHigh" type="bool" value="true"/>
+    <property name="isPontoon" type="bool" value="true"/>
+    <property name="toggleOffset" type="int" value="1"/>
+   </properties>
+  </tile>
+  <tile id="18">
+   <properties>
+    <property name="isHigh" type="bool" value="false"/>
+    <property name="isPontoon" type="bool" value="true"/>
+    <property name="toggleOffset" type="int" value="-1"/>
+   </properties>
+  </tile>
+  <tile id="19">
+   <properties>
+    <property name="toggleOffset" type="int" value="-1"/>
+   </properties>
+  </tile>
+  <tile id="23">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="27">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="28">
+   <properties>
+    <property name="puzzleStart" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="34">
+   <properties>
+    <property name="foot" value="top"/>
+    <property name="stairs" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="35">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="39">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="40">
+   <properties>
+    <property name="puzzleStart" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="46">
+   <properties>
+    <property name="foot" value="bottom"/>
+    <property name="stairs" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="47">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="51">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="52">
+   <properties>
+    <property name="puzzleStart" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="58">
+   <properties>
+    <property name="foot" value="right"/>
+    <property name="stairs" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="59">
+   <properties>
+    <property name="foot" value="left"/>
+    <property name="stairs" type="bool" value="true"/>
+   </properties>
+  </tile>
+ </tileset>
+ <tileset firstgid="83" name="water directions" tilewidth="32" tileheight="32" tilecount="32" columns="8">
+  <image source="tilesets/water directions.png" width="256" height="128"/>
+  <tile id="0">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="1">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="2">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="3">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="4">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="5">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="6">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="7">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="8">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="9">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="10">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="11">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="12">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="13">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="14">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="15">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="16">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="17">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="18">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="19">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="20">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="21">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="22">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="23">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="false"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="24">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="25">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="26">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="27">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="false"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="28">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="29">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="false"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="30">
+   <properties>
+    <property name="flowEast" type="bool" value="false"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="31">
+   <properties>
+    <property name="flowEast" type="bool" value="true"/>
+    <property name="flowNorth" type="bool" value="true"/>
+    <property name="flowSouth" type="bool" value="true"/>
+    <property name="flowWest" type="bool" value="true"/>
+    <property name="source" type="bool" value="true"/>
+   </properties>
+  </tile>
+ </tileset>
+ <tileset firstgid="115" name="exterior" tilewidth="32" tileheight="32" tilecount="243" columns="9">
+  <image source="tilesets/exterior.png" width="288" height="864"/>
+  <wangsets>
+   <wangset name="Path" type="edge" tile="-1">
+    <wangcolor name="" color="#ff0000" tile="-1" probability="1"/>
+    <wangtile tileid="35" wangid="0,0,1,0,0,0,0,0"/>
+    <wangtile tileid="37" wangid="1,0,1,0,1,0,1,0"/>
+    <wangtile tileid="38" wangid="1,0,1,0,1,0,1,0"/>
+    <wangtile tileid="39" wangid="0,0,1,0,1,0,1,0"/>
+    <wangtile tileid="40" wangid="0,0,1,0,1,0,1,0"/>
+    <wangtile tileid="41" wangid="0,0,0,0,1,0,0,0"/>
+    <wangtile tileid="42" wangid="1,0,1,0,1,0,0,0"/>
+    <wangtile tileid="43" wangid="1,0,0,0,1,0,1,0"/>
+    <wangtile tileid="44" wangid="0,0,1,0,0,0,0,0"/>
+    <wangtile tileid="45" wangid="1,0,1,0,1,0,1,0"/>
+    <wangtile tileid="46" wangid="1,0,1,0,1,0,1,0"/>
+    <wangtile tileid="47" wangid="1,0,1,0,1,0,1,0"/>
+    <wangtile tileid="48" wangid="1,0,0,0,0,0,0,0"/>
+    <wangtile tileid="49" wangid="1,0,1,0,0,0,1,0"/>
+    <wangtile tileid="50" wangid="1,0,0,0,0,0,0,0"/>
+    <wangtile tileid="51" wangid="1,0,1,0,1,0,0,0"/>
+    <wangtile tileid="52" wangid="1,0,0,0,1,0,1,0"/>
+    <wangtile tileid="53" wangid="0,0,0,0,0,0,1,0"/>
+    <wangtile tileid="54" wangid="1,0,1,0,1,0,1,0"/>
+    <wangtile tileid="55" wangid="1,0,0,0,0,0,1,0"/>
+    <wangtile tileid="56" wangid="0,0,1,0,1,0,0,0"/>
+    <wangtile tileid="57" wangid="0,0,0,0,1,0,1,0"/>
+    <wangtile tileid="58" wangid="1,0,1,0,0,0,0,0"/>
+    <wangtile tileid="62" wangid="0,0,0,0,0,0,1,0"/>
+   </wangset>
+   <wangset name="Just Solid Path" type="edge" tile="-1">
+    <wangcolor name="" color="#ff0000" tile="-1" probability="1"/>
+    <wangtile tileid="37" wangid="1,0,1,0,1,0,1,0"/>
+    <wangtile tileid="38" wangid="1,0,1,0,1,0,1,0"/>
+    <wangtile tileid="45" wangid="1,0,1,0,1,0,1,0"/>
+    <wangtile tileid="46" wangid="1,0,1,0,1,0,1,0"/>
+    <wangtile tileid="47" wangid="1,0,1,0,1,0,1,0"/>
+    <wangtile tileid="54" wangid="1,0,1,0,1,0,1,0"/>
+   </wangset>
+  </wangsets>
+ </tileset>
+ <tileset firstgid="358" name="jewels" tilewidth="32" tileheight="32" tilecount="16" columns="4">
+  <image source="sprites/jewels.png" width="128" height="128"/>
+  <tile id="1">
+   <properties>
+    <property name="jewel" value="red"/>
+   </properties>
+   <animation>
+    <frame tileid="0" duration="200"/>
+    <frame tileid="1" duration="200"/>
+    <frame tileid="2" duration="200"/>
+    <frame tileid="3" duration="200"/>
+   </animation>
+  </tile>
+  <tile id="5">
+   <animation>
+    <frame tileid="4" duration="200"/>
+    <frame tileid="5" duration="200"/>
+    <frame tileid="6" duration="200"/>
+    <frame tileid="7" duration="200"/>
+   </animation>
+  </tile>
+  <tile id="9">
+   <animation>
+    <frame tileid="8" duration="200"/>
+    <frame tileid="9" duration="200"/>
+    <frame tileid="10" duration="200"/>
+    <frame tileid="11" duration="200"/>
+   </animation>
+  </tile>
+  <tile id="13">
+   <animation>
+    <frame tileid="12" duration="200"/>
+    <frame tileid="13" duration="200"/>
+    <frame tileid="14" duration="200"/>
+    <frame tileid="15" duration="200"/>
+   </animation>
+  </tile>
+ </tileset>
+ <tileset firstgid="374" source="tilesets/to_process/CraftpixGrass.tsx"/>
+ <tileset firstgid="1180" name="DeepForest" tilewidth="32" tileheight="32" tilecount="624" columns="26">
+  <image source="tilesets/DeepForest.png" width="832" height="768"/>
+ </tileset>
+ <tileset firstgid="1804" name="GrassDetails" tilewidth="32" tileheight="32" tilecount="88" columns="11">
+  <image source="tilesets/ground_grass_details.png" width="352" height="256"/>
+ </tileset>
+ <tileset firstgid="1892" name="Raft" tilewidth="32" tileheight="32" tilecount="560" columns="20">
+  <image source="tilesets/Raft-idle-by-Sevarihk.png" width="652" height="896"/>
+  <tile id="0">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+   <animation>
+    <frame tileid="0" duration="200"/>
+    <frame tileid="1" duration="200"/>
+    <frame tileid="2" duration="200"/>
+    <frame tileid="3" duration="200"/>
+   </animation>
+  </tile>
+  <tile id="1">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="2">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="3">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+ </tileset>
+ <tileset firstgid="2452" name="sand-waterfalls" tilewidth="32" tileheight="32" tilecount="324" columns="27">
+  <image source="tilesets/sand-waterfalls.png" width="864" height="384"/>
+  <tile id="30">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="33">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="192">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="195">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <wangsets>
+   <wangset name="Mid Water" type="corner" tile="-1">
+    <wangcolor name="" color="#ff0000" tile="-1" probability="1"/>
+    <wangtile tileid="7" wangid="0,1,0,0,0,1,0,1"/>
+    <wangtile tileid="8" wangid="0,1,0,1,0,0,0,1"/>
+    <wangtile tileid="34" wangid="0,0,0,1,0,1,0,1"/>
+    <wangtile tileid="35" wangid="0,1,0,1,0,1,0,0"/>
+    <wangtile tileid="60" wangid="0,0,0,1,0,0,0,0"/>
+    <wangtile tileid="61" wangid="0,0,0,1,0,1,0,0"/>
+    <wangtile tileid="62" wangid="0,0,0,0,0,1,0,0"/>
+    <wangtile tileid="87" wangid="0,1,0,1,0,0,0,0"/>
+    <wangtile tileid="88" wangid="0,1,0,1,0,1,0,1"/>
+    <wangtile tileid="89" wangid="0,0,0,0,0,1,0,1"/>
+    <wangtile tileid="114" wangid="0,1,0,0,0,0,0,0"/>
+    <wangtile tileid="115" wangid="0,1,0,0,0,0,0,1"/>
+    <wangtile tileid="116" wangid="0,0,0,0,0,0,0,1"/>
+   </wangset>
+   <wangset name="Lighter Water" type="corner" tile="-1">
+    <wangcolor name="" color="#ff0000" tile="-1" probability="1"/>
+    <wangtile tileid="7" wangid="0,1,0,0,0,1,0,1"/>
+    <wangtile tileid="8" wangid="0,1,0,1,0,0,0,1"/>
+    <wangtile tileid="34" wangid="0,0,0,1,0,1,0,1"/>
+    <wangtile tileid="35" wangid="0,1,0,1,0,1,0,0"/>
+    <wangtile tileid="60" wangid="0,0,0,1,0,0,0,0"/>
+    <wangtile tileid="61" wangid="0,0,0,1,0,1,0,0"/>
+    <wangtile tileid="62" wangid="0,0,0,0,0,1,0,0"/>
+    <wangtile tileid="87" wangid="0,1,0,1,0,0,0,0"/>
+    <wangtile tileid="88" wangid="0,1,0,1,0,1,0,1"/>
+    <wangtile tileid="89" wangid="0,0,0,0,0,1,0,1"/>
+    <wangtile tileid="114" wangid="0,1,0,0,0,0,0,0"/>
+    <wangtile tileid="115" wangid="0,1,0,0,0,0,0,1"/>
+    <wangtile tileid="116" wangid="0,0,0,0,0,0,0,1"/>
+   </wangset>
+  </wangsets>
+ </tileset>
+ <tileset firstgid="2776" name="pier" tilewidth="32" tileheight="32" tilecount="16" columns="4">
+  <image source="tilesets/pier.png" width="128" height="128"/>
+  <tile id="4">
+   <animation>
+    <frame tileid="4" duration="200"/>
+    <frame tileid="5" duration="200"/>
+    <frame tileid="6" duration="200"/>
+    <frame tileid="7" duration="200"/>
+   </animation>
+  </tile>
+  <tile id="8">
+   <animation>
+    <frame tileid="8" duration="200"/>
+    <frame tileid="9" duration="200"/>
+    <frame tileid="10" duration="200"/>
+    <frame tileid="11" duration="200"/>
+   </animation>
+  </tile>
+  <tile id="12">
+   <animation>
+    <frame tileid="12" duration="200"/>
+    <frame tileid="13" duration="200"/>
+    <frame tileid="14" duration="200"/>
+    <frame tileid="15" duration="200"/>
+   </animation>
+  </tile>
+ </tileset>
+ <tileset firstgid="2792" source="tilesets/roads/Road1_32x32_wang.tsx"/>
+ <tileset firstgid="2872" source="tilesets/to_process/Ground_moss_32x32_partial_edge_wang.tsx"/>
+ <group id="114" name="Forest">
+  <layer id="127" name="lowground" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="117" name="water" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="116" name="ground" width="90" height="90">
+   <properties>
+    <property name="autoRender" type="bool" value="false"/>
+   </properties>
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="126" name="path" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJzt1rsKwjAAQNFUFEs7K+JrUnHx/3/LRfA1GCEilKZYcRHOgQwlmS55NAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACA/3CvQhjVIRRxDNO4VPn1p445+lnV+bl1xxz97GLLW2bfLj7oXMY1g/p9To7OQNY+9rm29Fl2dK5S34k938uz9bnRet7SsEz7dqbv17ap4ettbN4b4/g91fdnNulf5JC6F+mO0BgAAAD4tQfhswu2
+  </data>
+  </layer>
+  <layer id="141" name="walls" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJzt0rFKQmEcxuGzn4tqNqgcvIP25owmU6TWmmuMQKjIIJDjtfkX3yCCQheDeB74cfg8i7zfaRoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOC7w7ZpDtq//hf/T682Pa5O8pxUw5yP8lv/y/vPs7vYzXntdVGNq9uqq25ynqRpdVVdpvU9nNp5J6Pa665apLf0ml6qZfa/zv7r3c+qga239lFbPbWb5+MPu73nDrq0zF3c23lrz/lm57/sNsu7Wb7xB/sCAAAAAMBerABL/ied
+  </data>
+  </layer>
+  <layer id="119" name="decorations" width="90" height="90">
+   <properties>
+    <property name="autoRender" type="bool" value="false"/>
+   </properties>
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="120" name="obstacles" width="90" height="90">
+   <properties>
+    <property name="autoRender" type="bool" value="false"/>
+   </properties>
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <objectgroup id="125" name="npcs"/>
+  <layer id="118" name="collision" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="124" name="pontoons" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <objectgroup id="115" name="puzzles"/>
+  <layer id="122" name="roofs" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <objectgroup id="123" name="roof hide zones"/>
+ </group>
+ <group id="128" name="Template">
+  <layer id="129" name="lowground" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="130" name="water" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="131" name="ground" width="90" height="90">
+   <properties>
+    <property name="autoRender" type="bool" value="false"/>
+   </properties>
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="132" name="path" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="133" name="decorations" width="90" height="90">
+   <properties>
+    <property name="autoRender" type="bool" value="false"/>
+   </properties>
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="134" name="obstacles" width="90" height="90">
+   <properties>
+    <property name="autoRender" type="bool" value="false"/>
+   </properties>
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <objectgroup id="135" name="npcs"/>
+  <layer id="136" name="collision" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <layer id="137" name="pontoons" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <objectgroup id="138" name="puzzles"/>
+  <layer id="139" name="roofs" width="90" height="90">
+   <data encoding="base64" compression="zlib">
+   eJztwTEBAAAAwqD1T20ND6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeDR+kAAB
+  </data>
+  </layer>
+  <objectgroup id="140" name="roof hide zones"/>
+ </group>
+ <objectgroup id="3" name="sceneTransitions">
+  <object id="8" name="player start" x="1984" y="1728" width="32" height="32">
+   <properties>
+    <property name="default" type="bool" value="false"/>
+    <property name="id" value="forest"/>
+   </properties>
+  </object>
+  <object id="50" name="player start" x="608" y="2304" width="32" height="32">
+   <properties>
+    <property name="default" type="bool" value="false"/>
+    <property name="id" value="beach"/>
+   </properties>
+  </object>
+  <object id="67" name="player start" x="1376" y="1888" width="32" height="32">
+   <properties>
+    <property name="default" type="bool" value="true"/>
+    <property name="id" value="bay"/>
+   </properties>
+  </object>
+  <object id="101" name="player start" x="1440" y="1312" width="32" height="32">
+   <properties>
+    <property name="default" type="bool" value="false"/>
+    <property name="id" value="river"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <layer id="121" name="edges" width="90" height="90" opacity="0.4">
+  <data encoding="base64" compression="zlib">
+   eJztm+uO4yAMhaOqXc2+/wvPn4mW8fpyDDYQ4JMQoZDYnLouRMl1zclrtAMbsLLGr6JIbTr+ImOkcXSM5cfqIHpxx1wtXQe1X8P7p9A29xnXj5wfAdWZ052r0e8HtV3LW6hpv9WmWkdj6cW10XGo3RY4nTVttVjnxkfBxTOSn+nnWp7XbLZixbM0Tvs8Q+feRP/nWfkV6b+YMU9mh3XFaI7G+RyN8zka53M0zkdb00l7S22NGeWTZ49ljdfm0gPNjrUmz/QVtS2dY/kqxU5W0dD29to9gAis30yNztm/wVpWjmfpGiPw6JyRnzXbpV3rHO38w2FF/ixUDv8TrcsTdKbxQI/Lfq6m/Uh87aYz9U/Ts6ZG7bbyRJ298avVqN1WnqizVkvHM+j8d+Jy++iJT0/+1nSJZPZ4HsXRuQ+76Txqv7Cbzhkgc5b+f6XP0HXPbnj/B2vX8ai9ldHmjujM7TNpP2LLolx7XcUxV3Njy/YopPnPFM+arkjdgw9QrNx7tz3r+Mj87InnSxiL8iG15xyE7Hw6Ip7p+QhenT0a30TlU+vaXqw8bOVrD+XvHBlbS9Y67CnrDTSeWzS+8exnPNd8AojOqMbI72lXnS08GlOyn8XxlPegUuqo5WdPvqBaz/QcwwzP50fkjJtS66Pzb7Jy89H5N5HxXHJ0/kdEfpb2SUdnnBV15mKLHkt9XBshYn8i7U9n1vli2lrNHXuI0pnb+8+sMxe/kpaS/h4i45m2Z9b5YtpWLZ2PEHlf4ynrulE6R+wHuXu0s+o8I959yio6c/P25HTkep7+m9XiuTa31OaFLJ297z1Z70HdbekdogidafxqtXU9b79Gps7e8SvEc+26TnsnDNGZe79Sen+yRmdP/CL5OeL+Rs0+pVVnpL5ZYb3Rsu/W9NPyrfV+ZGt+zuDcr8snOz+j5TO4fCUVVMuW9YaHXnZG247Yd7c837e6zq37xZvWZylX19nixDMOl5OjfWh9JngVncs6w4ejc594bmUVnct6hA+z2Mm0feJ5nG10PxP13OTo/Z5VoqiN5whG31uwmCE/R7CTzi05upWddC7r3hyd+7CLzqPZRecTzzpH5z6c9XMfVtF5pG2ESP+OzjKz+4cy+zxm9w9l9nlk+0f34tz+nPpQ9qPrmJp5WL6gvn8p/S3+ebD08vZbdjygvli+IX6Mimfa1uaC3J9qiWd6DRqf0njO7kidubq237LjoTWeuevMFs/aHHrmZ+0zKb6leNf8mP1/GmX2eWT69w3kIRji
+  </data>
+ </layer>
+</map>

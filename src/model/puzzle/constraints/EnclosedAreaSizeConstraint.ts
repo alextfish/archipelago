@@ -1,6 +1,7 @@
 import type { BridgePuzzle } from '../BridgePuzzle';
 import { Constraint } from './Constraint';
 import type { ConstraintResult } from './ConstraintResult';
+import type { ConstraintDisplayItem } from './ConstraintDisplayItem';
 
 /**
  * Constraint for Farmlands puzzle type: Empty grid cells may have markers (N dots)
@@ -11,6 +12,9 @@ import type { ConstraintResult } from './ConstraintResult';
  * to the outside (not in a fully enclosed area).
  */
 export class EnclosedAreaSizeConstraint extends Constraint {
+  override readonly conversationFile: string;
+  override readonly conversationFileSolved: string;
+
   private x: number;
   private y: number;
   private expectedSize: number;
@@ -20,13 +24,19 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     this.x = x;
     this.y = y;
     this.expectedSize = expectedSize;
+    this.conversationFile = expectedSize === 0
+      ? 'constraints/enclosedAreaSizeZero_unsatisfied.json'
+      : 'constraints/enclosedAreaSize_unsatisfied.json';
+    this.conversationFileSolved = expectedSize === 0
+      ? 'constraints/enclosedAreaSizeZero_satisfied.json'
+      : 'constraints/enclosedAreaSize_satisfied.json';
   }
 
-  static fromSpec(params: { 
-    x: number; 
-    y: number; 
+  static fromSpec(params: {
+    x: number;
+    y: number;
     size: number;
-    [key: string]: any 
+    [key: string]: any
   }): EnclosedAreaSizeConstraint {
     return new EnclosedAreaSizeConstraint(params.x, params.y, params.size);
   }
@@ -54,7 +64,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
       return {
         satisfied: ok,
         affectedElements: ok ? [] : [`${this.x},${this.y}`],
-        message: ok ? undefined : 
+        message: ok ? undefined :
           `Cell (${this.x}, ${this.y}) with size=0 must be covered by a bridge or open to outside, but is in an enclosed area`,
         glyphMessage: ok ? undefined : "area must-not enclosed"
       };
@@ -91,8 +101,8 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     return {
       satisfied: ok,
       affectedElements: ok ? areaInfo.cells : [`${this.x},${this.y}`, ...areaInfo.cells],
-      message: ok ? undefined : 
-        areaInfo.isEnclosed 
+      message: ok ? undefined :
+        areaInfo.isEnclosed
           ? `Cell (${this.x}, ${this.y}) is in an enclosed area of size ${areaInfo.size}, but requires size ${this.expectedSize}`
           : `Cell (${this.x}, ${this.y}) is not in a fully enclosed area (requires size ${this.expectedSize})`,
       glyphMessage
@@ -126,7 +136,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
    */
   private createOccupancyMatrix(puzzle: BridgePuzzle): number[][] {
     const matrix: number[][] = [];
-    
+
     // Initialize matrix with 0s
     for (let y = 0; y <= puzzle.height; y++) {
       matrix[y] = new Array(puzzle.width + 1).fill(0);
@@ -168,21 +178,21 @@ export class EnclosedAreaSizeConstraint extends Constraint {
   }
 
   private isOutOfBounds(x: number, y: number, puzzle: BridgePuzzle): boolean {
-    return x <= 0 || x >= puzzle.width || y <= 0 || y >= puzzle.height;
+    return x < 0 || x > puzzle.width || y < 0 || y > puzzle.height;
   }
 
   private getEnclosedAreaSize(
-    puzzle: BridgePuzzle, 
-    startX: number, 
+    puzzle: BridgePuzzle,
+    startX: number,
     startY: number
   ): { size: number; isEnclosed: boolean; cells: string[] } {
     // Create occupancy matrix once
     const matrix = this.createOccupancyMatrix(puzzle);
-    
+
     const visited = new Set<string>();
     const queue: Array<{ x: number; y: number }> = [{ x: startX, y: startY }];
     const cellKey = (x: number, y: number) => `${x},${y}`;
-    
+
     visited.add(cellKey(startX, startY));
     let isEnclosed = true;
     const cells: string[] = [];
@@ -231,5 +241,18 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     }
 
     return { size: cells.length, isEnclosed, cells };
+  }
+
+  protected override getCoreDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+    const result = this.check(puzzle);
+    // check() always sets glyphMessage for violations; fallback matches the most common failure case
+    return [{
+      elementID: `${this.x},${this.y}`,
+      glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "area not enclosed"),
+      constraintType: 'EnclosedAreaSizeConstraint',
+      position: { x: this.x, y: this.y },
+      requiredCount: this.expectedSize >= 0 ? this.expectedSize : undefined,
+      conversationVariables: this.expectedSize >= 0 ? { count: String(this.expectedSize) } : undefined,
+    }];
   }
 }

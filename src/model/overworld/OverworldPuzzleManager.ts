@@ -29,7 +29,9 @@ export class OverworldPuzzleManager {
 
         for (const definition of definitions) {
             try {
-                const puzzle = this.extractor.createBridgePuzzle(definition, tiledMapData);
+                const puzzle = definition.puzzleClass === 'FlowPuzzle'
+                    ? this.extractor.createFlowPuzzle(definition, tiledMapData)
+                    : this.extractor.createBridgePuzzle(definition, tiledMapData);
                 puzzles.set(puzzle.id, puzzle);
                 this.puzzleCache.set(puzzle.id, puzzle);
                 this.definitionCache.set(puzzle.id, definition);

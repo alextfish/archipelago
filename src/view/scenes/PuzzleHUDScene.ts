@@ -8,15 +8,28 @@ export class PuzzleHUDScene extends Phaser.Scene {
     private counts: Record<string, number> = {};
     private types: BridgeType[] = [];
     private solvedOverlay: Phaser.GameObjects.Container | null = null;
-    private currentController: PuzzleController | null = null;
-    private currentPuzzleType: 'overworld' | 'bridge' | null = null;
     private eventListeners: Array<{ event: string; callback: Function }> = [];
+    private backgroundRect: Phaser.GameObjects.Rectangle | null = null;
 
     constructor() {
         super({ key: 'PuzzleHUDScene' });
     }
 
     create() {
+        // Create solid background that sits between the overworld and HUD elements
+        // This prevents the overworld from showing through the HUD
+        this.backgroundRect = this.add.rectangle(
+            0,
+            0,
+            this.scale.width,
+            this.scale.height,
+            0x1a1a1a,
+            0.85
+        );
+        this.backgroundRect.setOrigin(0, 0);
+        this.backgroundRect.setDepth(0);
+        this.backgroundRect.setScrollFactor(0);
+        this.backgroundRect.setVisible(false); // Hidden by default
         // Create the sidebar UI and wire its callbacks to scene events so other scenes
         // can listen for user actions.
         const callbacks = {
@@ -24,6 +37,8 @@ export class PuzzleHUDScene extends Phaser.Scene {
             onExit: () => this.events.emit('exit'),
             onUndo: () => this.events.emit('undo'),
             onRedo: () => this.events.emit('redo'),
+            onNavigateNext: () => this.events.emit('navigateNext'),
+            onNavigatePrevious: () => this.events.emit('navigatePrevious'),
         };
 
         this.sidebar = new PuzzleSidebar(this as Phaser.Scene, callbacks);
@@ -67,6 +82,19 @@ export class PuzzleHUDScene extends Phaser.Scene {
             this.sidebar?.updateIslandInfo(totalCount, visibleCount, bounds);
         });
 
+        // Listen for series navigation events
+        this.events.on('setSeriesNavigationVisible', (visible: boolean) => {
+            this.sidebar?.setSeriesNavigationVisible(visible);
+        });
+
+        this.events.on('setNextEnabled', (enabled: boolean) => {
+            this.sidebar?.setNextEnabled(enabled);
+        });
+
+        this.events.on('setPreviousEnabled', (enabled: boolean) => {
+            this.sidebar?.setPreviousEnabled(enabled);
+        });
+
         // Listen for solved notification and show a persistent HUD overlay
         this.events.on('puzzleSolved', () => {
             try { console.log('[PuzzleHUDScene] puzzleSolved event received - showing HUD overlay'); } catch (e) { }
@@ -103,11 +131,15 @@ export class PuzzleHUDScene extends Phaser.Scene {
      * Setup HUD for a specific puzzle type
      * Called by PuzzleHUDManager when entering puzzle mode
      */
-    setupForPuzzle(controller: PuzzleController, puzzleType: 'overworld' | 'bridge'): void {
+    setupForPuzzle(_controller: PuzzleController, puzzleType: 'overworld' | 'bridge'): void {
         console.log(`PuzzleHUDScene: Setting up for ${puzzleType} puzzle`);
 
-        this.currentController = controller;
-        this.currentPuzzleType = puzzleType;
+        // Show background only for bridge puzzles (series/standalone)
+        // Overworld puzzles need to see the terrain, so no background
+        if (this.backgroundRect) {
+
+            this.backgroundRect.setVisible(puzzleType === 'bridge');
+        }
 
         // Clear any existing event listeners
         this.cleanupEventListeners();
@@ -153,6 +185,19 @@ export class PuzzleHUDScene extends Phaser.Scene {
 
         this.setupEventListener(sourceScene.events, 'updateIslandInfo', (totalCount: number, visibleCount: number, bounds?: { minX: number; maxX: number; minY: number; maxY: number }) => {
             this.sidebar?.updateIslandInfo(totalCount, visibleCount, bounds);
+        });
+
+        // Series navigation events
+        this.setupEventListener(sourceScene.events, 'setSeriesNavigationVisible', (visible: boolean) => {
+            this.sidebar?.setSeriesNavigationVisible(visible);
+        });
+
+        this.setupEventListener(sourceScene.events, 'setNextEnabled', (enabled: boolean) => {
+            this.sidebar?.setNextEnabled(enabled);
+        });
+
+        this.setupEventListener(sourceScene.events, 'setPreviousEnabled', (enabled: boolean) => {
+            this.sidebar?.setPreviousEnabled(enabled);
         });
 
         this.setupEventListener(sourceScene.events, 'puzzleSolved', () => {
@@ -252,8 +297,6 @@ export class PuzzleHUDScene extends Phaser.Scene {
         this.cleanupEventListeners();
 
         // Reset state
-        this.currentController = null;
-        this.currentPuzzleType = null;
         this.counts = {};
         this.types = [];
 
@@ -267,13 +310,34 @@ export class PuzzleHUDScene extends Phaser.Scene {
     }
 
     /**
+     * Hide puzzle controls (sidebar, background) while keeping the solved overlay visible.
+     * Used during overworld puzzle exit so the overlay stays on screen during the camera pan.
+     * The full HUD cleanup happens once the camera pan completes.
+     */
+    public hideControlsOnly(): void {
+        this.sidebar?.setVisible(false);
+        if (this.backgroundRect) {
+            this.backgroundRect.setVisible(false);
+        }
+        this.cleanupEventListeners();
+    }
+
+    /**
      * Set visibility of the HUD scene
      */
-    setVisible(visible: boolean): void {
+    setVisible(visible: boolean, puzzleType: 'overworld' | 'bridge'): void {
         console.log(`PuzzleHUDScene: Setting visibility to ${visible}`);
         this.scene.setVisible(visible);
 
-        // Sidebar visibility is controlled by the scene visibility
-        // No need to explicitly control it
+        // When showing the HUD, always re-show the sidebar in case hideControlsOnly()
+        // hid it while the solved overlay was on screen during a previous camera pan.
+        if (visible) {
+            this.sidebar?.setVisible(true);
+        }
+
+        // Show/hide background with HUD
+        if (this.backgroundRect) {
+            this.backgroundRect.setVisible(visible && puzzleType === 'bridge');
+        }
     }
 }

@@ -19,6 +19,9 @@ export interface SpeechBubbleFrames {
     bottomEdge: number;
     bottomRight: number;
     arrow: number;
+    /** Diagonal arrow pointing down-left by default. Swap into the appropriate corner
+     *  (with flipping) when a diagonal pointer toward the speaker is needed. */
+    arrowDiagonal: number;
 }
 
 export interface LanguageDefinition {
@@ -69,11 +72,29 @@ export class LanguageGlyphRegistry {
             ['right-of', 51],
             ['above', 52],
             ['below', 53],
+            ['good', 54],
+            ['water', 55],
             // Color glyphs
-            ['red', 60],
-            ['blue', 61],
-            ['green', 62],
-            ['yellow', 63],
+            ['red', 56],
+            ['blue', 57],
+            ['green', 58],
+            ['yellow', 59],
+            // Conversation glyphs
+            ['happy', 60],
+            ['sad', 61],
+            ['1', 62],
+            ['2', 63],
+            ['3', 64],
+            ['4', 65],
+            ['5', 66],
+            ['6', 67],
+            ['7', 68],
+            ['8', 69],
+            ['9', 70],
+            ['10', 71],
+            ['exclamation', 72],
+            ['jewel', 73],
+            ['see', 74],
         ]);
 
         this.languages.set('grass', {
@@ -89,6 +110,7 @@ export class LanguageGlyphRegistry {
                 bottomEdge: 21,
                 bottomRight: 22,
                 arrow: 16,
+                arrowDiagonal: 26,
             },
             glyphs: grassGlyphs,
             missingGlyphFrame: 6,
@@ -112,6 +134,7 @@ export class LanguageGlyphRegistry {
                 bottomEdge: 24,
                 bottomRight: 25,
                 arrow: 17,
+                arrowDiagonal: 27,
             },
             glyphs: fireGlyphs,
             missingGlyphFrame: 7,
@@ -156,6 +179,24 @@ export class LanguageGlyphRegistry {
     parseGlyphs(language: string, glyphText: string): number[] {
         const words = glyphText.trim().split(/\s+/);
         return words.map(word => this.getGlyphFrame(language, word));
+    }
+
+    /**
+     * Parse a glyph string into per-sentence frame indices.
+     * Sentences are separated by ". " (full stop followed by a space).
+     * Each sentence is returned as its own array of frame indices.
+     * Empty sentences are omitted.
+     * @param language Language key
+     * @param glyphText Space-separated words, with ". " between sentences
+     */
+    parseGlyphsPerSentence(language: string, glyphText: string): number[][] {
+        return glyphText
+            .split('. ')
+            .map(sentence => sentence.trim())
+            .filter(sentence => sentence.length > 0)
+            .map(sentence =>
+                sentence.split(/\s+/).map(word => this.getGlyphFrame(language, word))
+            );
     }
 
     /**

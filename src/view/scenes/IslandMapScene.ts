@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import { GridToWorldMapper } from '../GridToWorldMapper';
 import { PhaserPuzzleRenderer } from '../PhaserPuzzleRenderer';
+import { isTestMode, attachTestMarker } from '@helpers/TestMarkers';
+import { loadNPCSprites } from '../NPCSpriteHelper';
 
 export class IslandMapScene extends Phaser.Scene {
     private puzzle: BridgePuzzle | null = null;
@@ -21,6 +23,19 @@ export class IslandMapScene extends Phaser.Scene {
             frameWidth: 32,
             frameHeight: 32
         });
+        // Load language tileset for speech bubbles in constraint feedback
+        this.load.spritesheet('language', 'resources/tilesets/language.png', {
+            frameWidth: 32,
+            frameHeight: 32
+        });
+        // Load counts overlay spritesheet for constraint NPCs
+        this.load.spritesheet('counts overlay', 'resources/sprites/counts overlay.png', {
+            frameWidth: 32,
+            frameHeight: 32
+        });
+        // Compass overlay art is not finalised yet, so do not queue the texture here.
+        // Load NPC sprites for constraint feedback display
+        loadNPCSprites(this.load);
         console.log('IslandMapScene: preload() finished');
     }
 
@@ -83,6 +98,14 @@ export class IslandMapScene extends Phaser.Scene {
             this.puzzleRenderer?.destroy();
         });
 
+        this.events.on('showConstraintFeedback', (items: any[], puzzle: any) => {
+            this.puzzleRenderer?.showConstraintFeedback(items, puzzle);
+        });
+
+        this.events.on('hideConstraintFeedback', () => {
+            this.puzzleRenderer?.hideConstraintFeedback();
+        });
+
         // Listen for coordinate conversion requests
         this.events.on('worldToGrid', (worldX: number, worldY: number, callback: (result: { x: number; y: number }) => void) => {
             if (this.gridMapper) {
@@ -134,6 +157,13 @@ export class IslandMapScene extends Phaser.Scene {
             bridgeScene.events.emit('island-pointerup', worldX, worldY, gridX, gridY);
         });
 
+        // Forward bridge clicks from renderer to BridgePuzzleScene
+        this.events.on('bridge-clicked', (bridgeId: string) => {
+            console.log(`IslandMapScene: Forwarding bridge click (${bridgeId}) to BridgePuzzleScene`);
+            const bridgeScene = this.scene.get('BridgePuzzleScene');
+            bridgeScene.events.emit('bridge-clicked', bridgeId);
+        });
+
         // Emit ready events to signal that IslandMapScene is fully initialized
         console.log('IslandMapScene: Emitting islandMapReady events to BridgePuzzleScene');
         const bridgeScene = this.scene.get('BridgePuzzleScene');
@@ -141,10 +171,13 @@ export class IslandMapScene extends Phaser.Scene {
         bridgeScene.events.emit('islandMapReadyForCamera');
     }
 
+    getGridMapper(): GridToWorldMapper | null {
+        return this.gridMapper;
+    }
+
     private initializeRenderer() {
         if (!this.puzzle) return;
 
-        console.log('IslandMapScene: Initializing renderer');
         // Create coordinate mapper with 32px cell size (sprites are 32x32)
         this.gridMapper = new GridToWorldMapper(32);
 
@@ -152,7 +185,6 @@ export class IslandMapScene extends Phaser.Scene {
         this.puzzleRenderer = new PhaserPuzzleRenderer(this, this.gridMapper, 'sprout-tiles');
 
         // Initialize renderer with puzzle
-        console.log('IslandMapScene: Calling renderer.init and updateFromPuzzle');
         this.puzzleRenderer.init(this.puzzle);
         this.puzzleRenderer.updateFromPuzzle(this.puzzle);
         console.log('IslandMapScene: Renderer initialized, island count:', this.puzzle.islands.length);
@@ -182,7 +214,42 @@ export class IslandMapScene extends Phaser.Scene {
             console.log(`Camera size: ${cam.width} x ${cam.height}`);
             console.log(`Camera center would be: (${cam.scrollX + cam.width / 2}, ${cam.scrollY + cam.height / 2})`);
             console.log('=== END CAMERA DEBUG ===');
+
+            // Expose camera info for Playwright tests
+            if (isTestMode()) {
+                (window as any).__PUZZLE_CAMERA_INFO__ = {
+                    zoom: cam.zoom,
+                    scrollX: cam.scrollX,
+                    scrollY: cam.scrollY
+                };
+                console.log('[TEST] Exposed puzzle camera info:', (window as any).__PUZZLE_CAMERA_INFO__);
+            }
         }, 100);
+
+        // Add test marker for puzzle boundary
+        if (isTestMode() && this.gridMapper) {
+            const cell = this.gridMapper.getCellSize();
+            const puzzleWidth = this.puzzle.islands.length > 0
+                ? (Math.max(...this.puzzle.islands.map(i => i.x)) + 1) * cell
+                : cell * 10;
+            const puzzleHeight = this.puzzle.islands.length > 0
+                ? (Math.max(...this.puzzle.islands.map(i => i.y)) + 1) * cell
+                : cell * 10;
+
+            // Create an invisible game object at origin to attach marker to
+            const markerObject = this.add.rectangle(0, 0, puzzleWidth, puzzleHeight, 0x000000, 0);
+            markerObject.setOrigin(0, 0);
+
+            attachTestMarker(this, markerObject, {
+                id: 'puzzle-boundary',
+                testId: 'puzzle-boundary',
+                width: puzzleWidth,
+                height: puzzleHeight,
+                showBorder: false // Don't show visual border, just DOM marker
+            });
+
+            console.log(`[TEST] Added puzzle boundary marker: ${puzzleWidth}x${puzzleHeight}`);
+        }
     }
 
     private adjustCameraForIslands() {
@@ -244,6 +311,16 @@ export class IslandMapScene extends Phaser.Scene {
             this.cameras.main.scrollX -= worldDeltaX;
             this.cameras.main.scrollY -= worldDeltaY;
             console.log(`Camera centered and nudged by world delta (${worldDeltaX.toFixed(2)}, ${worldDeltaY.toFixed(2)})`);
+
+            // Update exposed camera info for tests
+            if (isTestMode()) {
+                const cam = this.cameras.main;
+                (window as any).__PUZZLE_CAMERA_INFO__ = {
+                    zoom: cam.zoom,
+                    scrollX: cam.scrollX,
+                    scrollY: cam.scrollY
+                };
+            }
         }
     }
 

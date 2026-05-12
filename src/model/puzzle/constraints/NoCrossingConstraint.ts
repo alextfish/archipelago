@@ -8,6 +8,8 @@ import type { Point } from "../Point";
  * (excluding shared endpoints).
  */
 export class NoCrossingConstraint extends Constraint {
+  override readonly personified: boolean = false;
+
   static fromSpec(_params: { [key: string]: any }): NoCrossingConstraint {
     return new NoCrossingConstraint();
   }

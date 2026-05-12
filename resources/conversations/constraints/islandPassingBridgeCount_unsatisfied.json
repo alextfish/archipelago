@@ -1,0 +1,18 @@
+{
+  "id": "islandPassingBridgeCount_unsatisfied",
+  "start": "main",
+  "nodes": {
+    "main": {
+      "npc": {
+        "expression": "neutral",
+        "glyphs": "me want {{count}} bridge {{direction}} island"
+      },
+      "choices": [
+        {
+          "text": "Leave",
+          "end": true
+        }
+      ]
+    }
+  }
+}

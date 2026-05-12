@@ -8,6 +8,8 @@ export interface PuzzleSidebarCallbacks {
   onExit: () => void;
   onUndo: () => void;
   onRedo: () => void;
+  onNavigateNext?: () => void;
+  onNavigatePrevious?: () => void;
 }
 
 export class PuzzleSidebar {
@@ -21,6 +23,9 @@ export class PuzzleSidebar {
   private selectedTypeId: string | null = null;
   private undoBg: Phaser.GameObjects.Rectangle | null = null;
   private redoBg: Phaser.GameObjects.Rectangle | null = null;
+  private nextBg: Phaser.GameObjects.Rectangle | null = null;
+  private prevBg: Phaser.GameObjects.Rectangle | null = null;
+  private seriesNavigationContainer: Phaser.GameObjects.Container | null = null;
 
   // Debug panel
   private debugPanel: Phaser.GameObjects.Container | null = null;
@@ -106,10 +111,42 @@ export class PuzzleSidebar {
     this.redoBg = redoBtn.getAll().find(c => c instanceof Phaser.GameObjects.Rectangle) as Phaser.GameObjects.Rectangle;
     yOffset += 40;
 
+    // Series navigation buttons (initially hidden)
+    this.createSeriesNavigationButtons(yOffset);
+    yOffset += 90; // Space for both buttons when visible
+
     // Debug panel (only show in debug mode)
     if (Environment.isDebug()) {
       this.createDebugPanel(yOffset);
     }
+  }
+
+  private createSeriesNavigationButtons(y: number): void {
+    if (this.seriesNavigationContainer) {
+      this.seriesNavigationContainer.destroy();
+    }
+
+    this.seriesNavigationContainer = this.scene.add.container(0, y);
+    this.seriesNavigationContainer.setVisible(false); // Hidden by default
+
+    let localY = 0;
+
+    // Previous button
+    if (this.callbacks.onNavigatePrevious) {
+      const prevBtn = this.createButton('Previous', localY, () => this.callbacks.onNavigatePrevious!());
+      this.seriesNavigationContainer.add(prevBtn);
+      this.prevBg = prevBtn.getAll().find(c => c instanceof Phaser.GameObjects.Rectangle) as Phaser.GameObjects.Rectangle;
+      localY += 40;
+    }
+
+    // Next button
+    if (this.callbacks.onNavigateNext) {
+      const nextBtn = this.createButton('Next', localY, () => this.callbacks.onNavigateNext!());
+      this.seriesNavigationContainer.add(nextBtn);
+      this.nextBg = nextBtn.getAll().find(c => c instanceof Phaser.GameObjects.Rectangle) as Phaser.GameObjects.Rectangle;
+    }
+
+    this.panel.add(this.seriesNavigationContainer);
   }
 
   private createBridgeTypeButton(type: BridgeType, y: number): Phaser.GameObjects.Container | undefined {
@@ -190,6 +227,34 @@ export class PuzzleSidebar {
     }
   }
 
+  setSeriesNavigationVisible(visible: boolean): void {
+    if (this.seriesNavigationContainer) {
+      this.seriesNavigationContainer.setVisible(visible);
+    }
+  }
+
+  setNextEnabled(enabled: boolean): void {
+    if (!this.nextBg) return;
+    if (enabled) {
+      this.nextBg.setFillStyle(0x0077ff, 1);
+      if ((this.nextBg as any).setInteractive) (this.nextBg as any).setInteractive({ useHandCursor: true });
+    } else {
+      this.nextBg.setFillStyle(0x0077ff, 0.35);
+      if ((this.nextBg as any).disableInteractive) (this.nextBg as any).disableInteractive();
+    }
+  }
+
+  setPreviousEnabled(enabled: boolean): void {
+    if (!this.prevBg) return;
+    if (enabled) {
+      this.prevBg.setFillStyle(0x0077ff, 1);
+      if ((this.prevBg as any).setInteractive) (this.prevBg as any).setInteractive({ useHandCursor: true });
+    } else {
+      this.prevBg.setFillStyle(0x0077ff, 0.35);
+      if ((this.prevBg as any).disableInteractive) (this.prevBg as any).disableInteractive();
+    }
+  }
+
   updateCounts(counts: Record<string, number>): void {
     this.counts = counts;
 
@@ -244,7 +309,9 @@ export class PuzzleSidebar {
         if (id === typeId) {
           bg.setFillStyle(0x9999aa, 1); // Bright cyan when selected
         } else {
-          bg.setFillStyle(0x555555, 1); // Grey when not selected
+          // Keep depleted buttons dark so they don't look available
+          const avail = this.counts[id] ?? 0;
+          bg.setFillStyle(avail > 0 ? 0x555555 : 0x222222, 1);
         }
       }
     }
@@ -324,6 +391,10 @@ export class PuzzleSidebar {
     for (let i = 0; i < Math.min(debugInfo.length, this.debugTexts.length); i++) {
       this.debugTexts[i].setText(debugInfo[i]);
     }
+  }
+
+  setVisible(visible: boolean): void {
+    this.panel.setVisible(visible);
   }
 
   destroy(): void {

@@ -1,6 +1,7 @@
 import type { BridgePuzzle } from "../BridgePuzzle";
 import type { Bridge } from "../Bridge";
 import type { ConstraintResult } from "./ConstraintResult";
+import type { ConstraintDisplayItem } from "./ConstraintDisplayItem";
 import { Constraint } from "./Constraint";
 
 type Point = { x: number; y: number };
@@ -72,7 +73,7 @@ abstract class GridCellConstraint extends Constraint {
  * adjacent to the given grid space.
  */
 export class MustTouchAHorizontalBridge extends GridCellConstraint {
-    static fromSpec(params: { x: number; y: number; [key: string]: any  }): MustTouchAHorizontalBridge {
+    static fromSpec(params: { x: number; y: number;[key: string]: any }): MustTouchAHorizontalBridge {
         return new MustTouchAHorizontalBridge(params.x, params.y);
     }
     check(puzzle: BridgePuzzle): ConstraintResult {
@@ -87,8 +88,17 @@ export class MustTouchAHorizontalBridge extends GridCellConstraint {
             message: ok
                 ? undefined
                 : `No horizontal bridge adjacent to space (${this.x}, ${this.y})`,
-            glyphMessage: ok ? undefined : "no adjacent bridge",
+            glyphMessage: ok ? undefined : "no adjacent horizontal bridge",
         };
+    }
+
+    protected override getCoreDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+        const result = this.check(puzzle);
+        return [{
+            elementID: `${this.x},${this.y}`,
+            glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "good"),
+            constraintType: 'MustTouchAHorizontalBridge',
+        }];
     }
 }
 
@@ -97,7 +107,7 @@ export class MustTouchAHorizontalBridge extends GridCellConstraint {
  * adjacent to the given grid space.
  */
 export class MustTouchAVerticalBridge extends GridCellConstraint {
-    static fromSpec(params: { x: number; y: number; [key: string]: any  }): MustTouchAVerticalBridge {
+    static fromSpec(params: { x: number; y: number;[key: string]: any }): MustTouchAVerticalBridge {
         return new MustTouchAVerticalBridge(params.x, params.y);
     }
     check(puzzle: BridgePuzzle): ConstraintResult {
@@ -112,7 +122,16 @@ export class MustTouchAVerticalBridge extends GridCellConstraint {
             message: ok
                 ? undefined
                 : `No vertical bridge adjacent to space (${this.x}, ${this.y})`,
-            glyphMessage: ok ? undefined : "no adjacent bridge",
+            glyphMessage: ok ? undefined : "no adjacent vertical bridge",
         };
+    }
+
+    protected override getCoreDisplayItems(puzzle: BridgePuzzle): ConstraintDisplayItem[] {
+        const result = this.check(puzzle);
+        return [{
+            elementID: `${this.x},${this.y}`,
+            glyphMessage: result.satisfied ? "good" : (result.glyphMessage ?? "good"),
+            constraintType: 'MustTouchAVerticalBridge',
+        }];
     }
 }
