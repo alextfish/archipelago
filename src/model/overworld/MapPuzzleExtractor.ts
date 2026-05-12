@@ -315,11 +315,11 @@ export class MapPuzzleExtractor {
             parentPath: this.parentPath(layer.fullPath),
         }));
         const regionWaterflow = definition.regionGroup
-            ? layersWithParentPath.find(l =>
-                l.parentPath === definition.regionGroup
-                || l.parentPath.startsWith(`${definition.regionGroup}/`)
+            ? layersWithParentPath.find(layerWithPath =>
+                layerWithPath.parentPath === definition.regionGroup
+                || layerWithPath.parentPath.startsWith(`${definition.regionGroup}/`)
             )?.layer
-            : layersWithParentPath.find(l => l.parentPath === '')?.layer;
+            : layersWithParentPath.find(layerWithPath => layerWithPath.parentPath === '')?.layer;
         const waterflowLayer = regionWaterflow ?? layersWithParentPath[0]?.layer;
         if (!waterflowLayer) return [];
 

@@ -125,10 +125,10 @@ export class WaterDisplayManifestReader {
 
     private static isWaterDirectionsTile(tilesets: any[], gid: number): boolean {
         let owningTileset: any = null;
-        for (const ts of tilesets ?? []) {
-            if (ts.firstgid <= gid) {
-                if (!owningTileset || ts.firstgid > owningTileset.firstgid) {
-                    owningTileset = ts;
+        for (const tileset of tilesets ?? []) {
+            if (tileset.firstgid <= gid) {
+                if (!owningTileset || tileset.firstgid > owningTileset.firstgid) {
+                    owningTileset = tileset;
                 }
             }
         }
