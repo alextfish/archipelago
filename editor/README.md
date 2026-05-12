@@ -90,18 +90,13 @@ The editor exports puzzles in this format:
 
 ## Limitations (MVP)
 
-- Solution testing is a placeholder (requires full constraint implementation)
-- Bridge placement for testing is not yet implemented
 - BridgeMustCoverIslandConstraint configuration per bridge type is not implemented
 - No undo/redo functionality
 - Limited validation of puzzle correctness
 
 ## Future Enhancements
 
-- Full solution testing with constraint validation
-- Visual bridge placement for testing solutions
 - Undo/redo support
 - Puzzle validation before export
 - Import existing puzzle files for editing
-- Visual indicators for constraint locations on the grid
 - Preview of puzzle in game style
