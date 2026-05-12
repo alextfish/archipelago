@@ -52,7 +52,7 @@ export class WaterDisplayManifestReader {
 
                 const tileX = i % mapWidth;
                 const tileY = Math.floor(i / mapWidth);
-                const key = `${tileX},${tileY}`;
+                const key = this.tileKey(tileX, tileY);
                 const visualGID = visualData[i] ?? 0;
 
                 const logicProps = TiledLayerUtils.getTileProperties(tiledMapData.tilesets, logicGID);
@@ -95,14 +95,14 @@ export class WaterDisplayManifestReader {
             const groupPath = this.parentPath(visualLayer.fullPath);
             const visualData: number[] = visualLayer.data?.data ?? visualLayer.data ?? [];
             for (let i = 0; i < visualData.length; i++) {
-                if (entries.has(`${i % mapWidth},${Math.floor(i / mapWidth)}`)) continue;
+                const tileX = i % mapWidth;
+                const tileY = Math.floor(i / mapWidth);
+                const key = this.tileKey(tileX, tileY);
+                if (entries.has(key)) continue;
                 const visualGID = visualData[i] ?? 0;
                 if (visualGID <= 0) continue;
                 if (!this.isWaterDirectionsTile(tiledMapData.tilesets, visualGID)) continue;
 
-                const tileX = i % mapWidth;
-                const tileY = Math.floor(i / mapWidth);
-                const key = `${tileX},${tileY}`;
                 const visualProps = TiledLayerUtils.getTileProperties(tiledMapData.tilesets, visualGID);
                 const visualOutgoing = TiledLayerUtils.flowDirectionsFromProperties(visualProps);
                 const fallbackWaterGID = this.pickStableFallbackWaterGID(tileX, tileY, groupPath, waterGIDs);
@@ -155,6 +155,10 @@ export class WaterDisplayManifestReader {
     private static parentPath(fullPath: string): string {
         const idx = fullPath.lastIndexOf('/');
         return idx >= 0 ? fullPath.substring(0, idx) : '';
+    }
+
+    private static tileKey(tileX: number, tileY: number): string {
+        return `${tileX},${tileY}`;
     }
 
     private static isWaterDirectionsTile(tilesets: any[], gid: number): boolean {

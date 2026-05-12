@@ -167,9 +167,15 @@ export class FlowWaterVisualManager {
      * Dynamic FlowPuzzle updates still override these tiles as puzzle water changes.
      */
     normaliseStaticWaterTiles(): void {
+        const tileLayerByName = new Map<string, Phaser.Tilemaps.TilemapLayer>();
+        for (const layer of this.map.layers) {
+            if (layer.tilemapLayer) {
+                tileLayerByName.set(layer.name, layer.tilemapLayer);
+            }
+        }
+
         for (const entry of this.displayManifest.entries.values()) {
-            const layerData = this.map.layers.find(layer => layer.name === entry.targetWaterLayerName);
-            const tileLayer = layerData?.tilemapLayer;
+            const tileLayer = tileLayerByName.get(entry.targetWaterLayerName);
             if (!tileLayer) continue;
 
             const needsFallbackReplacement = entry.visualIsDirectionOnly || !entry.visualGID;
