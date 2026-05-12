@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import type { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
 import { CollisionType } from '@model/overworld/CollisionTypes';
-import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import type { PontoonTileData } from '@model/overworld/CollisionInitialiser';
+import type { WaterDisplayManifest, WaterDisplayManifestTile } from '@model/overworld/WaterDisplayManifestReader';
+import { WaterAnimationManager } from '@view/WaterAnimationManager';
 
 /**
  * Manages the visual synchronisation of overworld water tiles and pontoon tiles
@@ -21,16 +22,12 @@ import type { PontoonTileData } from '@model/overworld/CollisionInitialiser';
 export class FlowWaterVisualManager {
     private readonly map: Phaser.Tilemaps.Tilemap;
     private readonly tiledMapData: any;
+    private readonly displayManifest: WaterDisplayManifest;
+    private readonly waterAnimationManager?: WaterAnimationManager;
+    private readonly tileLayerByName = new Map<string, Phaser.Tilemaps.TilemapLayer>();
 
     /** Pontoon tile registry populated at map-load time by CollisionInitialiser. */
     readonly pontoonTiles: Map<string, PontoonTileData>;
-
-    /**
-     * Cache of GIDs removed from the water Tiled layer to make river tiles look
-     * dry. Keyed by `"tileX,tileY"`. The entry is deleted when the GID is
-     * restored.
-     */
-    private readonly waterTileGidCache: Map<string, { gid: number; layerName: string }> = new Map();
 
     private readonly getCollisionAt: (tileX: number, tileY: number) => CollisionType;
     private readonly setCollisionAt: (tileX: number, tileY: number, type: CollisionType) => void;
@@ -39,17 +36,26 @@ export class FlowWaterVisualManager {
     constructor(
         map: Phaser.Tilemaps.Tilemap,
         tiledMapData: any,
+        displayManifest: WaterDisplayManifest,
         pontoonTiles: Map<string, PontoonTileData>,
         getCollisionAt: (tileX: number, tileY: number) => CollisionType,
         setCollisionAt: (tileX: number, tileY: number, type: CollisionType) => void,
         isPermanentlyBlocked: (tileX: number, tileY: number) => boolean,
+        waterAnimationManager?: WaterAnimationManager,
     ) {
         this.map = map;
         this.tiledMapData = tiledMapData;
+        this.displayManifest = displayManifest;
         this.pontoonTiles = pontoonTiles;
         this.getCollisionAt = getCollisionAt;
         this.setCollisionAt = setCollisionAt;
         this.isPermanentlyBlocked = isPermanentlyBlocked;
+        this.waterAnimationManager = waterAnimationManager;
+        for (const layer of this.map.layers) {
+            if (layer.tilemapLayer) {
+                this.tileLayerByName.set(layer.name, layer.tilemapLayer);
+            }
+        }
     }
 
     /**
@@ -88,29 +94,8 @@ export class FlowWaterVisualManager {
      */
     updateSingleFlowTileVisual(tileX: number, tileY: number, hasWater: boolean): void {
         const key = `${tileX},${tileY}`;
-        const waterLayerData = this.findLayersBySuffix('water');
-
-        if (hasWater) {
-            const cached = this.waterTileGidCache.get(key);
-            if (cached) {
-                const ld = waterLayerData.find(l => l.name === cached.layerName);
-                if (ld?.tilemapLayer) {
-                    ld.tilemapLayer.putTileAt(cached.gid, tileX, tileY);
-                }
-                this.waterTileGidCache.delete(key);
-            }
-        } else {
-            if (!this.waterTileGidCache.has(key)) {
-                for (const ld of waterLayerData) {
-                    const tile = ld.tilemapLayer?.getTileAt(tileX, tileY);
-                    if (tile) {
-                        this.waterTileGidCache.set(key, { gid: tile.index, layerName: ld.name });
-                        ld.tilemapLayer!.removeTileAt(tileX, tileY);
-                        break;
-                    }
-                }
-            }
-        }
+        const manifestEntry = this.displayManifest.entries.get(key);
+        this.updateWaterDisplayForTile(key, tileX, tileY, hasWater, manifestEntry);
 
         // Pontoon at this position (if any).
         // Skip pontoons on ALWAYS_HIGH or STAIRS tiles — immune to flow water overrides.
@@ -180,12 +165,60 @@ export class FlowWaterVisualManager {
         }
     }
 
+    /**
+     * Replace non-display directional placeholder tiles (from the "water directions"
+     * tileset) with deterministic fallback water art so arrows are never visible.
+     *
+     * Also fills logic-backed tiles with fallback art when no authored visual tile exists.
+     * Dynamic FlowPuzzle updates still override these tiles as puzzle water changes.
+     */
+    normaliseStaticWaterTiles(): void {
+        for (const entry of this.displayManifest.entries.values()) {
+            const tileLayer = this.tileLayerByName.get(entry.targetWaterLayerName);
+            if (!tileLayer) continue;
+
+            const needsFallbackReplacement = entry.visualIsDirectionOnly || !entry.visualGID;
+            if (!needsFallbackReplacement || !entry.fallbackWaterGID) continue;
+            tileLayer.putTileAt(entry.fallbackWaterGID, entry.tileX, entry.tileY);
+        }
+    }
+
     // ── Private helpers ──────────────────────────────────────────────────────
 
-    /** Return all Phaser LayerData objects whose name suffix matches `suffix`. */
-    private findLayersBySuffix(suffix: string): Phaser.Tilemaps.LayerData[] {
-        return this.map.layers.filter(
-            layer => TiledLayerUtils.getLayerSuffix(layer.name) === suffix
-        );
+    private updateWaterDisplayForTile(
+        key: string,
+        tileX: number,
+        tileY: number,
+        hasWater: boolean,
+        manifestEntry: WaterDisplayManifestTile | undefined,
+    ): void {
+        if (!manifestEntry) return;
+        const tileLayer = this.tileLayerByName.get(manifestEntry.targetWaterLayerName);
+        if (!tileLayer) return;
+
+        if (hasWater) {
+            if (manifestEntry.visualHasFlowDirections) {
+                const baseGID = manifestEntry.visualIsDirectionOnly
+                    ? manifestEntry.fallbackWaterGID
+                    : (manifestEntry.visualGID ?? manifestEntry.fallbackWaterGID);
+                if (baseGID) {
+                    tileLayer.putTileAt(baseGID, tileX, tileY);
+                }
+                this.waterAnimationManager?.setTileWaterState(key, true);
+                return;
+            }
+
+            this.waterAnimationManager?.setTileWaterState(key, false);
+
+            const gidToShow = manifestEntry.visualGID ?? manifestEntry.fallbackWaterGID;
+            if (gidToShow) {
+                tileLayer.putTileAt(gidToShow, tileX, tileY);
+            }
+            return;
+        }
+
+        tileLayer.removeTileAt(tileX, tileY);
+        this.waterAnimationManager?.setTileWaterState(key, false);
     }
+
 }

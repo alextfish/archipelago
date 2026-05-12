@@ -290,29 +290,40 @@ export class MapPuzzleExtractor {
     }
 
     /**
-     * Extract flow square data from the "water" tile layer within the puzzle's bounds.
+     * Extract flow square data from the "waterflow" tile layer within the puzzle's bounds.
      * Returns local (puzzle-relative) coordinates and direction flags.
      */
     private extractFlowSquares(
         definition: MapPuzzleDefinition,
         tiledMap: TiledMapData
     ): FlowSquareSpec[] {
-        const waterLayers = TiledLayerUtils.findTileLayersByName(
+        const waterflowLayers = TiledLayerUtils.findTileLayersByName(
             tiledMap.layers as any[],
-            'water'
+            'waterflow'
         );
-        if (waterLayers.length === 0) {
-            console.warn(`No water layer found for FlowPuzzle ${definition.id}`);
+        const logicLayers = waterflowLayers.length > 0
+            ? waterflowLayers
+            : TiledLayerUtils.findTileLayersByName(tiledMap.layers as any[], 'water');
+        if (logicLayers.length === 0) {
+            console.warn(`No waterflow/water layer found for FlowPuzzle ${definition.id}`);
             return [];
         }
 
-        // Prefer the water layer in the same region group if available
-        const regionWater = definition.regionGroup
-            ? waterLayers.find(l => l.fullPath.startsWith(definition.regionGroup!))
-            : undefined;
-        const waterLayer = regionWater ?? waterLayers[0];
+        // Prefer the logic layer in the same region group if available.
+        const layersWithParentPath = logicLayers.map(layer => ({
+            layer,
+            parentPath: this.parentPath(layer.fullPath),
+        }));
+        const regionWaterflow = definition.regionGroup
+            ? layersWithParentPath.find(layerWithPath =>
+                layerWithPath.parentPath === definition.regionGroup
+                || layerWithPath.parentPath.startsWith(`${definition.regionGroup}/`)
+            )?.layer
+            : layersWithParentPath.find(layerWithPath => layerWithPath.parentPath === '')?.layer;
+        const waterflowLayer = regionWaterflow ?? layersWithParentPath[0]?.layer;
+        if (!waterflowLayer) return [];
 
-        const tileData: number[] = waterLayer.data.data as number[];
+        const tileData: number[] = (waterflowLayer.data.data ?? waterflowLayer.data) as number[];
         const tilesets: any[] = (tiledMap.tilesets ?? []) as any[];
 
         const puzzleOriginTileX = Math.floor(definition.bounds.x / tiledMap.tilewidth);
@@ -331,11 +342,7 @@ export class MapPuzzleExtractor {
                 const localX = tx - puzzleOriginTileX;
                 const localY = ty - puzzleOriginTileY;
 
-                const outgoing: Array<'N' | 'S' | 'E' | 'W'> = [];
-                if (props.flowNorth) outgoing.push('N');
-                if (props.flowSouth) outgoing.push('S');
-                if (props.flowEast) outgoing.push('E');
-                if (props.flowWest) outgoing.push('W');
+                const outgoing = TiledLayerUtils.flowDirectionsFromProperties(props);
 
                 flowSquares.push({
                     x: localX,
@@ -364,6 +371,11 @@ export class MapPuzzleExtractor {
 
         console.log(`Extracted ${flowSquares.length} flow squares for puzzle ${definition.id}`);
         return flowSquares;
+    }
+
+    private parentPath(fullPath: string): string {
+        const idx = fullPath.lastIndexOf('/');
+        return idx >= 0 ? fullPath.substring(0, idx) : '';
     }
     private createPuzzleDefinition(obj: MapObject, regionGroup?: string): MapPuzzleDefinition {
         const metadata = this.extractObjectProperties(obj);
