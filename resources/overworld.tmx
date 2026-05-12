@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="90" height="90" tilewidth="32" tileheight="32" infinite="0" nextlayerid="116" nextobjectid="123">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="90" height="90" tilewidth="32" tileheight="32" infinite="0" nextlayerid="116" nextobjectid="124">
  <editorsettings>
   <export target="overworld.json" format="json"/>
  </editorsettings>
@@ -3824,12 +3824,6 @@
      <property name="bridges" value="3"/>
     </properties>
    </object>
-   <object id="96" name="player start" x="1408" y="768" width="32" height="32">
-    <properties>
-     <property name="default" type="bool" value="true"/>
-     <property name="id" value="river"/>
-    </properties>
-   </object>
   </objectgroup>
   <objectgroup id="28" name="roof hide zones"/>
   <layer id="29" name="roofs" width="90" height="90">
@@ -6635,7 +6629,7 @@
   </object>
   <object id="67" name="player start" x="1376" y="1888" width="32" height="32">
    <properties>
-    <property name="default" type="bool" value="true"/>
+    <property name="default" type="bool" value="false"/>
     <property name="id" value="bay"/>
    </properties>
   </object>
@@ -6643,6 +6637,12 @@
    <properties>
     <property name="default" type="bool" value="false"/>
     <property name="id" value="river"/>
+   </properties>
+  </object>
+  <object id="123" name="player start" x="1088" y="1120" width="32" height="32">
+   <properties>
+    <property name="default" type="bool" value="true"/>
+    <property name="id" value="river edge"/>
    </properties>
   </object>
  </objectgroup>
