@@ -24,6 +24,7 @@ export class FlowWaterVisualManager {
     private readonly tiledMapData: any;
     private readonly displayManifest: WaterDisplayManifest;
     private readonly waterAnimationManager?: WaterAnimationManager;
+    private readonly tileLayerByName = new Map<string, Phaser.Tilemaps.TilemapLayer>();
 
     /** Pontoon tile registry populated at map-load time by CollisionInitialiser. */
     readonly pontoonTiles: Map<string, PontoonTileData>;
@@ -50,6 +51,11 @@ export class FlowWaterVisualManager {
         this.setCollisionAt = setCollisionAt;
         this.isPermanentlyBlocked = isPermanentlyBlocked;
         this.waterAnimationManager = waterAnimationManager;
+        for (const layer of this.map.layers) {
+            if (layer.tilemapLayer) {
+                this.tileLayerByName.set(layer.name, layer.tilemapLayer);
+            }
+        }
     }
 
     /**
@@ -167,15 +173,8 @@ export class FlowWaterVisualManager {
      * Dynamic FlowPuzzle updates still override these tiles as puzzle water changes.
      */
     normaliseStaticWaterTiles(): void {
-        const tileLayerByName = new Map<string, Phaser.Tilemaps.TilemapLayer>();
-        for (const layer of this.map.layers) {
-            if (layer.tilemapLayer) {
-                tileLayerByName.set(layer.name, layer.tilemapLayer);
-            }
-        }
-
         for (const entry of this.displayManifest.entries.values()) {
-            const tileLayer = tileLayerByName.get(entry.targetWaterLayerName);
+            const tileLayer = this.tileLayerByName.get(entry.targetWaterLayerName);
             if (!tileLayer) continue;
 
             const needsFallbackReplacement = entry.visualIsDirectionOnly || !entry.visualGID;
@@ -194,8 +193,7 @@ export class FlowWaterVisualManager {
         manifestEntry: WaterDisplayManifestTile | undefined,
     ): void {
         if (!manifestEntry) return;
-        const layerData = this.map.layers.find(layer => layer.name === manifestEntry.targetWaterLayerName);
-        const tileLayer = layerData?.tilemapLayer;
+        const tileLayer = this.tileLayerByName.get(manifestEntry.targetWaterLayerName);
         if (!tileLayer) return;
 
         if (hasWater) {

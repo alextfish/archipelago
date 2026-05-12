@@ -70,8 +70,7 @@ export class WaterAnimationManager {
 
     /**
      * Resolve render depth for animated overlays from the target water layer.
-     * Falls back to depth 0 when the layer is not available so overlays remain
-     * in the default world depth and avoid floating above canopy/overhead layers.
+     * Falls back to depth 0 when the layer is not available.
      */
     private resolveWaterLayerDepth(targetLayerName: string): number {
         const layerData = this.map.layers.find(layer => layer.name === targetLayerName);
