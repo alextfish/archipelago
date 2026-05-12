@@ -2,11 +2,19 @@ import { describe, expect, it, vi } from 'vitest';
 import { WaterAnimationManager } from '@view/WaterAnimationManager';
 import type { WaterDisplayManifestTile } from '@model/overworld/WaterDisplayManifestReader';
 
+interface SpriteDouble {
+  setOrigin: ReturnType<typeof vi.fn>;
+  setVisible: ReturnType<typeof vi.fn>;
+  setDepth: ReturnType<typeof vi.fn>;
+  play: ReturnType<typeof vi.fn>;
+  stop: ReturnType<typeof vi.fn>;
+}
+
 describe('WaterAnimationManager', () => {
   it('sets animation sprite depth to the target water layer depth', () => {
-    const createdSprites: any[] = [];
-    const spriteFactory = () => {
-      const sprite = {
+    const createdSprites: SpriteDouble[] = [];
+    const spriteFactory = (): SpriteDouble => {
+      const sprite: SpriteDouble = {
         setOrigin: vi.fn(),
         setVisible: vi.fn(),
         setDepth: vi.fn(),

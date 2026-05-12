@@ -172,8 +172,8 @@ export class FlowWaterVisualManager {
             const tileLayer = layerData?.tilemapLayer;
             if (!tileLayer) continue;
 
-            const shouldUseFallback = entry.visualIsDirectionOnly || !entry.visualGID;
-            if (!shouldUseFallback || !entry.fallbackWaterGID) continue;
+            const needsFallbackReplacement = entry.visualIsDirectionOnly || !entry.visualGID;
+            if (!needsFallbackReplacement || !entry.fallbackWaterGID) continue;
             tileLayer.putTileAt(entry.fallbackWaterGID, entry.tileX, entry.tileY);
         }
     }
