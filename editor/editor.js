@@ -869,7 +869,7 @@ var IslandVisibilityConstraint = class _IslandVisibilityConstraint extends Const
     while (true) {
       currentX += dx;
       currentY += dy;
-      if (currentX < 0 || currentX >= puzzle.width || currentY < 0 || currentY >= puzzle.height) {
+      if (currentX < 1 || currentX > puzzle.width || currentY < 1 || currentY > puzzle.height) {
         break;
       }
       const islandAtPosition = puzzle.islands.find((i) => i.x === currentX && i.y === currentY);

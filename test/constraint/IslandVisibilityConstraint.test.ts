@@ -88,6 +88,26 @@ describe("IslandVisibilityConstraint", () => {
 
     expect(result.satisfied).toBe(true);
   });
+
+  it("counts chained visible islands all the way to the puzzle edge", () => {
+    const islands = [
+      { id: "A", x: 1, y: 1 },
+      { id: "B", x: 3, y: 1 },
+      { id: "C", x: 5, y: 1 }
+    ];
+
+    const bridges = [
+      { id: "b1", start: { x: 1, y: 1 }, end: { x: 3, y: 1 }, type: { id: "t1" } },
+      { id: "b2", start: { x: 3, y: 1 }, end: { x: 5, y: 1 }, type: { id: "t2" } }
+    ];
+
+    const puzzle = makeMockPuzzle({ islands, bridges, placedBridges: bridges, width: 5, height: 5 });
+
+    const constraint = new IslandVisibilityConstraint("A", 2);
+    const result = constraint.check(puzzle as any);
+
+    expect(result.satisfied).toBe(true);
+  });
 });
 
 describe("IslandVisibilityConstraint.getDisplayItems", () => {
