@@ -1,0 +1,469 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f5f5f5;
+    color: #333;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+header {
+    background: #2c3e50;
+    color: white;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+}
+
+header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.header-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.btn:hover {
+    background: #2980b9;
+}
+
+.btn.active {
+    background: #27ae60;
+}
+
+.btn.active:hover {
+    background: #229954;
+}
+
+.btn-full {
+    width: 100%;
+    text-align: center;
+    display: block;
+    margin-bottom: 0.4rem;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #3498db;
+    border: 1px solid #3498db;
+}
+
+.btn-outline:hover {
+    background: #3498db;
+    color: white;
+}
+
+.btn-small {
+    background: #95a5a6;
+    color: white;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+}
+
+.btn-small:hover {
+    background: #7f8c8d;
+}
+
+.cancel-btn {
+    background: #e74c3c;
+    margin-top: 0.5rem;
+}
+
+.cancel-btn:hover {
+    background: #c0392b;
+}
+
+.main-container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.left-panel {
+    width: 260px;
+    flex-shrink: 0;
+    background: white;
+    padding: 1rem;
+    overflow-y: auto;
+    border-right: 1px solid #ddd;
+}
+
+.center-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+    overflow-y: auto;
+    gap: 1rem;
+}
+
+/* Left panel sections */
+.panel-action-buttons {
+    margin-bottom: 0.75rem;
+}
+
+#constraintTypePanel h3,
+#constraintFormPanel h3,
+#puzzleConstraintsPanel h3 {
+    font-size: 0.95rem;
+    color: #2c3e50;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid #ddd;
+}
+
+.constraint-form-panel {
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+}
+
+.cell-hint {
+    font-size: 0.8rem;
+    color: #e67e22;
+    background: #fef9e7;
+    border: 1px solid #f0ad4e;
+    border-radius: 4px;
+    padding: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.constraint-note {
+    font-size: 0.8rem;
+    color: #666;
+    font-style: italic;
+    margin-bottom: 0.5rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 0.5rem;
+}
+
+/* Puzzle info */
+.puzzle-info {
+    background: white;
+    padding: 1rem;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+}
+
+.form-group {
+    margin-bottom: 0.75rem;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"] {
+    padding: 0.4rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    width: 8rem;
+}
+
+/* Canvas */
+.canvas-container {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-shrink: 0;
+    overflow: auto;
+}
+
+#gridCanvas {
+    border: 2px solid #34495e;
+    cursor: crosshair;
+    display: block;
+}
+
+/* Tool controls */
+.tool-controls {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+/* Below-grid panels */
+.below-grid {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+
+.bridge-types-section,
+.test-solution-section {
+    flex: 1;
+    min-width: 280px;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    padding: 1rem;
+}
+
+h2 {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 0.4rem;
+}
+
+/* Constraint list in left panel */
+.constraint-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 60vh;
+    overflow-y: auto;
+    margin-bottom: 0.5rem;
+}
+
+.constraint-item {
+    padding: 0.5rem 0.75rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.constraint-item:hover {
+    background: #e9ecef;
+    border-color: #3498db;
+}
+
+.constraint-item h4 {
+    font-size: 0.85rem;
+    margin-bottom: 0.15rem;
+    color: #2c3e50;
+}
+
+.constraint-item p {
+    font-size: 0.75rem;
+    color: #666;
+    line-height: 1.3;
+}
+
+/* Puzzle constraints list */
+#puzzleConstraintsList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+}
+
+.puzzle-constraint {
+    padding: 0.5rem 2rem 0.5rem 0.75rem;
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 4px;
+    position: relative;
+    font-size: 0.85rem;
+}
+
+.puzzle-constraint .remove-btn {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    background: #dc3545;
+    color: white;
+    border: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.7rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Constraint form fields */
+.param-group {
+    margin-bottom: 0.6rem;
+}
+
+.param-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 0.2rem;
+    color: #444;
+}
+
+.param-group label small {
+    font-weight: normal;
+    color: #888;
+    font-size: 0.75rem;
+}
+
+.param-group input {
+    width: 100%;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+/* Bridge type list */
+#bridgeTypeList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.bridge-type-item {
+    padding: 0.6rem 2.5rem 0.6rem 0.75rem;
+    background: #f8f9fa;
+    border: 2px solid #dee2e6;
+    border-radius: 4px;
+    position: relative;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.bridge-type-item:hover {
+    border-color: #3498db;
+    background: #eaf4fb;
+}
+
+.bridge-type-item.selected {
+    border-color: #3498db;
+    background: #d6eaf8;
+}
+
+.bridge-type-item .remove-btn {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    background: #dc3545;
+    color: white;
+    border: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.75rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bridge-type-item label {
+    display: block;
+    font-size: 0.82rem;
+    margin-top: 0.25rem;
+}
+
+.bridge-type-item input {
+    width: 120px;
+    padding: 0.25rem 0.4rem;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    margin-left: 0.3rem;
+    font-size: 0.82rem;
+}
+
+/* Test solution */
+.test-hint {
+    font-size: 0.8rem;
+    color: #666;
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
+}
+
+.test-controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+#validationResults {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.validation-message {
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.validation-message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.validation-message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.empty-note {
+    color: #999;
+    font-size: 0.85rem;
+    font-style: italic;
+}
