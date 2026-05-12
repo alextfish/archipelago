@@ -12,6 +12,7 @@ export interface WaterDisplayManifestTile {
     readonly visualGID?: number;
     readonly visualOutgoing: Direction[];
     readonly visualHasFlowDirections: boolean;
+    readonly visualIsDirectionOnly: boolean;
     readonly fallbackWaterGID?: number;
 }
 
@@ -30,6 +31,7 @@ export class WaterDisplayManifestReader {
         const mapWidth: number = tiledMapData.width ?? 0;
         const waterLayers = TiledLayerUtils.findTileLayersByName(tiledMapData.layers, 'water');
         const waterflowLayers = TiledLayerUtils.findTileLayersByName(tiledMapData.layers, 'waterflow');
+        const logicLayers = waterflowLayers.length > 0 ? waterflowLayers : waterLayers;
         const waterGIDs = this.getWaterTilesetGIDs(tiledMapData.tilesets);
 
         const waterLayerByGroup = new Map<string, TiledTileLayerResult>();
@@ -37,7 +39,7 @@ export class WaterDisplayManifestReader {
             waterLayerByGroup.set(this.parentPath(layer.fullPath), layer);
         }
 
-        for (const logicLayer of waterflowLayers) {
+        for (const logicLayer of logicLayers) {
             const groupPath = this.parentPath(logicLayer.fullPath);
             const visualLayer = waterLayerByGroup.get(groupPath);
             const visualData: number[] = visualLayer?.data?.data ?? visualLayer?.data ?? [];
@@ -61,7 +63,10 @@ export class WaterDisplayManifestReader {
                     : {};
                 const visualOutgoing = TiledLayerUtils.flowDirectionsFromProperties(visualProps);
                 const visualHasFlowDirections = visualOutgoing.length > 0;
-                const fallbackWaterGID = visualGID > 0 ? undefined : this.pickStableFallbackWaterGID(
+                const visualIsDirectionOnly = visualGID > 0
+                    ? this.isWaterDirectionsTile(tiledMapData.tilesets, visualGID)
+                    : false;
+                const fallbackWaterGID = (visualGID > 0 && !visualIsDirectionOnly) ? undefined : this.pickStableFallbackWaterGID(
                     tileX,
                     tileY,
                     groupPath,
@@ -78,6 +83,7 @@ export class WaterDisplayManifestReader {
                     visualGID: visualGID > 0 ? visualGID : undefined,
                     visualOutgoing,
                     visualHasFlowDirections,
+                    visualIsDirectionOnly,
                     fallbackWaterGID
                 });
             }
@@ -115,6 +121,21 @@ export class WaterDisplayManifestReader {
     private static parentPath(fullPath: string): string {
         const idx = fullPath.lastIndexOf('/');
         return idx >= 0 ? fullPath.substring(0, idx) : '';
+    }
+
+    private static isWaterDirectionsTile(tilesets: any[], gid: number): boolean {
+        let owningTileset: any = null;
+        for (const ts of tilesets ?? []) {
+            if (ts.firstgid <= gid) {
+                if (!owningTileset || ts.firstgid > owningTileset.firstgid) {
+                    owningTileset = ts;
+                }
+            }
+        }
+        if (!owningTileset) return false;
+        const name = String(owningTileset.name ?? '').toLowerCase();
+        const image = String(owningTileset.image ?? '').toLowerCase();
+        return name.includes('water directions') || image.includes('water directions');
     }
 
     private static hash(input: string): number {

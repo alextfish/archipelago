@@ -175,8 +175,11 @@ export class FlowWaterVisualManager {
 
         if (hasWater) {
             if (manifestEntry.visualHasFlowDirections) {
-                if (manifestEntry.visualGID) {
-                    tileLayer.putTileAt(manifestEntry.visualGID, tileX, tileY);
+                const baseGID = manifestEntry.visualIsDirectionOnly
+                    ? manifestEntry.fallbackWaterGID
+                    : (manifestEntry.visualGID ?? manifestEntry.fallbackWaterGID);
+                if (baseGID) {
+                    tileLayer.putTileAt(baseGID, tileX, tileY);
                 }
                 this.waterAnimationManager?.setTileWaterState(key, true);
                 return;

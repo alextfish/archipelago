@@ -19,10 +19,10 @@ export class WaterAnimationManager {
     ) {
         for (const entry of manifestEntries) {
             if (!entry.visualHasFlowDirections) continue;
-            // Animation asset naming uses "incoming-to-outgoing"; we use logical outgoing
-            // as the incoming side and the authored visual flow directions as outgoing.
+            // Animation assets are keyed as "incoming-to-outgoing". Visual flow props
+            // encode outgoing directions; incoming is inferred by the calculator.
             const animationKey = WaterFlowAnimationCalculator.calculateAnimationKey(
-                entry.logicOutgoing,
+                [],
                 entry.visualOutgoing
             );
             if (!animationKey || !this.scene.textures.exists(animationKey)) continue;

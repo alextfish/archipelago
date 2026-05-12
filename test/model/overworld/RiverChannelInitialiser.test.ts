@@ -102,7 +102,7 @@ describe('RiverChannelInitialiser.buildMergedWaterLayer', () => {
     expect(RiverChannelInitialiser.buildMergedWaterLayer(null)).toBeUndefined();
   });
 
-  it('returns an all-zero array when there are no waterflow layers', () => {
+  it('returns an all-zero array when there are no waterflow or water layers', () => {
     const tiledMapData = {
       width: 3,
       height: 2,
@@ -162,6 +162,21 @@ describe('RiverChannelInitialiser.buildMergedWaterLayer', () => {
     const result = RiverChannelInitialiser.buildMergedWaterLayer(tiledMapData);
     const waterCount = result!.filter(v => v > 0).length;
     expect(waterCount).toBe(3);
+  });
+
+  it('falls back to water layers when no waterflow layers exist', () => {
+    const tiledMapData = {
+      width: 4,
+      height: 1,
+      layers: [{
+        name: 'River/water',
+        type: 'tilelayer',
+        data: [0, 4, 5, 0],
+      }],
+    };
+
+    const result = RiverChannelInitialiser.buildMergedWaterLayer(tiledMapData);
+    expect(result).toEqual([0, 4, 5, 0]);
   });
 });
 

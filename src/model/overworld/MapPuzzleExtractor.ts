@@ -301,18 +301,24 @@ export class MapPuzzleExtractor {
             tiledMap.layers as any[],
             'waterflow'
         );
-        if (waterflowLayers.length === 0) {
-            console.warn(`No waterflow layer found for FlowPuzzle ${definition.id}`);
+        const logicLayers = waterflowLayers.length > 0
+            ? waterflowLayers
+            : TiledLayerUtils.findTileLayersByName(tiledMap.layers as any[], 'water');
+        if (logicLayers.length === 0) {
+            console.warn(`No waterflow/water layer found for FlowPuzzle ${definition.id}`);
             return [];
         }
 
-        // Prefer the waterflow layer in the same region group if available.
-        const layersWithParentPath = waterflowLayers.map(layer => ({
+        // Prefer the logic layer in the same region group if available.
+        const layersWithParentPath = logicLayers.map(layer => ({
             layer,
             parentPath: this.parentPath(layer.fullPath),
         }));
         const regionWaterflow = definition.regionGroup
-            ? layersWithParentPath.find(l => l.parentPath === definition.regionGroup)?.layer
+            ? layersWithParentPath.find(l =>
+                l.parentPath === definition.regionGroup
+                || l.parentPath.startsWith(`${definition.regionGroup}/`)
+            )?.layer
             : layersWithParentPath.find(l => l.parentPath === '')?.layer;
         const waterflowLayer = regionWaterflow ?? layersWithParentPath[0]?.layer;
         if (!waterflowLayer) return [];

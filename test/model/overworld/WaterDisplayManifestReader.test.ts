@@ -43,6 +43,7 @@ describe('WaterDisplayManifestReader', () => {
     expect(tile1?.targetWaterLayerName).toBe('River/water');
     expect(tile1?.visualGID).toBe(201);
     expect(tile1?.visualHasFlowDirections).toBe(true);
+    expect(tile1?.visualIsDirectionOnly).toBe(true);
     expect(tile0?.fallbackWaterGID).toBeGreaterThanOrEqual(100);
     expect(tile0?.fallbackWaterGID).toBeLessThanOrEqual(102);
   });
@@ -82,5 +83,46 @@ describe('WaterDisplayManifestReader', () => {
     const second = WaterDisplayManifestReader.build(tiledMapData).entries.get('0,0');
     expect(first?.fallbackWaterGID).toBeDefined();
     expect(first?.fallbackWaterGID).toBe(second?.fallbackWaterGID);
+  });
+
+  it('uses water as logic fallback when waterflow layer is absent', () => {
+    const tiledMapData = {
+      width: 1,
+      height: 1,
+      layers: [{
+        name: 'River',
+        type: 'group',
+        layers: [
+          { name: 'water', type: 'tilelayer', data: [201] },
+        ],
+      }],
+      tilesets: [
+        {
+          firstgid: 50,
+          name: 'water',
+          image: 'tilesets/water.png',
+          tilecount: 4,
+          tiles: [],
+        },
+        {
+          firstgid: 201,
+          name: 'water directions',
+          image: 'tilesets/water directions.png',
+          tiles: [{
+            id: 0,
+            properties: [{ name: 'flowSouth', type: 'bool', value: true }],
+          }],
+        },
+      ],
+    };
+
+    const manifest = WaterDisplayManifestReader.build(tiledMapData);
+    const tile = manifest.entries.get('0,0');
+    expect(tile).toBeDefined();
+    expect(tile?.logicLayerName).toBe('River/water');
+    expect(tile?.visualHasFlowDirections).toBe(true);
+    expect(tile?.visualIsDirectionOnly).toBe(true);
+    expect(tile?.fallbackWaterGID).toBeGreaterThanOrEqual(50);
+    expect(tile?.fallbackWaterGID).toBeLessThanOrEqual(53);
   });
 });
