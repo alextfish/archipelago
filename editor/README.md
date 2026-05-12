@@ -10,7 +10,7 @@ A minimal web-based editor for creating Archipelago bridge puzzles.
 - **Constraint system**: Add various puzzle constraints from a comprehensive list:
   - Global constraints (AllBridgesPlaced, NoCrossing)
   - Grid cell constraints (MustTouchHorizontalBridge, MustTouchVerticalBridge, MustHaveWater)
-  - Island-specific constraints (IslandMustBeCovered, IslandColorSeparation, etc.)
+  - Island-specific constraints (IslandMustBeCovered, IslandColourSeparation, etc.)
 - **Constraint labels on the grid**: Cell/island constraints are shown directly on the board (e.g., `A=3`, `DV`, `B=3`)
 - **Local storage**: Save and load draft puzzles to browser localStorage
 - **JSON export**: Export puzzles in the standard format compatible with `src/data/puzzles`
@@ -90,7 +90,7 @@ The editor exports puzzles in this format:
 
 ## Limitations (MVP)
 
-- BridgeMustCoverIslandConstraint is listed, but dedicated per-bridge-type configuration UI is not implemented yet
+- BridgeMustCoverIslandConstraint support is incomplete; there is no dedicated UI workflow and it may require manual JSON edits
 - No undo/redo functionality
 - Limited validation of puzzle correctness
 
