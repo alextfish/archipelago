@@ -19,40 +19,42 @@
         </header>
 
         <div class="main-container">
-            <!-- Left panel: Constraints -->
+            <!-- Left panel: Constraint management -->
             <aside class="left-panel">
-                <h2>Constraints</h2>
-                <div class="mode-selector">
-                    <label>
-                        <input type="radio" name="mode" value="edit" checked>
-                        Edit Mode
-                    </label>
-                    <label>
-                        <input type="radio" name="mode" value="constraint">
-                        Add Constraint
-                    </label>
-                </div>
-                
-                <div id="constraintList" class="constraint-list">
-                    <!-- Constraint types will be populated here -->
+                <div class="panel-action-buttons">
+                    <button id="showConstraintListBtn" class="btn btn-full">Add constraint</button>
+                    <button id="editConstraintsBtn" class="btn-outline btn-full">Edit constraints</button>
                 </div>
 
-                <div id="puzzleConstraints" class="puzzle-constraints">
+                <!-- Constraint type chooser (hidden by default) -->
+                <div id="constraintTypePanel" style="display:none">
+                    <h3>Choose type:</h3>
+                    <div id="constraintList" class="constraint-list"></div>
+                    <button id="cancelConstraintTypeBtn" class="btn-small cancel-btn">✕ Cancel</button>
+                </div>
+
+                <!-- Constraint parameter form (hidden by default) -->
+                <div id="constraintFormPanel" class="constraint-form-panel" style="display:none">
+                    <h3 id="constraintFormTitle">Configure constraint</h3>
+                    <div id="constraintFormFields"></div>
+                    <div class="form-actions">
+                        <button id="confirmAddConstraintBtn" class="btn">Add</button>
+                        <button id="cancelConstraintFormBtn" class="btn-small cancel-btn">Cancel</button>
+                    </div>
+                </div>
+
+                <!-- Current puzzle constraints (hidden by default) -->
+                <div id="puzzleConstraintsPanel" style="display:none">
                     <h3>Puzzle Constraints</h3>
                     <div id="puzzleConstraintsList"></div>
                 </div>
-
-                <div id="cellConstraints" class="cell-constraints" style="display:none;">
-                    <h3>Cell Constraint Config</h3>
-                    <div id="cellConstraintConfig"></div>
-                </div>
             </aside>
 
-            <!-- Center panel: Grid -->
+            <!-- Center panel: Grid + below-grid sections -->
             <main class="center-panel">
                 <div class="puzzle-info">
                     <div class="form-group">
-                        <label>Puzzle ID: <input type="text" id="puzzleId" placeholder="my_puzzle"></label>
+                        <label>Puzzle ID: <input type="text" id="puzzleId" value="my_puzzle" placeholder="my_puzzle"></label>
                     </div>
                     <div class="form-group">
                         <label>Width: <input type="number" id="gridWidth" value="4" min="2" max="20"></label>
@@ -62,7 +64,7 @@
                 </div>
 
                 <div class="canvas-container">
-                    <canvas id="gridCanvas" width="600" height="600"></canvas>
+                    <canvas id="gridCanvas" width="240" height="240"></canvas>
                 </div>
 
                 <div class="tool-controls">
@@ -70,30 +72,26 @@
                     <button id="removeIslandBtn" class="btn">Remove Island</button>
                     <button id="addBridgeBtn" class="btn">Add Bridge</button>
                 </div>
+
+                <!-- Below-grid panels -->
+                <div class="below-grid">
+                    <section class="bridge-types-section">
+                        <h2>Bridge Types</h2>
+                        <div id="bridgeTypeList"></div>
+                        <button id="addBridgeType" class="btn-small">+ Add Bridge Type</button>
+                    </section>
+
+                    <section class="test-solution-section">
+                        <h2>Test Solution</h2>
+                        <p class="test-hint">Select a bridge type, then click "Add Bridge" and click two grid cells to place a test bridge.</p>
+                        <div class="test-controls">
+                            <button id="validateBtn" class="btn">Validate</button>
+                            <button id="clearTestBtn" class="btn-small">Clear Test</button>
+                        </div>
+                        <div id="validationResults"></div>
+                    </section>
+                </div>
             </main>
-
-            <!-- Right panel: Bridge Types & Islands -->
-            <aside class="right-panel">
-                <section class="bridge-types">
-                    <h2>Bridge Types</h2>
-                    <div id="bridgeTypeList"></div>
-                    <button id="addBridgeType" class="btn-small">+ Add Bridge Type</button>
-                </section>
-
-                <section class="islands-list">
-                    <h2>Islands</h2>
-                    <div id="islandsList"></div>
-                </section>
-
-                <section class="test-solution" id="testSection">
-                    <h2>Test Solution</h2>
-                    <div id="testControls">
-                        <button id="validateBtn" class="btn">Validate</button>
-                        <button id="clearTestBtn" class="btn-small">Clear Test</button>
-                    </div>
-                    <div id="validationResults"></div>
-                </section>
-            </aside>
         </div>
     </div>
 

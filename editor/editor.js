@@ -1,14 +1,146 @@
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+
+// src/model/puzzle/StrutBridge.ts
+var StrutBridge = class {
+  constructor(id, type) {
+    __publicField(this, "id");
+    __publicField(this, "start");
+    __publicField(this, "end");
+    __publicField(this, "type");
+    this.id = id;
+    this.type = type;
+  }
+  /**
+   * Returns the strut location for this bridge when placed, based on
+   * which islands the bridge crosses:
+   * - 0 islands crossed → midpoint of the bridge
+   * - 1 island crossed  → that island's position
+   * - 2+ islands crossed → island closest to the midpoint
+   *
+   * Returns null when the bridge is not placed or has length less than 2.
+   */
+  getStrutLocation(puzzle) {
+    if (!this.start || !this.end) return null;
+    const length = Math.abs(this.end.x - this.start.x) + Math.abs(this.end.y - this.start.y);
+    if (length < 2) return null;
+    const { start, end } = this;
+    const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+    const crossedIslands = this.getCrossedIslands(puzzle.islands);
+    if (crossedIslands.length === 0) {
+      return midpoint;
+    }
+    if (crossedIslands.length === 1) {
+      return { x: crossedIslands[0].x, y: crossedIslands[0].y };
+    }
+    let closest = crossedIslands[0];
+    let closestDist = distSquared(closest, midpoint);
+    for (let i = 1; i < crossedIslands.length; i++) {
+      const d = distSquared(crossedIslands[i], midpoint);
+      if (d < closestDist) {
+        closestDist = d;
+        closest = crossedIslands[i];
+      }
+    }
+    return { x: closest.x, y: closest.y };
+  }
+  /**
+   * Returns all islands that this bridge crosses (strictly between endpoints).
+   * Assumes the bridge is placed (start and end are defined).
+   */
+  getCrossedIslands(islands) {
+    if (!this.start || !this.end) return [];
+    const { start, end } = this;
+    const result = [];
+    const isHorizontal = start.y === end.y;
+    const isVertical = start.x === end.x;
+    const minX = Math.min(start.x, end.x);
+    const maxX = Math.max(start.x, end.x);
+    const minY = Math.min(start.y, end.y);
+    const maxY = Math.max(start.y, end.y);
+    for (const island of islands) {
+      if (island.x === start.x && island.y === start.y) continue;
+      if (island.x === end.x && island.y === end.y) continue;
+      if (isHorizontal && island.y === start.y) {
+        if (island.x > minX && island.x < maxX) {
+          result.push(island);
+        }
+      }
+      if (isVertical && island.x === start.x) {
+        if (island.y > minY && island.y < maxY) {
+          result.push(island);
+        }
+      }
+    }
+    return result;
+  }
+  /**
+   * Returns the ordered list of sprite frame names for this bridge, from the
+   * start endpoint to the end endpoint, including endpoint tiles.
+   *
+   * Frame name semantics:
+   * - l2s-* : "left/top to strut" — the approach from the start endpoint
+   * - strut  : the strut tile itself
+   * - s2r-* : "strut to right/bottom" — the departure toward the end endpoint
+   *
+   * Returns null when the bridge is not placed.
+   */
+  getFrames(puzzle) {
+    if (!this.start || !this.end) return null;
+    const { start, end } = this;
+    const isHorizontal = start.y === end.y;
+    const length = isHorizontal ? Math.abs(end.x - start.x) : Math.abs(end.y - start.y);
+    if (length === 1) {
+      return ["l2s-single", "s2r-single"];
+    }
+    const strutLocation = this.getStrutLocation(puzzle);
+    if (!strutLocation) return null;
+    const strutDist = isHorizontal ? Math.abs(strutLocation.x - Math.min(start.x, end.x)) : Math.abs(strutLocation.y - Math.min(start.y, end.y));
+    const rightDist = length - strutDist;
+    return [
+      ...buildSectionFrames(strutDist, "l2s"),
+      "strut",
+      ...buildSectionFrames(rightDist, "s2r")
+    ];
+  }
+};
+function buildSectionFrames(dist, prefix) {
+  if (dist === 1) return [`${prefix}-single`];
+  if (dist === 2) return [`${prefix}-left`, `${prefix}-right`];
+  return [
+    `${prefix}-left`,
+    ...Array(dist - 2).fill(`${prefix}-mid`),
+    `${prefix}-right`
+  ];
+}
+function distSquared(a, b) {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return dx * dx + dy * dy;
+}
+
 // src/model/puzzle/BridgeInventory.ts
 var BridgeInventory = class {
-  allBridges = [];
   constructor(types) {
+    __publicField(this, "allBridges", []);
     let counter = 0;
     for (const t of types) {
       for (let i = 0; i < t.count; i++) {
-        this.allBridges.push({
-          id: `b${++counter}`,
-          type: { id: t.id, colour: t.colour, width: t.width, style: t.style, length: t.length }
-        });
+        const bridgeType = {
+          id: t.id,
+          colour: t.colour,
+          width: t.width,
+          style: t.style,
+          length: t.length,
+          mustCoverIsland: t.mustCoverIsland,
+          canCoverIsland: t.canCoverIsland
+        };
+        if (t.mustCoverIsland) {
+          this.allBridges.push(new StrutBridge(`b${++counter}`, bridgeType));
+        } else {
+          this.allBridges.push({ id: `b${++counter}`, type: bridgeType });
+        }
       }
     }
   }
@@ -58,13 +190,80 @@ var BridgeInventory = class {
 
 // src/model/puzzle/constraints/Constraint.ts
 var Constraint = class {
-  id;
-  description;
-  violations;
+  constructor() {
+    __publicField(this, "id");
+    __publicField(this, "description");
+    __publicField(this, "violations");
+    /**
+     * Whether this constraint is "personified" — i.e. it has an NPC that
+     * represents it in the world. Most constraints are personified. Non-personified
+     * constraints (e.g. AllBridgesPlacedConstraint, BridgeLengthConstraint,
+     * NoCrossingConstraint) don't need NPC glyph lists or conversation files.
+     */
+    __publicField(this, "personified", true);
+    /**
+     * Path (relative to resources/conversations/) to the conversation JSON file
+     * shown when this constraint is unsatisfied.
+     */
+    __publicField(this, "conversationFile");
+    /**
+     * Path (relative to resources/conversations/) to the conversation JSON file
+     * shown when this constraint is satisfied.
+     */
+    __publicField(this, "conversationFileSolved");
+  }
+  /**
+   * Returns the core display items for this constraint — one per constrained element.
+   * Each item carries the glyph message ("good" when satisfied, violation message
+   * otherwise) to be shown in a small speech bubble next to the element.
+   * Constraints that have no per-element display return an empty array (the default).
+   *
+   * Subclasses override this method rather than {@link getDisplayItems}.
+   * Disguise overrides from island constraint strings are applied automatically by
+   * {@link getDisplayItems} after this method returns.
+   */
+  getCoreDisplayItems(_puzzle) {
+    return [];
+  }
+  /**
+   * Returns display items for this constraint, enriched with any disguise properties
+   * declared on the corresponding islands in the Tiled map
+   * (`disguise_sprite`, `disguise_sprite_solved`, `conversation_file`,
+   * `conversation_file_solved`).
+   *
+   * Subclasses should override {@link getCoreDisplayItems}, not this method.
+   */
+  getDisplayItems(puzzle) {
+    const items = this.getCoreDisplayItems(puzzle);
+    return items.map((item) => {
+      const island = puzzle.islands.find((i) => i.id === item.elementID);
+      if (!island?.constraints) return item;
+      const get = (prefix) => island.constraints.find((c) => c.startsWith(`${prefix}=`))?.substring(prefix.length + 1);
+      const disguiseSpriteKey = get("disguise_sprite");
+      const disguiseSpriteSolvedKey = get("disguise_sprite_solved");
+      const conversationFile = get("conversation_file");
+      const conversationFileSolved = get("conversation_file_solved");
+      const animate = island.constraints.includes("animate=true") || void 0;
+      const hasOverride = [disguiseSpriteKey, disguiseSpriteSolvedKey, conversationFile, conversationFileSolved, animate].some((v) => v !== void 0);
+      if (!hasOverride) return item;
+      return {
+        ...item,
+        ...disguiseSpriteKey !== void 0 && { disguiseSpriteKey },
+        ...disguiseSpriteSolvedKey !== void 0 && { disguiseSpriteSolvedKey },
+        ...conversationFile !== void 0 && { conversationFile },
+        ...conversationFileSolved !== void 0 && { conversationFileSolved },
+        ...animate !== void 0 && { animate }
+      };
+    });
+  }
 };
 
 // src/model/puzzle/constraints/AllBridgesPlacedConstraint.ts
 var AllBridgesPlacedConstraint = class _AllBridgesPlacedConstraint extends Constraint {
+  constructor() {
+    super(...arguments);
+    __publicField(this, "personified", false);
+  }
   static fromSpec(_params) {
     return new _AllBridgesPlacedConstraint();
   }
@@ -82,10 +281,10 @@ var AllBridgesPlacedConstraint = class _AllBridgesPlacedConstraint extends Const
 
 // src/model/puzzle/constraints/GridCellConstraints.ts
 var GridCellConstraint = class extends Constraint {
-  x;
-  y;
   constructor(x, y) {
     super();
+    __publicField(this, "x");
+    __publicField(this, "y");
     this.x = x;
     this.y = y;
   }
@@ -138,8 +337,16 @@ var MustTouchAHorizontalBridge = class _MustTouchAHorizontalBridge extends GridC
       satisfied: ok,
       affectedElements: ok ? touching.map((b) => b.id) : [],
       message: ok ? void 0 : `No horizontal bridge adjacent to space (${this.x}, ${this.y})`,
-      glyphMessage: ok ? void 0 : "no adjacent bridge"
+      glyphMessage: ok ? void 0 : "no adjacent horizontal bridge"
     };
+  }
+  getCoreDisplayItems(puzzle) {
+    const result = this.check(puzzle);
+    return [{
+      elementID: `${this.x},${this.y}`,
+      glyphMessage: result.satisfied ? "good" : result.glyphMessage ?? "good",
+      constraintType: "MustTouchAHorizontalBridge"
+    }];
   }
 };
 var MustTouchAVerticalBridge = class _MustTouchAVerticalBridge extends GridCellConstraint {
@@ -154,13 +361,25 @@ var MustTouchAVerticalBridge = class _MustTouchAVerticalBridge extends GridCellC
       satisfied: ok,
       affectedElements: ok ? touching.map((b) => b.id) : [],
       message: ok ? void 0 : `No vertical bridge adjacent to space (${this.x}, ${this.y})`,
-      glyphMessage: ok ? void 0 : "no adjacent bridge"
+      glyphMessage: ok ? void 0 : "no adjacent vertical bridge"
     };
+  }
+  getCoreDisplayItems(puzzle) {
+    const result = this.check(puzzle);
+    return [{
+      elementID: `${this.x},${this.y}`,
+      glyphMessage: result.satisfied ? "good" : result.glyphMessage ?? "good",
+      constraintType: "MustTouchAVerticalBridge"
+    }];
   }
 };
 
 // src/model/puzzle/constraints/NoCrossingConstraint.ts
 var NoCrossingConstraint = class _NoCrossingConstraint extends Constraint {
+  constructor() {
+    super(...arguments);
+    __publicField(this, "personified", false);
+  }
   static fromSpec(_params) {
     return new _NoCrossingConstraint();
   }
@@ -201,9 +420,9 @@ var NoCrossingConstraint = class _NoCrossingConstraint extends Constraint {
 
 // src/model/puzzle/constraints/IslandMustBeCoveredConstraint.ts
 var IslandMustBeCoveredConstraint = class _IslandMustBeCoveredConstraint extends Constraint {
-  islandId;
   constructor(islandId) {
     super();
+    __publicField(this, "islandId");
     this.islandId = islandId;
   }
   static fromSpec(params) {
@@ -241,19 +460,27 @@ var IslandMustBeCoveredConstraint = class _IslandMustBeCoveredConstraint extends
       glyphMessage: ok ? void 0 : "no bridge over island"
     };
   }
+  getCoreDisplayItems(puzzle) {
+    const result = this.check(puzzle);
+    return [{
+      elementID: this.islandId,
+      glyphMessage: result.satisfied ? "good" : result.glyphMessage ?? "good",
+      constraintType: "IslandMustBeCoveredConstraint"
+    }];
+  }
 };
 
-// src/model/puzzle/constraints/IslandColorSeparationConstraint.ts
-var IslandColorSeparationConstraint = class _IslandColorSeparationConstraint extends Constraint {
-  color1;
-  color2;
-  constructor(color1, color2) {
+// src/model/puzzle/constraints/IslandColourSeparationConstraint.ts
+var IslandColourSeparationConstraint = class _IslandColourSeparationConstraint extends Constraint {
+  constructor(colour1, colour2) {
     super();
-    this.color1 = color1;
-    this.color2 = color2;
+    __publicField(this, "colour1");
+    __publicField(this, "colour2");
+    this.colour1 = colour1;
+    this.colour2 = colour2;
   }
   static fromSpec(params) {
-    return new _IslandColorSeparationConstraint(params.color1, params.color2);
+    return new _IslandColourSeparationConstraint(params.colour1, params.colour2);
   }
   check(puzzle) {
     const adjacencyMap = /* @__PURE__ */ new Map();
@@ -287,9 +514,9 @@ var IslandColorSeparationConstraint = class _IslandColorSeparationConstraint ext
           }
         }
       }
-      const hasColor1 = component.some((i) => this.getIslandColor(i) === this.color1);
-      const hasColor2 = component.some((i) => this.getIslandColor(i) === this.color2);
-      if (hasColor1 && hasColor2) {
+      const hasColour1 = component.some((i) => this.getIslandColour(i) === this.colour1);
+      const hasColour2 = component.some((i) => this.getIslandColour(i) === this.colour2);
+      if (hasColour1 && hasColour2) {
         violations.push(...component.map((i) => i.id));
       }
     }
@@ -297,34 +524,49 @@ var IslandColorSeparationConstraint = class _IslandColorSeparationConstraint ext
     const ok = violations.length === 0;
     let glyphMessage;
     if (!ok) {
-      glyphMessage = `${this.color1} island must-not connected ${this.color2} island`;
+      glyphMessage = `${this.colour1} island must-not connected ${this.colour2} island`;
     }
     return {
       satisfied: ok,
       affectedElements: violations,
-      message: ok ? void 0 : `Islands of colour ${this.color1} must not connect to islands of colour ${this.color2}`,
+      message: ok ? void 0 : `Islands of colour ${this.colour1} must not connect to islands of colour ${this.colour2}`,
       glyphMessage
     };
   }
   /**
    * Extract colour from island constraints.
-   * Expects a constraint like "color=red" or "colour=blue"
+   * Expects a constraint like "colour=red" or "colour=blue"
    */
-  getIslandColor(island) {
-    const colorConstraint = island.constraints?.find(
-      (c) => c.startsWith("color=") || c.startsWith("colour=")
+  getIslandColour(island) {
+    const colourConstraint = island.constraints?.find(
+      (c) => c.startsWith("colour=")
     );
-    if (!colorConstraint) return void 0;
-    return colorConstraint.split("=")[1];
+    if (!colourConstraint) return void 0;
+    return colourConstraint.split("=")[1];
+  }
+  getCoreDisplayItems(puzzle) {
+    const result = this.check(puzzle);
+    const violatedIds = new Set(result.affectedElements ?? []);
+    const violationGlyph = result.glyphMessage ?? `${this.colour1} island must-not connected ${this.colour2} island`;
+    return puzzle.islands.filter((island) => {
+      const colour = this.getIslandColour(island);
+      return colour === this.colour1 || colour === this.colour2;
+    }).map((island) => ({
+      elementID: island.id,
+      glyphMessage: violatedIds.has(island.id) ? violationGlyph : "good",
+      constraintType: "IslandColourSeparationConstraint"
+    }));
   }
 };
 
 // src/model/puzzle/constraints/IslandDirectionalBridgeConstraint.ts
 var IslandDirectionalBridgeConstraint = class _IslandDirectionalBridgeConstraint extends Constraint {
-  islandId;
-  constraintType;
   constructor(islandId, constraintType) {
     super();
+    __publicField(this, "conversationFile", "constraints/islandDirectionalBridge_unsatisfied.json");
+    __publicField(this, "conversationFileSolved", "constraints/islandDirectionalBridge_satisfied.json");
+    __publicField(this, "islandId");
+    __publicField(this, "constraintType");
     this.islandId = islandId;
     this.constraintType = constraintType;
   }
@@ -409,15 +651,25 @@ var IslandDirectionalBridgeConstraint = class _IslandDirectionalBridgeConstraint
     }
     return counts;
   }
+  getCoreDisplayItems(puzzle) {
+    const result = this.check(puzzle);
+    return [{
+      elementID: this.islandId,
+      glyphMessage: result.satisfied ? "good" : result.glyphMessage ?? "good",
+      constraintType: "IslandDirectionalBridgeConstraint"
+    }];
+  }
 };
 
 // src/model/puzzle/constraints/IslandPassingBridgeCountConstraint.ts
 var IslandPassingBridgeCountConstraint = class _IslandPassingBridgeCountConstraint extends Constraint {
-  islandId;
-  direction;
-  expectedCount;
   constructor(islandId, direction, expectedCount) {
     super();
+    __publicField(this, "conversationFile", "constraints/islandPassingBridgeCount_unsatisfied.json");
+    __publicField(this, "conversationFileSolved", "constraints/islandPassingBridgeCount_satisfied.json");
+    __publicField(this, "islandId");
+    __publicField(this, "direction");
+    __publicField(this, "expectedCount");
     this.islandId = islandId;
     this.direction = direction;
     this.expectedCount = expectedCount;
@@ -512,14 +764,62 @@ var IslandPassingBridgeCountConstraint = class _IslandPassingBridgeCountConstrai
     }
     return false;
   }
+  /** Maps direction to the glyph word used in speech bubble messages. */
+  directionGlyphWord() {
+    switch (this.direction) {
+      case "above":
+        return "above";
+      case "below":
+        return "below";
+      case "left":
+        return "left-of";
+      case "right":
+        return "right-of";
+      case "adjacent":
+        return "adjacent";
+    }
+  }
+  /** Maps direction to the compass_overlay frame index (0=N, 1=E, 2=S, 3=W, 5=adjacent). */
+  directionCompassFrame() {
+    switch (this.direction) {
+      case "above":
+        return 0;
+      case "right":
+        return 1;
+      case "below":
+        return 2;
+      case "left":
+        return 3;
+      case "adjacent":
+        return 5;
+    }
+  }
+  getCoreDisplayItems(puzzle) {
+    const island = puzzle.islands.find((i) => i.id === this.islandId);
+    if (!island) return [];
+    const result = this.check(puzzle);
+    const compassFrame = this.directionCompassFrame();
+    const conversationVariables = { count: String(this.expectedCount), direction: this.directionGlyphWord() };
+    if (result.satisfied) {
+      return [{ elementID: this.islandId, glyphMessage: "good", constraintType: "IslandPassingBridgeCountConstraint", requiredCount: this.expectedCount, compassFrame, conversationVariables }];
+    }
+    const dirWord = this.directionGlyphWord();
+    const passingBridges = this.findPassingBridges(puzzle, island);
+    const actualCount = passingBridges.length;
+    const prefix = actualCount < this.expectedCount ? "not-enough" : "too-many";
+    const glyphMessage = `${prefix} bridge ${dirWord} island`;
+    return [{ elementID: this.islandId, glyphMessage, constraintType: "IslandPassingBridgeCountConstraint", requiredCount: this.expectedCount, compassFrame, conversationVariables }];
+  }
 };
 
 // src/model/puzzle/constraints/IslandVisibilityConstraint.ts
 var IslandVisibilityConstraint = class _IslandVisibilityConstraint extends Constraint {
-  islandId;
-  expectedCount;
   constructor(islandId, expectedCount) {
     super();
+    __publicField(this, "conversationFile", "constraints/islandVisibility_unsatisfied.json");
+    __publicField(this, "conversationFileSolved", "constraints/islandVisibility_satisfied.json");
+    __publicField(this, "islandId");
+    __publicField(this, "expectedCount");
     this.islandId = islandId;
     this.expectedCount = expectedCount;
   }
@@ -542,9 +842,9 @@ var IslandVisibilityConstraint = class _IslandVisibilityConstraint extends Const
     let glyphMessage;
     if (!ok) {
       if (actualCount < this.expectedCount) {
-        glyphMessage = "not-enough island connected";
+        glyphMessage = "see not-enough island";
       } else {
-        glyphMessage = "too-many island connected";
+        glyphMessage = "see too-many island";
       }
     }
     return {
@@ -581,7 +881,7 @@ var IslandVisibilityConstraint = class _IslandVisibilityConstraint extends Const
     while (true) {
       currentX += dx;
       currentY += dy;
-      if (currentX <= 0 || currentX >= puzzle.width || currentY <= 0 || currentY >= puzzle.height) {
+      if (currentX < 0 || currentX >= puzzle.width || currentY < 0 || currentY >= puzzle.height) {
         break;
       }
       const islandAtPosition = puzzle.islands.find((i) => i.x === currentX && i.y === currentY);
@@ -607,18 +907,32 @@ var IslandVisibilityConstraint = class _IslandVisibilityConstraint extends Const
       return connects1to2 || connects2to1;
     });
   }
+  getCoreDisplayItems(puzzle) {
+    const result = this.check(puzzle);
+    return [{
+      elementID: this.islandId,
+      glyphMessage: result.satisfied ? "good" : result.glyphMessage ?? "good",
+      constraintType: "IslandVisibilityConstraint",
+      requiredCount: this.expectedCount,
+      conversationVariables: { count: String(this.expectedCount) }
+    }];
+  }
 };
 
 // src/model/puzzle/constraints/EnclosedAreaSizeConstraint.ts
 var EnclosedAreaSizeConstraint = class _EnclosedAreaSizeConstraint extends Constraint {
-  x;
-  y;
-  expectedSize;
   constructor(x, y, expectedSize) {
     super();
+    __publicField(this, "conversationFile");
+    __publicField(this, "conversationFileSolved");
+    __publicField(this, "x");
+    __publicField(this, "y");
+    __publicField(this, "expectedSize");
     this.x = x;
     this.y = y;
     this.expectedSize = expectedSize;
+    this.conversationFile = expectedSize === 0 ? "constraints/enclosedAreaSizeZero_unsatisfied.json" : "constraints/enclosedAreaSize_unsatisfied.json";
+    this.conversationFileSolved = expectedSize === 0 ? "constraints/enclosedAreaSizeZero_satisfied.json" : "constraints/enclosedAreaSize_satisfied.json";
   }
   static fromSpec(params) {
     return new _EnclosedAreaSizeConstraint(params.x, params.y, params.size);
@@ -722,7 +1036,7 @@ var EnclosedAreaSizeConstraint = class _EnclosedAreaSizeConstraint extends Const
     return matrix;
   }
   isOutOfBounds(x, y, puzzle) {
-    return x <= 0 || x >= puzzle.width || y <= 0 || y >= puzzle.height;
+    return x < 0 || x > puzzle.width || y < 0 || y > puzzle.height;
   }
   getEnclosedAreaSize(puzzle, startX, startY) {
     const matrix = this.createOccupancyMatrix(puzzle);
@@ -767,18 +1081,34 @@ var EnclosedAreaSizeConstraint = class _EnclosedAreaSizeConstraint extends Const
     }
     return { size: cells.length, isEnclosed, cells };
   }
+  getCoreDisplayItems(puzzle) {
+    const result = this.check(puzzle);
+    return [{
+      elementID: `${this.x},${this.y}`,
+      glyphMessage: result.satisfied ? "good" : result.glyphMessage ?? "area not enclosed",
+      constraintType: "EnclosedAreaSizeConstraint",
+      position: { x: this.x, y: this.y },
+      requiredCount: this.expectedSize >= 0 ? this.expectedSize : void 0,
+      conversationVariables: this.expectedSize >= 0 ? { count: String(this.expectedSize) } : void 0
+    }];
+  }
 };
 
 // src/model/puzzle/constraints/BridgeMustCoverIslandConstraint.ts
 var BridgeMustCoverIslandConstraint = class _BridgeMustCoverIslandConstraint extends Constraint {
+  constructor(bridgeID) {
+    super();
+    __publicField(this, "bridgeID");
+    this.bridgeID = bridgeID;
+  }
   static fromSpec(_params) {
     return new _BridgeMustCoverIslandConstraint();
   }
   check(puzzle) {
     const violations = [];
-    for (const bridge of puzzle.placedBridges) {
+    const bridgesToCheck = this.bridgeID ? puzzle.placedBridges.filter((b) => b.id === this.bridgeID) : puzzle.placedBridges.filter((b) => b.type.mustCoverIsland);
+    for (const bridge of bridgesToCheck) {
       if (!bridge.start || !bridge.end) continue;
-      if (!bridge.type.mustCoverIsland) continue;
       const coversIsland = this.bridgeCoversAnyIsland(puzzle, bridge);
       if (!coversIsland) {
         violations.push(bridge.id);
@@ -792,6 +1122,22 @@ var BridgeMustCoverIslandConstraint = class _BridgeMustCoverIslandConstraint ext
       message: ok ? void 0 : `Bridge${violations.length === 1 ? "" : "s"} must cover island${violations.length === 1 ? "" : "s"}: ${violations.join(", ")}`,
       glyphMessage: ok ? void 0 : "no island under bridge"
     };
+  }
+  getCoreDisplayItems(puzzle) {
+    if (!this.bridgeID) return [];
+    const bridge = puzzle.bridges.find((b) => b.id === this.bridgeID);
+    if (!bridge || !bridge.start || !bridge.end) return [];
+    if (!(bridge instanceof StrutBridge)) return [];
+    const strutLocation = bridge.getStrutLocation(puzzle);
+    if (!strutLocation) return [];
+    const coversIsland = this.bridgeCoversAnyIsland(puzzle, bridge);
+    const glyphMessage = coversIsland ? "good" : "no island under bridge";
+    return [{
+      elementID: bridge.id,
+      glyphMessage,
+      constraintType: "BridgeMustCoverIslandConstraint",
+      position: strutLocation
+    }];
   }
   bridgeCoversAnyIsland(puzzle, bridge) {
     const { start, end } = bridge;
@@ -815,6 +1161,106 @@ var BridgeMustCoverIslandConstraint = class _BridgeMustCoverIslandConstraint ext
   }
 };
 
+// src/model/puzzle/constraints/MustHaveWaterConstraint.ts
+function hasTileHasWater(puzzle) {
+  return typeof puzzle.tileHasWater === "function";
+}
+var MustHaveWaterConstraint = class _MustHaveWaterConstraint extends Constraint {
+  constructor(x, y) {
+    super();
+    __publicField(this, "conversationFile", "constraints/mustHaveWater_unsatisfied.json");
+    __publicField(this, "conversationFileSolved", "constraints/mustHaveWater_satisfied.json");
+    __publicField(this, "x");
+    __publicField(this, "y");
+    this.x = x;
+    this.y = y;
+  }
+  static fromSpec(params) {
+    return new _MustHaveWaterConstraint(params.x, params.y);
+  }
+  check(puzzle) {
+    const has = hasTileHasWater(puzzle) ? puzzle.tileHasWater(this.x, this.y) : false;
+    this.violations = has ? [] : [`${this.x},${this.y}`];
+    return {
+      satisfied: has,
+      affectedElements: this.violations ?? [],
+      message: has ? void 0 : `Tile (${this.x},${this.y}) must have water.`,
+      glyphMessage: has ? void 0 : "no water"
+    };
+  }
+  getCoreDisplayItems(puzzle) {
+    const result = this.check(puzzle);
+    return [{
+      elementID: `${this.x},${this.y}`,
+      glyphMessage: result.satisfied ? "good" : "no water",
+      constraintType: "MustHaveWaterConstraint",
+      position: { x: this.x, y: this.y }
+    }];
+  }
+};
+
+// src/model/puzzle/constraints/IslandBridgeCountConstraint.ts
+var IslandBridgeCountConstraint = class _IslandBridgeCountConstraint extends Constraint {
+  constructor() {
+    super(...arguments);
+    __publicField(this, "conversationFile", "constraints/islandBridgeCount_unsatisfied.json");
+    __publicField(this, "conversationFileSolved", "constraints/islandBridgeCount_satisfied.json");
+  }
+  static fromSpec(_params) {
+    return new _IslandBridgeCountConstraint();
+  }
+  check(puzzle) {
+    const violations = [];
+    const violationGlyphs = [];
+    for (const island of puzzle.islands) {
+      const rule = island.constraints?.find((c) => c.startsWith("num_bridges="));
+      if (!rule) continue;
+      const expected = Number(rule.split("=")[1]);
+      const actual = puzzle.bridgesFromIsland(island).length;
+      if (actual !== expected) {
+        violations.push(island.id);
+        if (actual < expected) {
+          violationGlyphs.push("not-enough bridge");
+        } else {
+          violationGlyphs.push("too-many bridge");
+        }
+      }
+    }
+    const glyphMessage = violationGlyphs.length > 0 ? violationGlyphs[0] : void 0;
+    return {
+      satisfied: violations.length === 0,
+      affectedElements: violations,
+      message: violations.length ? `Incorrect bridge count: ${violations.join(", ")}` : void 0,
+      glyphMessage
+    };
+  }
+  getCoreDisplayItems(puzzle) {
+    const items = [];
+    for (const island of puzzle.islands) {
+      const rule = island.constraints?.find((c) => c.startsWith("num_bridges="));
+      if (!rule) continue;
+      const expected = Number(rule.split("=")[1]);
+      const actual = puzzle.bridgesFromIsland(island).length;
+      let glyphMessage;
+      if (actual === expected) {
+        glyphMessage = "good";
+      } else if (actual < expected) {
+        glyphMessage = "not-enough bridge";
+      } else {
+        glyphMessage = "too-many bridge";
+      }
+      items.push({
+        elementID: island.id,
+        glyphMessage,
+        constraintType: "IslandBridgeCountConstraint",
+        requiredCount: expected,
+        conversationVariables: { count: String(expected) }
+      });
+    }
+    return items;
+  }
+};
+
 // src/model/puzzle/constraints/createConstraintsFromSpec.ts
 function createConstraintsFromSpec(constraints) {
   return constraints.map((spec) => {
@@ -829,8 +1275,8 @@ function createConstraintsFromSpec(constraints) {
         return MustTouchAVerticalBridge.fromSpec(spec.params);
       case "IslandMustBeCoveredConstraint":
         return IslandMustBeCoveredConstraint.fromSpec(spec.params);
-      case "IslandColorSeparationConstraint":
-        return IslandColorSeparationConstraint.fromSpec(spec.params);
+      case "IslandColourSeparationConstraint":
+        return IslandColourSeparationConstraint.fromSpec(spec.params);
       case "IslandDirectionalBridgeConstraint":
         return IslandDirectionalBridgeConstraint.fromSpec(spec.params);
       case "IslandPassingBridgeCountConstraint":
@@ -841,6 +1287,10 @@ function createConstraintsFromSpec(constraints) {
         return EnclosedAreaSizeConstraint.fromSpec(spec.params);
       case "BridgeMustCoverIslandConstraint":
         return BridgeMustCoverIslandConstraint.fromSpec(spec.params);
+      case "MustHaveWaterConstraint":
+        return MustHaveWaterConstraint.fromSpec(spec.params);
+      case "IslandBridgeCountConstraint":
+        return IslandBridgeCountConstraint.fromSpec(spec.params);
       // Add more cases as needed for other constraint types.
       default:
         throw new Error(`Unknown constraint type: ${spec.type}`);
@@ -850,10 +1300,11 @@ function createConstraintsFromSpec(constraints) {
 
 // src/model/puzzle/constraints/BridgeLengthConstraint.ts
 var BridgeLengthConstraint = class _BridgeLengthConstraint extends Constraint {
-  typeId;
-  expectedLength;
   constructor(typeId, expectedLength) {
     super();
+    __publicField(this, "personified", false);
+    __publicField(this, "typeId");
+    __publicField(this, "expectedLength");
     this.typeId = typeId;
     this.expectedLength = expectedLength;
   }
@@ -913,19 +1364,21 @@ function createBridgeType(params) {
 
 // src/model/puzzle/BridgePuzzle.ts
 var BridgePuzzle = class {
-  id;
-  width;
-  height;
-  islands;
-  constraints;
-  inventory;
-  maxNumBridges;
   constructor(spec) {
+    __publicField(this, "id");
+    __publicField(this, "width");
+    __publicField(this, "height");
+    __publicField(this, "islands");
+    __publicField(this, "constraints");
+    __publicField(this, "inventory");
+    __publicField(this, "maxNumBridges");
+    __publicField(this, "givesFeedback");
     this.id = spec.id;
     this.width = spec.size.width;
     this.height = spec.size.height;
     this.islands = spec.islands;
     this.constraints = createConstraintsFromSpec(spec.constraints);
+    this.givesFeedback = spec.givesFeedback ?? true;
     const bridgeTypes = spec.bridgeTypes.map(
       (spec2) => ({
         ...createBridgeType({
@@ -933,7 +1386,8 @@ var BridgePuzzle = class {
           colour: spec2.colour,
           length: spec2.length,
           width: spec2.width,
-          style: spec2.style
+          style: spec2.style,
+          mustCoverIsland: spec2.mustCoverIsland
         }),
         count: spec2.count ?? 1
       })
@@ -951,6 +1405,11 @@ var BridgePuzzle = class {
         if (len !== -1) {
           this.constraints.push(BridgeLengthConstraint.fromSpec({ typeId: bt.id, length: len }));
         }
+      }
+    }
+    for (const bridge of this.inventory.bridges) {
+      if (bridge instanceof StrutBridge) {
+        this.constraints.push(new BridgeMustCoverIslandConstraint(bridge.id));
       }
     }
   }
@@ -1011,7 +1470,7 @@ var BridgePuzzle = class {
   }
   /**
    * Returns whether a bridge of the given type can be placed between two islands.
-   * If typeId is undefined, this behaves like the legacy couldPlaceBridgeAt (only max-bridges and existence checks).
+   * If typeId is undefined, this performs only max-bridges and existence checks.
    */
   couldPlaceBridgeOfType(startIslandId, endIslandId, typeId) {
     if (startIslandId === endIslandId) return false;
@@ -1097,12 +1556,56 @@ var BridgePuzzle = class {
     }
     return foundBridges;
   }
+  /**
+   * Parse a Tiled "bridges" property string into BridgeTypeSpecs.
+   *
+   * Each entry is a length optionally followed by '+' to denote a StrutBridge
+   * (e.g. "3,2,3+,4+"). Duplicate lengths are counted and collapsed into a
+   * single spec with the appropriate count.  StrutBridge entries receive
+   * `mustCoverIsland: true` and use an id prefixed with "strut_".
+   *
+   * @param bridges - Comma-separated bridge entries, e.g. "3,2,3+,4+"
+   * @param colour  - Colour to apply to all created bridge types
+   */
+  static parseBridgesString(bridges, colour = "#8B4513") {
+    const normalCounts = /* @__PURE__ */ new Map();
+    const strutCounts = /* @__PURE__ */ new Map();
+    for (const raw of bridges.split(",")) {
+      const part = raw.trim();
+      if (!part) continue;
+      if (part.endsWith("+")) {
+        const len = parseInt(part.slice(0, -1), 10);
+        if (!Number.isFinite(len)) continue;
+        strutCounts.set(len, (strutCounts.get(len) ?? 0) + 1);
+      } else {
+        const len = parseInt(part, 10);
+        if (!Number.isFinite(len)) continue;
+        normalCounts.set(len, (normalCounts.get(len) ?? 0) + 1);
+      }
+    }
+    const result = [];
+    for (const [length, count] of normalCounts) {
+      result.push({ id: `fixed_${length}`, colour, length, count, width: 1, style: "wooden" });
+    }
+    for (const [length, count] of strutCounts) {
+      result.push({
+        id: `strut_${length}`,
+        colour,
+        length,
+        count,
+        width: 1,
+        style: "wooden",
+        mustCoverIsland: true
+      });
+    }
+    return result;
+  }
 };
 
 // src/model/puzzle/PuzzleValidator.ts
 var PuzzleValidator = class {
-  puzzle;
   constructor(puzzle) {
+    __publicField(this, "puzzle");
     this.puzzle = puzzle;
   }
   /**
@@ -1141,6 +1644,14 @@ var PuzzleValidator = class {
   isSolved() {
     return this.validateAll().allSatisfied;
   }
+  /**
+   * Collects display items from all constraints that provide them.
+   * Each item describes what glyph to show in the speech bubble next to a
+   * constrained element when all bridges are placed.
+   */
+  getConstraintDisplayItems() {
+    return this.puzzle.constraints.flatMap((c) => c.getDisplayItems(this.puzzle));
+  }
 };
 
 // editor/editor.ts
@@ -1149,107 +1660,197 @@ var CONSTRAINT_TYPES = [
     type: "AllBridgesPlacedConstraint",
     name: "All Bridges Placed",
     description: "All bridges from inventory must be placed",
-    needsParams: false,
-    needsCell: false
+    params: []
   },
   {
     type: "NoCrossingConstraint",
     name: "No Crossing",
     description: "Bridges must not cross each other",
-    needsParams: false,
-    needsCell: false
+    params: []
   },
   {
     type: "MustTouchAHorizontalBridge",
     name: "Must Touch Horizontal Bridge",
     description: "Cell must be adjacent to a horizontal bridge",
-    needsParams: true,
-    needsCell: true,
-    params: ["x", "y"]
+    params: [
+      { name: "x", type: "number", isCoord: true },
+      { name: "y", type: "number", isCoord: true }
+    ],
+    needsCell: true
   },
   {
     type: "MustTouchAVerticalBridge",
     name: "Must Touch Vertical Bridge",
     description: "Cell must be adjacent to a vertical bridge",
-    needsParams: true,
-    needsCell: true,
-    params: ["x", "y"]
+    params: [
+      { name: "x", type: "number", isCoord: true },
+      { name: "y", type: "number", isCoord: true }
+    ],
+    needsCell: true
   },
   {
     type: "IslandMustBeCoveredConstraint",
     name: "Island Must Be Covered",
     description: "Specified island must be covered by at least one bridge",
-    needsParams: true,
-    needsCell: false,
     params: [{ name: "islandId", type: "string" }]
   },
   {
-    type: "IslandColorSeparationConstraint",
+    type: "IslandColourSeparationConstraint",
     name: "Island Colour Separation",
-    description: "Islands of different colours must be separated",
-    needsParams: true,
-    needsCell: false,
+    description: "Islands of different colours must be separated by bridge colours",
     params: [{ name: "colour1", type: "string" }, { name: "colour2", type: "string" }]
   },
   {
     type: "IslandDirectionalBridgeConstraint",
     name: "Island Directional Bridge",
-    description: "Island must have a bridge in a specific direction",
-    needsParams: true,
-    needsCell: false,
-    params: [{ name: "islandId", type: "string" }, { name: "constraintType", type: "string" }]
+    description: "Island must have bridges in a specific direction pattern",
+    params: [
+      { name: "islandId", type: "string" },
+      {
+        name: "constraintType",
+        type: "string",
+        hint: "double_horizontal | double_vertical | double_any_direction | no_double_any_direction"
+      }
+    ]
   },
   {
     type: "IslandPassingBridgeCountConstraint",
     name: "Island Passing Bridge Count",
-    description: "Number of bridges passing by an island",
-    needsParams: true,
-    needsCell: false,
+    description: "Number of bridges passing by an island in a given direction",
     params: [
       { name: "islandId", type: "string" },
-      { name: "direction", type: "string" },
+      { name: "direction", type: "string", hint: "above | below | left | right | adjacent" },
       { name: "count", type: "number" }
     ]
   },
   {
     type: "IslandVisibilityConstraint",
     name: "Island Visibility",
-    description: "Islands must be visible from a specific island",
-    needsParams: true,
-    needsCell: false,
-    params: [{ name: "islandId", type: "string" }, { name: "count", type: "number" }]
+    description: "Precise count of islands visible from a specific island",
+    params: [
+      { name: "islandId", type: "string" },
+      { name: "count", type: "number" }
+    ]
   },
   {
     type: "EnclosedAreaSizeConstraint",
     name: "Enclosed Area Size",
-    description: "Size of enclosed areas created by bridges",
-    needsParams: true,
-    needsCell: true,
-    params: [{ name: "size", type: "number" }]
+    description: "Size of enclosed area at a grid cell (0 = open or covered)",
+    params: [
+      { name: "x", type: "number", isCoord: true },
+      { name: "y", type: "number", isCoord: true },
+      { name: "size", type: "number" }
+    ],
+    needsCell: true
   },
   {
     type: "BridgeMustCoverIslandConstraint",
     name: "Bridge Must Cover Island",
     description: "A specific bridge must cover an island",
-    needsParams: true,
-    needsCell: false,
     params: [{ name: "islandId", type: "string" }],
     note: "Applied to individual bridge types"
+  },
+  {
+    type: "IslandBridgeCountConstraint",
+    name: "Island Bridge Count",
+    description: "Number of bridges required at an island",
+    params: [
+      { name: "islandId", type: "string" },
+      { name: "count", type: "number" }
+    ]
   }
 ];
+function getConstraintGridItems(constraints, islands) {
+  const items = [];
+  for (const c of constraints) {
+    const p = c.params;
+    switch (c.type) {
+      case "MustTouchAHorizontalBridge":
+        if (p?.x != null && p?.y != null) items.push({ x: p.x, y: p.y, label: "TH" });
+        break;
+      case "MustTouchAVerticalBridge":
+        if (p?.x != null && p?.y != null) items.push({ x: p.x, y: p.y, label: "TV" });
+        break;
+      case "EnclosedAreaSizeConstraint":
+        if (p?.x != null && p?.y != null) {
+          items.push({ x: p.x, y: p.y, label: `A=${p.size ?? "?"}` });
+        }
+        break;
+      case "IslandMustBeCoveredConstraint": {
+        const island = islands.find((i) => i.id === p?.islandId);
+        if (island) items.push({ x: island.x, y: island.y, label: "COV" });
+        break;
+      }
+      case "IslandDirectionalBridgeConstraint": {
+        const island = islands.find((i) => i.id === p?.islandId);
+        if (island) {
+          const labelMap = {
+            double_horizontal: "DH",
+            double_vertical: "DV",
+            double_any_direction: "D",
+            no_double_any_direction: "DX"
+          };
+          const label = labelMap[p?.constraintType ?? ""] ?? "D?";
+          items.push({ x: island.x, y: island.y, label });
+        }
+        break;
+      }
+      case "IslandPassingBridgeCountConstraint": {
+        const island = islands.find((i) => i.id === p?.islandId);
+        if (island) {
+          const dirMap = {
+            above: "PU",
+            below: "PD",
+            left: "PL",
+            right: "PR",
+            adjacent: "P"
+          };
+          const prefix = dirMap[p?.direction ?? ""] ?? "P";
+          items.push({ x: island.x, y: island.y, label: `${prefix}=${p?.count ?? "?"}` });
+        }
+        break;
+      }
+      case "IslandVisibilityConstraint": {
+        const island = islands.find((i) => i.id === p?.islandId);
+        if (island) items.push({ x: island.x, y: island.y, label: `V=${p?.count ?? "?"}` });
+        break;
+      }
+      case "IslandBridgeCountConstraint": {
+        const island = islands.find((i) => i.id === p?.islandId);
+        if (island && p?.count != null) {
+          items.push({ x: island.x, y: island.y, label: `B=${p.count}` });
+        }
+        break;
+      }
+    }
+  }
+  for (const island of islands) {
+    const rule = island.constraints?.find((c) => c.startsWith("num_bridges="));
+    if (rule) {
+      const n = rule.split("=")[1];
+      const alreadyAdded = items.some((i) => i.x === island.x && i.y === island.y && i.label.startsWith("B="));
+      if (!alreadyAdded) {
+        items.push({ x: island.x, y: island.y, label: `B=${n}` });
+      }
+    }
+  }
+  return items;
+}
 var PuzzleEditor = class {
-  canvas;
-  ctx;
-  puzzle;
-  cellSize = 60;
-  mode = "edit";
-  tool = "island";
-  selectedConstraintType = null;
-  selectedBridgeTypeId = null;
-  testBridges = [];
-  bridgePlacementStart = null;
-  nextIslandId = 0;
   constructor() {
+    __publicField(this, "canvas");
+    __publicField(this, "ctx");
+    __publicField(this, "puzzle");
+    __publicField(this, "cellSize", 60);
+    __publicField(this, "tool", "island");
+    __publicField(this, "selectedBridgeTypeId", null);
+    __publicField(this, "testBridges", []);
+    __publicField(this, "bridgePlacementStart", null);
+    __publicField(this, "nextIslandId", 0);
+    // Constraint form state
+    __publicField(this, "constraintFormVisible", false);
+    __publicField(this, "constraintFormNeedsCell", false);
+    __publicField(this, "selectedConstraintType", null);
     this.canvas = document.getElementById("gridCanvas");
     this.ctx = this.canvas.getContext("2d");
     this.puzzle = {
@@ -1262,16 +1863,12 @@ var PuzzleEditor = class {
       maxNumBridges: 10
     };
     this.setupEventListeners();
+    this.renderConstraintTypeList();
+    this.updateCanvasSize();
     this.renderAll();
   }
   setupEventListeners() {
     this.canvas.addEventListener("click", (e) => this.handleCanvasClick(e));
-    document.querySelectorAll('input[name="mode"]').forEach((radio) => {
-      radio.addEventListener("change", (e) => {
-        this.mode = e.target.value;
-        this.updateUI();
-      });
-    });
     document.getElementById("addIslandBtn")?.addEventListener("click", () => {
       this.tool = "island";
       this.updateToolButtons();
@@ -1290,9 +1887,11 @@ var PuzzleEditor = class {
     document.getElementById("resizeGrid")?.addEventListener("click", () => {
       const width = parseInt(document.getElementById("gridWidth").value);
       const height = parseInt(document.getElementById("gridHeight").value);
-      this.puzzle.size = { width, height };
-      this.updateCanvasSize();
-      this.renderAll();
+      if (!isNaN(width) && !isNaN(height)) {
+        this.puzzle.size = { width, height };
+        this.updateCanvasSize();
+        this.renderAll();
+      }
     });
     document.getElementById("saveBtn")?.addEventListener("click", () => this.savePuzzle());
     document.getElementById("loadBtn")?.addEventListener("click", () => this.loadPuzzle());
@@ -1306,6 +1905,104 @@ var PuzzleEditor = class {
       document.getElementById("validationResults").innerHTML = "";
       this.renderAll();
     });
+    document.getElementById("showConstraintListBtn")?.addEventListener("click", () => {
+      this.toggleConstraintTypePanel();
+    });
+    document.getElementById("editConstraintsBtn")?.addEventListener("click", () => {
+      this.togglePuzzleConstraintsPanel();
+    });
+    document.getElementById("cancelConstraintTypeBtn")?.addEventListener("click", () => {
+      this.hideConstraintTypePanel();
+    });
+    document.getElementById("cancelConstraintFormBtn")?.addEventListener("click", () => {
+      this.hideConstraintForm();
+    });
+    document.getElementById("confirmAddConstraintBtn")?.addEventListener("click", () => {
+      this.addConstraintFromForm();
+    });
+  }
+  toggleConstraintTypePanel() {
+    const panel = document.getElementById("constraintTypePanel");
+    if (panel.style.display !== "none") {
+      this.hideConstraintTypePanel();
+    } else {
+      this.hideConstraintForm();
+      panel.style.display = "block";
+    }
+  }
+  hideConstraintTypePanel() {
+    document.getElementById("constraintTypePanel").style.display = "none";
+  }
+  togglePuzzleConstraintsPanel() {
+    const panel = document.getElementById("puzzleConstraintsPanel");
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
+    if (panel.style.display === "block") {
+      this.renderPuzzleConstraints();
+    }
+  }
+  showConstraintForm(ctDef) {
+    this.selectedConstraintType = ctDef;
+    this.constraintFormVisible = true;
+    this.constraintFormNeedsCell = ctDef.needsCell === true;
+    const title = document.getElementById("constraintFormTitle");
+    const fields = document.getElementById("constraintFormFields");
+    title.textContent = ctDef.name;
+    let html = "";
+    if (ctDef.needsCell) {
+      html += `<p class="cell-hint">Click a grid cell to set position, or type coordinates below.</p>`;
+    }
+    if (ctDef.note) {
+      html += `<p class="constraint-note">${ctDef.note}</p>`;
+    }
+    for (const param of ctDef.params ?? []) {
+      const hintHtml = param.hint ? ` <small>${param.hint}</small>` : "";
+      html += `<div class="param-group">
+                <label for="param_${param.name}">${param.name}:${hintHtml}</label>
+                <input type="${param.type === "number" ? "number" : "text"}"
+                       id="param_${param.name}"
+                       placeholder="${param.name}">
+            </div>`;
+    }
+    fields.innerHTML = html;
+    document.getElementById("constraintFormPanel").style.display = "block";
+  }
+  hideConstraintForm() {
+    this.constraintFormVisible = false;
+    this.constraintFormNeedsCell = false;
+    this.selectedConstraintType = null;
+    document.getElementById("constraintFormPanel").style.display = "none";
+  }
+  addConstraintFromForm() {
+    const ctDef = this.selectedConstraintType;
+    if (!ctDef) return;
+    const params = {};
+    for (const param of ctDef.params ?? []) {
+      const input = document.getElementById(`param_${param.name}`);
+      if (!input || !input.value.trim()) {
+        alert(`Please enter a value for "${param.name}"`);
+        return;
+      }
+      if (param.type === "number") {
+        const n = parseInt(input.value, 10);
+        if (isNaN(n)) {
+          alert(`"${param.name}" must be a valid integer`);
+          return;
+        }
+        params[param.name] = n;
+      } else {
+        params[param.name] = input.value.trim();
+      }
+    }
+    this.puzzle.constraints.push({
+      type: ctDef.type,
+      params: Object.keys(params).length > 0 ? params : void 0
+    });
+    this.hideConstraintForm();
+    this.renderAll();
+    const panel = document.getElementById("puzzleConstraintsPanel");
+    if (panel.style.display !== "none") {
+      this.renderPuzzleConstraints();
+    }
   }
   handleCanvasClick(e) {
     const rect = this.canvas.getBoundingClientRect();
@@ -1316,13 +2013,13 @@ var PuzzleEditor = class {
     if (gridX < 1 || gridX > this.puzzle.size.width || gridY < 1 || gridY > this.puzzle.size.height) {
       return;
     }
-    if (this.mode === "edit") {
-      this.handleEditClick(gridX, gridY);
-    } else if (this.mode === "constraint") {
-      this.handleConstraintClick(gridX, gridY);
+    if (this.constraintFormVisible && this.constraintFormNeedsCell) {
+      const xInput = document.getElementById("param_x");
+      const yInput = document.getElementById("param_y");
+      if (xInput) xInput.value = String(gridX);
+      if (yInput) yInput.value = String(gridY);
+      return;
     }
-  }
-  handleEditClick(gridX, gridY) {
     if (this.tool === "island") {
       this.addIsland(gridX, gridY);
     } else if (this.tool === "remove") {
@@ -1333,7 +2030,7 @@ var PuzzleEditor = class {
   }
   handleBridgePlacement(gridX, gridY) {
     if (!this.selectedBridgeTypeId) {
-      alert("Please select a bridge type first from the right panel");
+      alert("Please select a bridge type first from the Bridge Types panel below");
       return;
     }
     if (!this.bridgePlacementStart) {
@@ -1349,39 +2046,17 @@ var PuzzleEditor = class {
         return;
       }
       if (start.x === end.x && start.y === end.y) {
-        alert("Bridge must connect two different cells");
         this.bridgePlacementStart = null;
         this.renderAll();
         return;
       }
-      this.testBridges.push({
-        start,
-        end,
-        bridgeTypeId: this.selectedBridgeTypeId
-      });
+      this.testBridges.push({ start, end, bridgeTypeId: this.selectedBridgeTypeId });
       this.bridgePlacementStart = null;
       this.renderAll();
     }
   }
-  handleConstraintClick(gridX, gridY) {
-    if (!this.selectedConstraintType) {
-      alert("Please select a constraint type first");
-      return;
-    }
-    const constraintInfo = CONSTRAINT_TYPES.find((c) => c.type === this.selectedConstraintType);
-    if (!constraintInfo) return;
-    if (constraintInfo.needsCell) {
-      this.showConstraintConfig(constraintInfo, { x: gridX, y: gridY });
-    } else {
-      alert("This constraint does not apply to grid cells. Configure it in the left panel.");
-    }
-  }
   addIsland(x, y) {
-    const existing = this.puzzle.islands.find((i) => i.x === x && i.y === y);
-    if (existing) {
-      alert("Island already exists at this position");
-      return;
-    }
+    if (this.puzzle.islands.find((i) => i.x === x && i.y === y)) return;
     const id = this.generateIslandId();
     this.puzzle.islands.push({ id, x, y });
     this.renderAll();
@@ -1399,12 +2074,7 @@ var PuzzleEditor = class {
   }
   addBridgeType() {
     const id = `bridge_${this.puzzle.bridgeTypes.length + 1}`;
-    this.puzzle.bridgeTypes.push({
-      id,
-      colour: "black",
-      length: 1,
-      count: 1
-    });
+    this.puzzle.bridgeTypes.push({ id, colour: "black", length: 1, count: 1 });
     this.renderAll();
   }
   removeBridgeType(id) {
@@ -1416,93 +2086,19 @@ var PuzzleEditor = class {
   }
   updateBridgeType(id, field, value) {
     const bridge = this.puzzle.bridgeTypes.find((b) => b.id === id);
-    if (bridge) {
-      bridge[field] = value;
-    }
-  }
-  showConstraintConfig(constraintInfo, cell) {
-    const configDiv = document.getElementById("cellConstraintConfig");
-    const cellConstraintsDiv = document.getElementById("cellConstraints");
-    cellConstraintsDiv.style.display = "block";
-    let html = `<h4>${constraintInfo.name}</h4>`;
-    if (cell) {
-      html += `<div class="param-group">
-                <label>X:</label>
-                <input type="number" id="param_x" value="${cell.x}" readonly>
-            </div>
-            <div class="param-group">
-                <label>Y:</label>
-                <input type="number" id="param_y" value="${cell.y}" readonly>
-            </div>`;
-    }
-    if (constraintInfo.params && Array.isArray(constraintInfo.params)) {
-      constraintInfo.params.forEach((param) => {
-        const paramName = typeof param === "string" ? param : param.name;
-        const paramType = typeof param === "string" ? "text" : param.type;
-        if (paramName !== "x" && paramName !== "y") {
-          html += `<div class="param-group">
-                        <label>${paramName}:</label>
-                        <input type="${paramType === "number" ? "number" : "text"}" 
-                               id="param_${paramName}" 
-                               placeholder="${paramName}">
-                    </div>`;
-        }
-      });
-    }
-    html += `<button class="btn-small" id="addConstraintBtn">Add Constraint</button>`;
-    configDiv.innerHTML = html;
-    document.getElementById("addConstraintBtn")?.addEventListener("click", () => {
-      this.addConstraintFromConfig(constraintInfo);
-    });
-  }
-  addConstraintFromConfig(constraintInfo) {
-    const params = {};
-    if (constraintInfo.needsCell) {
-      params.x = parseInt(document.getElementById("param_x").value);
-      params.y = parseInt(document.getElementById("param_y").value);
-    }
-    if (constraintInfo.params) {
-      constraintInfo.params.forEach((param) => {
-        const paramName = typeof param === "string" ? param : param.name;
-        const paramType = typeof param === "string" ? "text" : param.type;
-        if (paramName !== "x" && paramName !== "y") {
-          const input = document.getElementById(`param_${paramName}`);
-          if (input && input.value) {
-            if (paramType === "number") {
-              const numValue = parseInt(input.value);
-              if (!isNaN(numValue)) {
-                params[paramName] = numValue;
-              } else {
-                alert(`Please enter a valid number for ${paramName}`);
-                return;
-              }
-            } else {
-              params[paramName] = input.value;
-            }
-          } else {
-            alert(`Please enter a value for ${paramName}`);
-            return;
-          }
-        }
-      });
-    }
-    this.puzzle.constraints.push({
-      type: constraintInfo.type,
-      params: Object.keys(params).length > 0 ? params : void 0
-    });
-    this.renderAll();
-    document.getElementById("cellConstraints").style.display = "none";
+    if (bridge) bridge[field] = value;
   }
   removeConstraint(index) {
     this.puzzle.constraints.splice(index, 1);
     this.renderAll();
+    this.renderPuzzleConstraints();
   }
   savePuzzle() {
     try {
       localStorage.setItem("archipelago_puzzle_draft", JSON.stringify(this.puzzle));
       alert("Puzzle saved to local storage!");
     } catch (e) {
-      alert("Failed to save puzzle: " + e);
+      alert("Failed to save: " + e);
     }
   }
   loadPuzzle() {
@@ -1512,20 +2108,43 @@ var PuzzleEditor = class {
         this.puzzle = JSON.parse(saved);
         this.nextIslandId = this.puzzle.islands.length;
         document.getElementById("puzzleId").value = this.puzzle.id;
-        document.getElementById("gridWidth").value = this.puzzle.size.width.toString();
-        document.getElementById("gridHeight").value = this.puzzle.size.height.toString();
+        document.getElementById("gridWidth").value = String(this.puzzle.size.width);
+        document.getElementById("gridHeight").value = String(this.puzzle.size.height);
         this.updateCanvasSize();
         this.renderAll();
-        alert("Puzzle loaded from local storage!");
+        alert("Puzzle loaded!");
       } else {
         alert("No saved puzzle found in local storage");
       }
     } catch (e) {
-      alert("Failed to load puzzle: " + e);
+      alert("Failed to load: " + e);
     }
   }
+  // Transform editor-internal puzzle data to game-compatible export format
+  buildExportSpec() {
+    const spec = JSON.parse(JSON.stringify(this.puzzle));
+    const bridgeCountConstraints = spec.constraints.filter(
+      (c) => c.type === "IslandBridgeCountConstraint" && c.params?.islandId != null && c.params?.count != null
+    );
+    for (const bc of bridgeCountConstraints) {
+      const island = spec.islands.find((i) => i.id === bc.params.islandId);
+      if (island) {
+        if (!island.constraints) island.constraints = [];
+        island.constraints = island.constraints.filter((c) => !c.startsWith("num_bridges="));
+        island.constraints.push(`num_bridges=${bc.params.count}`);
+      }
+    }
+    spec.constraints = spec.constraints.filter(
+      (c) => !(c.type === "IslandBridgeCountConstraint" && c.params?.islandId != null)
+    );
+    if (bridgeCountConstraints.length > 0 && !spec.constraints.find((c) => c.type === "IslandBridgeCountConstraint")) {
+      spec.constraints.push({ type: "IslandBridgeCountConstraint" });
+    }
+    return spec;
+  }
   exportJSON() {
-    const json = JSON.stringify(this.puzzle, null, 2);
+    const spec = this.buildExportSpec();
+    const json = JSON.stringify(spec, null, 2);
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1535,64 +2154,63 @@ var PuzzleEditor = class {
     URL.revokeObjectURL(url);
   }
   newPuzzle() {
-    if (confirm("Create a new puzzle? Unsaved changes will be lost.")) {
-      this.puzzle = {
-        id: "new_puzzle",
-        type: "standard",
-        size: { width: 4, height: 4 },
-        islands: [],
-        bridgeTypes: [],
-        constraints: [],
-        maxNumBridges: 10
-      };
-      this.nextIslandId = 0;
-      this.testBridges = [];
-      document.getElementById("puzzleId").value = this.puzzle.id;
-      document.getElementById("gridWidth").value = "4";
-      document.getElementById("gridHeight").value = "4";
-      this.updateCanvasSize();
-      this.renderAll();
-    }
+    if (!confirm("Create a new puzzle? Unsaved changes will be lost.")) return;
+    this.puzzle = {
+      id: "new_puzzle",
+      type: "standard",
+      size: { width: 4, height: 4 },
+      islands: [],
+      bridgeTypes: [],
+      constraints: [],
+      maxNumBridges: 10
+    };
+    this.nextIslandId = 0;
+    this.testBridges = [];
+    this.bridgePlacementStart = null;
+    document.getElementById("puzzleId").value = "new_puzzle";
+    document.getElementById("gridWidth").value = "4";
+    document.getElementById("gridHeight").value = "4";
+    this.hideConstraintForm();
+    this.updateCanvasSize();
+    this.renderAll();
   }
   validateSolution() {
     try {
+      const exported = this.buildExportSpec();
       const puzzleSpec = {
-        id: this.puzzle.id,
-        type: this.puzzle.type,
-        size: this.puzzle.size,
-        islands: this.puzzle.islands,
-        bridgeTypes: this.puzzle.bridgeTypes,
-        constraints: this.puzzle.constraints,
-        maxNumBridges: this.puzzle.maxNumBridges
+        id: exported.id,
+        type: exported.type,
+        size: exported.size,
+        islands: exported.islands,
+        bridgeTypes: exported.bridgeTypes,
+        constraints: exported.constraints,
+        maxNumBridges: exported.maxNumBridges
       };
       const bridgePuzzle = new BridgePuzzle(puzzleSpec);
-      for (const testBridge of this.testBridges) {
-        const bridgeType = bridgePuzzle.inventory.takeBridge(testBridge.bridgeTypeId);
+      for (const tb of this.testBridges) {
+        const bridgeType = bridgePuzzle.inventory.takeBridge(tb.bridgeTypeId);
         if (!bridgeType) {
-          const resultsDiv2 = document.getElementById("validationResults");
-          resultsDiv2.innerHTML = `<div class="validation-message error">No more bridges of type ${testBridge.bridgeTypeId} available</div>`;
+          document.getElementById("validationResults").innerHTML = `<div class="validation-message error">No more bridges of type "${tb.bridgeTypeId}" available</div>`;
           return;
         }
-        bridgePuzzle.placeBridge(bridgeType.id, testBridge.start, testBridge.end);
+        bridgePuzzle.placeBridge(bridgeType.id, tb.start, tb.end);
       }
       const validator = new PuzzleValidator(bridgePuzzle);
-      const validationResult = validator.validateAll();
+      const result = validator.validateAll();
       const resultsDiv = document.getElementById("validationResults");
-      if (validationResult.allSatisfied) {
-        resultsDiv.innerHTML = '<div class="validation-message success">\u2713 All constraints satisfied! Puzzle solved!</div>';
+      if (result.allSatisfied) {
+        resultsDiv.innerHTML = '<div class="validation-message success">\u2713 All constraints satisfied!</div>';
       } else {
-        let html = `<div class="validation-message error">\u2717 ${validationResult.unsatisfiedCount} constraint(s) failed:</div>`;
-        for (const constraint of validationResult.perConstraint) {
-          if (!constraint.result.satisfied) {
-            const message = constraint.result.message || "Constraint not satisfied";
-            html += `<div class="validation-message error"><strong>${constraint.type}:</strong> ${message}</div>`;
+        let html = `<div class="validation-message error">\u2717 ${result.unsatisfiedCount} constraint(s) failed:</div>`;
+        for (const c of result.perConstraint) {
+          if (!c.result.satisfied) {
+            html += `<div class="validation-message error"><strong>${c.type}:</strong> ${c.result.message ?? "Not satisfied"}</div>`;
           }
         }
         resultsDiv.innerHTML = html;
       }
     } catch (error) {
-      const resultsDiv = document.getElementById("validationResults");
-      resultsDiv.innerHTML = `<div class="validation-message error">Validation error: ${error}</div>`;
+      document.getElementById("validationResults").innerHTML = `<div class="validation-message error">Validation error: ${error}</div>`;
       console.error("Validation error:", error);
     }
   }
@@ -1601,26 +2219,14 @@ var PuzzleEditor = class {
     this.canvas.height = this.puzzle.size.height * this.cellSize;
   }
   updateToolButtons() {
-    document.querySelectorAll(".tool-controls .btn").forEach((btn) => {
-      btn.classList.remove("active");
-    });
-    if (this.tool === "island") {
-      document.getElementById("addIslandBtn")?.classList.add("active");
-    } else if (this.tool === "remove") {
-      document.getElementById("removeIslandBtn")?.classList.add("active");
-    } else if (this.tool === "bridge") {
-      document.getElementById("addBridgeBtn")?.classList.add("active");
-    }
-  }
-  updateUI() {
-    this.renderConstraintList();
-    this.renderPuzzleConstraints();
-    this.renderBridgeTypes();
-    this.renderIslandsList();
+    document.querySelectorAll(".tool-controls .btn").forEach((btn) => btn.classList.remove("active"));
+    if (this.tool === "island") document.getElementById("addIslandBtn")?.classList.add("active");
+    else if (this.tool === "remove") document.getElementById("removeIslandBtn")?.classList.add("active");
+    else if (this.tool === "bridge") document.getElementById("addBridgeBtn")?.classList.add("active");
   }
   renderAll() {
-    this.updateUI();
     this.renderGrid();
+    this.renderBridgeTypes();
   }
   renderGrid() {
     const ctx = this.ctx;
@@ -1629,72 +2235,35 @@ var PuzzleEditor = class {
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.strokeStyle = "#ddd";
     ctx.lineWidth = 1;
-    for (let x = 0; x <= width; x++) {
+    for (let gx = 0; gx <= width; gx++) {
       ctx.beginPath();
-      ctx.moveTo(x * this.cellSize, 0);
-      ctx.lineTo(x * this.cellSize, height * this.cellSize);
+      ctx.moveTo(gx * this.cellSize, 0);
+      ctx.lineTo(gx * this.cellSize, height * this.cellSize);
       ctx.stroke();
     }
-    for (let y = 0; y <= height; y++) {
+    for (let gy = 0; gy <= height; gy++) {
       ctx.beginPath();
-      ctx.moveTo(0, y * this.cellSize);
-      ctx.lineTo(width * this.cellSize, y * this.cellSize);
+      ctx.moveTo(0, gy * this.cellSize);
+      ctx.lineTo(width * this.cellSize, gy * this.cellSize);
       ctx.stroke();
     }
-    this.puzzle.constraints.forEach((constraint) => {
-      if (constraint.params && constraint.params.x && constraint.params.y) {
-        const x = (constraint.params.x - 0.5) * this.cellSize;
-        const y = (constraint.params.y - 0.5) * this.cellSize;
-        ctx.fillStyle = "rgba(255, 193, 7, 0.3)";
-        ctx.fillRect(x - this.cellSize / 2, y - this.cellSize / 2, this.cellSize, this.cellSize);
-        ctx.strokeStyle = "#ffc107";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x - this.cellSize / 2, y - this.cellSize / 2, this.cellSize, this.cellSize);
-      }
-    });
-    const bridgesBySpan = /* @__PURE__ */ new Map();
-    this.testBridges.forEach((bridge) => {
-      const key = bridge.start.x === bridge.end.x ? `v_${bridge.start.x}_${Math.min(bridge.start.y, bridge.end.y)}_${Math.max(bridge.start.y, bridge.end.y)}` : `h_${Math.min(bridge.start.x, bridge.end.x)}_${Math.max(bridge.start.x, bridge.end.x)}_${bridge.start.y}`;
-      if (!bridgesBySpan.has(key)) {
-        bridgesBySpan.set(key, []);
-      }
-      bridgesBySpan.get(key).push(bridge);
-    });
-    bridgesBySpan.forEach((bridges) => {
-      bridges.forEach((bridge, index) => {
-        const startX = (bridge.start.x - 0.5) * this.cellSize;
-        const startY = (bridge.start.y - 0.5) * this.cellSize;
-        const endX = (bridge.end.x - 0.5) * this.cellSize;
-        const endY = (bridge.end.y - 0.5) * this.cellSize;
-        const offset = index * 4;
-        ctx.strokeStyle = "#3498db";
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        if (bridge.start.x === bridge.end.x) {
-          ctx.moveTo(startX + offset, startY);
-          ctx.lineTo(endX + offset, endY);
-        } else {
-          ctx.moveTo(startX, startY + offset);
-          ctx.lineTo(endX, endY + offset);
-        }
-        ctx.stroke();
-      });
-    });
+    this.renderConstraintLabels();
+    this.renderTestBridges();
     if (this.bridgePlacementStart) {
-      const x = (this.bridgePlacementStart.x - 0.5) * this.cellSize;
-      const y = (this.bridgePlacementStart.y - 0.5) * this.cellSize;
+      const px = (this.bridgePlacementStart.x - 0.5) * this.cellSize;
+      const py = (this.bridgePlacementStart.y - 0.5) * this.cellSize;
       ctx.fillStyle = "rgba(52, 152, 219, 0.3)";
-      ctx.fillRect(x - this.cellSize / 2, y - this.cellSize / 2, this.cellSize, this.cellSize);
+      ctx.fillRect(px - this.cellSize / 2, py - this.cellSize / 2, this.cellSize, this.cellSize);
       ctx.strokeStyle = "#3498db";
       ctx.lineWidth = 3;
-      ctx.strokeRect(x - this.cellSize / 2, y - this.cellSize / 2, this.cellSize, this.cellSize);
+      ctx.strokeRect(px - this.cellSize / 2, py - this.cellSize / 2, this.cellSize, this.cellSize);
     }
     this.puzzle.islands.forEach((island) => {
-      const x = (island.x - 0.5) * this.cellSize;
-      const y = (island.y - 0.5) * this.cellSize;
+      const ix = (island.x - 0.5) * this.cellSize;
+      const iy = (island.y - 0.5) * this.cellSize;
       ctx.fillStyle = "#2ecc71";
       ctx.beginPath();
-      ctx.arc(x, y, 20, 0, Math.PI * 2);
+      ctx.arc(ix, iy, 20, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = "#27ae60";
       ctx.lineWidth = 2;
@@ -1703,39 +2272,96 @@ var PuzzleEditor = class {
       ctx.font = "bold 16px sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(island.id, x, y);
+      ctx.fillText(island.id, ix, iy);
     });
   }
-  renderConstraintList() {
+  renderConstraintLabels() {
+    const items = getConstraintGridItems(this.puzzle.constraints, this.puzzle.islands);
+    const byPos = /* @__PURE__ */ new Map();
+    for (const item of items) {
+      const key = `${item.x},${item.y}`;
+      if (!byPos.has(key)) byPos.set(key, []);
+      byPos.get(key).push(item.label);
+    }
+    const ctx = this.ctx;
+    byPos.forEach((labels, key) => {
+      const [gx, gy] = key.split(",").map(Number);
+      const cx = (gx - 0.5) * this.cellSize;
+      const cy = (gy - 0.5) * this.cellSize;
+      const half = this.cellSize / 2;
+      ctx.fillStyle = "rgba(255, 193, 7, 0.15)";
+      ctx.fillRect(cx - half, cy - half, this.cellSize, this.cellSize);
+      ctx.strokeStyle = "rgba(255, 150, 0, 0.4)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx - half, cy - half, this.cellSize, this.cellSize);
+      ctx.font = "bold 10px monospace";
+      ctx.textAlign = "center";
+      labels.forEach((label, idx) => {
+        const textY = cy - half + 9 + idx * 13;
+        const metrics = ctx.measureText(label);
+        const bgW = metrics.width + 6;
+        const bgH = 12;
+        ctx.fillStyle = "rgba(255, 193, 7, 0.9)";
+        ctx.fillRect(cx - bgW / 2, textY - bgH + 3, bgW, bgH);
+        ctx.fillStyle = "#333";
+        ctx.fillText(label, cx, textY);
+      });
+    });
+  }
+  renderTestBridges() {
+    const bridgesBySpan = /* @__PURE__ */ new Map();
+    this.testBridges.forEach((bridge) => {
+      const key = bridge.start.x === bridge.end.x ? `v_${bridge.start.x}_${Math.min(bridge.start.y, bridge.end.y)}_${Math.max(bridge.start.y, bridge.end.y)}` : `h_${Math.min(bridge.start.x, bridge.end.x)}_${Math.max(bridge.start.x, bridge.end.x)}_${bridge.start.y}`;
+      if (!bridgesBySpan.has(key)) bridgesBySpan.set(key, []);
+      bridgesBySpan.get(key).push(bridge);
+    });
+    const ctx = this.ctx;
+    bridgesBySpan.forEach((bridges) => {
+      bridges.forEach((bridge, index) => {
+        const sx = (bridge.start.x - 0.5) * this.cellSize;
+        const sy = (bridge.start.y - 0.5) * this.cellSize;
+        const ex = (bridge.end.x - 0.5) * this.cellSize;
+        const ey = (bridge.end.y - 0.5) * this.cellSize;
+        const offset = (index - (bridges.length - 1) / 2) * 5;
+        ctx.strokeStyle = "#3498db";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        if (bridge.start.x === bridge.end.x) {
+          ctx.moveTo(sx + offset, sy);
+          ctx.lineTo(ex + offset, ey);
+        } else {
+          ctx.moveTo(sx, sy + offset);
+          ctx.lineTo(ex, ey + offset);
+        }
+        ctx.stroke();
+      });
+    });
+  }
+  renderConstraintTypeList() {
     const listDiv = document.getElementById("constraintList");
     let html = "";
-    CONSTRAINT_TYPES.forEach((constraint) => {
-      const selected = this.selectedConstraintType === constraint.type ? "selected" : "";
-      html += `
-                <div class="constraint-item ${selected}" data-type="${constraint.type}">
-                    <h4>${constraint.name}</h4>
-                    <p>${constraint.description}</p>
-                    ${constraint.note ? `<p><em>${constraint.note}</em></p>` : ""}
-                </div>
-            `;
+    CONSTRAINT_TYPES.forEach((ct) => {
+      html += `<div class="constraint-item" data-type="${ct.type}">
+                <h4>${ct.name}</h4>
+                <p>${ct.description}</p>
+                ${ct.note ? `<p><em>${ct.note}</em></p>` : ""}
+            </div>`;
     });
     listDiv.innerHTML = html;
     listDiv.querySelectorAll(".constraint-item").forEach((item) => {
       item.addEventListener("click", () => {
         const type = item.getAttribute("data-type");
-        this.selectedConstraintType = type;
-        this.renderConstraintList();
-        const constraintInfo = CONSTRAINT_TYPES.find((c) => c.type === type);
-        if (constraintInfo && !constraintInfo.needsCell) {
-          this.showConstraintConfig(constraintInfo);
-        }
+        const ctDef = CONSTRAINT_TYPES.find((c) => c.type === type);
+        if (!ctDef) return;
+        this.hideConstraintTypePanel();
+        this.showConstraintForm(ctDef);
       });
     });
   }
   renderPuzzleConstraints() {
     const listDiv = document.getElementById("puzzleConstraintsList");
     if (this.puzzle.constraints.length === 0) {
-      listDiv.innerHTML = '<p style="color: #999; font-size: 0.9rem;">No constraints added yet</p>';
+      listDiv.innerHTML = '<p class="empty-note">No constraints added yet</p>';
       return;
     }
     let html = "";
@@ -1743,13 +2369,11 @@ var PuzzleEditor = class {
       const info = CONSTRAINT_TYPES.find((c) => c.type === constraint.type);
       const name = info ? info.name : constraint.type;
       const paramsStr = constraint.params ? JSON.stringify(constraint.params) : "";
-      html += `
-                <div class="puzzle-constraint">
-                    <button class="remove-btn" data-index="${index}">\xD7</button>
-                    <strong>${name}</strong>
-                    ${paramsStr ? `<br><small>${paramsStr}</small>` : ""}
-                </div>
-            `;
+      html += `<div class="puzzle-constraint">
+                <button class="remove-btn" data-index="${index}">\xD7</button>
+                <strong>${name}</strong>
+                ${paramsStr ? `<br><small>${paramsStr}</small>` : ""}
+            </div>`;
     });
     listDiv.innerHTML = html;
     listDiv.querySelectorAll(".remove-btn").forEach((btn) => {
@@ -1762,50 +2386,34 @@ var PuzzleEditor = class {
   renderBridgeTypes() {
     const listDiv = document.getElementById("bridgeTypeList");
     if (this.puzzle.bridgeTypes.length === 0) {
-      listDiv.innerHTML = '<p style="color: #999; font-size: 0.9rem;">No bridge types defined</p>';
+      listDiv.innerHTML = '<p class="empty-note">No bridge types defined</p>';
       return;
     }
     let html = "";
-    this.puzzle.bridgeTypes.forEach((bridge, index) => {
+    this.puzzle.bridgeTypes.forEach((bridge) => {
       const selected = this.selectedBridgeTypeId === bridge.id ? "selected" : "";
-      html += `
-                <div class="bridge-type-item ${selected}" data-bridge-id="${bridge.id}">
-                    <button class="remove-btn" data-id="${bridge.id}">\xD7</button>
-                    <div><strong>ID:</strong> ${bridge.id}</div>
-                    <div>
-                        <label>Colour: 
-                            <input type="text" 
-                                   value="${bridge.colour || "black"}" 
-                                   data-id="${bridge.id}" 
-                                   data-field="colour">
-                        </label>
-                    </div>
-                    <div>
-                        <label>Length: 
-                            <input type="number" 
-                                   value="${bridge.length ?? 1}" 
-                                   data-id="${bridge.id}" 
-                                   data-field="length"
-                                   placeholder="-1 for variable">
-                        </label>
-                    </div>
-                    <div>
-                        <label>Count: 
-                            <input type="number" 
-                                   value="${bridge.count ?? 1}" 
-                                   data-id="${bridge.id}" 
-                                   data-field="count">
-                        </label>
-                    </div>
-                </div>
-            `;
+      html += `<div class="bridge-type-item ${selected}" data-bridge-id="${bridge.id}">
+                <button class="remove-btn" data-id="${bridge.id}">\xD7</button>
+                <div><strong>ID:</strong> ${bridge.id}</div>
+                <label>Colour:
+                    <input type="text" value="${bridge.colour || "black"}"
+                           data-id="${bridge.id}" data-field="colour">
+                </label>
+                <label>Length (\u22121 = variable):
+                    <input type="number" value="${bridge.length ?? 1}"
+                           data-id="${bridge.id}" data-field="length">
+                </label>
+                <label>Count:
+                    <input type="number" value="${bridge.count ?? 1}"
+                           data-id="${bridge.id}" data-field="count">
+                </label>
+            </div>`;
     });
     listDiv.innerHTML = html;
     listDiv.querySelectorAll(".bridge-type-item").forEach((item) => {
       item.addEventListener("click", (e) => {
-        if (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON" || e.target.classList.contains("remove-btn")) {
-          return;
-        }
+        const t = e.target;
+        if (t.tagName === "INPUT" || t.tagName === "BUTTON" || t.classList.contains("remove-btn")) return;
         const bridgeId = item.getAttribute("data-bridge-id");
         this.selectedBridgeTypeId = bridgeId;
         this.renderBridgeTypes();
@@ -1823,53 +2431,8 @@ var PuzzleEditor = class {
         const target = e.target;
         const id = target.getAttribute("data-id");
         const field = target.getAttribute("data-field");
-        const value = target.type === "number" ? parseInt(target.value) : target.value;
+        const value = target.type === "number" ? parseInt(target.value, 10) : target.value;
         this.updateBridgeType(id, field, value);
-      });
-    });
-  }
-  renderIslandsList() {
-    const listDiv = document.getElementById("islandsList");
-    if (this.puzzle.islands.length === 0) {
-      listDiv.innerHTML = '<p style="color: #999; font-size: 0.9rem;">No islands added yet</p>';
-      return;
-    }
-    let html = "";
-    this.puzzle.islands.forEach((island) => {
-      const constraintsStr = island.constraints ? island.constraints.join(", ") : "";
-      html += `
-                <div class="island-item">
-                    <button class="remove-btn" data-x="${island.x}" data-y="${island.y}">\xD7</button>
-                    <div><strong>${island.id}</strong> (${island.x}, ${island.y})</div>
-                    <div class="island-constraints">
-                        <label>Constraints (e.g., num_bridges=3):
-                            <input type="text" 
-                                   value="${constraintsStr}" 
-                                   data-id="${island.id}"
-                                   placeholder="num_bridges=3">
-                        </label>
-                    </div>
-                </div>
-            `;
-    });
-    listDiv.innerHTML = html;
-    listDiv.querySelectorAll(".remove-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        const target = e.target;
-        const x = parseInt(target.getAttribute("data-x"));
-        const y = parseInt(target.getAttribute("data-y"));
-        this.removeIsland(x, y);
-      });
-    });
-    listDiv.querySelectorAll("input").forEach((input) => {
-      input.addEventListener("change", (e) => {
-        const target = e.target;
-        const id = target.getAttribute("data-id");
-        const island = this.puzzle.islands.find((i) => i.id === id);
-        if (island) {
-          const value = target.value.trim();
-          island.constraints = value ? value.split(",").map((s) => s.trim()) : void 0;
-        }
       });
     });
   }
