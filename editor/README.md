@@ -9,9 +9,9 @@ A minimal web-based editor for creating Archipelago bridge puzzles.
 - **Bridge types**: Define bridge types with customizable colour, length (including variable length -1), and count
 - **Constraint system**: Add various puzzle constraints from a comprehensive list:
   - Global constraints (AllBridgesPlaced, NoCrossing)
-  - Grid cell constraints (MustTouchHorizontalBridge, MustTouchVerticalBridge)
+  - Grid cell constraints (MustTouchHorizontalBridge, MustTouchVerticalBridge, MustHaveWater)
   - Island-specific constraints (IslandMustBeCovered, IslandColorSeparation, etc.)
-  - Per-island constraints (e.g., `num_bridges=3`)
+- **Constraint labels on the grid**: Cell/island constraints are shown directly on the board (e.g., `A=3`, `DV`, `B=3`)
 - **Local storage**: Save and load draft puzzles to browser localStorage
 - **JSON export**: Export puzzles in the standard format compatible with `src/data/puzzles`
 - **Static site**: No server required - can be hosted on GitHub Pages
@@ -41,14 +41,15 @@ The editor will be built to the `dist/editor/` directory along with the main app
 
 1. **Set puzzle metadata**: Enter a puzzle ID and set the grid dimensions (width and height)
 2. **Add islands**: Click "Add Island" and then click on grid cells to place islands (shown as green circles)
-3. **Configure islands**: Each island gets an automatic ID (A, B, C...). You can add constraints like `num_bridges=3` in the Islands panel
+3. **Configure islands**: Each island gets an automatic ID (A, B, C...)
 4. **Define bridge types**: Click "+ Add Bridge Type" and configure:
    - Colour (e.g., "black", "red", "blue")
    - Length (positive number for fixed length, -1 for variable)
    - Count (how many of this type are available)
-5. **Add constraints**: Select "Add Constraint" mode, pick a constraint from the list:
-   - For global constraints: Click the constraint name and click "Add Constraint"
-   - For cell constraints: Click the constraint name, then click a grid cell to apply it there
+5. **Add constraints**: Click **Add constraint**, pick a type, then fill in the generated fields:
+    - For global constraints: Click the constraint name and click "Add Constraint"
+    - For cell constraints: Click the constraint name, then click a grid cell to apply it there
+6. **Review constraints**: Click **Edit constraints** to toggle the current puzzle constraints list
 
 ### Saving and Loading
 

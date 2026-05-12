@@ -89,6 +89,16 @@ const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         needsCell: true
     },
     {
+        type: 'MustHaveWaterConstraint',
+        name: 'Must Have Water',
+        description: 'A specific cell must contain water',
+        params: [
+            { name: 'x', type: 'number', isCoord: true },
+            { name: 'y', type: 'number', isCoord: true }
+        ],
+        needsCell: true
+    },
+    {
         type: 'IslandMustBeCoveredConstraint',
         name: 'Island Must Be Covered',
         description: 'Specified island must be covered by at least one bridge',
@@ -176,6 +186,9 @@ function getConstraintGridItems(
                 break;
             case 'MustTouchAVerticalBridge':
                 if (p?.x != null && p?.y != null) items.push({ x: p.x, y: p.y, label: 'TV' });
+                break;
+            case 'MustHaveWaterConstraint':
+                if (p?.x != null && p?.y != null) items.push({ x: p.x, y: p.y, label: 'W' });
                 break;
             case 'EnclosedAreaSizeConstraint':
                 if (p?.x != null && p?.y != null) {
@@ -346,17 +359,20 @@ class PuzzleEditor {
     }
 
     private toggleConstraintTypePanel() {
+        const sidebar = document.getElementById('constraintTypeSidebar')!;
         const panel = document.getElementById('constraintTypePanel')!;
-        if (panel.style.display !== 'none') {
+        if (sidebar.style.display !== 'none' && panel.style.display !== 'none') {
             this.hideConstraintTypePanel();
         } else {
             this.hideConstraintForm();
+            sidebar.style.display = 'block';
             panel.style.display = 'block';
         }
     }
 
     private hideConstraintTypePanel() {
         document.getElementById('constraintTypePanel')!.style.display = 'none';
+        document.getElementById('constraintTypeSidebar')!.style.display = 'none';
     }
 
     private togglePuzzleConstraintsPanel() {

@@ -19,34 +19,12 @@
         </header>
 
         <div class="main-container">
-            <!-- Left panel: Constraint management -->
-            <aside class="left-panel">
-                <div class="panel-action-buttons">
-                    <button id="showConstraintListBtn" class="btn btn-full">Add constraint</button>
-                    <button id="editConstraintsBtn" class="btn-outline btn-full">Edit constraints</button>
-                </div>
-
-                <!-- Constraint type chooser (hidden by default) -->
+            <!-- Left panel: Constraint type chooser -->
+            <aside id="constraintTypeSidebar" class="left-panel" style="display:none">
                 <div id="constraintTypePanel" style="display:none">
                     <h3>Choose type:</h3>
                     <div id="constraintList" class="constraint-list"></div>
                     <button id="cancelConstraintTypeBtn" class="btn-small cancel-btn">✕ Cancel</button>
-                </div>
-
-                <!-- Constraint parameter form (hidden by default) -->
-                <div id="constraintFormPanel" class="constraint-form-panel" style="display:none">
-                    <h3 id="constraintFormTitle">Configure constraint</h3>
-                    <div id="constraintFormFields"></div>
-                    <div class="form-actions">
-                        <button id="confirmAddConstraintBtn" class="btn">Add</button>
-                        <button id="cancelConstraintFormBtn" class="btn-small cancel-btn">Cancel</button>
-                    </div>
-                </div>
-
-                <!-- Current puzzle constraints (hidden by default) -->
-                <div id="puzzleConstraintsPanel" style="display:none">
-                    <h3>Puzzle Constraints</h3>
-                    <div id="puzzleConstraintsList"></div>
                 </div>
             </aside>
 
@@ -72,6 +50,25 @@
                     <button id="removeIslandBtn" class="btn">Remove Island</button>
                     <button id="addBridgeBtn" class="btn">Add Bridge</button>
                 </div>
+
+                <div class="constraint-controls">
+                    <button id="showConstraintListBtn" class="btn">Add constraint</button>
+                    <button id="editConstraintsBtn" class="btn-outline">Edit constraints</button>
+                </div>
+
+                <div id="constraintFormPanel" class="constraint-form-panel" style="display:none">
+                    <h3 id="constraintFormTitle">Configure constraint</h3>
+                    <div id="constraintFormFields"></div>
+                    <div class="form-actions">
+                        <button id="confirmAddConstraintBtn" class="btn">Add</button>
+                        <button id="cancelConstraintFormBtn" class="btn-small cancel-btn">Cancel</button>
+                    </div>
+                </div>
+
+                <section id="puzzleConstraintsPanel" class="puzzle-constraints-section" style="display:none">
+                    <h2>Puzzle Constraints</h2>
+                    <div id="puzzleConstraintsList"></div>
+                </section>
 
                 <!-- Below-grid panels -->
                 <div class="below-grid">

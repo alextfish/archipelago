@@ -1,14 +1,10 @@
-var __defProp = Object.defineProperty;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-
 // src/model/puzzle/StrutBridge.ts
 var StrutBridge = class {
+  id;
+  start;
+  end;
+  type;
   constructor(id, type) {
-    __publicField(this, "id");
-    __publicField(this, "start");
-    __publicField(this, "end");
-    __publicField(this, "type");
     this.id = id;
     this.type = type;
   }
@@ -122,8 +118,8 @@ function distSquared(a, b) {
 
 // src/model/puzzle/BridgeInventory.ts
 var BridgeInventory = class {
+  allBridges = [];
   constructor(types) {
-    __publicField(this, "allBridges", []);
     let counter = 0;
     for (const t of types) {
       for (let i = 0; i < t.count; i++) {
@@ -190,28 +186,26 @@ var BridgeInventory = class {
 
 // src/model/puzzle/constraints/Constraint.ts
 var Constraint = class {
-  constructor() {
-    __publicField(this, "id");
-    __publicField(this, "description");
-    __publicField(this, "violations");
-    /**
-     * Whether this constraint is "personified" — i.e. it has an NPC that
-     * represents it in the world. Most constraints are personified. Non-personified
-     * constraints (e.g. AllBridgesPlacedConstraint, BridgeLengthConstraint,
-     * NoCrossingConstraint) don't need NPC glyph lists or conversation files.
-     */
-    __publicField(this, "personified", true);
-    /**
-     * Path (relative to resources/conversations/) to the conversation JSON file
-     * shown when this constraint is unsatisfied.
-     */
-    __publicField(this, "conversationFile");
-    /**
-     * Path (relative to resources/conversations/) to the conversation JSON file
-     * shown when this constraint is satisfied.
-     */
-    __publicField(this, "conversationFileSolved");
-  }
+  id;
+  description;
+  violations;
+  /**
+   * Whether this constraint is "personified" — i.e. it has an NPC that
+   * represents it in the world. Most constraints are personified. Non-personified
+   * constraints (e.g. AllBridgesPlacedConstraint, BridgeLengthConstraint,
+   * NoCrossingConstraint) don't need NPC glyph lists or conversation files.
+   */
+  personified = true;
+  /**
+   * Path (relative to resources/conversations/) to the conversation JSON file
+   * shown when this constraint is unsatisfied.
+   */
+  conversationFile;
+  /**
+   * Path (relative to resources/conversations/) to the conversation JSON file
+   * shown when this constraint is satisfied.
+   */
+  conversationFileSolved;
   /**
    * Returns the core display items for this constraint — one per constrained element.
    * Each item carries the glyph message ("good" when satisfied, violation message
@@ -260,10 +254,7 @@ var Constraint = class {
 
 // src/model/puzzle/constraints/AllBridgesPlacedConstraint.ts
 var AllBridgesPlacedConstraint = class _AllBridgesPlacedConstraint extends Constraint {
-  constructor() {
-    super(...arguments);
-    __publicField(this, "personified", false);
-  }
+  personified = false;
   static fromSpec(_params) {
     return new _AllBridgesPlacedConstraint();
   }
@@ -281,10 +272,10 @@ var AllBridgesPlacedConstraint = class _AllBridgesPlacedConstraint extends Const
 
 // src/model/puzzle/constraints/GridCellConstraints.ts
 var GridCellConstraint = class extends Constraint {
+  x;
+  y;
   constructor(x, y) {
     super();
-    __publicField(this, "x");
-    __publicField(this, "y");
     this.x = x;
     this.y = y;
   }
@@ -376,10 +367,7 @@ var MustTouchAVerticalBridge = class _MustTouchAVerticalBridge extends GridCellC
 
 // src/model/puzzle/constraints/NoCrossingConstraint.ts
 var NoCrossingConstraint = class _NoCrossingConstraint extends Constraint {
-  constructor() {
-    super(...arguments);
-    __publicField(this, "personified", false);
-  }
+  personified = false;
   static fromSpec(_params) {
     return new _NoCrossingConstraint();
   }
@@ -420,9 +408,9 @@ var NoCrossingConstraint = class _NoCrossingConstraint extends Constraint {
 
 // src/model/puzzle/constraints/IslandMustBeCoveredConstraint.ts
 var IslandMustBeCoveredConstraint = class _IslandMustBeCoveredConstraint extends Constraint {
+  islandId;
   constructor(islandId) {
     super();
-    __publicField(this, "islandId");
     this.islandId = islandId;
   }
   static fromSpec(params) {
@@ -472,10 +460,10 @@ var IslandMustBeCoveredConstraint = class _IslandMustBeCoveredConstraint extends
 
 // src/model/puzzle/constraints/IslandColourSeparationConstraint.ts
 var IslandColourSeparationConstraint = class _IslandColourSeparationConstraint extends Constraint {
+  colour1;
+  colour2;
   constructor(colour1, colour2) {
     super();
-    __publicField(this, "colour1");
-    __publicField(this, "colour2");
     this.colour1 = colour1;
     this.colour2 = colour2;
   }
@@ -561,12 +549,12 @@ var IslandColourSeparationConstraint = class _IslandColourSeparationConstraint e
 
 // src/model/puzzle/constraints/IslandDirectionalBridgeConstraint.ts
 var IslandDirectionalBridgeConstraint = class _IslandDirectionalBridgeConstraint extends Constraint {
+  conversationFile = "constraints/islandDirectionalBridge_unsatisfied.json";
+  conversationFileSolved = "constraints/islandDirectionalBridge_satisfied.json";
+  islandId;
+  constraintType;
   constructor(islandId, constraintType) {
     super();
-    __publicField(this, "conversationFile", "constraints/islandDirectionalBridge_unsatisfied.json");
-    __publicField(this, "conversationFileSolved", "constraints/islandDirectionalBridge_satisfied.json");
-    __publicField(this, "islandId");
-    __publicField(this, "constraintType");
     this.islandId = islandId;
     this.constraintType = constraintType;
   }
@@ -663,13 +651,13 @@ var IslandDirectionalBridgeConstraint = class _IslandDirectionalBridgeConstraint
 
 // src/model/puzzle/constraints/IslandPassingBridgeCountConstraint.ts
 var IslandPassingBridgeCountConstraint = class _IslandPassingBridgeCountConstraint extends Constraint {
+  conversationFile = "constraints/islandPassingBridgeCount_unsatisfied.json";
+  conversationFileSolved = "constraints/islandPassingBridgeCount_satisfied.json";
+  islandId;
+  direction;
+  expectedCount;
   constructor(islandId, direction, expectedCount) {
     super();
-    __publicField(this, "conversationFile", "constraints/islandPassingBridgeCount_unsatisfied.json");
-    __publicField(this, "conversationFileSolved", "constraints/islandPassingBridgeCount_satisfied.json");
-    __publicField(this, "islandId");
-    __publicField(this, "direction");
-    __publicField(this, "expectedCount");
     this.islandId = islandId;
     this.direction = direction;
     this.expectedCount = expectedCount;
@@ -814,12 +802,12 @@ var IslandPassingBridgeCountConstraint = class _IslandPassingBridgeCountConstrai
 
 // src/model/puzzle/constraints/IslandVisibilityConstraint.ts
 var IslandVisibilityConstraint = class _IslandVisibilityConstraint extends Constraint {
+  conversationFile = "constraints/islandVisibility_unsatisfied.json";
+  conversationFileSolved = "constraints/islandVisibility_satisfied.json";
+  islandId;
+  expectedCount;
   constructor(islandId, expectedCount) {
     super();
-    __publicField(this, "conversationFile", "constraints/islandVisibility_unsatisfied.json");
-    __publicField(this, "conversationFileSolved", "constraints/islandVisibility_satisfied.json");
-    __publicField(this, "islandId");
-    __publicField(this, "expectedCount");
     this.islandId = islandId;
     this.expectedCount = expectedCount;
   }
@@ -921,13 +909,13 @@ var IslandVisibilityConstraint = class _IslandVisibilityConstraint extends Const
 
 // src/model/puzzle/constraints/EnclosedAreaSizeConstraint.ts
 var EnclosedAreaSizeConstraint = class _EnclosedAreaSizeConstraint extends Constraint {
+  conversationFile;
+  conversationFileSolved;
+  x;
+  y;
+  expectedSize;
   constructor(x, y, expectedSize) {
     super();
-    __publicField(this, "conversationFile");
-    __publicField(this, "conversationFileSolved");
-    __publicField(this, "x");
-    __publicField(this, "y");
-    __publicField(this, "expectedSize");
     this.x = x;
     this.y = y;
     this.expectedSize = expectedSize;
@@ -1096,9 +1084,9 @@ var EnclosedAreaSizeConstraint = class _EnclosedAreaSizeConstraint extends Const
 
 // src/model/puzzle/constraints/BridgeMustCoverIslandConstraint.ts
 var BridgeMustCoverIslandConstraint = class _BridgeMustCoverIslandConstraint extends Constraint {
+  bridgeID;
   constructor(bridgeID) {
     super();
-    __publicField(this, "bridgeID");
     this.bridgeID = bridgeID;
   }
   static fromSpec(_params) {
@@ -1166,12 +1154,12 @@ function hasTileHasWater(puzzle) {
   return typeof puzzle.tileHasWater === "function";
 }
 var MustHaveWaterConstraint = class _MustHaveWaterConstraint extends Constraint {
+  conversationFile = "constraints/mustHaveWater_unsatisfied.json";
+  conversationFileSolved = "constraints/mustHaveWater_satisfied.json";
+  x;
+  y;
   constructor(x, y) {
     super();
-    __publicField(this, "conversationFile", "constraints/mustHaveWater_unsatisfied.json");
-    __publicField(this, "conversationFileSolved", "constraints/mustHaveWater_satisfied.json");
-    __publicField(this, "x");
-    __publicField(this, "y");
     this.x = x;
     this.y = y;
   }
@@ -1201,11 +1189,8 @@ var MustHaveWaterConstraint = class _MustHaveWaterConstraint extends Constraint 
 
 // src/model/puzzle/constraints/IslandBridgeCountConstraint.ts
 var IslandBridgeCountConstraint = class _IslandBridgeCountConstraint extends Constraint {
-  constructor() {
-    super(...arguments);
-    __publicField(this, "conversationFile", "constraints/islandBridgeCount_unsatisfied.json");
-    __publicField(this, "conversationFileSolved", "constraints/islandBridgeCount_satisfied.json");
-  }
+  conversationFile = "constraints/islandBridgeCount_unsatisfied.json";
+  conversationFileSolved = "constraints/islandBridgeCount_satisfied.json";
   static fromSpec(_params) {
     return new _IslandBridgeCountConstraint();
   }
@@ -1300,11 +1285,11 @@ function createConstraintsFromSpec(constraints) {
 
 // src/model/puzzle/constraints/BridgeLengthConstraint.ts
 var BridgeLengthConstraint = class _BridgeLengthConstraint extends Constraint {
+  personified = false;
+  typeId;
+  expectedLength;
   constructor(typeId, expectedLength) {
     super();
-    __publicField(this, "personified", false);
-    __publicField(this, "typeId");
-    __publicField(this, "expectedLength");
     this.typeId = typeId;
     this.expectedLength = expectedLength;
   }
@@ -1364,15 +1349,15 @@ function createBridgeType(params) {
 
 // src/model/puzzle/BridgePuzzle.ts
 var BridgePuzzle = class {
+  id;
+  width;
+  height;
+  islands;
+  constraints;
+  inventory;
+  maxNumBridges;
+  givesFeedback;
   constructor(spec) {
-    __publicField(this, "id");
-    __publicField(this, "width");
-    __publicField(this, "height");
-    __publicField(this, "islands");
-    __publicField(this, "constraints");
-    __publicField(this, "inventory");
-    __publicField(this, "maxNumBridges");
-    __publicField(this, "givesFeedback");
     this.id = spec.id;
     this.width = spec.size.width;
     this.height = spec.size.height;
@@ -1604,8 +1589,8 @@ var BridgePuzzle = class {
 
 // src/model/puzzle/PuzzleValidator.ts
 var PuzzleValidator = class {
+  puzzle;
   constructor(puzzle) {
-    __publicField(this, "puzzle");
     this.puzzle = puzzle;
   }
   /**
@@ -1682,6 +1667,16 @@ var CONSTRAINT_TYPES = [
     type: "MustTouchAVerticalBridge",
     name: "Must Touch Vertical Bridge",
     description: "Cell must be adjacent to a vertical bridge",
+    params: [
+      { name: "x", type: "number", isCoord: true },
+      { name: "y", type: "number", isCoord: true }
+    ],
+    needsCell: true
+  },
+  {
+    type: "MustHaveWaterConstraint",
+    name: "Must Have Water",
+    description: "A specific cell must contain water",
     params: [
       { name: "x", type: "number", isCoord: true },
       { name: "y", type: "number", isCoord: true }
@@ -1771,6 +1766,9 @@ function getConstraintGridItems(constraints, islands) {
       case "MustTouchAVerticalBridge":
         if (p?.x != null && p?.y != null) items.push({ x: p.x, y: p.y, label: "TV" });
         break;
+      case "MustHaveWaterConstraint":
+        if (p?.x != null && p?.y != null) items.push({ x: p.x, y: p.y, label: "W" });
+        break;
       case "EnclosedAreaSizeConstraint":
         if (p?.x != null && p?.y != null) {
           items.push({ x: p.x, y: p.y, label: `A=${p.size ?? "?"}` });
@@ -1837,20 +1835,20 @@ function getConstraintGridItems(constraints, islands) {
   return items;
 }
 var PuzzleEditor = class {
+  canvas;
+  ctx;
+  puzzle;
+  cellSize = 60;
+  tool = "island";
+  selectedBridgeTypeId = null;
+  testBridges = [];
+  bridgePlacementStart = null;
+  nextIslandId = 0;
+  // Constraint form state
+  constraintFormVisible = false;
+  constraintFormNeedsCell = false;
+  selectedConstraintType = null;
   constructor() {
-    __publicField(this, "canvas");
-    __publicField(this, "ctx");
-    __publicField(this, "puzzle");
-    __publicField(this, "cellSize", 60);
-    __publicField(this, "tool", "island");
-    __publicField(this, "selectedBridgeTypeId", null);
-    __publicField(this, "testBridges", []);
-    __publicField(this, "bridgePlacementStart", null);
-    __publicField(this, "nextIslandId", 0);
-    // Constraint form state
-    __publicField(this, "constraintFormVisible", false);
-    __publicField(this, "constraintFormNeedsCell", false);
-    __publicField(this, "selectedConstraintType", null);
     this.canvas = document.getElementById("gridCanvas");
     this.ctx = this.canvas.getContext("2d");
     this.puzzle = {
@@ -1922,16 +1920,19 @@ var PuzzleEditor = class {
     });
   }
   toggleConstraintTypePanel() {
+    const sidebar = document.getElementById("constraintTypeSidebar");
     const panel = document.getElementById("constraintTypePanel");
-    if (panel.style.display !== "none") {
+    if (sidebar.style.display !== "none" && panel.style.display !== "none") {
       this.hideConstraintTypePanel();
     } else {
       this.hideConstraintForm();
+      sidebar.style.display = "block";
       panel.style.display = "block";
     }
   }
   hideConstraintTypePanel() {
     document.getElementById("constraintTypePanel").style.display = "none";
+    document.getElementById("constraintTypeSidebar").style.display = "none";
   }
   togglePuzzleConstraintsPanel() {
     const panel = document.getElementById("puzzleConstraintsPanel");
