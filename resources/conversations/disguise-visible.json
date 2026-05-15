@@ -1,11 +1,11 @@
 {
-  "id": "islandPassingBridgeCount_satisfied",
+  "id": "disguise-visible",
   "start": "main",
   "nodes": {
     "main": {
       "npc": {
-        "expression": "happy",
-        "glyphs": "{{count}} bridge. good"
+        "expression": "neutral",
+        "glyphs": "want see {{count}} island me island"
       },
       "choices": [
         {
