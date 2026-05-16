@@ -907,8 +907,20 @@ export class OverworldScene extends Phaser.Scene {
         this.playerStartManager,
         (start) => this.warpToStart(start),
         () => this.gameState.getOverworldDisplayItems(),
+        () => this.resetSavedStateAndReload(),
       );
     }
+  }
+
+  private resetSavedStateAndReload(): void {
+    try {
+      localStorage.removeItem('archipelago_game_state');
+      console.log('[OverworldScene] Cleared saved game state');
+    } catch (error) {
+      console.warn('[OverworldScene] Failed to clear saved game state:', error);
+    }
+
+    window.location.reload();
   }
 
   /**

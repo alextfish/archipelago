@@ -98,6 +98,7 @@ export class InteriorScene extends Phaser.Scene {
 
     // Map cache key for this interior (e.g. 'interiorMap_house')
     private mapCacheKey!: string;
+    private mapLoadFailed: boolean = false;
 
     constructor() {
         super({ key: 'InteriorScene' });
@@ -125,6 +126,7 @@ export class InteriorScene extends Phaser.Scene {
         this.lastCheckedTile = '';
         this.collisionLayers = [];
         this.roofsLayers = [];
+        this.mapLoadFailed = false;
     }
 
     preload(): void {
@@ -133,8 +135,17 @@ export class InteriorScene extends Phaser.Scene {
     }
 
     create(): void {
+        if (this.mapLoadFailed) {
+            return;
+        }
+
         // Poll until the map JSON has been added to the tilemap cache
         if (!this.cache.tilemap.exists(this.mapCacheKey)) {
+            this.time.delayedCall(100, () => this.create(), [], this);
+            return;
+        }
+
+        if (!this.areTilesetTexturesReady()) {
             this.time.delayedCall(100, () => this.create(), [], this);
             return;
         }
@@ -288,28 +299,43 @@ export class InteriorScene extends Phaser.Scene {
             console.log(`[InteriorScene] Map "${this.mapKey}" loaded`);
         } catch (error) {
             console.error(`[InteriorScene] Failed to load interior map "${this.mapKey}":`, error);
+            this.handleMapLoadFailure();
         }
+    }
+
+    private handleMapLoadFailure(): void {
+        if (this.mapLoadFailed) {
+            return;
+        }
+
+        this.mapLoadFailed = true;
+        this.gameState.clearCurrentInterior();
+        this.saveStateCallback();
+
+        console.warn(`[InteriorScene] Clearing saved interior state for failed map "${this.mapKey}"`);
+
+        const overworldScene = this.scene.get('OverworldScene');
+        if (overworldScene) {
+            this.scene.wake('OverworldScene');
+        }
+
+        this.scene.stop();
     }
 
     private loadEmbeddedTilesets(data: any): void {
         if (!data?.tilesets) return;
+
+        let queuedTextures = false;
         for (const tileset of data.tilesets) {
             if (!tileset.image) continue;
-            const key = `tileset_${tileset.name}`;
+            const key = this.getTilesetTextureKey(tileset.name);
             if (this.textures.exists(key)) continue;
-            let imagePath: string;
-            if (tileset.image.startsWith('data:')) {
-                imagePath = tileset.image;
-            } else if (tileset.image.startsWith('../')) {
-                imagePath = tileset.image.substring(3);
-            } else if (tileset.image.startsWith('tilesets/')) {
-                imagePath = `resources/${tileset.image}`;
-            } else {
-                imagePath = `resources/tilesets/${tileset.image}`;
-            }
+            const imagePath = this.resolveTilesetImagePath(tileset.image);
             this.load.image(key, imagePath);
+            queuedTextures = true;
         }
-        if (!this.load.isLoading() && this.load.totalToLoad > 0) {
+
+        if (queuedTextures && !this.load.isLoading()) {
             this.load.start();
         }
     }
@@ -321,14 +347,9 @@ export class InteriorScene extends Phaser.Scene {
             return [];
         }
 
-        const externalMapping: Record<string, string> = {
-            beach: 'beachTileset',
-            SproutLandsGrassIslands: 'grassTileset',
-        };
-
         const tilesets: Phaser.Tilemaps.Tileset[] = [];
         for (const ts of mapData.data.tilesets) {
-            const key = externalMapping[ts.name] ?? `tileset_${ts.name}`;
+            const key = this.getTilesetTextureKey(ts.name);
             const tileset = this.map.addTilesetImage(ts.name, key);
             if (tileset) {
                 tilesets.push(tileset);
@@ -337,6 +358,50 @@ export class InteriorScene extends Phaser.Scene {
             }
         }
         return tilesets;
+    }
+
+    private areTilesetTexturesReady(): boolean {
+        const mapData = this.cache.tilemap.get(this.mapCacheKey);
+        if (!mapData?.data?.tilesets) {
+            return false;
+        }
+
+        return mapData.data.tilesets.every((tileset: { name: string; image?: string }) => {
+            if (!tileset.image) {
+                return true;
+            }
+
+            return this.textures.exists(this.getTilesetTextureKey(tileset.name));
+        });
+    }
+
+    private getTilesetTextureKey(tilesetName: string): string {
+        const externalMapping: Record<string, string> = {
+            beach: 'beachTileset',
+            SproutLandsGrassIslands: 'grassTileset',
+        };
+
+        return externalMapping[tilesetName] ?? `tileset_${tilesetName}`;
+    }
+
+    private resolveTilesetImagePath(imagePath: string): string {
+        if (imagePath.startsWith('data:') || imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+            return imagePath;
+        }
+
+        if (imagePath.startsWith('resources/')) {
+            return imagePath;
+        }
+
+        if (imagePath.startsWith('../')) {
+            return `resources/${imagePath.substring(3)}`;
+        }
+
+        if (imagePath.startsWith('tilesets/') || imagePath.startsWith('sprites/')) {
+            return `resources/${imagePath}`;
+        }
+
+        return `resources/tilesets/${imagePath}`;
     }
 
     private setupVisualLayers(tilesets: Phaser.Tilemaps.Tileset[]): void {

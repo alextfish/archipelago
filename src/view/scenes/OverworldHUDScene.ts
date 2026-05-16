@@ -16,6 +16,7 @@
  */
 
 import Phaser from 'phaser';
+import { Environment } from '@helpers/Environment';
 import type { PlayerOverworldDisplayItem } from '@model/overworld/PlayerOverworldDisplay';
 import type { PlayerStartManager, PlayerStartPosition } from '@model/overworld/PlayerStartManager';
 
@@ -25,15 +26,19 @@ export const BOOK_ICON_X = 12;
 export const BOOK_ICON_WIDTH = 40;
 /** Y position shared by both the book icon and the warp button. */
 export const TOP_BUTTON_Y = 12;
+/** Width allowance for each top-left HUD button. */
+export const TOP_BUTTON_WIDTH = 40;
 
 export class OverworldHUDScene extends Phaser.Scene {
     private playerStartManager: PlayerStartManager | null = null;
     private warpCallback: ((start: PlayerStartPosition) => void) | null = null;
     private getDisplayItems: (() => PlayerOverworldDisplayItem[]) | null = null;
+    private resetCallback: (() => void) | null = null;
 
     private warpDialog: Phaser.GameObjects.Container | null = null;
     private dialogOpen: boolean = false;
     private warpButton: Phaser.GameObjects.Text | null = null;
+    private resetButton: Phaser.GameObjects.Text | null = null;
 
     private jewelHUDElements: Map<string, {
         sprite: Phaser.GameObjects.Image;
@@ -52,10 +57,12 @@ export class OverworldHUDScene extends Phaser.Scene {
         playerStartManager: PlayerStartManager,
         warpCallback: (start: PlayerStartPosition) => void,
         getDisplayItems: () => PlayerOverworldDisplayItem[],
+        resetCallback: () => void,
     ): void {
         this.playerStartManager = playerStartManager;
         this.warpCallback = warpCallback;
         this.getDisplayItems = getDisplayItems;
+        this.resetCallback = resetCallback;
     }
 
     create(): void {
@@ -90,6 +97,16 @@ export class OverworldHUDScene extends Phaser.Scene {
                 this.showWarpDialog();
             }
         });
+
+        if (Environment.isDevelopment()) {
+            this.resetButton = this.add.text(BOOK_ICON_X + BOOK_ICON_WIDTH + TOP_BUTTON_WIDTH, TOP_BUTTON_Y, '↺', { fontSize: '28px' });
+            this.resetButton.setDepth(200);
+            this.resetButton.setInteractive({ useHandCursor: true });
+            this.resetButton.on('pointerdown', () => {
+                this.hideWarpDialog();
+                this.resetCallback?.();
+            });
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -172,6 +189,7 @@ export class OverworldHUDScene extends Phaser.Scene {
     /** Show or hide the warp (⚡) button (e.g. hide while in a building interior). */
     setWarpButtonVisible(visible: boolean): void {
         this.warpButton?.setVisible(visible);
+        this.resetButton?.setVisible(visible);
     }
 
     /**
