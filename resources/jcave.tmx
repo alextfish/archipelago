@@ -741,7 +741,7 @@
   <object id="1" name="JournalCavePuzzle" x="320" y="256" width="288" height="288">
    <properties>
     <property name="bridges" value="3,3,3,3,3,2,2,2,2,2,2"/>
-    <property name="feedback" type="bool" value="false"/>
+    <property name="givesFeedback" type="bool" value="false"/>
    </properties>
   </object>
   <object id="2" name="see2" x="352" y="288" width="32" height="32">

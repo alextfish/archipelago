@@ -122,7 +122,7 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
 
                 const worldPos = this.gridMapper.gridToWorld(gridPos.x, gridPos.y);
                 const scale = this.gridMapper.getCellSize() / 32;
-                const spriteKey = getNPCSpriteKey(item.constraintType);
+                const spriteKey = item.disguiseSpriteKey ?? getNPCSpriteKey(item.constraintType);
 
                 const npcSprite = this.scene.add.sprite(worldPos.x, worldPos.y, spriteKey, NPC_FRAME.NEUTRAL)
                     .setOrigin(0, 0)

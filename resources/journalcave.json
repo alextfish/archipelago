@@ -299,7 +299,7 @@
                          "value":"3,3,3,3,3,2,2,2,2,2,2"
                         }, 
                         {
-                         "name":"feedback",
+                         "name":"givesFeedback",
                          "type":"bool",
                          "value":false
                         }],

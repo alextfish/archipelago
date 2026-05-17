@@ -331,6 +331,35 @@ describe('EmbeddedPuzzleRenderer Bridge Removal', () => {
 
             expect(mockNPCSprite.clearTint).toHaveBeenCalled();
         });
+
+        it('uses disguise sprites for constraint NPCs in puzzle mode', () => {
+            scene.add.sprite.mockClear();
+
+            const disguisedPuzzle = new BridgePuzzle({
+                id: 'disguised-npc-puzzle',
+                size: { width: 5, height: 5 },
+                islands: [
+                    {
+                        id: 'masked-island',
+                        x: 1,
+                        y: 1,
+                        constraints: ['num_bridges=3', 'disguise_sprite=Cultist-1']
+                    }
+                ],
+                bridgeTypes: [{ id: 'single', colour: 'black', count: 5 }],
+                constraints: [{ type: 'IslandBridgeCountConstraint' }],
+                maxNumBridges: 3
+            });
+
+            rendererWithNPC.init(disguisedPuzzle);
+
+            expect(scene.add.sprite).toHaveBeenCalledWith(
+                expect.any(Number),
+                expect.any(Number),
+                'Cultist-1',
+                expect.anything()
+            );
+        });
     });
 
     describe('Preview Bridge Rendering', () => {
