@@ -27,6 +27,7 @@ type MockScene = {
     anims: {
         create: ReturnType<typeof vi.fn>;
         generateFrameNumbers: ReturnType<typeof vi.fn>;
+        exists: ReturnType<typeof vi.fn>;
     };
     game: {
         loop: { delta: number };
@@ -68,7 +69,8 @@ describe('PlayerController', () => {
         mockScene = {
             anims: {
                 create: vi.fn(),
-                generateFrameNumbers: vi.fn((_key: string, _config: any) => [])
+                generateFrameNumbers: vi.fn((_key: string, _config: any) => []),
+                exists: vi.fn(() => false)
             },
             game: {
                 loop: { delta: 16 }
@@ -231,7 +233,7 @@ describe('PlayerController', () => {
                 anims: { play: vi.fn(), currentAnim: null }
             };
             const scene: MockScene = {
-                anims: { create: vi.fn(), generateFrameNumbers: vi.fn(() => []) },
+                anims: { create: vi.fn(), generateFrameNumbers: vi.fn(() => []), exists: vi.fn(() => false) },
                 game: { loop: { delta: 16 } }
             };
             const cursors: MockCursors = {
