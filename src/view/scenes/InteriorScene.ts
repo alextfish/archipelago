@@ -26,6 +26,7 @@ import { SceneTransitionCoordinator } from '@view/SceneTransitionCoordinator';
 import { buildPuzzleEntryInteractables, createBridgesLayer, isPuzzleEntryTile } from '@view/MapPuzzleSceneHelpers';
 import type { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
+import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 
 /**
  * Depth value for overhead layers (roofs, canopies, etc.) that should always
@@ -201,6 +202,7 @@ export class InteriorScene extends Phaser.Scene {
         this.cameras.main.roundPixels = true;
 
         this.scene.bringToTop('OverworldHUDScene');
+        PuzzleHUDManager.getInstance().ensureHidden(this);
 
         // Keyboard + player movement
         this.cursors = this.input.keyboard!.createCursorKeys();

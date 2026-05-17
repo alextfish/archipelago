@@ -129,6 +129,64 @@ export class NPCAppearanceRegistry {
                 { frame: 10, duration: 400 },
             ],
         });
+
+        // Journal Cave disguise appearances
+        this.appearances.set('Cultist-01', {
+            spriteKey: 'Cultist-01',
+            expressions: {
+                neutral: 0,
+                happy: 1,
+                sad: 2,
+            },
+        });
+
+        this.appearances.set('Cultist-02', {
+            spriteKey: 'Cultist-02',
+            expressions: {
+                neutral: 0,
+                happy: 1,
+                sad: 2,
+            },
+        });
+
+        this.appearances.set('Cultist-03', {
+            spriteKey: 'Cultist-03',
+            expressions: {
+                neutral: 0,
+                happy: 1,
+                sad: 2,
+            },
+        });
+
+        this.appearances.set('Cultist-01-Pirate-M', {
+            spriteKey: 'Cultist-01-Pirate-M',
+            faceId: 'Pirate-M',
+            expressions: {
+                neutral: 0,
+                happy: 1,
+                sad: 2,
+            },
+        });
+
+        this.appearances.set('Cultist-02-Ruby', {
+            spriteKey: 'Cultist-02-Ruby',
+            faceId: 'Ruby',
+            expressions: {
+                neutral: 0,
+                happy: 1,
+                sad: 2,
+            },
+        });
+
+        this.appearances.set('Cultist-03-Pirate-F', {
+            spriteKey: 'Cultist-03-Pirate-F',
+            faceId: 'Pirate-F',
+            expressions: {
+                neutral: 0,
+                happy: 1,
+                sad: 2,
+            },
+        });
     }
 
     /**

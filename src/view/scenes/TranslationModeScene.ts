@@ -124,6 +124,11 @@ export class TranslationModeScene extends Phaser.Scene {
             }
         }
 
+        this.scene.bringToTop('TranslationModeScene');
+        if (this.scene.isActive('OverworldHUDScene')) {
+            this.scene.bringToTop('OverworldHUDScene');
+        }
+
         this.overlay?.setVisible(true);
         this.buildHighlights();
     }

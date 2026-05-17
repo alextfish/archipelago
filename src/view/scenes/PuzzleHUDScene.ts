@@ -8,7 +8,7 @@ export class PuzzleHUDScene extends Phaser.Scene {
     private counts: Record<string, number> = {};
     private types: BridgeType[] = [];
     private solvedOverlay: Phaser.GameObjects.Container | null = null;
-    private eventListeners: Array<{ event: string; callback: Function }> = [];
+    private eventListeners: Array<{ emitter: Phaser.Events.EventEmitter; event: string; callback: Function }> = [];
     private backgroundRect: Phaser.GameObjects.Rectangle | null = null;
 
     constructor() {
@@ -123,6 +123,11 @@ export class PuzzleHUDScene extends Phaser.Scene {
 
             // Keep the overlay until the scene is stopped or reloaded. No auto-hide.
         });
+
+        // Start in a fully hidden state. The manager may request this scene to
+        // hide before create() has run, so reassert it here once UI children exist.
+        this.setVisible(false, 'bridge');
+
         // Notify other scenes that the HUD is ready to receive events
         this.scene.get('BridgePuzzleScene').events.emit('hudReady');
     }
@@ -219,7 +224,7 @@ export class PuzzleHUDScene extends Phaser.Scene {
      */
     private setupEventListener(emitter: Phaser.Events.EventEmitter, event: string, callback: Function): void {
         emitter.on(event, callback, this);
-        this.eventListeners.push({ event, callback });
+        this.eventListeners.push({ emitter, event, callback });
     }
 
     /**
@@ -275,7 +280,7 @@ export class PuzzleHUDScene extends Phaser.Scene {
     private cleanupEventListeners(): void {
         // Remove all tracked event listeners
         for (const listener of this.eventListeners) {
-            this.events.off(listener.event, listener.callback as any, this);
+            listener.emitter.off(listener.event, listener.callback as any, this);
         }
         this.eventListeners = [];
     }
@@ -329,12 +334,10 @@ export class PuzzleHUDScene extends Phaser.Scene {
         console.log(`PuzzleHUDScene: Setting visibility to ${visible}`);
         this.scene.setVisible(visible);
 
+        this.sidebar?.setVisible(visible);
+
         // When showing the HUD, always re-show the sidebar in case hideControlsOnly()
         // hid it while the solved overlay was on screen during a previous camera pan.
-        if (visible) {
-            this.sidebar?.setVisible(true);
-        }
-
         // Show/hide background with HUD
         if (this.backgroundRect) {
             this.backgroundRect.setVisible(visible && puzzleType === 'bridge');

@@ -35,6 +35,7 @@ export class PuzzleHUDManager {
     initializeHUD(scene: Phaser.Scene): void {
         if (this.isInitialized) {
             console.log('PuzzleHUDManager: HUD already initialized');
+            this.ensureHidden(scene);
             return;
         }
 
@@ -45,9 +46,7 @@ export class PuzzleHUDManager {
         this.hudScene = scene.scene.get('PuzzleHUDScene') as PuzzleHUDScene;
         this.isInitialized = true;
 
-        // Hide immediately so cold-start scene sleeps cannot leave the puzzle HUD visible.
-        scene.scene.setVisible(false, 'PuzzleHUDScene');
-        this.hudScene.setVisible(false, 'bridge');
+        this.ensureHidden(scene);
         console.log('PuzzleHUDManager: HUD initialized and hidden');
 
         console.log('PuzzleHUDManager: HUD initialization started');
@@ -89,8 +88,26 @@ export class PuzzleHUDManager {
         // Setup HUD for this puzzle
         this.hudScene.setupForPuzzle(controller, puzzleType, worldScene);
         this.hudScene.setVisible(true, puzzleType);
+        worldScene.scene.bringToTop('PuzzleHUDScene');
+        if (worldScene.scene.isActive('OverworldHUDScene')) {
+            worldScene.scene.bringToTop('OverworldHUDScene');
+        }
 
         console.log('PuzzleHUDManager: HUD visible and connected to controller');
+    }
+
+    /**
+     * Force the shared HUD back to its idle hidden state when no puzzle is active.
+     */
+    ensureHidden(scene?: Phaser.Scene): void {
+        if (!this.hudScene || this.currentController) {
+            return;
+        }
+
+        const puzzleType = this.currentPuzzleType ?? 'bridge';
+        scene?.scene.setVisible(false, 'PuzzleHUDScene');
+        this.hudScene.setVisible(false, puzzleType);
+        this.hudScene.cleanup();
     }
 
     /**

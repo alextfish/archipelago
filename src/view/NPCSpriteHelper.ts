@@ -58,6 +58,12 @@ export function loadNPCSprites(loader: Phaser.Loader.LoaderPlugin): void {
     sheet('Pirate-M', 'resources/sprites/Pirate-M.png'); // IslandPassingBridgeCountConstraint, IslandDirectionalBridgeConstraint
     sheet('Pirate-F', 'resources/sprites/Pirate-F.png'); // IslandVisibilityConstraint
     sheet('Lyuba', 'resources/sprites/Lyuba.png');
+    sheet('Cultist-01', 'resources/sprites/Cultist-01.png');
+    sheet('Cultist-02', 'resources/sprites/Cultist-02.png');
+    sheet('Cultist-03', 'resources/sprites/Cultist-03.png');
+    sheet('Cultist-01-Pirate-M', 'resources/sprites/Cultist-01-Pirate-M.png');
+    sheet('Cultist-02-Ruby', 'resources/sprites/Cultist-02-Ruby.png');
+    sheet('Cultist-03-Pirate-F', 'resources/sprites/Cultist-03-Pirate-F.png');
 
     loader.image('LyubaCleric', 'resources/sprites/LyubaCleric.png');
 
@@ -91,6 +97,10 @@ export function loadNPCSprites(loader: Phaser.Loader.LoaderPlugin): void {
     loader.image('faces/Yan neutral', 'resources/sprites/faces/Yan_face_casual_neutral.png');
     loader.image('faces/Yan happy', 'resources/sprites/faces/Yan_face_casual_happy.png');
     loader.image('faces/Yan frown', 'resources/sprites/faces/Yan_face_casual_dislike.png');
+    loader.image('faces/Cultist-01 neutral', 'resources/sprites/faces/Cultist-01.png');
+    loader.image('faces/Cultist-02 neutral', 'resources/sprites/faces/Cultist-02.png');
+    loader.image('faces/Cultist-03 neutral', 'resources/sprites/faces/Cultist-03.png');
+    loader.image('faces/Pirate-M neutral', 'resources/sprites/faces/Pirate M.png');
     loader.image('faces/Pirate-F neutral', 'resources/sprites/faces/Pirate-F neutral.png');
 }
 

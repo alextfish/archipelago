@@ -144,6 +144,10 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         // Make sure the scene itself is visible
         console.log('ConversationScene: Making scene visible');
         this.scene.setVisible(true, 'ConversationScene');
+        this.scene.bringToTop('ConversationScene');
+        if (this.scene.isActive('OverworldHUDScene')) {
+            this.scene.bringToTop('OverworldHUDScene');
+        }
 
         // Show UI elements
         console.log('ConversationScene: Setting UI visible to true');
