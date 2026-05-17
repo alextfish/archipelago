@@ -143,7 +143,7 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
                     this.onGameObjectCreated(numberSprite);
                 }
 
-                if (item.compassFrame !== undefined) {
+                if (item.compassFrame !== undefined && this.scene.textures.exists('compass overlay')) {
                     const cellSize = this.gridMapper.getCellSize();
                     const compassSprite = this.scene.add.sprite(
                         worldPos.x + cellSize / 2,

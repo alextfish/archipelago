@@ -184,7 +184,7 @@ export class ConstraintNPCManager {
                         this.constraintNumberSprites.set(npc.id, numberSprite);
                     }
 
-                    if (item.compassFrame !== undefined) {
+                    if (item.compassFrame !== undefined && this.scene.textures.exists('compass overlay')) {
                         const compassSprite = this.scene.add.sprite(
                             worldX + tileW / 2,
                             worldY - tileH / 2,

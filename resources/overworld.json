@@ -7356,13 +7356,35 @@
                         {
                          "name":"id",
                          "type":"string",
-                         "value":"forest"
+                         "value":"forestcave"
                         }],
                  "rotation":0,
                  "type":"",
                  "visible":true,
                  "width":32,
                  "x":1536,
+                 "y":1728
+                }, 
+                {
+                 "height":32,
+                 "id":125,
+                 "name":"player start",
+                 "properties":[
+                        {
+                         "name":"default",
+                         "type":"bool",
+                         "value":false
+                        }, 
+                        {
+                         "name":"id",
+                         "type":"string",
+                         "value":"forest"
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":32,
+                 "x":2016,
                  "y":1728
                 }, 
                 {
@@ -7449,7 +7471,7 @@
          "y":0
         }],
  "nextlayerid":116,
- "nextobjectid":125,
+ "nextobjectid":126,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.11.2",
@@ -10014,12 +10036,12 @@
          "columns":13,
          "firstgid":2300,
          "image":"tilesets\/CaveWalls.png",
-         "imageheight":272,
+         "imageheight":288,
          "imagewidth":416,
          "margin":0,
          "name":"CaveWalls",
          "spacing":0,
-         "tilecount":624,
+         "tilecount":117,
          "tileheight":32,
          "tiles":[
                 {

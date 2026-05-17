@@ -3,6 +3,7 @@ import { Portal } from '@model/overworld/Portal';
 import type { OverworldGameState } from '@model/overworld/OverworldGameState';
 import type { SeriesManager } from '@model/series/SeriesFactory';
 import type { PlayerController } from '@view/PlayerController';
+import { SceneTransitionCoordinator } from '@view/SceneTransitionCoordinator';
 import type { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 
@@ -30,6 +31,7 @@ export class PortalManager {
 
     /** All portals loaded from the Tiled map. */
     readonly portals: Portal[] = [];
+    private transitionInProgress: boolean = false;
 
     constructor(
         scene: Phaser.Scene,
@@ -103,38 +105,62 @@ export class PortalManager {
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
-    private triggerTransition(portal: Portal): void {
+    private async triggerTransition(portal: Portal): Promise<void> {
+        if (this.transitionInProgress) {
+            return;
+        }
+
+        this.transitionInProgress = true;
+
         const player = this.getPlayer();
         const playerController = this.getPlayerController();
+        const hud = this.getOverworldHUD();
 
-        // Disable player movement so they don't keep walking during the transition
-        playerController?.setEnabled(false);
+        try {
+            await SceneTransitionCoordinator.fadeOutAndDisable(
+                {
+                    scene: this.scene,
+                    playerController,
+                    hud,
+                },
+                SceneTransitionCoordinator.DEFAULT_FADE_DURATION_MS,
+            );
 
-        // Record where the player was standing so OverworldScene can restore the
-        // position on return from the interior.
-        const returnX = player?.x ?? 0;
-        const returnY = player?.y ?? 0;
-        this.gameState.setCurrentInterior(portal.targetMapKey, returnX, returnY);
+            // Record where the player was standing so OverworldScene can restore the
+            // position on return from the interior.
+            const returnX = player?.x ?? 0;
+            const returnY = player?.y ?? 0;
+            this.gameState.setCurrentInterior(portal.targetMapKey, returnX, returnY);
 
-        // Persist game state so a cold-start reload can resume inside the building
-        this.saveStateCallback();
+            // Persist game state so a cold-start reload can resume inside the building
+            this.saveStateCallback();
 
-        // Hide the warp button — it is only meaningful in the overworld
-        this.getOverworldHUD()?.setWarpButtonVisible(false);
+            // Hide the warp button — it is only meaningful in the overworld
+            hud?.setWarpButtonVisible(false);
 
-        console.log(
-            `[PortalManager] Transitioning to interior "${portal.targetMapKey}" ` +
-            `via spawn "${portal.targetSpawnID}"`
-        );
+            console.log(
+                `[PortalManager] Transitioning to interior "${portal.targetMapKey}" ` +
+                `via spawn "${portal.targetSpawnID}"`
+            );
 
-        // Launch the interior scene, then sleep the overworld
-        this.scene.scene.launch('InteriorScene', {
-            mapKey: portal.targetMapKey,
-            spawnID: portal.targetSpawnID,
-            gameState: this.gameState,
-            seriesManager: this.seriesManager,
-            saveStateCallback: this.saveStateCallback,
-        });
-        this.scene.scene.sleep('OverworldScene');
+            // Launch the interior scene, then sleep the overworld
+            this.scene.scene.launch('InteriorScene', {
+                mapKey: portal.targetMapKey,
+                spawnID: portal.targetSpawnID,
+                gameState: this.gameState,
+                seriesManager: this.seriesManager,
+                saveStateCallback: this.saveStateCallback,
+                fadeInDurationMs: SceneTransitionCoordinator.DEFAULT_FADE_DURATION_MS,
+            });
+            this.scene.scene.sleep('OverworldScene');
+            this.transitionInProgress = false;
+        } catch (error) {
+            console.error('[PortalManager] Failed to transition through portal:', error);
+            SceneTransitionCoordinator.enableInteraction({
+                scene: this.scene,
+                playerController,
+            });
+            this.transitionInProgress = false;
+        }
     }
 }

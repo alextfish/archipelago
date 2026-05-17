@@ -105,14 +105,25 @@ describe('OverworldGameState', () => {
     });
 
     describe('markPuzzleCompleted', () => {
-        it('should mark puzzle as completed and remove from progress', () => {
+        it('should mark puzzle as completed and preserve existing saved progress', () => {
             gameState.saveOverworldPuzzleProgress('puzzle1', mockPuzzle);
             expect(gameState.hasSavedProgress('puzzle1')).toBe(true);
 
             gameState.markPuzzleCompleted('puzzle1');
 
             expect(gameState.isPuzzleCompleted('puzzle1')).toBe(true);
-            expect(gameState.hasSavedProgress('puzzle1')).toBe(false);
+            expect(gameState.hasSavedProgress('puzzle1')).toBe(true);
+            expect(gameState.loadOverworldPuzzleProgress('puzzle1')).toBe(mockPuzzle);
+        });
+
+        it('should persist the active puzzle state when marking the active puzzle as completed', () => {
+            gameState.setActivePuzzle('puzzle1', mockPuzzle);
+
+            gameState.markPuzzleCompleted('puzzle1');
+
+            expect(gameState.isPuzzleCompleted('puzzle1')).toBe(true);
+            expect(gameState.hasSavedProgress('puzzle1')).toBe(true);
+            expect(gameState.loadOverworldPuzzleProgress('puzzle1')).toBe(mockPuzzle);
         });
     });
 

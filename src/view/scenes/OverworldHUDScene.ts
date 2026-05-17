@@ -39,6 +39,8 @@ export class OverworldHUDScene extends Phaser.Scene {
     private dialogOpen: boolean = false;
     private warpButton: Phaser.GameObjects.Text | null = null;
     private resetButton: Phaser.GameObjects.Text | null = null;
+    private playerLayerText: Phaser.GameObjects.Text | null = null;
+    private transitionOverlay: Phaser.GameObjects.Rectangle | null = null;
 
     private jewelHUDElements: Map<string, {
         sprite: Phaser.GameObjects.Image;
@@ -106,7 +108,23 @@ export class OverworldHUDScene extends Phaser.Scene {
                 this.hideWarpDialog();
                 this.resetCallback?.();
             });
+
+            this.playerLayerText = this.add.text(BOOK_ICON_X, TOP_BUTTON_Y + 36, 'layer: upper', {
+                fontSize: '14px',
+                color: '#bfe8ff',
+                backgroundColor: '#102030',
+                padding: { x: 6, y: 3 },
+            });
+            this.playerLayerText.setDepth(200);
         }
+
+        this.transitionOverlay = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 1);
+        this.transitionOverlay.setOrigin(0, 0);
+        this.transitionOverlay.setDepth(10_000);
+        this.transitionOverlay.setScrollFactor(0);
+        this.transitionOverlay.setVisible(false);
+        this.transitionOverlay.setAlpha(0);
+        this.transitionOverlay.setInteractive();
     }
 
     // -------------------------------------------------------------------------
@@ -188,8 +206,41 @@ export class OverworldHUDScene extends Phaser.Scene {
 
     /** Show or hide the warp (⚡) button (e.g. hide while in a building interior). */
     setWarpButtonVisible(visible: boolean): void {
+        if (!visible) {
+            this.hideWarpDialog();
+        }
+
         this.warpButton?.setVisible(visible);
-        this.resetButton?.setVisible(visible);
+    }
+
+    setPlayerLayerDisplay(layer: 'upper' | 'lower' | 'stairs'): void {
+        this.playerLayerText?.setText(`layer: ${layer}`);
+    }
+
+    async fadeOutToBlack(durationMs: number): Promise<void> {
+        const overlay = this.transitionOverlay;
+        if (!overlay) {
+            return;
+        }
+
+        overlay.setVisible(true);
+        overlay.setAlpha(0);
+
+        await this.tweenOverlayAlpha(1, durationMs);
+    }
+
+    async fadeInFromBlack(durationMs: number): Promise<void> {
+        const overlay = this.transitionOverlay;
+        if (!overlay) {
+            return;
+        }
+
+        overlay.setVisible(true);
+        overlay.setAlpha(1);
+
+        await this.tweenOverlayAlpha(0, durationMs);
+
+        overlay.setVisible(false);
     }
 
     /**
@@ -208,6 +259,25 @@ export class OverworldHUDScene extends Phaser.Scene {
     private toggleTranslation(): void {
         const translationScene = this.scene.get('TranslationModeScene') as any;
         translationScene?.toggle?.();
+    }
+
+    private tweenOverlayAlpha(alpha: number, durationMs: number): Promise<void> {
+        return new Promise((resolve) => {
+            const overlay = this.transitionOverlay;
+            if (!overlay) {
+                resolve();
+                return;
+            }
+
+            this.tweens.killTweensOf(overlay);
+            this.tweens.add({
+                targets: overlay,
+                alpha,
+                duration: durationMs,
+                ease: 'Linear',
+                onComplete: () => resolve(),
+            });
+        });
     }
 
     // -------------------------------------------------------------------------

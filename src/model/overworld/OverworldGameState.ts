@@ -133,10 +133,12 @@ export class OverworldGameState {
      */
     markPuzzleCompleted(puzzleId: string): void {
         console.log(`OverworldGameState: Marking puzzle ${puzzleId} as completed`);
-        this.completedPuzzles.add(puzzleId);
 
-        // Remove from progress since it's completed
-        this.puzzleProgress.delete(puzzleId);
+        if (this.activePuzzleId === puzzleId && this.activePuzzleState) {
+            this.puzzleProgress.set(puzzleId, this.activePuzzleState);
+        }
+
+        this.completedPuzzles.add(puzzleId);
     }
 
     /**

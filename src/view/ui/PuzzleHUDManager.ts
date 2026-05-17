@@ -45,13 +45,10 @@ export class PuzzleHUDManager {
         this.hudScene = scene.scene.get('PuzzleHUDScene') as PuzzleHUDScene;
         this.isInitialized = true;
 
-        // Wait for scene to be ready, then hide it
-        scene.time.delayedCall(10, () => {
-            if (this.hudScene) {
-                this.hudScene.setVisible(false, 'bridge');
-                console.log('PuzzleHUDManager: HUD initialized and hidden');
-            }
-        });
+        // Hide immediately so cold-start scene sleeps cannot leave the puzzle HUD visible.
+        scene.scene.setVisible(false, 'PuzzleHUDScene');
+        this.hudScene.setVisible(false, 'bridge');
+        console.log('PuzzleHUDManager: HUD initialized and hidden');
 
         console.log('PuzzleHUDManager: HUD initialization started');
     }
@@ -90,7 +87,7 @@ export class PuzzleHUDManager {
         // For overworld puzzles, keep OverworldScene visible
 
         // Setup HUD for this puzzle
-        this.hudScene.setupForPuzzle(controller, puzzleType);
+        this.hudScene.setupForPuzzle(controller, puzzleType, worldScene);
         this.hudScene.setVisible(true, puzzleType);
 
         console.log('PuzzleHUDManager: HUD visible and connected to controller');

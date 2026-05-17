@@ -11,9 +11,11 @@ export class OverworldPuzzleManager {
     private readonly puzzleCache = new Map<string, BridgePuzzle>();
     private readonly definitionCache = new Map<string, MapPuzzleDefinition>();
     private readonly spatialIndex = new Map<string, string>(); // "x,y" -> puzzleId
+    private readonly puzzleIdPrefix?: string;
 
-    constructor(tileConfig: TileLayerConfig) {
+    constructor(tileConfig: TileLayerConfig, puzzleIdPrefix?: string) {
         this.extractor = new MapPuzzleExtractor(tileConfig);
+        this.puzzleIdPrefix = puzzleIdPrefix;
     }
 
     /**
@@ -27,7 +29,8 @@ export class OverworldPuzzleManager {
 
         const puzzles = new Map<string, BridgePuzzle>();
 
-        for (const definition of definitions) {
+        for (const rawDefinition of definitions) {
+            const definition = this.withNamespacedID(rawDefinition);
             try {
                 const puzzle = definition.puzzleClass === 'FlowPuzzle'
                     ? this.extractor.createFlowPuzzle(definition, tiledMapData)
@@ -180,6 +183,17 @@ export class OverworldPuzzleManager {
         }
 
         return validationResults;
+    }
+
+    private withNamespacedID(definition: MapPuzzleDefinition): MapPuzzleDefinition {
+        if (!this.puzzleIdPrefix) {
+            return definition;
+        }
+
+        return {
+            ...definition,
+            id: `${this.puzzleIdPrefix}:${definition.id}`,
+        };
     }
 
     /**
