@@ -243,6 +243,37 @@ export class ConstraintNPCManager {
         console.log(`Shown constraint NPCs for puzzle: ${puzzleId}`);
     }
 
+    /**
+     * Return the NPC variant that should be used for conversations.
+     * The world sprite texture may swap to the solved disguise while the NPC
+     * model still carries its original appearance ID.
+     */
+    getConversationNPC(npc: NPC, useSolvedAppearance: boolean): NPC {
+        const disguise = this.constraintDisguiseKeys.get(npc.id);
+        if (!disguise) {
+            return npc;
+        }
+
+        const appearanceId = useSolvedAppearance ? disguise.solvedKey : disguise.normalKey;
+        if (appearanceId === npc.appearanceId) {
+            return npc;
+        }
+
+        return new NPC(
+            npc.id,
+            npc.name,
+            npc.tileX,
+            npc.tileY,
+            npc.language,
+            appearanceId,
+            npc.conversationFile,
+            npc.conversationFileSolved,
+            npc.seriesFile,
+            npc.conversationVariables,
+            npc.animate,
+        );
+    }
+
     // ── Private helpers ──────────────────────────────────────────────────────
 
     private setConstraintNPCsVisible(prefix: string, visible: boolean, applyDisguise: boolean): void {

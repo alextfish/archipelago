@@ -751,17 +751,6 @@
    <properties>
     <property name="animate" type="bool" value="false"/>
     <property name="constraint" type="bool" value="true"/>
-    <property name="conversation_file" value="disguise-visible-2.json"/>
-    <property name="conversation_file_solved" value="disguise-solved-visible-2.json"/>
-    <property name="disguise_sprite" value="Cultist-03"/>
-    <property name="disguise_sprite_solved" value="Cultist-03-Pirate-F"/>
-    <property name="num_visible" type="int" value="2"/>
-   </properties>
-  </object>
-  <object id="3" name="see2" x="352" y="288" width="32" height="32">
-   <properties>
-    <property name="animate" type="bool" value="false"/>
-    <property name="constraint" type="bool" value="true"/>
     <property name="conversation_file" value="disguise-visible.json"/>
     <property name="conversation_file_solved" value="disguise-solved-visible.json"/>
     <property name="disguise_sprite" value="Cultist-03"/>

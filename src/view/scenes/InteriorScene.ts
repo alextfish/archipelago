@@ -878,6 +878,8 @@ export class InteriorScene extends Phaser.Scene {
                 ConversationVariableSubstitutor.applyTo(conversationSpec, npc.conversationVariables);
             }
 
+            const conversationNPC = this.constraintNPCManager?.getConversationNPC(npc, useSolvedConversation) ?? npc;
+
             const conversationScene = this.scene.get('ConversationScene') as
                 (ConversationScene & { startConversation: Function; events: Phaser.Events.EventEmitter }) | null;
             if (!conversationScene) {
@@ -900,11 +902,11 @@ export class InteriorScene extends Phaser.Scene {
 
             if (!this.scene.isActive('ConversationScene')) {
                 conversationScene.events.once('create', () => {
-                    conversationScene.startConversation(conversationSpec, npc, startNodeId);
+                    conversationScene.startConversation(conversationSpec, conversationNPC, startNodeId);
                 });
                 this.scene.launch('ConversationScene');
             } else {
-                conversationScene.startConversation(conversationSpec, npc, startNodeId);
+                conversationScene.startConversation(conversationSpec, conversationNPC, startNodeId);
             }
 
         } catch (error) {

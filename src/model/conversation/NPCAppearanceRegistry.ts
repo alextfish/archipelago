@@ -12,6 +12,7 @@ export interface NPCAnimationFrame {
 export interface NPCAppearance {
     spriteKey: string;         // Phaser asset key for sprite sheet
     faceId?: string;           // Override for face texture lookup (e.g. 'Yan' for 'Farmer')
+    faceTextureOverrides?: Partial<Record<'neutral' | 'happy' | 'sad', string>>;
     expressions: {
         neutral: string | number;  // Frame name or index
         happy: string | number;
@@ -161,6 +162,9 @@ export class NPCAppearanceRegistry {
         this.appearances.set('Cultist-01-Pirate-M', {
             spriteKey: 'Cultist-01-Pirate-M',
             faceId: 'Pirate-M',
+            faceTextureOverrides: {
+                happy: 'faces/Pirate-M cultist happy',
+            },
             expressions: {
                 neutral: 0,
                 happy: 1,
@@ -171,6 +175,9 @@ export class NPCAppearanceRegistry {
         this.appearances.set('Cultist-02-Ruby', {
             spriteKey: 'Cultist-02-Ruby',
             faceId: 'Ruby',
+            faceTextureOverrides: {
+                happy: 'faces/Ruby cultist happy',
+            },
             expressions: {
                 neutral: 0,
                 happy: 1,
@@ -181,6 +188,9 @@ export class NPCAppearanceRegistry {
         this.appearances.set('Cultist-03-Pirate-F', {
             spriteKey: 'Cultist-03-Pirate-F',
             faceId: 'Pirate-F',
+            faceTextureOverrides: {
+                happy: 'faces/Pirate-F cultist happy',
+            },
             expressions: {
                 neutral: 0,
                 happy: 1,
@@ -250,6 +260,12 @@ export class NPCAppearanceRegistry {
     getFaceTextureKey(appearanceId: string, expression: string): string | undefined {
         // Use faceId override if present (e.g. Farmer → Yan, Fisherman → Evan)
         const appearance = this.appearances.get(appearanceId);
+        const expressionKey = expression as 'neutral' | 'happy' | 'sad';
+        const overrideKey = appearance?.faceTextureOverrides?.[expressionKey];
+        if (overrideKey) {
+            return overrideKey;
+        }
+
         const faceId = appearance?.faceId ?? appearanceId;
         const faceKey = `faces/${faceId} ${expression}`;
         return faceKey;

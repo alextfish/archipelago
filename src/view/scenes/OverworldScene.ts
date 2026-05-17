@@ -1728,6 +1728,8 @@ export class OverworldScene extends Phaser.Scene {
         ConversationVariableSubstitutor.applyTo(conversationSpec, npc.conversationVariables);
       }
 
+      const conversationNPC = this.constraintNPCManager?.getConversationNPC(npc, useSolvedConversation) ?? npc;
+
       // Switch to conversation mode
       this.gameMode = 'conversation';
       this.interactionCursor?.hide();
@@ -1758,12 +1760,12 @@ export class OverworldScene extends Phaser.Scene {
       if (!this.scene.isActive('ConversationScene')) {
         // Wait for the scene to be created before starting conversation
         conversationScene.events.once('create', () => {
-          conversationScene.startConversation(conversationSpec, npc, startNodeId);
+          conversationScene.startConversation(conversationSpec, conversationNPC, startNodeId);
         });
         this.scene.launch('ConversationScene');
       } else {
         // Scene already running, start conversation immediately
-        conversationScene.startConversation(conversationSpec, npc, startNodeId);
+        conversationScene.startConversation(conversationSpec, conversationNPC, startNodeId);
       }
 
     } catch (error) {

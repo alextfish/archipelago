@@ -211,7 +211,7 @@
          "height":20,
          "id":7,
          "name":"collision",
-         "opacity":0.51,
+         "opacity":0.29,
          "type":"tilelayer",
          "visible":true,
          "width":30,
@@ -361,53 +361,6 @@
                         {
                          "name":"conversation_file",
                          "type":"string",
-                         "value":"disguise-visible-2.json"
-                        }, 
-                        {
-                         "name":"conversation_file_solved",
-                         "type":"string",
-                         "value":"disguise-solved-visible-2.json"
-                        }, 
-                        {
-                         "name":"disguise_sprite",
-                         "type":"string",
-                         "value":"Cultist-03"
-                        }, 
-                        {
-                         "name":"disguise_sprite_solved",
-                         "type":"string",
-                         "value":"Cultist-03-Pirate-F"
-                        }, 
-                        {
-                         "name":"num_visible",
-                         "type":"int",
-                         "value":2
-                        }],
-                 "rotation":0,
-                 "type":"",
-                 "visible":true,
-                 "width":32,
-                 "x":352,
-                 "y":288
-                }, 
-                {
-                 "height":32,
-                 "id":3,
-                 "name":"see2",
-                 "properties":[
-                        {
-                         "name":"animate",
-                         "type":"bool",
-                         "value":false
-                        }, 
-                        {
-                         "name":"constraint",
-                         "type":"bool",
-                         "value":true
-                        }, 
-                        {
-                         "name":"conversation_file",
-                         "type":"string",
                          "value":"disguise-visible.json"
                         }, 
                         {
@@ -475,7 +428,7 @@
                         {
                          "name":"num_visible",
                          "type":"int",
-                         "value":2
+                         "value":1
                         }],
                  "rotation":0,
                  "type":"",
@@ -616,7 +569,7 @@
                         {
                          "name":"num_visible",
                          "type":"int",
-                         "value":2
+                         "value":3
                         }],
                  "rotation":0,
                  "type":"",

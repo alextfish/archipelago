@@ -102,6 +102,9 @@ export function loadNPCSprites(loader: Phaser.Loader.LoaderPlugin): void {
     loader.image('faces/Cultist-03 neutral', 'resources/sprites/faces/Cultist-03.png');
     loader.image('faces/Pirate-M neutral', 'resources/sprites/faces/Pirate M.png');
     loader.image('faces/Pirate-F neutral', 'resources/sprites/faces/Pirate-F neutral.png');
+    loader.image('faces/Ruby cultist happy', 'resources/sprites/faces/Ruby happy cultist.png');
+    loader.image('faces/Pirate-F cultist happy', 'resources/sprites/faces/Pirate-F cultist.png');
+    loader.image('faces/Pirate-M cultist happy', 'resources/sprites/faces/Pirate M cultist.png');
 }
 
 /**
