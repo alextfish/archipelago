@@ -16,6 +16,7 @@
  */
 
 import Phaser from 'phaser';
+import { Environment } from '@helpers/Environment';
 import type { PlayerOverworldDisplayItem } from '@model/overworld/PlayerOverworldDisplay';
 import type { PlayerStartManager, PlayerStartPosition } from '@model/overworld/PlayerStartManager';
 
@@ -25,14 +26,21 @@ export const BOOK_ICON_X = 12;
 export const BOOK_ICON_WIDTH = 40;
 /** Y position shared by both the book icon and the warp button. */
 export const TOP_BUTTON_Y = 12;
+/** Width allowance for each top-left HUD button. */
+export const TOP_BUTTON_WIDTH = 40;
 
 export class OverworldHUDScene extends Phaser.Scene {
     private playerStartManager: PlayerStartManager | null = null;
     private warpCallback: ((start: PlayerStartPosition) => void) | null = null;
     private getDisplayItems: (() => PlayerOverworldDisplayItem[]) | null = null;
+    private resetCallback: (() => void) | null = null;
 
     private warpDialog: Phaser.GameObjects.Container | null = null;
     private dialogOpen: boolean = false;
+    private warpButton: Phaser.GameObjects.Text | null = null;
+    private resetButton: Phaser.GameObjects.Text | null = null;
+    private playerLayerText: Phaser.GameObjects.Text | null = null;
+    private transitionOverlay: Phaser.GameObjects.Rectangle | null = null;
 
     private jewelHUDElements: Map<string, {
         sprite: Phaser.GameObjects.Image;
@@ -51,10 +59,12 @@ export class OverworldHUDScene extends Phaser.Scene {
         playerStartManager: PlayerStartManager,
         warpCallback: (start: PlayerStartPosition) => void,
         getDisplayItems: () => PlayerOverworldDisplayItem[],
+        resetCallback: () => void,
     ): void {
         this.playerStartManager = playerStartManager;
         this.warpCallback = warpCallback;
         this.getDisplayItems = getDisplayItems;
+        this.resetCallback = resetCallback;
     }
 
     create(): void {
@@ -79,16 +89,42 @@ export class OverworldHUDScene extends Phaser.Scene {
         });
 
         // Warp button – sits immediately right of the book icon
-        const warpButton = this.add.text(BOOK_ICON_X + BOOK_ICON_WIDTH, TOP_BUTTON_Y, '⚡', { fontSize: '28px' });
-        warpButton.setDepth(200);
-        warpButton.setInteractive({ useHandCursor: true });
-        warpButton.on('pointerdown', () => {
+        this.warpButton = this.add.text(BOOK_ICON_X + BOOK_ICON_WIDTH, TOP_BUTTON_Y, '⚡', { fontSize: '28px' });
+        this.warpButton.setDepth(200);
+        this.warpButton.setInteractive({ useHandCursor: true });
+        this.warpButton.on('pointerdown', () => {
             if (this.dialogOpen) {
                 this.hideWarpDialog();
             } else {
                 this.showWarpDialog();
             }
         });
+
+        if (Environment.isDevelopment()) {
+            this.resetButton = this.add.text(BOOK_ICON_X + BOOK_ICON_WIDTH + TOP_BUTTON_WIDTH, TOP_BUTTON_Y, '↺', { fontSize: '28px' });
+            this.resetButton.setDepth(200);
+            this.resetButton.setInteractive({ useHandCursor: true });
+            this.resetButton.on('pointerdown', () => {
+                this.hideWarpDialog();
+                this.resetCallback?.();
+            });
+
+            this.playerLayerText = this.add.text(BOOK_ICON_X, TOP_BUTTON_Y + 36, 'layer: upper', {
+                fontSize: '14px',
+                color: '#bfe8ff',
+                backgroundColor: '#102030',
+                padding: { x: 6, y: 3 },
+            });
+            this.playerLayerText.setDepth(200);
+        }
+
+        this.transitionOverlay = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, 1);
+        this.transitionOverlay.setOrigin(0, 0);
+        this.transitionOverlay.setDepth(10_000);
+        this.transitionOverlay.setScrollFactor(0);
+        this.transitionOverlay.setVisible(false);
+        this.transitionOverlay.setAlpha(0);
+        this.transitionOverlay.setInteractive();
     }
 
     // -------------------------------------------------------------------------
@@ -168,6 +204,45 @@ export class OverworldHUDScene extends Phaser.Scene {
         }
     }
 
+    /** Show or hide the warp (⚡) button (e.g. hide while in a building interior). */
+    setWarpButtonVisible(visible: boolean): void {
+        if (!visible) {
+            this.hideWarpDialog();
+        }
+
+        this.warpButton?.setVisible(visible);
+    }
+
+    setPlayerLayerDisplay(layer: 'upper' | 'lower' | 'stairs'): void {
+        this.playerLayerText?.setText(`layer: ${layer}`);
+    }
+
+    async fadeOutToBlack(durationMs: number): Promise<void> {
+        const overlay = this.transitionOverlay;
+        if (!overlay) {
+            return;
+        }
+
+        overlay.setVisible(true);
+        overlay.setAlpha(0);
+
+        await this.tweenOverlayAlpha(1, durationMs);
+    }
+
+    async fadeInFromBlack(durationMs: number): Promise<void> {
+        const overlay = this.transitionOverlay;
+        if (!overlay) {
+            return;
+        }
+
+        overlay.setVisible(true);
+        overlay.setAlpha(1);
+
+        await this.tweenOverlayAlpha(0, durationMs);
+
+        overlay.setVisible(false);
+    }
+
     /**
      * Returns true while the warp dialog is open.
      * OverworldScene checks this to suppress pointer-move events so the player
@@ -184,6 +259,25 @@ export class OverworldHUDScene extends Phaser.Scene {
     private toggleTranslation(): void {
         const translationScene = this.scene.get('TranslationModeScene') as any;
         translationScene?.toggle?.();
+    }
+
+    private tweenOverlayAlpha(alpha: number, durationMs: number): Promise<void> {
+        return new Promise((resolve) => {
+            const overlay = this.transitionOverlay;
+            if (!overlay) {
+                resolve();
+                return;
+            }
+
+            this.tweens.killTweensOf(overlay);
+            this.tweens.add({
+                targets: overlay,
+                alpha,
+                duration: durationMs,
+                ease: 'Linear',
+                onComplete: () => resolve(),
+            });
+        });
     }
 
     // -------------------------------------------------------------------------

@@ -80,12 +80,19 @@ Prioritise: **Clarity → Testability → Architectural Consistency**
 
 The player's state can be:
 - Exploring the overworld
+- Exploring a building interior (a separate Tiled map running in `InteriorScene`)
 - Solving an overworld puzzle on a puzzle version of the overworld view
 - Talking to an NPC
 - Solving a BridgePuzzle on a separate screen
 - Translating in-game language on the translation mode overlay
 
 When the player solves an overworld puzzle, the bridges are added to the OverworldScene's collisionArray to make them walkable. The map read from Tiled contains a "collision" layer which we **NEVER CHANGE**.
+
+### Scene Transitions
+
+**Never call `scene.start()` after gameplay begins** — it destroys the current scene and all in-memory state; it is only valid for the very first scene launched from `main.ts`.
+
+Always use `scene.sleep()` / `scene.wake()` (or `scene.launch()` for a first-time start), including for overlay scenes such as `OverworldHUDScene`, `TranslationModeScene`, and `ConversationScene`.
 
 ### Source Control
 

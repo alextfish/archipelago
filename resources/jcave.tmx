@@ -1,0 +1,847 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="20" tilewidth="32" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="16">
+ <editorsettings>
+  <export target="interiors/journalcave.json" format="json"/>
+ </editorsettings>
+ <tileset firstgid="1" name="CaveWalls" tilewidth="32" tileheight="32" tilecount="117" columns="13">
+  <image source="tilesets/CaveWalls.png" width="416" height="288"/>
+  <tile id="48">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="49">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="62">
+   <properties>
+    <property name="foot" value="bottom"/>
+    <property name="stairs" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="76">
+   <properties>
+    <property name="foot" value="top"/>
+    <property name="stairs" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <wangsets>
+   <wangset name="Wall" type="corner" tile="-1">
+    <wangcolor name="Wall" color="#ff0000" tile="-1" probability="1"/>
+    <wangcolor name="Ground" color="#00ff00" tile="-1" probability="1"/>
+    <wangcolor name="Ceiling" color="#0000ff" tile="-1" probability="1"/>
+    <wangcolor name="top of wall" color="#ff7700" tile="-1" probability="1"/>
+    <wangtile tileid="0" wangid="0,3,0,4,0,4,0,3"/>
+    <wangtile tileid="1" wangid="0,3,0,4,0,4,0,3"/>
+    <wangtile tileid="2" wangid="0,3,0,4,0,4,0,3"/>
+    <wangtile tileid="3" wangid="0,4,0,1,0,2,0,2"/>
+    <wangtile tileid="4" wangid="0,3,0,4,0,4,0,4"/>
+    <wangtile tileid="5" wangid="0,4,0,4,0,4,0,3"/>
+    <wangtile tileid="6" wangid="0,2,0,2,0,1,0,4"/>
+    <wangtile tileid="13" wangid="0,4,0,1,0,1,0,4"/>
+    <wangtile tileid="14" wangid="0,4,0,1,0,1,0,4"/>
+    <wangtile tileid="15" wangid="0,4,0,1,0,1,0,4"/>
+    <wangtile tileid="16" wangid="0,1,0,2,0,2,0,2"/>
+    <wangtile tileid="17" wangid="0,4,0,1,0,1,0,1"/>
+    <wangtile tileid="18" wangid="0,1,0,1,0,1,0,4"/>
+    <wangtile tileid="19" wangid="0,2,0,2,0,2,0,1"/>
+    <wangtile tileid="20" wangid="0,0,0,0,0,0,0,3"/>
+    <wangtile tileid="21" wangid="0,3,0,0,0,0,0,0"/>
+    <wangtile tileid="26" wangid="0,1,0,2,0,2,0,1"/>
+    <wangtile tileid="27" wangid="0,1,0,2,0,2,0,1"/>
+    <wangtile tileid="28" wangid="0,1,0,2,0,2,0,1"/>
+    <wangtile tileid="29" wangid="0,2,0,0,0,0,0,0"/>
+    <wangtile tileid="30" wangid="0,1,0,2,0,2,0,2"/>
+    <wangtile tileid="31" wangid="0,2,0,2,0,2,0,1"/>
+    <wangtile tileid="32" wangid="0,0,0,0,0,2,0,2"/>
+    <wangtile tileid="39" wangid="0,3,0,3,0,4,0,4"/>
+    <wangtile tileid="40" wangid="0,4,0,4,0,3,0,3"/>
+    <wangtile tileid="54" wangid="0,4,0,3,0,4,0,4"/>
+    <wangtile tileid="55" wangid="0,4,0,4,0,3,0,4"/>
+    <wangtile tileid="56" wangid="0,4,0,3,0,3,0,4"/>
+    <wangtile tileid="67" wangid="0,4,0,3,0,4,0,4"/>
+    <wangtile tileid="68" wangid="0,4,0,4,0,3,0,4"/>
+   </wangset>
+  </wangsets>
+ </tileset>
+ <tileset firstgid="118" name="CaveFloor" tilewidth="32" tileheight="32" tilecount="110" columns="11">
+  <image source="tilesets/CaveFloor.png" width="352" height="320"/>
+  <tile id="0">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="1">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="2">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="3">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="4">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="5">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="6">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="7">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="8">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="9">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="11">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="12">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="13">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="14">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="15">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="16">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="17">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="18">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="19">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="20">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="22">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="23">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="24">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="25">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="26">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="27">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="28">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="29">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="30">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="31">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="33">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="34">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="35">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="36">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="37">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="38">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="39">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="40">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="41">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="42">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="44">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="45">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="46">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="47">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="48">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="49">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="50">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="51">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="52">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="53">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+ </tileset>
+ <tileset firstgid="228" name="collision" tilewidth="32" tileheight="32" tilecount="10" columns="10">
+  <image source="tilesets/collision.png" width="320" height="32"/>
+  <tile id="0">
+   <properties>
+    <property name="blocksBridge" type="bool" value="false"/>
+    <property name="collides" type="bool" value="false"/>
+    <property name="walkable" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="1">
+   <properties>
+    <property name="blocksBridge" type="bool" value="false"/>
+    <property name="collides" type="bool" value="true"/>
+    <property name="walkable" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="2">
+   <properties>
+    <property name="blocksBridge" type="bool" value="true"/>
+    <property name="collides" type="bool" value="true"/>
+    <property name="walkable" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="3">
+   <properties>
+    <property name="alwaysHigh" type="bool" value="true"/>
+    <property name="blocksBridge" type="bool" value="false"/>
+    <property name="collides" type="bool" value="false"/>
+    <property name="walkable" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="4">
+   <properties>
+    <property name="blocksBridge" type="bool" value="false"/>
+    <property name="collides" type="bool" value="false"/>
+    <property name="walkable" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="5">
+   <properties>
+    <property name="blocksBridge" type="bool" value="false"/>
+    <property name="collides" type="bool" value="true"/>
+    <property name="walkable" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="6">
+   <properties>
+    <property name="blocksBridge" type="bool" value="true"/>
+    <property name="collides" type="bool" value="false"/>
+    <property name="walkable" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="7">
+   <properties>
+    <property name="blocksBridge" type="bool" value="false"/>
+    <property name="collides" type="bool" value="true"/>
+    <property name="walkable" type="bool" value="false"/>
+   </properties>
+  </tile>
+  <tile id="8">
+   <properties>
+    <property name="walkable" type="bool" value="false"/>
+    <property name="walkable_low" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="9">
+   <properties>
+    <property name="stairs" type="bool" value="true"/>
+    <property name="walkable" type="bool" value="true"/>
+    <property name="walkable_low" type="bool" value="true"/>
+   </properties>
+  </tile>
+ </tileset>
+ <tileset firstgid="238" name="jewels" tilewidth="32" tileheight="32" tilecount="16" columns="4">
+  <image source="sprites/jewels.png" width="128" height="128"/>
+  <tile id="1">
+   <properties>
+    <property name="jewel" value="red"/>
+   </properties>
+   <animation>
+    <frame tileid="0" duration="200"/>
+    <frame tileid="1" duration="200"/>
+    <frame tileid="2" duration="200"/>
+    <frame tileid="3" duration="200"/>
+   </animation>
+  </tile>
+  <tile id="5">
+   <animation>
+    <frame tileid="4" duration="200"/>
+    <frame tileid="5" duration="200"/>
+    <frame tileid="6" duration="200"/>
+    <frame tileid="7" duration="200"/>
+   </animation>
+  </tile>
+  <tile id="9">
+   <animation>
+    <frame tileid="8" duration="200"/>
+    <frame tileid="9" duration="200"/>
+    <frame tileid="10" duration="200"/>
+    <frame tileid="11" duration="200"/>
+   </animation>
+  </tile>
+  <tile id="13">
+   <animation>
+    <frame tileid="12" duration="200"/>
+    <frame tileid="13" duration="200"/>
+    <frame tileid="14" duration="200"/>
+    <frame tileid="15" duration="200"/>
+   </animation>
+  </tile>
+ </tileset>
+ <tileset firstgid="254" name="terrains" tilewidth="32" tileheight="32" tilecount="72" columns="12">
+  <image source="tilesets/terrains.png" width="384" height="192"/>
+  <tile id="5">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="6">
+   <properties>
+    <property name="puzzleStart" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="11">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="17">
+   <properties>
+    <property name="isHigh" type="bool" value="true"/>
+    <property name="isPontoon" type="bool" value="true"/>
+    <property name="toggleOffset" type="int" value="1"/>
+   </properties>
+  </tile>
+  <tile id="18">
+   <properties>
+    <property name="isHigh" type="bool" value="false"/>
+    <property name="isPontoon" type="bool" value="true"/>
+    <property name="toggleOffset" type="int" value="-1"/>
+   </properties>
+  </tile>
+  <tile id="19">
+   <properties>
+    <property name="toggleOffset" type="int" value="-1"/>
+   </properties>
+  </tile>
+  <tile id="23">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="27">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="28">
+   <properties>
+    <property name="puzzleStart" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="34">
+   <properties>
+    <property name="foot" value="top"/>
+    <property name="stairs" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="35">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="39">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="40">
+   <properties>
+    <property name="puzzleStart" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="46">
+   <properties>
+    <property name="foot" value="bottom"/>
+    <property name="stairs" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="47">
+   <properties>
+    <property name="lowground" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="51">
+   <properties>
+    <property name="isIsland" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="52">
+   <properties>
+    <property name="puzzleStart" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="58">
+   <properties>
+    <property name="foot" value="right"/>
+    <property name="stairs" type="bool" value="true"/>
+   </properties>
+  </tile>
+  <tile id="59">
+   <properties>
+    <property name="foot" value="left"/>
+    <property name="stairs" type="bool" value="true"/>
+   </properties>
+  </tile>
+ </tileset>
+ <layer id="4" name="lowground" width="30" height="20">
+  <properties>
+   <property name="autoRender" type="bool" value="true"/>
+  </properties>
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,142,140,156,146,163,151,141,151,146,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,156,129,118,142,121,120,131,124,144,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,157,134,120,152,123,133,141,121,144,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,140,130,153,124,134,121,151,153,153,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,151,130,157,120,144,122,143,118,143,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,157,129,122,146,121,134,121,133,146,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,163,120,134,157,135,123,141,122,163,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,157,152,124,123,123,129,135,135,154,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,151,141,154,129,123,133,144,129,157,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,152,151,142,154,140,142,141,151,153,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <layer id="5" name="lowground decor 1" width="30" height="20">
+  <properties>
+   <property name="autoRender" type="bool" value="true"/>
+  </properties>
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,25,73,76,73,73,73,76,73,26,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,62,0,0,62,0,0,62,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,62,0,62,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,62,0,0,62,0,0,62,39,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,62,0,62,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,62,0,0,62,0,0,62,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,62,0,62,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,62,0,0,62,0,0,62,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <layer id="3" name="ground" width="30" height="20">
+  <properties>
+   <property name="autoRender" type="bool" value="true"/>
+  </properties>
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,211,211,211,211,211,211,211,211,211,211,211,211,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,211,211,223,211,211,211,196,211,211,188,211,211,211,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,211,211,211,211,211,209,211,211,211,211,211,211,211,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,211,211,211,211,211,211,211,225,211,211,211,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,212,211,211,218,211,211,211,211,211,211,211,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,211,211,211,188,211,196,211,211,211,197,211,211,178,211,211,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,211,211,211,211,12,60,63,60,60,60,63,60,13,211,211,211,211,211,0,0,0,0,0,0,
+0,0,0,0,0,0,211,178,211,211,25,49,0,0,49,0,0,49,39,211,211,211,211,211,0,0,0,0,0,0,
+0,0,0,0,0,0,211,211,204,173,38,0,0,49,0,49,0,0,39,211,211,211,211,211,0,0,0,0,0,0,
+0,0,0,0,0,0,211,211,211,211,38,49,0,0,49,0,0,49,39,208,211,211,219,211,0,0,0,0,0,0,
+0,0,0,0,0,0,211,211,211,222,38,0,0,49,0,49,0,0,260,211,211,211,211,211,0,0,0,0,0,0,
+0,0,0,0,0,0,202,211,211,211,38,49,0,0,49,0,0,49,39,211,211,211,211,211,0,0,0,0,0,0,
+0,0,0,0,0,0,211,195,211,211,38,0,0,49,0,49,0,0,39,218,211,211,211,211,0,0,0,0,0,0,
+0,0,0,0,0,0,211,211,211,211,38,49,0,0,49,0,0,49,39,211,211,179,211,211,0,0,0,0,0,0,
+0,0,0,0,0,0,211,224,211,211,51,47,77,47,47,47,77,47,52,211,182,211,211,211,0,0,0,0,0,0,
+0,0,0,0,0,0,211,211,211,207,211,211,211,211,211,211,211,193,211,211,211,211,211,211,0,0,0,0,0,0,
+0,0,0,0,0,0,211,211,211,211,211,211,178,211,211,211,211,211,211,211,211,211,211,211,0,0,0,0,0,0,
+0,0,0,0,0,0,0,211,211,211,211,211,211,211,211,211,211,211,211,211,211,211,211,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <layer id="6" name="ground decor" width="30" height="20">
+  <properties>
+   <property name="autoRender" type="bool" value="true"/>
+  </properties>
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,43,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,34,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <layer id="1" name="walls" width="30" height="20">
+  <properties>
+   <property name="autoRender" type="bool" value="true"/>
+  </properties>
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,2,1,2,3,1,2,3,2,3,2,3,66,66,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,15,14,15,16,14,15,16,15,16,15,16,9,5,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,28,27,28,29,27,28,29,28,29,28,29,22,40,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,35,40,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,55,57,70,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,5,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,23,18,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,36,31,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,44,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,41,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,40,0,0,0,0,0,0,
+0,0,0,0,0,0,41,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,40,0,0,0,0,0,0,
+0,0,0,0,0,0,41,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,40,0,0,0,0,0,0,
+0,0,0,0,0,0,41,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,40,0,0,0,0,0,0,
+0,0,0,0,0,0,41,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,40,0,0,0,0,0,0,
+0,0,0,0,0,0,41,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,68,70,0,0,0,0,0,0,
+0,0,0,0,0,0,41,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,40,0,0,0,0,0,0,0,
+0,0,0,0,0,0,71,57,69,0,0,0,0,0,0,0,0,0,0,0,0,55,70,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,71,57,57,57,57,56,0,55,57,57,57,57,57,70,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,41,0,40,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <layer id="7" name="collision" width="30" height="20" opacity="0.51">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,229,229,229,229,229,229,229,229,229,229,229,229,229,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,229,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,229,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,229,229,229,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,229,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,229,229,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,231,231,237,231,231,231,237,231,231,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,231,231,236,236,231,236,236,231,231,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,229,0,0,0,231,236,236,231,236,231,236,236,231,0,0,0,0,229,0,0,0,0,0,0,
+0,0,0,0,0,0,229,0,0,0,231,231,236,236,231,236,236,231,231,0,0,0,0,229,229,0,0,0,0,0,
+0,0,0,0,0,0,229,0,0,0,231,236,236,231,236,231,236,236,231,0,0,0,0,229,229,0,0,0,0,0,
+0,0,0,0,0,0,229,0,0,0,231,231,236,236,231,236,236,231,231,0,0,0,0,229,0,0,0,0,0,0,
+0,0,0,0,0,0,229,0,0,0,231,236,236,231,236,231,236,236,231,0,0,0,0,229,0,0,0,0,0,0,
+0,0,0,0,0,0,229,0,0,0,231,231,236,236,231,236,236,231,231,0,0,0,229,229,0,0,0,0,0,0,
+0,0,0,0,0,0,229,0,0,0,231,231,237,231,231,231,237,231,231,0,0,0,229,0,0,0,0,0,0,0,
+0,0,0,0,0,0,229,229,229,0,231,231,231,231,231,231,231,231,231,0,0,229,229,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,229,229,229,229,229,229,229,0,229,229,229,229,229,229,229,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,229,229,229,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <layer id="9" name="collectibles_vis" width="30" height="20">
+  <properties>
+   <property name="autoRender" type="bool" value="true"/>
+  </properties>
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,239,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+</data>
+ </layer>
+ <objectgroup id="8" name="collectibles">
+  <object id="12" name="red jewel" x="448" y="96" width="32" height="32">
+   <properties>
+    <property name="jewel" value="red"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="10" name="portals">
+  <object id="13" name="exit" x="448" y="576" width="32" height="32">
+   <properties>
+    <property name="targetMapKey" value="overworld"/>
+    <property name="targetSpawnID" value="journalCaveExit"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="2" name="puzzles">
+  <object id="1" name="JournalCavePuzzle" x="320" y="256" width="288" height="288">
+   <properties>
+    <property name="bridges" value="3,3,3,3,3,2,2,2,2,2,2"/>
+    <property name="feedback" type="bool" value="false"/>
+   </properties>
+  </object>
+  <object id="2" name="see2" x="352" y="288" width="32" height="32">
+   <properties>
+    <property name="animate" type="bool" value="false"/>
+    <property name="constraint" type="bool" value="true"/>
+    <property name="conversation_file" value="disguise-visible-2.json"/>
+    <property name="conversation_file_solved" value="disguise-solved-visible-2.json"/>
+    <property name="disguise_sprite" value="Cultist-03"/>
+    <property name="disguise_sprite_solved" value="Cultist-03-Pirate-F"/>
+    <property name="num_visible" type="int" value="2"/>
+   </properties>
+  </object>
+  <object id="3" name="see2" x="352" y="288" width="32" height="32">
+   <properties>
+    <property name="animate" type="bool" value="false"/>
+    <property name="constraint" type="bool" value="true"/>
+    <property name="conversation_file" value="disguise-visible.json"/>
+    <property name="conversation_file_solved" value="disguise-solved-visible.json"/>
+    <property name="disguise_sprite" value="Cultist-03"/>
+    <property name="disguise_sprite_solved" value="Cultist-03-Pirate-F"/>
+    <property name="num_visible" type="int" value="2"/>
+   </properties>
+  </object>
+  <object id="4" name="see1" x="544" y="352" width="32" height="32">
+   <properties>
+    <property name="animate" type="bool" value="false"/>
+    <property name="constraint" type="bool" value="true"/>
+    <property name="conversation_file" value="disguise-visible.json"/>
+    <property name="conversation_file_solved" value="disguise-solved-visible.json"/>
+    <property name="disguise_sprite" value="Cultist-03"/>
+    <property name="disguise_sprite_solved" value="Cultist-03-Pirate-F"/>
+    <property name="num_visible" type="int" value="2"/>
+   </properties>
+  </object>
+  <object id="9" name="count1" x="448" y="288" width="32" height="32">
+   <properties>
+    <property name="animate" type="bool" value="false"/>
+    <property name="constraint" type="bool" value="true"/>
+    <property name="conversation_file" value="disguise-count.json"/>
+    <property name="conversation_file_solved" value="disguise-solved-count.json"/>
+    <property name="disguise_sprite" value="Cultist-02"/>
+    <property name="disguise_sprite_solved" value="Cultist-02-Ruby"/>
+    <property name="num_bridges" type="int" value="1"/>
+   </properties>
+  </object>
+  <object id="10" name="count1" x="480" y="448" width="32" height="32">
+   <properties>
+    <property name="constraint" type="bool" value="true"/>
+    <property name="num_bridges" type="int" value="1"/>
+   </properties>
+  </object>
+  <object id="11" name="count2" x="352" y="352" width="32" height="32">
+   <properties>
+    <property name="animate" type="bool" value="false"/>
+    <property name="constraint" type="bool" value="true"/>
+    <property name="conversation_file" value="disguise-count.json"/>
+    <property name="conversation_file_solved" value="disguise-solved-count.json"/>
+    <property name="disguise_sprite" value="Cultist-02"/>
+    <property name="disguise_sprite_solved" value="Cultist-02-Ruby"/>
+    <property name="num_bridges" type="int" value="2"/>
+   </properties>
+  </object>
+  <object id="5" name="see3" x="544" y="416" width="32" height="32">
+   <properties>
+    <property name="animate" type="bool" value="false"/>
+    <property name="constraint" type="bool" value="true"/>
+    <property name="conversation_file" value="disguise-visible.json"/>
+    <property name="conversation_file_solved" value="disguise-solved-visible.json"/>
+    <property name="disguise_sprite" value="Cultist-03"/>
+    <property name="disguise_sprite_solved" value="Cultist-03-Pirate-F"/>
+    <property name="num_visible" type="int" value="2"/>
+   </properties>
+  </object>
+  <object id="6" name="pass3" x="448" y="352" width="32" height="32">
+   <properties>
+    <property name="animate" type="bool" value="false"/>
+    <property name="constraint" type="bool" value="true"/>
+    <property name="conversation_file" value="disguise-pass.json"/>
+    <property name="conversation_file_solved" value="disguise-solved-pass.json"/>
+    <property name="direction" value="adjacent"/>
+    <property name="disguise_sprite" value="Cultist-01"/>
+    <property name="disguise_sprite_solved" value="Cultist-01-Pirate-M"/>
+    <property name="num_passing" type="int" value="3"/>
+   </properties>
+  </object>
+  <object id="7" name="pass2" x="416" y="448" width="32" height="32">
+   <properties>
+    <property name="animate" type="bool" value="false"/>
+    <property name="constraint" type="bool" value="true"/>
+    <property name="conversation_file" value="disguise-pass.json"/>
+    <property name="conversation_file_solved" value="disguise-solved-pass.json"/>
+    <property name="direction" value="adjacent"/>
+    <property name="disguise_sprite" value="Cultist-01"/>
+    <property name="disguise_sprite_solved" value="Cultist-01-Pirate-M"/>
+    <property name="num_passing" type="int" value="2"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="11" name="sceneTransitions">
+  <object id="14" name="entrance" x="448" y="544" width="32" height="32"/>
+ </objectgroup>
+</map>

@@ -22,20 +22,20 @@ export class OverworldGameState {
 
     /** Jewels the player has collected, keyed by colour (e.g. 'red'). */
     private collectedJewels: Map<string, number> = new Map();
-    
+
     // FlowPuzzle-specific state
     /** Track solved FlowPuzzles and their edge outputs (local coordinates) */
     private flowPuzzleOutputs: Map<string, { x: number; y: number }[]> = new Map();
-    
+
     /** Cache of computed edge inputs for each FlowPuzzle (local coordinates) */
     private flowPuzzleInputs: Map<string, { x: number; y: number }[]> = new Map();
-    
+
     /** Current water state of overworld river tiles (world tile coordinates) */
     private overworldWaterState: Set<GridKey> = new Set();
-    
+
     /** Instance of water propagation engine */
     private waterPropagation?: WaterPropagationEngine;
-    
+
     /** Reference to overworld puzzle manager (for bounds lookup) */
     private puzzleManager?: OverworldPuzzleManager;
 
@@ -44,6 +44,29 @@ export class OverworldGameState {
 
     /** Tracks all currently-displayed glyph sets for Translation Mode. */
     readonly glyphTracker: ActiveGlyphTracker = new ActiveGlyphTracker();
+
+    // -----------------------------------------------------------------------
+    // Interior scene tracking (for save/restore across cold starts)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Map key of the interior the player is currently inside, or undefined when
+     * the player is in the overworld.  Persisted so that a cold-start reload can
+     * resume inside the correct building.
+     */
+    private currentInteriorID?: string;
+
+    /**
+     * Player pixel-X when the overworld was last left to enter an interior.
+     * Used by OverworldScene to restore the player's position on return.
+     */
+    private interiorReturnX?: number;
+
+    /**
+     * Player pixel-Y when the overworld was last left to enter an interior.
+     * Used by OverworldScene to restore the player's position on return.
+     */
+    private interiorReturnY?: number;
 
     /**
      * Set the currently active overworld puzzle
@@ -110,10 +133,12 @@ export class OverworldGameState {
      */
     markPuzzleCompleted(puzzleId: string): void {
         console.log(`OverworldGameState: Marking puzzle ${puzzleId} as completed`);
-        this.completedPuzzles.add(puzzleId);
 
-        // Remove from progress since it's completed
-        this.puzzleProgress.delete(puzzleId);
+        if (this.activePuzzleId === puzzleId && this.activePuzzleState) {
+            this.puzzleProgress.set(puzzleId, this.activePuzzleState);
+        }
+
+        this.completedPuzzles.add(puzzleId);
     }
 
     /**
@@ -180,6 +205,46 @@ export class OverworldGameState {
      */
     getUnlockedDoors(): string[] {
         return Array.from(this.unlockedDoors);
+    }
+
+    // -----------------------------------------------------------------------
+    // Interior scene tracking
+    // -----------------------------------------------------------------------
+
+    /**
+     * Mark the player as having entered an interior building.
+     *
+     * @param interiorID  Map key of the interior (e.g. `'house'`).
+     * @param returnX     Overworld pixel-X where the player stood before entering.
+     * @param returnY     Overworld pixel-Y where the player stood before entering.
+     */
+    setCurrentInterior(interiorID: string, returnX: number, returnY: number): void {
+        this.currentInteriorID = interiorID;
+        this.interiorReturnX = returnX;
+        this.interiorReturnY = returnY;
+    }
+
+    /** Mark the player as having returned to the overworld. */
+    clearCurrentInterior(): void {
+        this.currentInteriorID = undefined;
+        this.interiorReturnX = undefined;
+        this.interiorReturnY = undefined;
+    }
+
+    /** Returns the interior map key if the player is inside a building, else undefined. */
+    getCurrentInteriorID(): string | undefined {
+        return this.currentInteriorID;
+    }
+
+    /**
+     * Returns the overworld position the player should be placed at on return
+     * from an interior, or undefined if no interior is recorded.
+     */
+    getInteriorReturnPosition(): { x: number; y: number } | undefined {
+        if (this.interiorReturnX === undefined || this.interiorReturnY === undefined) {
+            return undefined;
+        }
+        return { x: this.interiorReturnX, y: this.interiorReturnY };
     }
 
     // -----------------------------------------------------------------------
@@ -261,13 +326,18 @@ export class OverworldGameState {
         this.completedPuzzles.clear();
         this.unlockedDoors.clear();
         this.collectedJewels.clear();
-        
+
         // Reset FlowPuzzle state
         this.flowPuzzleOutputs.clear();
         this.flowPuzzleInputs.clear();
         this.overworldWaterState.clear();
+
+        // Reset interior tracking
+        this.currentInteriorID = undefined;
+        this.interiorReturnX = undefined;
+        this.interiorReturnY = undefined;
     }
-    
+
     /**
      * Initialize water propagation system with river channels and puzzle manager.
      * Called once at game load after Tiled map is parsed.
@@ -280,7 +350,7 @@ export class OverworldGameState {
         this.puzzleManager = puzzleManager;
         console.log('OverworldGameState: Water propagation initialized');
     }
-    
+
     /**
      * Update water propagation when a FlowPuzzle's state changes.
      * Returns the tiles that changed state (for view updates).
@@ -306,7 +376,7 @@ export class OverworldGameState {
                 affectedPuzzles: new Map()
             };
         }
-        
+
         // 1. Get puzzle bounds (in pixel coordinates)
         const bounds = this.puzzleManager.getPuzzleBounds(puzzleId);
         if (!bounds) {
@@ -317,7 +387,7 @@ export class OverworldGameState {
                 affectedPuzzles: new Map()
             };
         }
-        
+
         // Convert pixel bounds to tile bounds (assuming 32px tile size)
         const TILE_SIZE = 32;
         const tileBounds = {
@@ -326,45 +396,45 @@ export class OverworldGameState {
             width: Math.floor(bounds.width / TILE_SIZE),
             height: Math.floor(bounds.height / TILE_SIZE)
         };
-        
+
         // 2. Get edge outputs from puzzle (local coordinates)
         const localOutputs = puzzle.getEdgeOutput();
-        
+
         // 3. Store outputs for this puzzle
         this.flowPuzzleOutputs.set(puzzleId, localOutputs);
-        
+
         // 4. Compute propagation through river channels
         const propagation = this.waterPropagation.computePropagation(
             puzzleId,
             localOutputs.map(o => ({ localX: o.x, localY: o.y })),
             tileBounds
         );
-        
+
         // 5. Update overworld water state
         // Add new flooded tiles
         for (const tile of propagation.flooded) {
             this.overworldWaterState.add(tile);
         }
-        
+
         // Remove drained tiles
         for (const tile of propagation.drained) {
             this.overworldWaterState.delete(tile);
         }
-        
+
         // 6. Update edge inputs for affected puzzles
         for (const [targetPuzzleId, inputs] of propagation.downstreamInputs) {
             this.flowPuzzleInputs.set(targetPuzzleId, inputs);
         }
-        
+
         console.log(`OverworldGameState: Updated water state for ${puzzleId} - flooded: ${propagation.flooded.size}, drained: ${propagation.drained.size}`);
-        
+
         return {
             flooded: propagation.flooded,
             drained: propagation.drained,
             affectedPuzzles: propagation.downstreamInputs
         };
     }
-    
+
     /**
      * Get computed edge inputs for a FlowPuzzle when it's entered.
      * Used by controller to call puzzle.setEdgeInputs().
@@ -372,7 +442,7 @@ export class OverworldGameState {
     getFlowPuzzleInputs(puzzleId: string): { x: number; y: number }[] {
         return this.flowPuzzleInputs.get(puzzleId) ?? [];
     }
-    
+
     /**
      * Check if a world tile currently has water.
      * Coordinates are in world tile units.
@@ -380,7 +450,7 @@ export class OverworldGameState {
     tileHasWater(worldTileX: number, worldTileY: number): boolean {
         return this.overworldWaterState.has(gridKey(worldTileX, worldTileY));
     }
-    
+
     /**
      * Get all world tiles that currently have water (as GridKeys).
      */
@@ -400,6 +470,9 @@ export class OverworldGameState {
         flowPuzzleInputs: Record<string, { x: number; y: number }[]>;
         overworldWaterState: string[];
         translationDictionary: Record<string, string>;
+        currentInteriorID?: string;
+        interiorReturnX?: number;
+        interiorReturnY?: number;
     } {
         const puzzleProgressObj: Record<string, any> = {};
         for (const [id, puzzle] of this.puzzleProgress) {
@@ -427,6 +500,9 @@ export class OverworldGameState {
                     ([frame, text]) => [String(frame), text]
                 )
             ),
+            currentInteriorID: this.currentInteriorID,
+            interiorReturnX: this.interiorReturnX,
+            interiorReturnY: this.interiorReturnY,
         };
     }
 
@@ -443,6 +519,9 @@ export class OverworldGameState {
         flowPuzzleInputs?: Record<string, { x: number; y: number }[]>;
         overworldWaterState?: string[];
         translationDictionary?: Record<string, string>;
+        currentInteriorID?: string;
+        interiorReturnX?: number;
+        interiorReturnY?: number;
     }): void {
         console.log('OverworldGameState: Importing state');
 
@@ -469,6 +548,11 @@ export class OverworldGameState {
                 this.translationDictionary.setTranslation(Number(frameStr), text);
             }
         }
+
+        // Interior tracking
+        this.currentInteriorID = state.currentInteriorID;
+        this.interiorReturnX = state.interiorReturnX;
+        this.interiorReturnY = state.interiorReturnY;
 
         // Note: puzzleProgress would need to be reconstructed as BridgePuzzle objects
         // This is left as a future enhancement when persistence is fully implemented

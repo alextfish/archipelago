@@ -227,4 +227,38 @@ describe('CollisionManager', () => {
             );
         });
     });
+
+    describe('resetFlowTilesToWalkableLow', () => {
+        it('should not require isPermanentlyBlocked on the host', () => {
+            const hostWithoutPermanentBlockCheck = {
+                getCollisionAt: vi.fn().mockReturnValue(CollisionType.BLOCKED),
+                setCollisionAt: vi.fn(),
+            };
+            const manager = new CollisionManager(hostWithoutPermanentBlockCheck);
+
+            expect(() => {
+                manager.resetFlowTilesToWalkableLow([{ tileX: 4, tileY: 7 }]);
+            }).not.toThrow();
+
+            expect(hostWithoutPermanentBlockCheck.setCollisionAt).toHaveBeenCalledWith(
+                4,
+                7,
+                CollisionType.WALKABLE_LOW
+            );
+        });
+
+        it('should leave permanently blocked tiles unchanged', () => {
+            const hostWithPermanentBlockCheck = {
+                getCollisionAt: vi.fn().mockReturnValue(CollisionType.BLOCKED),
+                setCollisionAt: vi.fn(),
+                isPermanentlyBlocked: vi.fn().mockReturnValue(true),
+            };
+            const manager = new CollisionManager(hostWithPermanentBlockCheck);
+
+            manager.resetFlowTilesToWalkableLow([{ tileX: 2, tileY: 3 }]);
+
+            expect(hostWithPermanentBlockCheck.isPermanentlyBlocked).toHaveBeenCalledWith(2, 3);
+            expect(hostWithPermanentBlockCheck.setCollisionAt).not.toHaveBeenCalled();
+        });
+    });
 });

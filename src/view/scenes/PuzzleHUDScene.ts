@@ -131,7 +131,7 @@ export class PuzzleHUDScene extends Phaser.Scene {
      * Setup HUD for a specific puzzle type
      * Called by PuzzleHUDManager when entering puzzle mode
      */
-    setupForPuzzle(_controller: PuzzleController, puzzleType: 'overworld' | 'bridge'): void {
+    setupForPuzzle(_controller: PuzzleController, puzzleType: 'overworld' | 'bridge', worldScene?: Phaser.Scene): void {
         console.log(`PuzzleHUDScene: Setting up for ${puzzleType} puzzle`);
 
         // Show background only for bridge puzzles (series/standalone)
@@ -147,7 +147,7 @@ export class PuzzleHUDScene extends Phaser.Scene {
         // Get the source scene for events (different for each puzzle type)
         const sourceScene = puzzleType === 'bridge'
             ? this.scene.get('BridgePuzzleScene')
-            : this.scene.get('OverworldScene');
+            : (worldScene ?? this.scene.get('OverworldScene'));
 
         if (!sourceScene) {
             console.error(`PuzzleHUDScene: Could not find source scene for ${puzzleType}`);

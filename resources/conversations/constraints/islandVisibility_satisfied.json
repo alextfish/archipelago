@@ -5,7 +5,7 @@
     "main": {
       "npc": {
         "expression": "happy",
-        "glyphs": "{{count}} island connected exclamation happy"
+        "glyphs": "happy exclamation. {{count}} island connected"
       },
       "choices": [
         {

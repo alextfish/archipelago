@@ -65,6 +65,7 @@ export class CollectibleManager {
         for (const colour of colours) {
             const textureKey = `jewel-${colour}`;
             if (!this.scene.textures.exists(textureKey)) continue;
+            if (this.scene.anims.exists(`${textureKey}-anim`)) continue;
             this.scene.anims.create({
                 key: `${textureKey}-anim`,
                 frames: this.scene.anims.generateFrameNumbers(textureKey, { start: 0, end: 3 }),

@@ -10,7 +10,23 @@ export const MAX_TEST_DURATION = 60000;  // 1 minute maximum
 export const IDLE_TIMEOUT = 10000;       // 10 seconds of no activity
 export const ACTIVITY_CHECK_INTERVAL = 1000; // Check every second
 
-export const DEV_PORT = 5173; // Port where Vite serves the test page
+export const DEV_PORT = 5173; // Default port where Vite serves the test page
+
+function resolveBaseURL(baseURL) {
+    if (baseURL) {
+        return baseURL;
+    }
+
+    if (process.env.TEST_BASE_URL) {
+        return process.env.TEST_BASE_URL;
+    }
+
+    if (process.env.TEST_PORT) {
+        return `http://localhost:${process.env.TEST_PORT}`;
+    }
+
+    return `http://localhost:${DEV_PORT}`;
+}
 
 /**
  * Initialize a browser test session
@@ -23,6 +39,8 @@ export const DEV_PORT = 5173; // Port where Vite serves the test page
  */
 export async function initTest(config) {
     console.log(`[TEST: ${config.name}] Starting automated test...`);
+
+    const baseURL = resolveBaseURL(config.baseURL);
 
     const testStartTime = Date.now();
     const lastActivityTime = { value: Date.now() };
@@ -105,7 +123,8 @@ export async function initTest(config) {
         browser,
         page,
         cleanup,
-        lastActivityTime
+        lastActivityTime,
+        baseURL,
     };
 }
 
@@ -113,15 +132,17 @@ export async function initTest(config) {
  * Navigate to test.html and wait for game to load
  * @param {Object} page - Playwright page
  */
-export async function navigateAndWaitForLoad(page) {
+export async function navigateAndWaitForLoad(page, baseURL) {
     console.log('[TEST] Opening test.html...');
+
+    const resolvedBaseURL = resolveBaseURL(baseURL);
 
     // Listen for page errors
     page.on('pageerror', (error) => {
         console.error('[BROWSER ERROR]', error.message);
     });
 
-    await page.goto(`http://localhost:${DEV_PORT}/test.html`);
+    await page.goto(`${resolvedBaseURL}/test.html`);
 
     // Wait for Phaser to be available
     console.log('[TEST] Waiting for game to load...');

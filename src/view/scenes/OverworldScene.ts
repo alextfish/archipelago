@@ -31,6 +31,7 @@ import { TileAnimationManager } from '@view/TileAnimationManager';
 import { loadNPCSprites } from '@view/NPCSpriteHelper';
 import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
 import type { PlayerStartPosition } from '@model/overworld/PlayerStartManager';
+import { SceneTransitionCoordinator } from '@view/SceneTransitionCoordinator';
 import { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 import { CollisionInitialiser } from '@model/overworld/CollisionInitialiser';
 import { FlowWaterVisualManager } from '@view/FlowWaterVisualManager';
@@ -39,6 +40,8 @@ import { CollectibleManager } from '@view/CollectibleManager';
 import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
 import { NPCSpriteController } from '@view/NPCSpriteController';
 import { ConversationVariableSubstitutor } from '@model/conversation/ConversationVariableSubstitutor';
+import { PortalManager } from '@view/PortalManager';
+import { buildPuzzleEntryInteractables, createBridgesLayer, isPuzzleEntryTile } from '@view/MapPuzzleSceneHelpers';
 
 /**
  * Depth value for overhead layers (roofs, canopies, etc.) that should always
@@ -110,6 +113,13 @@ export class OverworldScene extends Phaser.Scene {
   /** Manages regular NPC sprites, series states, and icon badges. */
   private npcSpriteController?: NPCSpriteController;
 
+  // Portal (scene-transition hotspot) system
+  private portalManager?: PortalManager;
+  /** Tile-keyed callbacks fired when the player first steps onto a tile. */
+  private readonly stepHotspots: Map<string, () => void> = new Map();
+  /** Tile key of the last tile the step-hotspot system was checked against. */
+  private lastCheckedTile: string = '';
+
   // Player start position management
   private playerStartManager?: PlayerStartManager;
 
@@ -174,7 +184,6 @@ export class OverworldScene extends Phaser.Scene {
     });
 
     // Compass overlay art is not finalised yet, so do not queue the texture here.
-
     // Load NPC icon sprites
     this.load.image(NPCIconConfig.INCOMPLETE, 'resources/sprites/icon-incomplete.png');
     this.load.image(NPCIconConfig.COMPLETE, 'resources/sprites/icon-complete.png');
@@ -263,6 +272,8 @@ export class OverworldScene extends Phaser.Scene {
           if (tileset.image.startsWith('../')) {
             // Remove ../ prefix
             imagePath = tileset.image.substring(3);
+          } else if (tileset.image.startsWith('sprites/')) {
+            imagePath = `resources/${tileset.image}`;
           } else if (tileset.image.startsWith('tilesets/')) {
             // Already has tilesets/ prefix, just add resources/
             imagePath = `resources/${tileset.image}`;
@@ -379,6 +390,14 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   create() {
+    // Load persisted game state from localStorage (best-effort; no-op if absent)
+    this.loadGameState();
+
+    // Listen for the wake event so we can handle returns from InteriorScene
+    this.events.on('wake', (_sys: unknown, data?: { returnPlayerX?: number; returnPlayerY?: number }) => {
+      this.onWake(data);
+    });
+
     // Wait for map loading if needed
     if (!this.cache.tilemap.exists('overworldMap')) {
       console.log('Waiting for map to load...');
@@ -577,8 +596,48 @@ export class OverworldScene extends Phaser.Scene {
       this.gameState.collectJewel('green');
       this.overworldHUD?.refreshJewelHUD();
 
+      // Load portals from the Tiled map and register them as step hotspots
+      this.portalManager = new PortalManager(
+        this,
+        this.tiledMapData,
+        this.map,
+        this.gameState,
+        this.seriesManager,
+        () => this.player ?? null,
+        () => this.playerController,
+        () => this.overworldHUD,
+        (tx, ty, cb) => this.registerStepHotspot(tx, ty, cb),
+        () => this.saveGameState(),
+      );
+      this.portalManager.loadPortals();
+
     } catch (error) {
       console.error('Failed to initialize overworld puzzles:', error);
+    }
+
+    // Cold-start interior resume — runs after puzzle init completes (or even if
+    // parts of it failed) so the player can still re-enter their building.
+    try {
+      const resumeInteriorID = this.gameState.getCurrentInteriorID();
+      if (resumeInteriorID) {
+        console.log(`[OverworldScene] Resuming inside interior "${resumeInteriorID}"`);
+        this.gameMode = 'exploration';
+        this.gameState.clearActivePuzzle();
+        PuzzleHUDManager.getInstance().exitPuzzle();
+        this.scene.setVisible(false, 'PuzzleHUDScene');
+        this.playerController?.setEnabled(false);
+        this.overworldHUD?.setWarpButtonVisible(false);
+        this.scene.launch('InteriorScene', {
+          mapKey: resumeInteriorID,
+          spawnID: undefined,
+          gameState: this.gameState,
+          seriesManager: this.seriesManager,
+          saveStateCallback: () => this.saveGameState(),
+        });
+        this.scene.sleep('OverworldScene');
+      }
+    } catch (error) {
+      console.error('[OverworldScene] Failed to resume inside interior on cold start:', error);
     }
   }
 
@@ -848,8 +907,20 @@ export class OverworldScene extends Phaser.Scene {
         this.playerStartManager,
         (start) => this.warpToStart(start),
         () => this.gameState.getOverworldDisplayItems(),
+        () => this.resetSavedStateAndReload(),
       );
     }
+  }
+
+  private resetSavedStateAndReload(): void {
+    try {
+      localStorage.removeItem('archipelago_game_state');
+      console.log('[OverworldScene] Cleared saved game state');
+    } catch (error) {
+      console.warn('[OverworldScene] Failed to clear saved game state:', error);
+    }
+
+    window.location.reload();
   }
 
   /**
@@ -883,41 +954,14 @@ export class OverworldScene extends Phaser.Scene {
       return;
     }
 
-    // Get all puzzle definitions
-    const puzzles = this.puzzleManager.getAllPuzzles();
-
-    // For each puzzle, add its entry tiles as interactables
-    for (const [puzzleId] of puzzles) {
-      const definition = this.puzzleManager.getPuzzleDefinitionById(puzzleId);
-      if (!definition) continue;
-
-      // Get the puzzle bounds in tile coordinates
-      const bounds = this.puzzleManager.getPuzzleBounds(puzzleId);
-      if (!bounds) continue;
-
-      const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(bounds.x, bounds.y);
-      const width = Math.ceil(bounds.width / this.tiledMapData.tilewidth);
-      const height = Math.ceil(bounds.height / this.tiledMapData.tileheight);
-
-      // Add all tiles in the puzzle area as potential entry points
-      // (We'll validate actual entry tiles when attempting to enter)
-      for (let dy = 0; dy < height; dy++) {
-        for (let dx = 0; dx < width; dx++) {
-          const entryTileX = tileX + dx;
-          const entryTileY = tileY + dy;
-
-          // Check if this is actually a valid entry tile
-          if (this.isPuzzleEntryTile(entryTileX, entryTileY)) {
-            this.interactables.push({
-              type: 'puzzle',
-              tileX: entryTileX,
-              tileY: entryTileY,
-              data: { puzzleId }
-            });
-          }
-        }
-      }
-    }
+    this.interactables.push(
+      ...buildPuzzleEntryInteractables(
+        this.puzzleManager,
+        this.tiledMapData,
+        this.gridMapper,
+        this.map,
+      )
+    );
 
     // Load NPCs from the "npcs" object layer
     this.loadNPCs();
@@ -1169,7 +1213,7 @@ export class OverworldScene extends Phaser.Scene {
 
     if (bridgesLayerData) {
       console.log(`Creating bridges layer with tilesets`);
-      const bridgesLayer = this.map.createLayer(OverworldBridgeManager.getBridgesLayerName(), tilesets);
+      const bridgesLayer = createBridgesLayer(this.map, tilesets);
 
       if (bridgesLayer) {
         this.bridgesLayer = bridgesLayer;
@@ -1303,6 +1347,10 @@ export class OverworldScene extends Phaser.Scene {
     // Only handle player movement in exploration mode
     if (this.gameMode === 'exploration' && this.playerController) {
       this.playerController.update();
+      this.overworldHUD?.setPlayerLayerDisplay(this.playerController.getPlayerLayer());
+
+      // Check step hotspots (e.g. portal entrances) — fires at most once per new tile
+      this.checkStepHotspots();
 
       // Update interaction cursor based on player position
       if (this.interactionCursor && this.tiledMapData && this.player) {
@@ -1320,6 +1368,118 @@ export class OverworldScene extends Phaser.Scene {
       if (this.roofManager && this.player) {
         this.roofManager.update(this.player.x, this.player.y);
       }
+    }
+  }
+
+  /**
+   * Register a tile-based step hotspot.
+   * The callback fires exactly once the first time the player steps onto the
+   * named tile.  PortalManager (and other managers) use this to trigger
+   * automatic scene transitions without needing to poll on every frame.
+   */
+  public registerStepHotspot(tileX: number, tileY: number, callback: () => void): void {
+    this.stepHotspots.set(`${tileX},${tileY}`, callback);
+  }
+
+  /**
+   * Check whether the player has moved onto a new tile that has a registered
+   * step hotspot, and fire the callback if so.
+   * Called every exploration-mode frame, but each hotspot fires at most once
+   * per tile entry (tracking via {@link lastCheckedTile}).
+   */
+  private checkStepHotspots(): void {
+    if (!this.player || !this.tiledMapData) return;
+    const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
+    const tileKey = `${tileX},${tileY}`;
+    if (tileKey !== this.lastCheckedTile) {
+      this.lastCheckedTile = tileKey;
+      const callback = this.stepHotspots.get(tileKey);
+      if (callback) callback();
+    }
+  }
+
+  /**
+   * Called when OverworldScene wakes (e.g. after returning from InteriorScene).
+   * Repositions the player, re-enables movement, and restores the warp button.
+   */
+  private onWake(data?: { returnPlayerX?: number; returnPlayerY?: number; fadeInDurationMs?: number }): void {
+    const logWakeComplete = (): void => {
+      console.log('[OverworldScene] Woke from interior; player controls restored');
+    };
+
+    // Reposition the player at the tile they stood on before entering the building
+    if (data?.returnPlayerX !== undefined && data?.returnPlayerY !== undefined) {
+      this.player?.setPosition(data.returnPlayerX, data.returnPlayerY);
+    }
+
+    // Clear the "inside interior" flag now that we're back in the overworld
+    this.gameState.clearCurrentInterior();
+
+    // Show the warp button again
+    this.overworldHUD?.setWarpButtonVisible(true);
+
+    // Persist the cleared interior state
+    this.saveGameState();
+
+    // Reset step-hotspot tracking to the current tile so the player doesn't
+    // immediately re-trigger the portal they just exited if it happens to be
+    // on or near their return position.
+    if (this.player && this.tiledMapData) {
+      const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
+      this.lastCheckedTile = `${tileX},${tileY}`;
+    } else {
+      this.lastCheckedTile = '';
+    }
+
+    if (data?.fadeInDurationMs) {
+      const hud = this.overworldHUD;
+      if (hud) {
+        void SceneTransitionCoordinator.fadeInAndEnable({
+          scene: this,
+          playerController: this.playerController,
+          hud,
+          onEnable: () => {
+            this.isPointerHeld = false;
+          },
+        }, data.fadeInDurationMs).then(() => {
+          logWakeComplete();
+        });
+        return;
+      }
+    }
+
+    SceneTransitionCoordinator.enableInteraction({
+      scene: this,
+      playerController: this.playerController,
+      onEnable: () => {
+        this.isPointerHeld = false;
+      },
+    });
+    logWakeComplete();
+  }
+
+  // ── Persistence helpers ───────────────────────────────────────────────────
+
+  /** Persist the current game state to localStorage. */
+  public saveGameState(): void {
+    try {
+      const data = this.gameState.exportState();
+      localStorage.setItem('archipelago_game_state', JSON.stringify(data));
+    } catch (e) {
+      console.warn('[OverworldScene] Failed to save game state:', e);
+    }
+  }
+
+  /** Load previously persisted game state from localStorage (best-effort). */
+  private loadGameState(): void {
+    try {
+      const saved = localStorage.getItem('archipelago_game_state');
+      if (saved) {
+        this.gameState.importState(JSON.parse(saved));
+        console.log('[OverworldScene] Game state loaded from localStorage');
+      }
+    } catch (e) {
+      console.warn('[OverworldScene] Failed to load game state:', e);
     }
   }
 
@@ -1859,17 +2019,7 @@ export class OverworldScene extends Phaser.Scene {
       return false;
     }
 
-    // Get all layers and check for tiles with puzzleStart property
-    for (const layer of this.map.layers) {
-      if (layer.tilemapLayer) {
-        const tile = layer.tilemapLayer.getTileAt(tileX, tileY);
-        if (tile && tile.properties && tile.properties.puzzleStart === true) {
-          return true;
-        }
-      }
-    }
-
-    return false;
+    return isPuzzleEntryTile(this.map, tileX, tileY);
   }
 
   /**

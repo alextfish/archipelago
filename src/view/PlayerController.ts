@@ -74,6 +74,10 @@ export class PlayerController {
      * Create animations for player character
      */
     private createPlayerAnimations(): void {
+        if (this.scene.anims.exists('walk-up')) {
+            return;
+        }
+
         // Walking up animations (frames 0-2)
         this.scene.anims.create({
             key: 'walk-up',

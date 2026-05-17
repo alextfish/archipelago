@@ -1,34 +1,39 @@
 import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import type { Bridge } from '@model/puzzle/Bridge';
-import type { OverworldScene } from '@view/scenes/OverworldScene';
 import type { Door } from '@model/overworld/Door';
 import { CollisionType } from '@model/overworld/CollisionTypes';
 
 // Re-export CollisionType so existing callers that import it from this module continue to work.
 export { CollisionType } from '@model/overworld/CollisionTypes';
 
+export interface CollisionSceneHost {
+    getCollisionAt(tileX: number, tileY: number): CollisionType;
+    setCollisionAt(tileX: number, tileY: number, collisionType: CollisionType): void;
+    isPermanentlyBlocked?(tileX: number, tileY: number): boolean;
+}
+
 /**
- * Manages **runtime** collision state for the overworld during gameplay.
+ * Manages **runtime** collision state for a map scene during gameplay.
  *
  * Responsibilities:
  * - Storing and restoring the original collision state when the player enters / exits a puzzle
  * - Applying WALKABLE collision for newly placed bridges; restoring it when bridges are removed
  * - Updating collision for doors when they are locked or unlocked
  *
- * This is a stateful object with a live reference to OverworldScene.
+ * This is a stateful object with a live reference to a scene collision host.
  * It is distinct from CollisionTileClassifier, which is a pure, stateless helper used
  * once at map-load time to read tile properties from Tiled and build the initial
  * collision arrays.
  */
 export class CollisionManager {
-    private overworldScene: OverworldScene;
+    private sceneHost: CollisionSceneHost;
     private originalCollision: Map<string, CollisionType> = new Map();
     private puzzleBounds: Phaser.Geom.Rectangle | null = null;
     private tileSize: number = 32;
     private doors: Door[] = [];
 
-    constructor(overworldScene: OverworldScene) {
-        this.overworldScene = overworldScene;
+    constructor(sceneHost: CollisionSceneHost) {
+        this.sceneHost = sceneHost;
     }
 
     /**
@@ -60,7 +65,7 @@ export class CollisionManager {
         // Restore all stored collision states
         for (const [key, originalCollisionType] of this.originalCollision) {
             const [x, y] = key.split(',').map(Number);
-            this.overworldScene.setCollisionAt(x, y, originalCollisionType);
+            this.sceneHost.setCollisionAt(x, y, originalCollisionType);
         }
 
         // Clear stored state
@@ -73,7 +78,7 @@ export class CollisionManager {
      * Updates both the collision array and the appropriate collision layers.
      */
     setCollisionAt(tileX: number, tileY: number, collisionType: CollisionType): void {
-        this.overworldScene.setCollisionAt(tileX, tileY, collisionType);
+        this.sceneHost.setCollisionAt(tileX, tileY, collisionType);
     }
 
     /**
@@ -105,7 +110,7 @@ export class CollisionManager {
         for (const { tileX, tileY } of bridgeTiles) {
             const key = `${tileX},${tileY}`;
             const originalCollisionType = this.originalCollision.get(key) ?? CollisionType.WALKABLE;
-            this.overworldScene.setCollisionAt(tileX, tileY, originalCollisionType);
+            this.sceneHost.setCollisionAt(tileX, tileY, originalCollisionType);
         }
     }
 
@@ -120,7 +125,7 @@ export class CollisionManager {
         for (let tileY = startTileY; tileY < endTileY; tileY++) {
             for (let tileX = startTileX; tileX < endTileX; tileX++) {
                 const key = `${tileX},${tileY}`;
-                const originalCollisionType = this.overworldScene.getCollisionAt(tileX, tileY);
+                const originalCollisionType = this.sceneHost.getCollisionAt(tileX, tileY);
                 this.originalCollision.set(key, originalCollisionType);
             }
         }
@@ -138,7 +143,7 @@ export class CollisionManager {
 
         // Set walkable for each tile (bridges are always upper layer)
         for (const { tileX, tileY } of bridgeTiles) {
-            this.overworldScene.setCollisionAt(tileX, tileY, CollisionType.WALKABLE);
+            this.sceneHost.setCollisionAt(tileX, tileY, CollisionType.WALKABLE);
         }
     }
 
@@ -212,7 +217,7 @@ export class CollisionManager {
         const collisionType = locked ? CollisionType.BLOCKED : CollisionType.WALKABLE;
         console.log(`CollisionManager: Updating door ${door.id} collision: locked=${locked}, type=${collisionType}`);
         for (const pos of door.getPositions()) {
-            this.overworldScene.setCollisionAt(pos.tileX, pos.tileY, collisionType);
+            this.sceneHost.setCollisionAt(pos.tileX, pos.tileY, collisionType);
             console.log(`  Set collision at (${pos.tileX}, ${pos.tileY}) to ${collisionType}`);
         }
     }
@@ -227,9 +232,9 @@ export class CollisionManager {
      */
     applyFlowWaterCollision(wetWorldTiles: ReadonlyArray<{ tileX: number; tileY: number }>): void {
         for (const { tileX, tileY } of wetWorldTiles) {
-            const current = this.overworldScene.getCollisionAt(tileX, tileY);
+            const current = this.sceneHost.getCollisionAt(tileX, tileY);
             if (current !== CollisionType.ALWAYS_HIGH && current !== CollisionType.STAIRS) {
-                this.overworldScene.setCollisionAt(tileX, tileY, CollisionType.BLOCKED);
+                this.sceneHost.setCollisionAt(tileX, tileY, CollisionType.BLOCKED);
             }
         }
         console.log(`CollisionManager: Blocked ${wetWorldTiles.length} wet flow tiles`);
@@ -246,11 +251,11 @@ export class CollisionManager {
      */
     resetFlowTilesToWalkableLow(flowTiles: ReadonlyArray<{ tileX: number; tileY: number }>): void {
         for (const { tileX, tileY } of flowTiles) {
-            const current = this.overworldScene.getCollisionAt(tileX, tileY);
+            const current = this.sceneHost.getCollisionAt(tileX, tileY);
             if (current !== CollisionType.ALWAYS_HIGH &&
                 current !== CollisionType.STAIRS &&
-                !this.overworldScene.isPermanentlyBlocked(tileX, tileY)) {
-                this.overworldScene.setCollisionAt(tileX, tileY, CollisionType.WALKABLE_LOW);
+                !this.sceneHost.isPermanentlyBlocked?.(tileX, tileY)) {
+                this.sceneHost.setCollisionAt(tileX, tileY, CollisionType.WALKABLE_LOW);
             }
         }
         console.log(`CollisionManager: Reset ${flowTiles.length} flow tiles to WALKABLE_LOW`);

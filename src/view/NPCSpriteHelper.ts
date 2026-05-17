@@ -62,7 +62,6 @@ export function loadNPCSprites(loader: Phaser.Loader.LoaderPlugin): void {
     loader.image('LyubaCleric', 'resources/sprites/LyubaCleric.png');
 
     // Compass overlay art is not finalised yet, so do not queue the texture here.
-
     // Background characters
     loader.image('Mage1', 'resources/sprites/Mage1.png');
     loader.image('Mage2', 'resources/sprites/Mage2.png');
