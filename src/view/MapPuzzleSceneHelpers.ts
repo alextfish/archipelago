@@ -65,9 +65,18 @@ export function createBridgesLayer(
     tilesets: Phaser.Tilemaps.Tileset[],
 ): Phaser.Tilemaps.TilemapLayer | null {
     const bridgesLayerData = map.getLayer(OverworldBridgeManager.getBridgesLayerName());
-    if (!bridgesLayerData) {
-        return null;
+    if (bridgesLayerData) {
+        return map.createLayer(OverworldBridgeManager.getBridgesLayerName(), tilesets) ?? null;
     }
 
-    return map.createLayer(OverworldBridgeManager.getBridgesLayerName(), tilesets) ?? null;
+    return map.createBlankLayer(
+        OverworldBridgeManager.getBridgesLayerName(),
+        tilesets,
+        0,
+        0,
+        map.width,
+        map.height,
+        map.tileWidth,
+        map.tileHeight,
+    ) ?? null;
 }

@@ -852,8 +852,16 @@ export class InteriorScene extends Phaser.Scene {
         try {
             this.gameMode = 'conversation';
             let useSolvedConversation = false;
-            const state = this.npcSpriteController?.npcSeriesStates.get(npc.id);
-            useSolvedConversation = state?.isSeriesCompleted() ?? false;
+
+            if (npc.id.startsWith('constraint-')) {
+                const puzzleId = this.getConstraintPuzzleId(npc.id);
+                useSolvedConversation = puzzleId
+                    ? this.gameState.isPuzzleCompleted(puzzleId)
+                    : false;
+            } else {
+                const state = this.npcSpriteController?.npcSeriesStates.get(npc.id);
+                useSolvedConversation = state?.isSeriesCompleted() ?? false;
+            }
 
             const conversationPath = npc.getConversationPath(useSolvedConversation);
             const response = await fetch(conversationPath);
@@ -996,18 +1004,22 @@ export class InteriorScene extends Phaser.Scene {
             this.input.keyboard?.off('keydown-ESC', this.handleEscapeKey, this);
 
             const activePuzzleId = this.puzzleController.getCurrentPuzzleId();
-            if (activePuzzleId) {
-                this.constraintNPCManager?.showConstraintNPCsForPuzzle(activePuzzleId);
-            }
-
-            await this.puzzleController.exitPuzzle(success, (mode: 'exploration') => {
+            const exitResult = await this.puzzleController.exitPuzzle(success, (mode: 'exploration') => {
                 this.gameMode = mode;
                 this.cameras.main.startFollow(this.player);
             });
 
+            if (activePuzzleId) {
+                this.constraintNPCManager?.showConstraintNPCsForPuzzle(activePuzzleId);
+            }
+
             const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
             hud?.setJewelHUDVisible(true);
             this.playerController?.setEnabled(true);
+
+            if (exitResult.wasSolved || exitResult.wasUnsolved) {
+                this.saveStateCallback();
+            }
 
             if (this.pointerDownHandler) {
                 this.input.off('pointerdown', this.pointerDownHandler);
@@ -1027,6 +1039,25 @@ export class InteriorScene extends Phaser.Scene {
         } finally {
             this.isExitingPuzzle = false;
         }
+    }
+
+    private getConstraintPuzzleId(npcId: string): string | null {
+        if (!npcId.startsWith('constraint-')) {
+            return null;
+        }
+
+        const lastSeparator = npcId.lastIndexOf('-');
+        if (lastSeparator <= 'constraint-'.length) {
+            return null;
+        }
+
+        const withoutIslandId = npcId.substring(0, lastSeparator);
+        const typeSeparator = withoutIslandId.lastIndexOf('-');
+        if (typeSeparator <= 'constraint-'.length) {
+            return null;
+        }
+
+        return withoutIslandId.substring('constraint-'.length, typeSeparator);
     }
 
     private handleHUDExit(): void {

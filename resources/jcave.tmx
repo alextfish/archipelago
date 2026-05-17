@@ -536,6 +536,9 @@
    </properties>
   </tile>
  </tileset>
+ <tileset firstgid="326" name="SproutLandsGrassIslands" tilewidth="32" tileheight="32" tilecount="99" columns="11">
+  <image source="tilesets/SproutLandsGrassIslands.png" width="352" height="288"/>
+ </tileset>
  <layer id="4" name="lowground" width="30" height="20">
   <properties>
    <property name="autoRender" type="bool" value="true"/>
@@ -671,7 +674,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,41,0,40,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 </data>
  </layer>
- <layer id="7" name="collision" width="30" height="20" opacity="0.51">
+ <layer id="7" name="collision" width="30" height="20" opacity="0.29">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -774,7 +777,7 @@
     <property name="conversation_file_solved" value="disguise-solved-visible.json"/>
     <property name="disguise_sprite" value="Cultist-03"/>
     <property name="disguise_sprite_solved" value="Cultist-03-Pirate-F"/>
-    <property name="num_visible" type="int" value="2"/>
+    <property name="num_visible" type="int" value="1"/>
    </properties>
   </object>
   <object id="9" name="count1" x="448" y="288" width="32" height="32">
@@ -807,7 +810,7 @@
     <property name="conversation_file_solved" value="disguise-solved-visible.json"/>
     <property name="disguise_sprite" value="Cultist-03"/>
     <property name="disguise_sprite_solved" value="Cultist-03-Pirate-F"/>
-    <property name="num_visible" type="int" value="2"/>
+    <property name="num_visible" type="int" value="3"/>
    </properties>
   </object>
   <object id="6" name="pass3" x="448" y="352" width="32" height="32">

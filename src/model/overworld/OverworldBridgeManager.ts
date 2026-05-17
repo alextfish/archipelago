@@ -10,7 +10,10 @@ import { CollisionType } from './CollisionManager';
  */
 export class OverworldBridgeManager {
     private static readonly BRIDGES_LAYER_NAME = 'bridges';
-    private static readonly BRIDGE_TILESET_IMAGE = 'SproutLandsGrassIslands.png';
+    private static readonly BRIDGE_TILESET_IMAGES = [
+        'SproutLandsGrassIslands.png',
+        'terrains.png',
+    ] as const;
 
     private bridgeTilesetFirstGid: number = 0;
 
@@ -23,12 +26,15 @@ export class OverworldBridgeManager {
         private tiledMapData: any,
         private collisionManager: any // OverworldScene that has setCollisionAt method
     ) {
-        // Find the bridge tileset by searching for the image filename
+        // Find the bridge tileset by searching for a known bridge-capable image.
         this.bridgeTilesetFirstGid = this.findBridgeTilesetFirstGid();
         if (this.bridgeTilesetFirstGid > 0) {
             // fine
         } else {
-            console.error(`OverworldBridgeManager: Could not find tileset with image ${OverworldBridgeManager.BRIDGE_TILESET_IMAGE}`);
+            console.error(
+                `OverworldBridgeManager: Could not find a bridge tileset in ` +
+                `${OverworldBridgeManager.BRIDGE_TILESET_IMAGES.join(', ')}`
+            );
         }
     }
 
@@ -42,11 +48,15 @@ export class OverworldBridgeManager {
             return 0;
         }
 
-        for (const tilesetData of this.tiledMapData.tilesets) {
-            // Check if the tileset's image ends with our bridge tileset filename
-            if (tilesetData.image && tilesetData.image.endsWith(OverworldBridgeManager.BRIDGE_TILESET_IMAGE)) {
-                console.log(`OverworldBridgeManager: Found bridge tileset '${tilesetData.name}' with image ${tilesetData.image}`);
-                return tilesetData.firstgid;
+        for (const imageName of OverworldBridgeManager.BRIDGE_TILESET_IMAGES) {
+            for (const tilesetData of this.tiledMapData.tilesets) {
+                if (tilesetData.image && tilesetData.image.endsWith(imageName)) {
+                    console.log(
+                        `OverworldBridgeManager: Found bridge tileset '${tilesetData.name}' ` +
+                        `with image ${tilesetData.image}`
+                    );
+                    return tilesetData.firstgid;
+                }
             }
         }
 
