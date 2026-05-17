@@ -411,6 +411,7 @@ export class MapPuzzleExtractor {
 
         for (const layer of islandLayers) {
             const layerIslands = this.extractIslandsFromLayer(layer, definition, tiledMap, islandTileIDs);
+            console.log(`  Found ${layerIslands.length} islands in layer ${layer.name}`);
             islands.push(...layerIslands);
         }
 
@@ -534,6 +535,29 @@ export class MapPuzzleExtractor {
                     params: { islandId: island.id, count }
                 });
                 console.log(`Auto-added IslandVisibilityConstraint(${count}) for island ${island.id} in puzzle ${definition.id}`);
+            }
+        }
+
+        // Auto-add one IslandPassingBridgeCountConstraint per island that has
+        // both num_passing= and direction= from a Tiled constraint object.
+        for (const island of islands) {
+            const countRule = island.constraints?.find(c => c.startsWith('num_passing='));
+            if (!countRule) continue;
+
+            const directionRule = island.constraints?.find(c => c.startsWith('direction='));
+            if (!directionRule) {
+                //console.warn(`Island ${island.id} in puzzle ${definition.id} has num_passing but no direction; skipping IslandPassingBridgeCountConstraint`);
+                continue;
+            }
+
+            const count = parseInt(countRule.split('=')[1]);
+            const direction = directionRule.split('=')[1];
+            if (!isNaN(count)) {
+                constraints.push({
+                    type: 'IslandPassingBridgeCountConstraint',
+                    params: { islandId: island.id, direction, count }
+                });
+                console.log(`Auto-added IslandPassingBridgeCountConstraint(${count}, ${direction}) for island ${island.id} in puzzle ${definition.id}`);
             }
         }
 
@@ -863,6 +887,7 @@ export class MapPuzzleExtractor {
 
                 // Parse constraint properties
                 const props = this.extractObjectProperties(constraintObj);
+                const hasProp = (name: string): boolean => Object.prototype.hasOwnProperty.call(props, name);
 
                 // Cell-level constraints (MustHaveWater, EnclosedAreaSize) don't need a
                 // matching island — they are handled by extractCellConstraintsFromObjects.
@@ -880,7 +905,7 @@ export class MapPuzzleExtractor {
                 const constraints: string[] = [];
 
                 // Check for num_bridges property
-                if (props.num_bridges) {
+                if (hasProp('num_bridges')) {
                     const numBridges = parseInt(props.num_bridges);
                     if (!isNaN(numBridges)) {
                         constraints.push(`num_bridges=${numBridges}`);
@@ -889,13 +914,13 @@ export class MapPuzzleExtractor {
                 }
 
                 // Check for directional_constraint property
-                if (props.directional_constraint) {
+                if (hasProp('directional_constraint')) {
                     constraints.push(`directional_constraint=${props.directional_constraint}`);
                     console.log(`Applied directional_constraint=${props.directional_constraint} constraint to island ${island.id}`);
                 }
 
                 // Check for num_visible property
-                if (props.num_visible) {
+                if (hasProp('num_visible')) {
                     const numVisible = parseInt(props.num_visible);
                     if (!isNaN(numVisible)) {
                         constraints.push(`num_visible=${numVisible}`);
@@ -903,20 +928,34 @@ export class MapPuzzleExtractor {
                     }
                 }
 
+                // Check for num_passing and direction properties
+                if (hasProp('num_passing')) {
+                    const numPassing = parseInt(props.num_passing);
+                    if (!isNaN(numPassing)) {
+                        constraints.push(`num_passing=${numPassing}`);
+                        console.log(`Applied num_passing=${numPassing} constraint to island ${island.id}`);
+                    }
+                }
+
+                if (hasProp('direction')) {
+                    constraints.push(`direction=${props.direction}`);
+                    console.log(`Applied direction=${props.direction} constraint to island ${island.id}`);
+                }
+
                 // Disguise sprite and conversation overrides apply to any constraint type
-                if (props.disguise_sprite) {
+                if (hasProp('disguise_sprite')) {
                     constraints.push(`disguise_sprite=${props.disguise_sprite}`);
                     console.log(`Applied disguise_sprite=${props.disguise_sprite} to island ${island.id}`);
                 }
-                if (props.disguise_sprite_solved) {
+                if (hasProp('disguise_sprite_solved')) {
                     constraints.push(`disguise_sprite_solved=${props.disguise_sprite_solved}`);
                     console.log(`Applied disguise_sprite_solved=${props.disguise_sprite_solved} to island ${island.id}`);
                 }
-                if (props.conversation_file) {
+                if (hasProp('conversation_file')) {
                     constraints.push(`conversation_file=${props.conversation_file}`);
                     console.log(`Applied conversation_file=${props.conversation_file} to island ${island.id}`);
                 }
-                if (props.conversation_file_solved) {
+                if (hasProp('conversation_file_solved')) {
                     constraints.push(`conversation_file_solved=${props.conversation_file_solved}`);
                     console.log(`Applied conversation_file_solved=${props.conversation_file_solved} to island ${island.id}`);
                 }

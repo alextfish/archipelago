@@ -81,7 +81,7 @@ export class PlayerController {
         // Walking up animations (frames 0-2)
         this.scene.anims.create({
             key: 'walk-up',
-            frames: this.scene.anims.generateFrameNumbers('player', { start: 0, end: 2 }),
+            frames: this.scene.anims.generateFrameNumbers('player', { start: 6, end: 8 }),
             frameRate: 8,
             repeat: -1
         });
@@ -89,7 +89,7 @@ export class PlayerController {
         // Walking right animations (frames 3-5)
         this.scene.anims.create({
             key: 'walk-right',
-            frames: this.scene.anims.generateFrameNumbers('player', { start: 3, end: 5 }),
+            frames: this.scene.anims.generateFrameNumbers('player', { start: 9, end: 11 }),
             frameRate: 8,
             repeat: -1
         });
@@ -97,7 +97,7 @@ export class PlayerController {
         // Walking down animations (frames 6-8)
         this.scene.anims.create({
             key: 'walk-down',
-            frames: this.scene.anims.generateFrameNumbers('player', { start: 6, end: 8 }),
+            frames: this.scene.anims.generateFrameNumbers('player', { start: 0, end: 2 }),
             frameRate: 8,
             repeat: -1
         });
@@ -105,7 +105,7 @@ export class PlayerController {
         // Walking left animations (frames 9-11)
         this.scene.anims.create({
             key: 'walk-left',
-            frames: this.scene.anims.generateFrameNumbers('player', { start: 9, end: 11 }),
+            frames: this.scene.anims.generateFrameNumbers('player', { start: 3, end: 5 }),
             frameRate: 8,
             repeat: -1
         });
@@ -113,25 +113,25 @@ export class PlayerController {
         // Idle frames (first frame of each direction)
         this.scene.anims.create({
             key: 'idle-up',
-            frames: [{ key: 'player', frame: 0 }],
+            frames: [{ key: 'player', frame: 7 }],
             frameRate: 1
         });
 
         this.scene.anims.create({
             key: 'idle-right',
-            frames: [{ key: 'player', frame: 3 }],
+            frames: [{ key: 'player', frame: 10 }],
             frameRate: 1
         });
 
         this.scene.anims.create({
             key: 'idle-down',
-            frames: [{ key: 'player', frame: 6 }],
+            frames: [{ key: 'player', frame: 1 }],
             frameRate: 1
         });
 
         this.scene.anims.create({
             key: 'idle-left',
-            frames: [{ key: 'player', frame: 9 }],
+            frames: [{ key: 'player', frame: 4 }],
             frameRate: 1
         });
     }

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="20" tilewidth="32" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="16">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="30" height="20" tilewidth="32" tileheight="32" infinite="0" nextlayerid="13" nextobjectid="17">
  <editorsettings>
   <export target="interiors/journalcave.json" format="json"/>
  </editorsettings>
@@ -740,7 +740,7 @@
  <objectgroup id="2" name="puzzles">
   <object id="1" name="JournalCavePuzzle" x="320" y="256" width="288" height="288">
    <properties>
-    <property name="bridges" value="3,3,3,3,3,2,2,2,2,2,2"/>
+    <property name="bridges" value="3,3,3,3,3,2,2,2,2,2,2,2"/>
     <property name="givesFeedback" type="bool" value="false"/>
    </properties>
   </object>
@@ -788,12 +788,6 @@
     <property name="num_bridges" type="int" value="1"/>
    </properties>
   </object>
-  <object id="10" name="count1" x="480" y="448" width="32" height="32">
-   <properties>
-    <property name="constraint" type="bool" value="true"/>
-    <property name="num_bridges" type="int" value="1"/>
-   </properties>
-  </object>
   <object id="11" name="count2" x="352" y="352" width="32" height="32">
    <properties>
     <property name="animate" type="bool" value="false"/>
@@ -838,6 +832,17 @@
     <property name="disguise_sprite" value="Cultist-01"/>
     <property name="disguise_sprite_solved" value="Cultist-01-Pirate-M"/>
     <property name="num_passing" type="int" value="2"/>
+   </properties>
+  </object>
+  <object id="16" name="count1" x="480" y="448" width="32" height="32">
+   <properties>
+    <property name="animate" type="bool" value="false"/>
+    <property name="constraint" type="bool" value="true"/>
+    <property name="conversation_file" value="disguise-count.json"/>
+    <property name="conversation_file_solved" value="disguise-solved-count.json"/>
+    <property name="disguise_sprite" value="Cultist-02"/>
+    <property name="disguise_sprite_solved" value="Cultist-02-Ruby"/>
+    <property name="num_bridges" type="int" value="1"/>
    </properties>
   </object>
  </objectgroup>

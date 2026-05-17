@@ -576,6 +576,66 @@ describe("MapPuzzleExtractor", () => {
             expect(island!.constraints).toContain("conversation_file_solved=journalcave-bridgecount-satisfied.json");
         });
 
+        it("auto-adds IslandPassingBridgeCountConstraint from num_passing and direction properties", () => {
+            const mapData: TiledMapData = {
+                width: 10,
+                height: 10,
+                tilewidth: 32,
+                tileheight: 32,
+                layers: [
+                    {
+                        name: "ground",
+                        type: "tilelayer",
+                        width: 10,
+                        height: 10,
+                        data: Array(100).fill(0).map((_, i) => i === 11 ? 6 : 0),
+                        visible: true,
+                        opacity: 1
+                    },
+                    {
+                        name: "puzzles",
+                        type: "objectgroup",
+                        visible: true,
+                        opacity: 1,
+                        objects: [
+                            {
+                                id: 1,
+                                name: "test_puzzle",
+                                type: "puzzle",
+                                x: 0, y: 0, width: 320, height: 320,
+                                visible: true, rotation: 0, properties: []
+                            },
+                            {
+                                id: 2,
+                                name: "constraint_obj",
+                                type: "",
+                                x: 32, y: 32, width: 32, height: 32,
+                                visible: true, rotation: 0,
+                                properties: [
+                                    { name: "constraint", value: "true", type: "string" },
+                                    { name: "num_passing", value: 3, type: "int" },
+                                    { name: "direction", value: "adjacent", type: "string" },
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            };
+
+            const puzzle = extractor.createBridgePuzzle(
+                { id: "test_puzzle", bounds: { x: 0, y: 0, width: 320, height: 320 }, metadata: {} },
+                mapData
+            );
+
+            const island = puzzle.islands.find(i => i.x === 1 && i.y === 1);
+            expect(island).toBeDefined();
+            expect(island!.constraints).toContain("num_passing=3");
+            expect(island!.constraints).toContain("direction=adjacent");
+
+            const passingConstraint = puzzle.constraints.find(c => c.constructor.name === "IslandPassingBridgeCountConstraint");
+            expect(passingConstraint).toBeDefined();
+        });
+
         it("does not add disguise properties when absent from constraint object", () => {
             const mapData: TiledMapData = {
                 width: 10,
