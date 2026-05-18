@@ -211,16 +211,32 @@ describe('OverworldGameState', () => {
         });
     });
 
+    describe('collectibles and jewels', () => {
+        it('should track collected collectible IDs without double-counting jewels', () => {
+            gameState.collectJewel('green', 'collectible-1');
+            gameState.collectJewel('green', 'collectible-1');
+
+            expect(gameState.getJewelCount('green')).toBe(1);
+            expect(gameState.isCollectibleCollected('collectible-1')).toBe(true);
+            expect(gameState.getCollectedCollectibleIDs()).toEqual(['collectible-1']);
+        });
+    });
+
     describe('exportState', () => {
         it('should export current state', () => {
             gameState.setActivePuzzle('active-puzzle', mockPuzzle);
             gameState.markPuzzleCompleted('completed-puzzle');
+            gameState.unlockDoor('door-1');
+            gameState.collectJewel('blue', 'collectible-2');
 
             const exported = gameState.exportState();
 
             expect(exported.activePuzzleId).toBe('active-puzzle');
             expect(exported.completedPuzzles).toContain('completed-puzzle');
             expect(exported.puzzleProgress).toBeDefined();
+            expect(exported.unlockedDoors).toContain('door-1');
+            expect(exported.collectedJewels.blue).toBe(1);
+            expect(exported.collectedCollectibleIDs).toContain('collectible-2');
         });
     });
 
@@ -229,7 +245,10 @@ describe('OverworldGameState', () => {
             const stateToImport = {
                 activePuzzleId: 'imported-active',
                 puzzleProgress: {},
-                completedPuzzles: ['imported-completed']
+                completedPuzzles: ['imported-completed'],
+                unlockedDoors: ['door-2'],
+                collectedJewels: { yellow: 2 },
+                collectedCollectibleIDs: ['collectible-3']
             };
 
             gameState.importState(stateToImport);
@@ -237,6 +256,41 @@ describe('OverworldGameState', () => {
             const debugInfo = gameState.getDebugInfo();
             expect(debugInfo.activePuzzle).toBe('imported-active');
             expect(debugInfo.completedPuzzles).toContain('imported-completed');
+            expect(gameState.isDoorUnlocked('door-2')).toBe(true);
+            expect(gameState.getJewelCount('yellow')).toBe(2);
+            expect(gameState.isCollectibleCollected('collectible-3')).toBe(true);
+        });
+
+        it('should restore saved bridge progress onto freshly loaded puzzles', () => {
+            mockPuzzle.placeBridge('b1', { x: 1, y: 1 }, { x: 3, y: 1 });
+            gameState.saveOverworldPuzzleProgress('test-puzzle', mockPuzzle);
+
+            const exported = gameState.exportState();
+
+            const reloadedState = new OverworldGameState();
+            reloadedState.importState(exported);
+
+            const freshPuzzle = new BridgePuzzle({
+                id: 'test-puzzle',
+                size: { width: 5, height: 5 },
+                islands: [
+                    { id: 'island1', x: 1, y: 1 },
+                    { id: 'island2', x: 3, y: 1 }
+                ],
+                bridgeTypes: [
+                    { id: 'single', count: 5 }
+                ],
+                constraints: [],
+                maxNumBridges: 2
+            });
+
+            reloadedState.restorePuzzleProgress(new Map([[freshPuzzle.id, freshPuzzle]]));
+
+            const restored = reloadedState.loadOverworldPuzzleProgress('test-puzzle');
+            expect(restored).toBe(freshPuzzle);
+            expect(restored?.placedBridges).toHaveLength(1);
+            expect(restored?.placedBridges[0].start).toEqual({ x: 1, y: 1 });
+            expect(restored?.placedBridges[0].end).toEqual({ x: 3, y: 1 });
         });
     });
 });

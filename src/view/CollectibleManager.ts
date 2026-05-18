@@ -111,6 +111,12 @@ export class CollectibleManager {
 
                 this.collectibles.push(collectible);
 
+                if (this.gameState.isCollectibleCollected(collectible.id)) {
+                    collectible.collect();
+                    console.log(`Skipping previously collected collectible ${collectible.id}`);
+                    continue;
+                }
+
                 const worldX = collectible.tileX * tileWidth + tileWidth / 2;
                 const worldY = collectible.tileY * tileHeight + tileHeight / 2;
                 const spriteKey = `jewel-${collectible.colour}`;
@@ -165,7 +171,7 @@ export class CollectibleManager {
         if (!collectible || collectible.collected) return;
 
         collectible.collect();
-        this.gameState.collectJewel(collectible.colour);
+        this.gameState.collectJewel(collectible.colour, collectibleId);
 
         const sprite = this.collectibleSprites.get(collectibleId);
         if (sprite) {

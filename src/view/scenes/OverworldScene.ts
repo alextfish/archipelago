@@ -17,6 +17,7 @@ import { attachTestMarker, isTestMode, getTestConfig } from '@helpers/TestMarker
 import { emitTestEvent } from '@helpers/TestEvents';
 import { SeriesFactory, SeriesManager } from '@model/series/SeriesFactory';
 import { FilePuzzleLoader, LocalStorageProgressStore } from '@model/series/SeriesLoaders';
+import { clearArchipelagoPersistentState } from '@model/persistence/PersistenceUtils';
 import { NPCIconConfig } from '@view/NPCIconConfig';
 import { Door } from '@model/overworld/Door';
 import { PlayerStartManager } from '@model/overworld/PlayerStartManager';
@@ -536,8 +537,23 @@ export class OverworldScene extends Phaser.Scene {
           this // Pass scene for setCollisionAt calls
         );
         console.log('Bridge manager created');
+      }
 
-        // Restore completed puzzle bridges
+      // Load all puzzles from the map
+      const puzzles = this.puzzleManager.loadPuzzlesFromMap(this.tiledMapData);
+      console.log(`Loaded ${puzzles.size} overworld puzzles`);
+
+      this.gameState.restorePuzzleProgress(puzzles);
+      for (const [puzzleId, puzzle] of puzzles) {
+        if (puzzle instanceof FlowPuzzle) {
+          const savedInputs = this.gameState.getFlowPuzzleInputs(puzzleId);
+          if (savedInputs.length > 0) {
+            puzzle.setEdgeInputs(savedInputs);
+          }
+        }
+      }
+
+      if (this.bridgeManager) {
         this.bridgeManager.restoreCompletedPuzzles(
           this.gameState,
           (puzzleId: string) => {
@@ -546,10 +562,6 @@ export class OverworldScene extends Phaser.Scene {
           }
         );
       }
-
-      // Load all puzzles from the map
-      const puzzles = this.puzzleManager.loadPuzzlesFromMap(this.tiledMapData);
-      console.log(`Loaded ${puzzles.size} overworld puzzles`);
 
       // Apply initial water blocking for FlowPuzzles.
       // Each FlowPuzzle computes its water state on construction; those tiles must
@@ -591,9 +603,6 @@ export class OverworldScene extends Phaser.Scene {
 
       // Launch the overworld HUD scene and wire it up with the services it needs
       this.launchOverworldHUD();
-
-      // TODO: remove — temporary starting jewel to verify HUD visibility
-      this.gameState.collectJewel('green');
       this.overworldHUD?.refreshJewelHUD();
 
       // Load portals from the Tiled map and register them as step hotspots
@@ -676,6 +685,7 @@ export class OverworldScene extends Phaser.Scene {
       }
 
       this.flowWaterManager.updatePontoonVisuals(puzzle, puzzleBounds);
+      this.flowWaterManager.updateFlowWaterVisuals(puzzle, puzzleBounds);
     }
   }
 
@@ -914,7 +924,7 @@ export class OverworldScene extends Phaser.Scene {
 
   private resetSavedStateAndReload(): void {
     try {
-      localStorage.removeItem('archipelago_game_state');
+      clearArchipelagoPersistentState();
       console.log('[OverworldScene] Cleared saved game state');
     } catch (error) {
       console.warn('[OverworldScene] Failed to clear saved game state:', error);
@@ -1059,6 +1069,7 @@ export class OverworldScene extends Phaser.Scene {
    */
   private collectJewel(collectibleId: string): void {
     this.collectibleManager?.collectJewel(collectibleId);
+    this.saveGameState();
   }
 
   /**
@@ -1957,6 +1968,10 @@ export class OverworldScene extends Phaser.Scene {
       if (result.newlyUnlockedPuzzles.length > 0) {
         console.log(`Newly unlocked puzzles: ${result.newlyUnlockedPuzzles.join(', ')}`);
       }
+
+      if (this.seriesManager) {
+        await this.seriesManager.saveSeriesProgress(this.currentSeries);
+      }
     }
 
     // Check if the series is now complete
@@ -1983,6 +1998,8 @@ export class OverworldScene extends Phaser.Scene {
     } else {
       console.log(`Series ${this.currentSeries.id} not yet complete`);
     }
+
+    this.saveGameState();
   }
 
   /**

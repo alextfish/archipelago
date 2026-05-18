@@ -837,6 +837,7 @@ export class InteriorScene extends Phaser.Scene {
             case 'collectible':
                 if (target.data?.collectibleId) {
                     this.collectibleManager?.collectJewel(target.data.collectibleId);
+                    this.saveStateCallback();
                 }
                 break;
             default:
@@ -1197,7 +1198,7 @@ export class InteriorScene extends Phaser.Scene {
 
         // Listen for series completion (BridgePuzzleScene emits to 'InteriorScene')
         this.events.once('seriesPuzzleCompleted', (data: { puzzleId: string; success: boolean }) => {
-            this.handleSeriesPuzzleCompleted(data);
+            void this.handleSeriesPuzzleCompleted(data);
         });
 
         this.scene.launch('BridgePuzzleScene', {
@@ -1207,7 +1208,7 @@ export class InteriorScene extends Phaser.Scene {
         });
     }
 
-    private handleSeriesPuzzleCompleted(data: { puzzleId: string; success: boolean }): void {
+    private async handleSeriesPuzzleCompleted(data: { puzzleId: string; success: boolean }): Promise<void> {
         const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
         hud?.setJewelHUDVisible(true);
 
@@ -1223,6 +1224,10 @@ export class InteriorScene extends Phaser.Scene {
         const result = this.currentSeries.completePuzzle(matching.id);
         if (result.success) {
             console.log(`[InteriorScene] Series puzzle "${matching.id}" completed`);
+            if (this.seriesManager) {
+                await this.seriesManager.saveSeriesProgress(this.currentSeries);
+            }
+            this.saveStateCallback();
         }
     }
 }

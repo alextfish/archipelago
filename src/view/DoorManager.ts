@@ -81,6 +81,9 @@ export class DoorManager {
             for (const obj of doorsLayer.objects) {
                 try {
                     const door = Door.fromTiledObject(obj, tileWidth, tileHeight);
+                    if (this.gameState.isDoorUnlocked(door.id)) {
+                        door.unlock();
+                    }
                     this.doors.push(door);
                     this.createDoorSprites(door);
                     console.log(

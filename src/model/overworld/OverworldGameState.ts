@@ -17,11 +17,15 @@ export class OverworldGameState {
     private activePuzzleId?: string;
     private activePuzzleState?: BridgePuzzle;
     private puzzleProgress: Map<string, BridgePuzzle> = new Map();
+    private persistedPuzzleProgress: Map<string, PersistedPuzzleProgress> = new Map();
     private completedPuzzles: Set<string> = new Set();
     private unlockedDoors: Set<string> = new Set();
 
     /** Jewels the player has collected, keyed by colour (e.g. 'red'). */
     private collectedJewels: Map<string, number> = new Map();
+
+    /** Collectible object IDs the player has already picked up. */
+    private collectedCollectibleIDs: Set<string> = new Set();
 
     // FlowPuzzle-specific state
     /** Track solved FlowPuzzles and their edge outputs (local coordinates) */
@@ -96,7 +100,7 @@ export class OverworldGameState {
     clearActivePuzzle(): void {
         if (this.activePuzzleId && this.activePuzzleState) {
             console.log(`OverworldGameState: Saving progress for puzzle ${this.activePuzzleId}`);
-            this.puzzleProgress.set(this.activePuzzleId, this.activePuzzleState);
+            this.saveOverworldPuzzleProgress(this.activePuzzleId, this.activePuzzleState);
         }
 
         this.activePuzzleId = undefined;
@@ -109,6 +113,7 @@ export class OverworldGameState {
     saveOverworldPuzzleProgress(puzzleId: string, puzzle: BridgePuzzle): void {
         console.log(`OverworldGameState: Saving progress for puzzle ${puzzleId} (${puzzle.bridges.length} bridges)`);
         this.puzzleProgress.set(puzzleId, puzzle);
+        this.persistedPuzzleProgress.set(puzzleId, this.serialisePuzzleProgress(puzzle));
 
         // Update active puzzle if it matches
         if (this.activePuzzleId === puzzleId) {
@@ -135,7 +140,7 @@ export class OverworldGameState {
         console.log(`OverworldGameState: Marking puzzle ${puzzleId} as completed`);
 
         if (this.activePuzzleId === puzzleId && this.activePuzzleState) {
-            this.puzzleProgress.set(puzzleId, this.activePuzzleState);
+            this.saveOverworldPuzzleProgress(puzzleId, this.activePuzzleState);
         }
 
         this.completedPuzzles.add(puzzleId);
@@ -254,10 +259,31 @@ export class OverworldGameState {
     /**
      * Record that the player has collected one jewel of the given colour.
      */
-    collectJewel(colour: string): void {
+    collectJewel(colour: string, collectibleId?: string): void {
+        if (collectibleId) {
+            if (this.collectedCollectibleIDs.has(collectibleId)) {
+                return;
+            }
+            this.collectedCollectibleIDs.add(collectibleId);
+        }
+
         const current = this.collectedJewels.get(colour) ?? 0;
         this.collectedJewels.set(colour, current + 1);
         console.log(`OverworldGameState: Collected ${colour} jewel (total: ${current + 1})`);
+    }
+
+    /**
+     * Check whether a world collectible has already been collected.
+     */
+    isCollectibleCollected(collectibleId: string): boolean {
+        return this.collectedCollectibleIDs.has(collectibleId);
+    }
+
+    /**
+     * Return all collected world collectible IDs.
+     */
+    getCollectedCollectibleIDs(): string[] {
+        return Array.from(this.collectedCollectibleIDs);
     }
 
     /**
@@ -323,9 +349,11 @@ export class OverworldGameState {
         this.activePuzzleId = undefined;
         this.activePuzzleState = undefined;
         this.puzzleProgress.clear();
+        this.persistedPuzzleProgress.clear();
         this.completedPuzzles.clear();
         this.unlockedDoors.clear();
         this.collectedJewels.clear();
+        this.collectedCollectibleIDs.clear();
 
         // Reset FlowPuzzle state
         this.flowPuzzleOutputs.clear();
@@ -459,13 +487,38 @@ export class OverworldGameState {
     }
 
     /**
+     * Apply imported puzzle progress to freshly loaded puzzle instances.
+     * This reconstructs cold-start puzzle state so bridge baking and flow state
+     * can be replayed from the live puzzle models.
+     */
+    restorePuzzleProgress(puzzles: ReadonlyMap<string, BridgePuzzle>): void {
+        this.puzzleProgress.clear();
+
+        for (const [puzzleId, puzzle] of puzzles) {
+            const persisted = this.persistedPuzzleProgress.get(puzzleId);
+            if (!persisted) {
+                continue;
+            }
+
+            this.applyPersistedPuzzleProgress(puzzle, persisted, puzzleId);
+            this.puzzleProgress.set(puzzleId, puzzle);
+        }
+
+        this.activePuzzleState = this.activePuzzleId
+            ? this.puzzleProgress.get(this.activePuzzleId)
+            : undefined;
+    }
+
+    /**
      * Export state for persistence to localStorage or file
      */
     exportState(): {
         activePuzzleId?: string;
-        puzzleProgress: Record<string, any>;
+        puzzleProgress: Record<string, PersistedPuzzleProgress>;
         completedPuzzles: string[];
         unlockedDoors: string[];
+        collectedJewels: Record<string, number>;
+        collectedCollectibleIDs: string[];
         flowPuzzleOutputs: Record<string, { x: number; y: number }[]>;
         flowPuzzleInputs: Record<string, { x: number; y: number }[]>;
         overworldWaterState: string[];
@@ -474,17 +527,19 @@ export class OverworldGameState {
         interiorReturnX?: number;
         interiorReturnY?: number;
     } {
-        const puzzleProgressObj: Record<string, any> = {};
+        const puzzleProgressObj: Record<string, PersistedPuzzleProgress> = {};
+        const persistedEntries = new Map(this.persistedPuzzleProgress);
+
         for (const [id, puzzle] of this.puzzleProgress) {
-            puzzleProgressObj[id] = {
-                id: puzzle.id,
-                width: puzzle.width,
-                height: puzzle.height,
-                islands: puzzle.islands,
-                bridges: puzzle.bridges,
-                constraints: puzzle.constraints,
-                inventory: puzzle.inventory
-            };
+            persistedEntries.set(id, this.serialisePuzzleProgress(puzzle));
+        }
+
+        if (this.activePuzzleId && this.activePuzzleState) {
+            persistedEntries.set(this.activePuzzleId, this.serialisePuzzleProgress(this.activePuzzleState));
+        }
+
+        for (const [id, progress] of persistedEntries) {
+            puzzleProgressObj[id] = progress;
         }
 
         return {
@@ -492,6 +547,8 @@ export class OverworldGameState {
             puzzleProgress: puzzleProgressObj,
             completedPuzzles: Array.from(this.completedPuzzles),
             unlockedDoors: Array.from(this.unlockedDoors),
+            collectedJewels: this.getJewelCounts(),
+            collectedCollectibleIDs: Array.from(this.collectedCollectibleIDs),
             flowPuzzleOutputs: Object.fromEntries(this.flowPuzzleOutputs),
             flowPuzzleInputs: Object.fromEntries(this.flowPuzzleInputs),
             overworldWaterState: Array.from(this.overworldWaterState) as string[],
@@ -512,9 +569,11 @@ export class OverworldGameState {
      */
     importState(state: {
         activePuzzleId?: string;
-        puzzleProgress: Record<string, any>;
+        puzzleProgress?: Record<string, PersistedPuzzleProgress>;
         completedPuzzles: string[];
         unlockedDoors?: string[];
+        collectedJewels?: Record<string, number>;
+        collectedCollectibleIDs?: string[];
         flowPuzzleOutputs?: Record<string, { x: number; y: number }[]>;
         flowPuzzleInputs?: Record<string, { x: number; y: number }[]>;
         overworldWaterState?: string[];
@@ -526,19 +585,32 @@ export class OverworldGameState {
         console.log('OverworldGameState: Importing state');
 
         this.activePuzzleId = state.activePuzzleId;
+        this.activePuzzleState = undefined;
+        this.puzzleProgress.clear();
+        this.persistedPuzzleProgress = new Map(Object.entries(state.puzzleProgress ?? {}));
         this.completedPuzzles = new Set(state.completedPuzzles);
         this.unlockedDoors = new Set(state.unlockedDoors || []);
+        this.collectedJewels = new Map(
+            Object.entries(state.collectedJewels ?? {}).map(([colour, count]) => [colour, Number(count)])
+        );
+        this.collectedCollectibleIDs = new Set(state.collectedCollectibleIDs || []);
 
         // Import FlowPuzzle water state
         if (state.flowPuzzleOutputs) {
             this.flowPuzzleOutputs = new Map(Object.entries(state.flowPuzzleOutputs));
+        } else {
+            this.flowPuzzleOutputs.clear();
         }
         if (state.flowPuzzleInputs) {
             this.flowPuzzleInputs = new Map(Object.entries(state.flowPuzzleInputs));
+        } else {
+            this.flowPuzzleInputs.clear();
         }
         if (state.overworldWaterState) {
             // Import GridKeys from saved strings
             this.overworldWaterState = new Set(state.overworldWaterState as GridKey[]);
+        } else {
+            this.overworldWaterState.clear();
         }
 
         // Import player translation dictionary
@@ -553,8 +625,50 @@ export class OverworldGameState {
         this.currentInteriorID = state.currentInteriorID;
         this.interiorReturnX = state.interiorReturnX;
         this.interiorReturnY = state.interiorReturnY;
-
-        // Note: puzzleProgress would need to be reconstructed as BridgePuzzle objects
-        // This is left as a future enhancement when persistence is fully implemented
     }
+
+    private serialisePuzzleProgress(puzzle: BridgePuzzle): PersistedPuzzleProgress {
+        return {
+            id: puzzle.id,
+            bridges: puzzle.bridges.map((bridge) => ({
+                id: bridge.id,
+                typeId: bridge.type.id,
+                start: bridge.start ? { ...bridge.start } : undefined,
+                end: bridge.end ? { ...bridge.end } : undefined,
+            })),
+        };
+    }
+
+    private applyPersistedPuzzleProgress(
+        puzzle: BridgePuzzle,
+        persisted: PersistedPuzzleProgress,
+        puzzleId: string
+    ): void {
+        for (const bridge of [...puzzle.placedBridges]) {
+            puzzle.removeBridge(bridge.id);
+        }
+
+        const persistedBridges = Array.isArray(persisted.bridges) ? persisted.bridges : [];
+        for (const bridgeState of persistedBridges) {
+            if (!bridgeState?.id || !bridgeState.start || !bridgeState.end) {
+                continue;
+            }
+
+            try {
+                puzzle.placeBridge(bridgeState.id, bridgeState.start, bridgeState.end);
+            } catch (error) {
+                console.warn(`OverworldGameState: Failed to restore bridge ${bridgeState.id} for puzzle ${puzzleId}`, error);
+            }
+        }
+    }
+}
+
+interface PersistedPuzzleProgress {
+    id?: string;
+    bridges?: Array<{
+        id?: string;
+        typeId?: string;
+        start?: { x: number; y: number };
+        end?: { x: number; y: number };
+    }>;
 }

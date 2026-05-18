@@ -1,6 +1,11 @@
 import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import type { PuzzleLoader, SeriesProgressStore } from './SeriesFactory';
 import type { SeriesProgress } from './PuzzleSeries';
+import {
+    SERIES_PROGRESS_STORAGE_KEY_PREFIX,
+    clearSeriesProgressStorage,
+    getSeriesProgressStorageKey,
+} from '@model/persistence/PersistenceUtils';
 
 /**
  * Implementation of PuzzleLoader that loads puzzle data from files or JSON
@@ -40,8 +45,6 @@ export class FilePuzzleLoader implements PuzzleLoader {
  * Local storage implementation of SeriesProgressStore
  */
 export class LocalStorageProgressStore implements SeriesProgressStore {
-    private readonly storageKeyPrefix = 'archipelago_series_progress_';
-
     /**
      * Load series progress from localStorage
      */
@@ -108,16 +111,7 @@ export class LocalStorageProgressStore implements SeriesProgressStore {
      */
     async clearAllProgress(): Promise<void> {
         try {
-            const keysToRemove: string[] = [];
-
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith(this.storageKeyPrefix)) {
-                    keysToRemove.push(key);
-                }
-            }
-
-            keysToRemove.forEach(key => localStorage.removeItem(key));
+            clearSeriesProgressStorage(localStorage);
         } catch (error) {
             console.error('Failed to clear all series progress:', error);
         }
@@ -132,8 +126,8 @@ export class LocalStorageProgressStore implements SeriesProgressStore {
 
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
-                if (key && key.startsWith(this.storageKeyPrefix)) {
-                    const seriesId = key.substring(this.storageKeyPrefix.length);
+                if (key && key.startsWith(SERIES_PROGRESS_STORAGE_KEY_PREFIX)) {
+                    const seriesId = key.substring(SERIES_PROGRESS_STORAGE_KEY_PREFIX.length);
                     seriesIds.push(seriesId);
                 }
             }
@@ -146,7 +140,7 @@ export class LocalStorageProgressStore implements SeriesProgressStore {
     }
 
     private getStorageKey(seriesId: string): string {
-        return `${this.storageKeyPrefix}${seriesId}`;
+        return getSeriesProgressStorageKey(seriesId);
     }
 }
 
