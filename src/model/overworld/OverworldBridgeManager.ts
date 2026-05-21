@@ -119,7 +119,7 @@ export class OverworldBridgeManager {
             this.bakedTilePositions.set(puzzleId, []);
         }
         const bakedPositions = this.bakedTilePositions.get(puzzleId)!;
-        bakedPositions.splice(0);
+        bakedPositions.length = 0;
         this.destroyEndpointSprites(puzzleId);
 
         let tilesPlaced = 0;
@@ -416,7 +416,7 @@ export class OverworldBridgeManager {
         const tileHeight = this.tiledMapData.tileheight as number;
         const endpoints = new Map<string, EndpointCombination>();
 
-        const upsertEndpoint = (tileX: number, tileY: number, direction: EndpointDirection, level: EndpointLevel): void => {
+        const recordEndpoint = (tileX: number, tileY: number, direction: EndpointDirection, level: EndpointLevel): void => {
             const key = `${tileX},${tileY}`;
             let combo = endpoints.get(key);
             if (!combo) {
@@ -440,19 +440,19 @@ export class OverworldBridgeManager {
             const isHorizontal = bridge.start.y === bridge.end.y;
             if (isHorizontal) {
                 if (bridge.start.x <= bridge.end.x) {
-                    upsertEndpoint(startTileX, startTileY, 'right', level);
-                    upsertEndpoint(endTileX, endTileY, 'left', level);
+                    recordEndpoint(startTileX, startTileY, 'right', level);
+                    recordEndpoint(endTileX, endTileY, 'left', level);
                 } else {
-                    upsertEndpoint(startTileX, startTileY, 'left', level);
-                    upsertEndpoint(endTileX, endTileY, 'right', level);
+                    recordEndpoint(startTileX, startTileY, 'left', level);
+                    recordEndpoint(endTileX, endTileY, 'right', level);
                 }
             } else {
                 if (bridge.start.y <= bridge.end.y) {
-                    upsertEndpoint(startTileX, startTileY, 'down', level);
-                    upsertEndpoint(endTileX, endTileY, 'up', level);
+                    recordEndpoint(startTileX, startTileY, 'down', level);
+                    recordEndpoint(endTileX, endTileY, 'up', level);
                 } else {
-                    upsertEndpoint(startTileX, startTileY, 'up', level);
-                    upsertEndpoint(endTileX, endTileY, 'down', level);
+                    recordEndpoint(startTileX, startTileY, 'up', level);
+                    recordEndpoint(endTileX, endTileY, 'down', level);
                 }
             }
         }
@@ -474,9 +474,9 @@ export class OverworldBridgeManager {
             const textureKey = this.getOrCreateEndpointCompositeTexture(combination);
             if (!textureKey) continue;
 
-            const [tileXRaw, tileYRaw] = tileKey.split(',');
-            const tileX = Number(tileXRaw);
-            const tileY = Number(tileYRaw);
+            const [tileXStr, tileYStr] = tileKey.split(',');
+            const tileX = Number(tileXStr);
+            const tileY = Number(tileYStr);
             const worldX = tileX * tileWidth + (tileWidth / 2);
             const worldY = tileY * tileHeight + (tileHeight / 2);
 
@@ -549,7 +549,6 @@ export class OverworldBridgeManager {
                 frame = BridgeSpriteFrames.H_BRIDGE_LEFT;
                 break;
             case 'down':
-            default:
                 frame = BridgeSpriteFrames.V_BRIDGE_TOP;
                 break;
         }
