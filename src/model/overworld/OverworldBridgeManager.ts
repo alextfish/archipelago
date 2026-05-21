@@ -4,6 +4,10 @@ import type { OverworldGameState } from './OverworldGameState';
 import { BridgeSpriteFrames } from '@view/BridgeSpriteFrameRegistry';
 import { CollisionType } from './CollisionManager';
 
+type EndpointDirection = 'up' | 'left' | 'right' | 'down';
+type EndpointLevel = 0 | 1 | 2;
+type EndpointCombination = Record<EndpointDirection, EndpointLevel>;
+
 /**
  * Manages rendering of completed puzzle bridges to the overworld tilemap.
  * Handles baking bridges to the bridges layer and updating collision.
@@ -115,7 +119,7 @@ export class OverworldBridgeManager {
             this.bakedTilePositions.set(puzzleId, []);
         }
         const bakedPositions = this.bakedTilePositions.get(puzzleId)!;
-        bakedPositions.length = 0;
+        bakedPositions.splice(0);
         this.destroyEndpointSprites(puzzleId);
 
         let tilesPlaced = 0;
@@ -458,7 +462,7 @@ export class OverworldBridgeManager {
 
     private createEndpointCompositeSprites(puzzleId: string, endpointCombinations: Map<string, EndpointCombination>): void {
         const scene = this.bridgesLayer.scene;
-        if (!scene || !scene.textures || !scene.add || !scene.textures.exists('sprout-tiles')) {
+        if (!scene || !scene.add || !this.hasEndpointCompositeSupport()) {
             return;
         }
 
@@ -486,7 +490,7 @@ export class OverworldBridgeManager {
 
     private getOrCreateEndpointCompositeTexture(combination: EndpointCombination): string | null {
         const scene = this.bridgesLayer.scene;
-        if (!scene || !scene.textures || !scene.textures.exists('sprout-tiles')) {
+        if (!scene || !this.hasEndpointCompositeSupport()) {
             return null;
         }
 
@@ -562,8 +566,9 @@ export class OverworldBridgeManager {
         }
         this.bakedEndpointSprites.delete(puzzleId);
     }
-}
 
-type EndpointDirection = 'up' | 'left' | 'right' | 'down';
-type EndpointLevel = 0 | 1 | 2;
-type EndpointCombination = Record<EndpointDirection, EndpointLevel>;
+    private hasEndpointCompositeSupport(): boolean {
+        const scene = this.bridgesLayer.scene;
+        return !!scene?.textures?.exists('sprout-tiles');
+    }
+}
