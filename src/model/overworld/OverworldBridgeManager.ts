@@ -10,6 +10,8 @@ import { CollisionType } from './CollisionManager';
  */
 export class OverworldBridgeManager {
     private static readonly BRIDGES_LAYER_NAME = 'bridges';
+    private static readonly ENDPOINT_COMPOSITE_TEXTURE_PREFIX = 'bridge-endpoint-composite';
+    private static readonly ENDPOINT_LAYER_ORDER: ReadonlyArray<EndpointDirection> = ['up', 'left', 'right', 'down'];
     private static readonly BRIDGE_TILESET_IMAGES = [
         'SproutLandsGrassIslands.png',
         'terrains.png',
@@ -20,6 +22,8 @@ export class OverworldBridgeManager {
     // Tile positions placed by bakePuzzleBridges, keyed by puzzleId.
     // Used to reliably clear exactly the baked tiles on puzzle re-entry.
     private bakedTilePositions: Map<string, Array<{ tileX: number; tileY: number }>> = new Map();
+    // Endpoint overlay sprites created for each baked puzzle, keyed by puzzleId.
+    private bakedEndpointSprites: Map<string, Phaser.GameObjects.Image[]> = new Map();
 
     constructor(
         private bridgesLayer: Phaser.Tilemaps.TilemapLayer,
@@ -111,8 +115,11 @@ export class OverworldBridgeManager {
             this.bakedTilePositions.set(puzzleId, []);
         }
         const bakedPositions = this.bakedTilePositions.get(puzzleId)!;
+        bakedPositions.length = 0;
+        this.destroyEndpointSprites(puzzleId);
 
         let tilesPlaced = 0;
+        const endpointCombinations = this.buildEndpointCombinationMap(bridges, puzzleBounds, bridgeCountPerPair);
 
         for (const bridge of bridges) {
             if (!bridge.start || !bridge.end) {
@@ -204,6 +211,8 @@ export class OverworldBridgeManager {
                 }
             }
         }
+
+        this.createEndpointCompositeSprites(puzzleId, endpointCombinations);
 
         console.log(`OverworldBridgeManager: Baked ${bridges.length} bridges (${tilesPlaced} tiles placed) for puzzle ${puzzleId}`);
     }
@@ -321,6 +330,7 @@ export class OverworldBridgeManager {
         }
 
         this.bakedTilePositions.delete(puzzleId);
+        this.destroyEndpointSprites(puzzleId);
     }
 
     /**
@@ -350,6 +360,8 @@ export class OverworldBridgeManager {
                 this.bridgesLayer.removeTileAt(tileX, tileY);
             }
         }
+
+        this.destroyEndpointSprites(puzzleId);
 
         console.log(`OverworldBridgeManager: Blanked region for puzzle ${puzzleId}`);
     }
@@ -390,4 +402,168 @@ export class OverworldBridgeManager {
     static getBridgesLayerName(): string {
         return OverworldBridgeManager.BRIDGES_LAYER_NAME;
     }
+
+    private buildEndpointCombinationMap(
+        bridges: Bridge[],
+        puzzleBounds: Phaser.Geom.Rectangle,
+        bridgeCountPerPair: Map<string, number>
+    ): Map<string, EndpointCombination> {
+        const tileWidth = this.tiledMapData.tilewidth as number;
+        const tileHeight = this.tiledMapData.tileheight as number;
+        const endpoints = new Map<string, EndpointCombination>();
+
+        const upsertEndpoint = (tileX: number, tileY: number, direction: EndpointDirection, level: EndpointLevel): void => {
+            const key = `${tileX},${tileY}`;
+            let combo = endpoints.get(key);
+            if (!combo) {
+                combo = { up: 0, left: 0, right: 0, down: 0 };
+                endpoints.set(key, combo);
+            }
+            combo[direction] = Math.max(combo[direction], level) as EndpointLevel;
+        };
+
+        for (const bridge of bridges) {
+            if (!bridge.start || !bridge.end) continue;
+
+            const pairKey = this.islandPairKey(bridge);
+            const level: EndpointLevel = (bridgeCountPerPair.get(pairKey) ?? 1) > 1 ? 2 : 1;
+
+            const startTileX = Math.floor((puzzleBounds.x + bridge.start.x * tileWidth) / tileWidth);
+            const startTileY = Math.floor((puzzleBounds.y + bridge.start.y * tileHeight) / tileHeight);
+            const endTileX = Math.floor((puzzleBounds.x + bridge.end.x * tileWidth) / tileWidth);
+            const endTileY = Math.floor((puzzleBounds.y + bridge.end.y * tileHeight) / tileHeight);
+
+            const isHorizontal = bridge.start.y === bridge.end.y;
+            if (isHorizontal) {
+                if (bridge.start.x <= bridge.end.x) {
+                    upsertEndpoint(startTileX, startTileY, 'right', level);
+                    upsertEndpoint(endTileX, endTileY, 'left', level);
+                } else {
+                    upsertEndpoint(startTileX, startTileY, 'left', level);
+                    upsertEndpoint(endTileX, endTileY, 'right', level);
+                }
+            } else {
+                if (bridge.start.y <= bridge.end.y) {
+                    upsertEndpoint(startTileX, startTileY, 'down', level);
+                    upsertEndpoint(endTileX, endTileY, 'up', level);
+                } else {
+                    upsertEndpoint(startTileX, startTileY, 'up', level);
+                    upsertEndpoint(endTileX, endTileY, 'down', level);
+                }
+            }
+        }
+
+        return endpoints;
+    }
+
+    private createEndpointCompositeSprites(puzzleId: string, endpointCombinations: Map<string, EndpointCombination>): void {
+        const scene = this.bridgesLayer.scene;
+        if (!scene || !scene.textures || !scene.add || !scene.textures.exists('sprout-tiles')) {
+            return;
+        }
+
+        const tileWidth = this.tiledMapData.tilewidth as number;
+        const tileHeight = this.tiledMapData.tileheight as number;
+        const sprites: Phaser.GameObjects.Image[] = [];
+
+        for (const [tileKey, combination] of endpointCombinations.entries()) {
+            const textureKey = this.getOrCreateEndpointCompositeTexture(combination);
+            if (!textureKey) continue;
+
+            const [tileXRaw, tileYRaw] = tileKey.split(',');
+            const tileX = Number(tileXRaw);
+            const tileY = Number(tileYRaw);
+            const worldX = tileX * tileWidth + (tileWidth / 2);
+            const worldY = tileY * tileHeight + (tileHeight / 2);
+
+            const sprite = scene.add.image(worldX, worldY, textureKey);
+            sprite.setDepth(this.bridgesLayer.depth);
+            sprites.push(sprite);
+        }
+
+        this.bakedEndpointSprites.set(puzzleId, sprites);
+    }
+
+    private getOrCreateEndpointCompositeTexture(combination: EndpointCombination): string | null {
+        const scene = this.bridgesLayer.scene;
+        if (!scene || !scene.textures || !scene.textures.exists('sprout-tiles')) {
+            return null;
+        }
+
+        const encoded = `u${combination.up}l${combination.left}r${combination.right}d${combination.down}`;
+        const textureKey = `${OverworldBridgeManager.ENDPOINT_COMPOSITE_TEXTURE_PREFIX}-${encoded}`;
+        if (scene.textures.exists(textureKey)) {
+            return textureKey;
+        }
+
+        const tileWidth = this.tiledMapData.tilewidth as number;
+        const tileHeight = this.tiledMapData.tileheight as number;
+        const canvasTexture = scene.textures.createCanvas(textureKey, tileWidth, tileHeight);
+        if (!canvasTexture) {
+            return null;
+        }
+
+        const sourceTexture = scene.textures.get('sprout-tiles');
+        const context = canvasTexture.context;
+        context.clearRect(0, 0, tileWidth, tileHeight);
+
+        for (const direction of OverworldBridgeManager.ENDPOINT_LAYER_ORDER) {
+            const level = combination[direction];
+            if (level === 0) continue;
+
+            const frameIndex = this.endpointFrameForDirection(direction, level);
+            const frame = sourceTexture.get(frameIndex);
+            if (!frame?.source?.image) continue;
+
+            context.drawImage(
+                frame.source.image as CanvasImageSource,
+                frame.cutX,
+                frame.cutY,
+                frame.cutWidth,
+                frame.cutHeight,
+                0,
+                0,
+                tileWidth,
+                tileHeight
+            );
+        }
+
+        canvasTexture.refresh();
+        return textureKey;
+    }
+
+    private endpointFrameForDirection(direction: EndpointDirection, level: EndpointLevel): number {
+        let frame: number;
+        switch (direction) {
+            case 'up':
+                frame = BridgeSpriteFrames.V_BRIDGE_BOTTOM;
+                break;
+            case 'left':
+                frame = BridgeSpriteFrames.H_BRIDGE_RIGHT;
+                break;
+            case 'right':
+                frame = BridgeSpriteFrames.H_BRIDGE_LEFT;
+                break;
+            case 'down':
+            default:
+                frame = BridgeSpriteFrames.V_BRIDGE_TOP;
+                break;
+        }
+        return level === 2 ? frame + BridgeSpriteFrames.DOUBLE_BRIDGE_OFFSET : frame;
+    }
+
+    private destroyEndpointSprites(puzzleId: string): void {
+        const sprites = this.bakedEndpointSprites.get(puzzleId);
+        if (!sprites || sprites.length === 0) return;
+        for (const sprite of sprites) {
+            if (sprite && !sprite.destroyed) {
+                sprite.destroy();
+            }
+        }
+        this.bakedEndpointSprites.delete(puzzleId);
+    }
 }
+
+type EndpointDirection = 'up' | 'left' | 'right' | 'down';
+type EndpointLevel = 0 | 1 | 2;
+type EndpointCombination = Record<EndpointDirection, EndpointLevel>;

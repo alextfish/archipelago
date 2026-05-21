@@ -4,6 +4,7 @@ import type { BridgeType } from '@model/puzzle/BridgeType';
 import type { PuzzleController } from '@controller/PuzzleController';
 
 export class PuzzleHUDScene extends Phaser.Scene {
+    private static readonly SOLVED_OVERLAY_DURATION_MS = 1000;
     private sidebar: PuzzleSidebar | null = null;
     private counts: Record<string, number> = {};
     private types: BridgeType[] = [];
@@ -98,30 +99,7 @@ export class PuzzleHUDScene extends Phaser.Scene {
         // Listen for solved notification and show a persistent HUD overlay
         this.events.on('puzzleSolved', () => {
             try { console.log('[PuzzleHUDScene] puzzleSolved event received - showing HUD overlay'); } catch (e) { }
-            if (this.solvedOverlay) return; // already shown
-            const centerX = (this.scale?.width ?? 800) / 2;
-            const centerY = (this.scale?.height ?? 600) / 2;
-
-            // Background translucent box
-            const bg = this.add.rectangle(centerX, centerY, 420, 120, 0x003300, 0.9);
-            const text = this.add.text(centerX, centerY, 'Puzzle Solved!', {
-                color: '#00ff00',
-                fontSize: '36px',
-                fontStyle: 'bold'
-            }).setOrigin(0.5, 0.5);
-
-            // Keep HUD elements fixed to the viewport
-            if ((bg as any).setScrollFactor) (bg as any).setScrollFactor(0);
-            if ((text as any).setScrollFactor) (text as any).setScrollFactor(0);
-
-            // High depth so it overlays everything
-            bg.setDepth(2000);
-            text.setDepth(2001);
-
-            this.solvedOverlay = this.add.container(0, 0, [bg, text]);
-            this.solvedOverlay.setDepth(2000);
-
-            // Keep the overlay until the scene is stopped or reloaded. No auto-hide.
+            this.showSolvedOverlay();
         });
 
         // Start in a fully hidden state. The manager may request this scene to
@@ -254,24 +232,35 @@ export class PuzzleHUDScene extends Phaser.Scene {
         const centerX = (this.scale?.width ?? 800) / 2;
         const centerY = (this.scale?.height ?? 600) / 2;
 
-        // Background translucent box
-        const bg = this.add.rectangle(centerX, centerY, 420, 120, 0x003300, 0.9);
-        const text = this.add.text(centerX, centerY, 'Puzzle Solved!', {
+        const symbol = this.add.text(centerX, centerY, '☑', {
             color: '#00ff00',
-            fontSize: '36px',
+            fontSize: '200px',
             fontStyle: 'bold'
         }).setOrigin(0.5, 0.5);
 
-        // Keep HUD elements fixed to the viewport
-        if ((bg as any).setScrollFactor) (bg as any).setScrollFactor(0);
-        if ((text as any).setScrollFactor) (text as any).setScrollFactor(0);
+        symbol.setScrollFactor(0);
+        symbol.setDepth(2001);
 
-        // High depth so it overlays everything
-        bg.setDepth(2000);
-        text.setDepth(2001);
-
-        this.solvedOverlay = this.add.container(0, 0, [bg, text]);
+        this.solvedOverlay = this.add.container(0, 0, [symbol]);
         this.solvedOverlay.setDepth(2000);
+        this.solvedOverlay.setAlpha(1);
+        this.solvedOverlay.setScale(1);
+        this.solvedOverlay.setScrollFactor(0);
+
+        this.tweens.add({
+            targets: this.solvedOverlay,
+            alpha: 0,
+            scaleX: 0,
+            scaleY: 0,
+            duration: PuzzleHUDScene.SOLVED_OVERLAY_DURATION_MS,
+            ease: 'Power2',
+            onComplete: () => {
+                if (this.solvedOverlay) {
+                    this.solvedOverlay.destroy();
+                    this.solvedOverlay = null;
+                }
+            }
+        });
     }
 
     /**
