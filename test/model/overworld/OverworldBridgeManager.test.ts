@@ -254,4 +254,36 @@ describe('OverworldBridgeManager', () => {
             expect(collisionSetAt(3, 3)).toBe(CollisionType.WALKABLE);
         });
     });
+
+    describe('clearBakedTiles', () => {
+        it('restores the pre-bake collision for cleared baked tiles', () => {
+            const bridge: Bridge = {
+                id: 'restore-test',
+                start: { x: 1, y: 3 },
+                end: { x: 5, y: 3 },
+                type: { id: 'single' }
+            };
+
+            collisionManager.getCollisionAt.mockImplementation(() => CollisionType.BLOCKED);
+
+            manager.bakePuzzleBridges('restore-puzzle', puzzleBounds, [bridge]);
+
+            bridgesLayer.removeTileAt.mockClear();
+            collisionManager.setCollisionAt.mockClear();
+
+            manager.clearBakedTiles('restore-puzzle');
+
+            expect(bridgesLayer.removeTileAt).toHaveBeenCalledWith(1, 3);
+            expect(bridgesLayer.removeTileAt).toHaveBeenCalledWith(2, 3);
+            expect(bridgesLayer.removeTileAt).toHaveBeenCalledWith(3, 3);
+            expect(bridgesLayer.removeTileAt).toHaveBeenCalledWith(4, 3);
+            expect(bridgesLayer.removeTileAt).toHaveBeenCalledWith(5, 3);
+
+            expect(collisionManager.setCollisionAt).toHaveBeenCalledWith(1, 3, CollisionType.BLOCKED);
+            expect(collisionManager.setCollisionAt).toHaveBeenCalledWith(2, 3, CollisionType.BLOCKED);
+            expect(collisionManager.setCollisionAt).toHaveBeenCalledWith(3, 3, CollisionType.BLOCKED);
+            expect(collisionManager.setCollisionAt).toHaveBeenCalledWith(4, 3, CollisionType.BLOCKED);
+            expect(collisionManager.setCollisionAt).toHaveBeenCalledWith(5, 3, CollisionType.BLOCKED);
+        });
+    });
 });

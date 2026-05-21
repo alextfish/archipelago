@@ -315,6 +315,55 @@ describe("MapPuzzleExtractor", () => {
             expect(forestPuzzle.islands.length).toBe(3);
         });
 
+        it("should extract islands from a region puzzleTiles layer as well as ground", () => {
+            const mapWithRegionalPuzzleTiles: TiledMapData = {
+                width: 20,
+                height: 20,
+                tilewidth: 32,
+                tileheight: 32,
+                layers: [
+                    {
+                        name: "Beach",
+                        type: "group",
+                        visible: true,
+                        opacity: 1,
+                        layers: [
+                            {
+                                name: "ground",
+                                type: "tilelayer",
+                                width: 20,
+                                height: 20,
+                                data: Array(400).fill(0).map((_, i) => i === 10 ? 6 : 0),
+                                visible: true,
+                                opacity: 1
+                            },
+                            {
+                                name: "puzzleTiles",
+                                type: "tilelayer",
+                                width: 20,
+                                height: 20,
+                                data: Array(400).fill(0).map((_, i) => i === 11 ? 6 : 0),
+                                visible: true,
+                                opacity: 1
+                            }
+                        ]
+                    }
+                ]
+            };
+
+            const puzzle = extractor.createBridgePuzzle(
+                {
+                    id: "beach_puzzle",
+                    regionGroup: "Beach",
+                    bounds: { x: 0, y: 0, width: 640, height: 640 },
+                    metadata: {}
+                },
+                mapWithRegionalPuzzleTiles
+            );
+
+            expect(puzzle.islands.length).toBe(2);
+        });
+
         it("should search all ground layers when no region specified", () => {
             const mapWithMultipleGroundLayers: TiledMapData = {
                 width: 10,
@@ -341,6 +390,37 @@ describe("MapPuzzleExtractor", () => {
                     metadata: {}
                 },
                 mapWithMultipleGroundLayers
+            );
+
+            expect(puzzle.islands.length).toBe(1);
+        });
+
+        it("should search puzzleTiles layers when no region is specified", () => {
+            const mapWithPuzzleTiles: TiledMapData = {
+                width: 10,
+                height: 10,
+                tilewidth: 32,
+                tileheight: 32,
+                layers: [
+                    {
+                        name: "puzzleTiles",
+                        type: "tilelayer",
+                        width: 10,
+                        height: 10,
+                        data: Array(100).fill(0).map((_, i) => i === 5 ? 6 : 0),
+                        visible: true,
+                        opacity: 1
+                    }
+                ]
+            };
+
+            const puzzle = extractor.createBridgePuzzle(
+                {
+                    id: "global_puzzle",
+                    bounds: { x: 0, y: 0, width: 320, height: 320 },
+                    metadata: {}
+                },
+                mapWithPuzzleTiles
             );
 
             expect(puzzle.islands.length).toBe(1);

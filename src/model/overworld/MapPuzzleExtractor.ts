@@ -3,6 +3,7 @@ import type { PuzzleSpec } from '@model/puzzle/BridgePuzzle';
 import type { Island } from '@model/puzzle/Island';
 import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
 import type { FlowPuzzleSpec, FlowSquareSpec } from '@model/puzzle/FlowTypes';
+import { overworldPuzzleTileSourceLayerNames } from '@model/overworld/PuzzleTileSourceLayers';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 
 /**
@@ -397,13 +398,14 @@ export class MapPuzzleExtractor {
         // Check relevant tile layers for island tiles
         let islandLayers: MapLayer[];
         if (definition.regionGroup) {
-            // Region-specific search: only check the "ground" layer within this region
-            const groundLayer = this.findLayerInRegion(tiledMap, definition.regionGroup, 'ground');
-            islandLayers = groundLayer ? [groundLayer] : [];
+            // Region-specific search: check all supported island source layers within this region
+            islandLayers = overworldPuzzleTileSourceLayerNames
+                .map(layerName => this.findLayerInRegion(tiledMap, definition.regionGroup!, layerName))
+                .filter(Boolean) as MapLayer[];
             console.log(`Extracting islands for ${definition.id} from region ${definition.regionGroup}`);
         } else {
             // Fallback: global search for backward compatibility
-            islandLayers = ['terrain', 'islands', 'puzzle_elements', 'ground']
+            islandLayers = ['terrain', 'islands', 'puzzle_elements', ...overworldPuzzleTileSourceLayerNames]
                 .map(name => this.findTileLayer(tiledMap, name))
                 .filter(Boolean) as MapLayer[];
             console.log(`Extracting islands for ${definition.id} from ${islandLayers.length} tile layers (global search)`);

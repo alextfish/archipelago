@@ -10,31 +10,30 @@ import { CollisionType } from './CollisionManager';
  */
 export class OverworldBridgeManager {
     private static readonly BRIDGES_LAYER_NAME = 'bridges';
-    private static readonly BRIDGE_TILESET_IMAGES = [
-        'SproutLandsGrassIslands.png',
-        'terrains.png',
-    ] as const;
+    private static readonly BRIDGE_TILESET_IMAGE = 'SproutLandsGrassIslands.png';
 
     private bridgeTilesetFirstGid: number = 0;
 
-    // Tile positions placed by bakePuzzleBridges, keyed by puzzleId.
-    // Used to reliably clear exactly the baked tiles on puzzle re-entry.
-    private bakedTilePositions: Map<string, Array<{ tileX: number; tileY: number }>> = new Map();
+    // Baked tile states keyed by puzzleId, then tile key.
+    // Used to reliably clear exactly the baked tiles on puzzle re-entry and
+    // restore the collision that existed before baking.
+    private bakedTiles: Map<string, Map<string, {
+        tileX: number;
+        tileY: number;
+        originalCollisionType: CollisionType;
+    }>> = new Map();
 
     constructor(
         private bridgesLayer: Phaser.Tilemaps.TilemapLayer,
         private tiledMapData: any,
         private collisionManager: any // OverworldScene that has setCollisionAt method
     ) {
-        // Find the bridge tileset by searching for a known bridge-capable image.
+        // Find the bridge tileset by searching for the image filename
         this.bridgeTilesetFirstGid = this.findBridgeTilesetFirstGid();
         if (this.bridgeTilesetFirstGid > 0) {
             // fine
         } else {
-            console.error(
-                `OverworldBridgeManager: Could not find a bridge tileset in ` +
-                `${OverworldBridgeManager.BRIDGE_TILESET_IMAGES.join(', ')}`
-            );
+            console.error(`OverworldBridgeManager: Could not find tileset with image ${OverworldBridgeManager.BRIDGE_TILESET_IMAGE}`);
         }
     }
 
@@ -48,15 +47,11 @@ export class OverworldBridgeManager {
             return 0;
         }
 
-        for (const imageName of OverworldBridgeManager.BRIDGE_TILESET_IMAGES) {
-            for (const tilesetData of this.tiledMapData.tilesets) {
-                if (tilesetData.image && tilesetData.image.endsWith(imageName)) {
-                    console.log(
-                        `OverworldBridgeManager: Found bridge tileset '${tilesetData.name}' ` +
-                        `with image ${tilesetData.image}`
-                    );
-                    return tilesetData.firstgid;
-                }
+        for (const tilesetData of this.tiledMapData.tilesets) {
+            // Check if the tileset's image ends with our bridge tileset filename
+            if (tilesetData.image && tilesetData.image.endsWith(OverworldBridgeManager.BRIDGE_TILESET_IMAGE)) {
+                console.log(`OverworldBridgeManager: Found bridge tileset '${tilesetData.name}' with image ${tilesetData.image}`);
+                return tilesetData.firstgid;
             }
         }
 
@@ -106,11 +101,10 @@ export class OverworldBridgeManager {
         const tileWidth = this.tiledMapData.tilewidth as number;
         const tileHeight = this.tiledMapData.tileheight as number;
 
-        // Ensure the position-tracking array exists for this puzzle.
-        if (!this.bakedTilePositions.has(puzzleId)) {
-            this.bakedTilePositions.set(puzzleId, []);
+        // Ensure the baked tile-tracking map exists for this puzzle.
+        if (!this.bakedTiles.has(puzzleId)) {
+            this.bakedTiles.set(puzzleId, new Map());
         }
-        const bakedPositions = this.bakedTilePositions.get(puzzleId)!;
 
         let tilesPlaced = 0;
 
@@ -147,11 +141,11 @@ export class OverworldBridgeManager {
                     }
                     const tileIndex = isDouble ? baseFrame + BridgeSpriteFrames.DOUBLE_BRIDGE_OFFSET : baseFrame;
                     const gid = this.bridgeTilesetFirstGid + tileIndex;
+                    const currentCollisionType = this.rememberBakedTileCollision(puzzleId, tileX, tileY);
 
                     const tile = this.bridgesLayer.putTileAt(gid, tileX, tileY);
                     if (tile) {
                         tilesPlaced++;
-                        bakedPositions.push({ tileX, tileY });
                     }
 
                     const tileKey = `${tileX},${tileY}`;
@@ -159,7 +153,7 @@ export class OverworldBridgeManager {
                     // Preserve ALWAYS_HIGH — these island tiles are already walkable and must
                     // remain immune to applyFlowWaterCollision; downgrading to WALKABLE would
                     // allow wet-tile logic to subsequently block them.
-                    if (this.collisionManager.getCollisionAt(tileX, tileY) !== CollisionType.ALWAYS_HIGH) {
+                    if (currentCollisionType !== CollisionType.ALWAYS_HIGH) {
                         this.collisionManager.setCollisionAt(tileX, tileY, collisionType);
                     }
                 }
@@ -186,11 +180,11 @@ export class OverworldBridgeManager {
                     }
                     const tileIndex = isDouble ? baseFrame + BridgeSpriteFrames.DOUBLE_BRIDGE_OFFSET : baseFrame;
                     const gid = this.bridgeTilesetFirstGid + tileIndex;
+                    const currentCollisionType = this.rememberBakedTileCollision(puzzleId, tileX, tileY);
 
                     const tile = this.bridgesLayer.putTileAt(gid, tileX, tileY);
                     if (tile) {
                         tilesPlaced++;
-                        bakedPositions.push({ tileX, tileY });
                     }
 
                     const tileKey = `${tileX},${tileY}`;
@@ -198,7 +192,7 @@ export class OverworldBridgeManager {
                     // Preserve ALWAYS_HIGH — these island tiles are already walkable and must
                     // remain immune to applyFlowWaterCollision; downgrading to WALKABLE would
                     // allow wet-tile logic to subsequently block them.
-                    if (this.collisionManager.getCollisionAt(tileX, tileY) !== CollisionType.ALWAYS_HIGH) {
+                    if (currentCollisionType !== CollisionType.ALWAYS_HIGH) {
                         this.collisionManager.setCollisionAt(tileX, tileY, collisionType);
                     }
                 }
@@ -302,25 +296,48 @@ export class OverworldBridgeManager {
         return collisionMap;
     }
 
+    private rememberBakedTileCollision(puzzleId: string, tileX: number, tileY: number): CollisionType {
+        let bakedTilesForPuzzle = this.bakedTiles.get(puzzleId);
+        if (!bakedTilesForPuzzle) {
+            bakedTilesForPuzzle = new Map();
+            this.bakedTiles.set(puzzleId, bakedTilesForPuzzle);
+        }
+
+        const tileKey = `${tileX},${tileY}`;
+        const existingState = bakedTilesForPuzzle.get(tileKey);
+        if (existingState) {
+            return existingState.originalCollisionType;
+        }
+
+        const originalCollisionType = this.collisionManager.getCollisionAt(tileX, tileY);
+        bakedTilesForPuzzle.set(tileKey, {
+            tileX,
+            tileY,
+            originalCollisionType,
+        });
+        return originalCollisionType;
+    }
+
     /**
      * Remove exactly the tiles that were baked for this puzzle and reset their collision.
      * Called when re-entering a previously-solved puzzle so no baked tiles linger
      * underneath the dynamic puzzle renderer.
      */
     clearBakedTiles(puzzleId: string): void {
-        const positions = this.bakedTilePositions.get(puzzleId);
-        if (!positions || positions.length === 0) {
+        const bakedTilesForPuzzle = this.bakedTiles.get(puzzleId);
+        if (!bakedTilesForPuzzle || bakedTilesForPuzzle.size === 0) {
             console.log(`OverworldBridgeManager: No baked tile positions recorded for puzzle ${puzzleId}`);
             return;
         }
 
-        console.log(`OverworldBridgeManager: Clearing ${positions.length} baked tiles for puzzle ${puzzleId}`);
+        console.log(`OverworldBridgeManager: Clearing ${bakedTilesForPuzzle.size} baked tiles for puzzle ${puzzleId}`);
 
-        for (const { tileX, tileY } of positions) {
+        for (const { tileX, tileY, originalCollisionType } of bakedTilesForPuzzle.values()) {
             this.bridgesLayer.removeTileAt(tileX, tileY);
+            this.collisionManager.setCollisionAt(tileX, tileY, originalCollisionType);
         }
 
-        this.bakedTilePositions.delete(puzzleId);
+        this.bakedTiles.delete(puzzleId);
     }
 
     /**
