@@ -416,14 +416,14 @@ export class OverworldBridgeManager {
         const tileHeight = this.tiledMapData.tileheight as number;
         const endpoints = new Map<string, EndpointCombination>();
 
-        const recordEndpoint = (tileX: number, tileY: number, direction: EndpointDirection, level: EndpointLevel): void => {
+        const recordEndpoint = (tileX: number, tileY: number, direction: EndpointDirection, endpointLevel: EndpointLevel): void => {
             const key = `${tileX},${tileY}`;
             let combo = endpoints.get(key);
             if (!combo) {
                 combo = { up: 0, left: 0, right: 0, down: 0 };
                 endpoints.set(key, combo);
             }
-            combo[direction] = Math.max(combo[direction], level) as EndpointLevel;
+            combo[direction] = Math.max(combo[direction], endpointLevel) as EndpointLevel;
         };
 
         for (const bridge of bridges) {
@@ -494,7 +494,7 @@ export class OverworldBridgeManager {
             return null;
         }
 
-        const encoded = `u${combination.up}l${combination.left}r${combination.right}d${combination.down}`;
+        const encoded = this.encodeEndpointCombination(combination);
         const textureKey = `${OverworldBridgeManager.ENDPOINT_COMPOSITE_TEXTURE_PREFIX}-${encoded}`;
         if (scene.textures.exists(textureKey)) {
             return textureKey;
@@ -551,6 +551,8 @@ export class OverworldBridgeManager {
             case 'down':
                 frame = BridgeSpriteFrames.V_BRIDGE_TOP;
                 break;
+            default:
+                throw new Error(`Unsupported endpoint direction: ${String(direction)}`);
         }
         return level === 2 ? frame + BridgeSpriteFrames.DOUBLE_BRIDGE_OFFSET : frame;
     }
@@ -569,5 +571,9 @@ export class OverworldBridgeManager {
     private hasEndpointCompositeSupport(): boolean {
         const scene = this.bridgesLayer.scene;
         return !!scene?.textures?.exists('sprout-tiles');
+    }
+
+    private encodeEndpointCombination(combination: EndpointCombination): string {
+        return `u${combination.up}l${combination.left}r${combination.right}d${combination.down}`;
     }
 }
