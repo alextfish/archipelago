@@ -556,7 +556,7 @@ export class OverworldBridgeManager {
         const sprites = this.bakedEndpointSprites.get(puzzleId);
         if (!sprites || sprites.length === 0) return;
         for (const sprite of sprites) {
-            if (sprite && !sprite.destroyed) {
+            if (sprite) {
                 sprite.destroy();
             }
         }
