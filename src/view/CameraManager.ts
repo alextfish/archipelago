@@ -1,13 +1,18 @@
 import Phaser from 'phaser';
+import type { ActiveOverworldCameraTarget, CameraZoneBounds } from '@model/overworld/OverworldCameraZones';
 
 // Margin around puzzle in grid cells when zooming to fit
 const PUZZLE_VIEW_MARGIN_CELLS = 2;
+const DEFAULT_FOLLOW_ZOOM = 2;
 
 /**
  * Manages camera transitions for overworld puzzle integration
  * Handles smooth transitions between overworld view and puzzle-focused view
  */
 export class CameraManager {
+    static readonly SCOPE_TRANSITION_DURATION_MS = 1500;
+    static readonly FOLLOW_ZOOM_TRANSITION_DURATION_MS = 1200;
+
     private scene: Phaser.Scene;
     private originalBounds: Phaser.Geom.Rectangle | null = null;
     private originalZoom: number = 1;
@@ -16,10 +21,20 @@ export class CameraManager {
     private originalCenterX: number = 0;
     private originalCenterY: number = 0;
     private readonly tileSize: number;
+    private readonly defaultFollowZoom: number;
+    private explorationTween?: Phaser.Tweens.Tween;
+    private explorationZoomTween?: Phaser.Tweens.Tween;
+    private isInScopedOverworldView: boolean = false;
+    private activeOverworldTargetKey: string | null = null;
 
-    constructor(scene: Phaser.Scene, tileSize: number = 32) {
+    constructor(scene: Phaser.Scene, tileSize: number = 32, defaultFollowZoom: number = DEFAULT_FOLLOW_ZOOM) {
         this.scene = scene;
         this.tileSize = tileSize;
+        this.defaultFollowZoom = defaultFollowZoom;
+    }
+
+    getDefaultFollowZoom(): number {
+        return this.defaultFollowZoom;
     }
 
     /**
@@ -41,8 +56,8 @@ export class CameraManager {
         this.originalX = camera.scrollX;
         this.originalY = camera.scrollY;
         // Store the center point of the current view in world coordinates
-        this.originalCenterX = camera.scrollX + (camera.width / camera.zoom) / 2;
-        this.originalCenterY = camera.scrollY + (camera.height / camera.zoom) / 2;
+        this.originalCenterX = camera.scrollX + (camera.width / 2);
+        this.originalCenterY = camera.scrollY + (camera.height / 2);
 
         console.log(`CameraManager: Stored camera state - scroll(${camera.scrollX}, ${camera.scrollY}) zoom=${camera.zoom}`);
         console.log(`  Calculated center: (${this.originalCenterX}, ${this.originalCenterY})`);
@@ -194,6 +209,43 @@ export class CameraManager {
         return this.originalBounds !== null;
     }
 
+    applyOverworldTarget(
+        player: Phaser.GameObjects.Sprite,
+        target: ActiveOverworldCameraTarget,
+        options: { immediate?: boolean; force?: boolean } = {}
+    ): void {
+        const { immediate = false, force = false } = options;
+        const wasInScopedOverworldView = this.isInScopedOverworldView;
+        if (!force && this.activeOverworldTargetKey === target.key) {
+            return;
+        }
+
+        this.activeOverworldTargetKey = target.key;
+
+        if (target.mode === 'scope' && target.focusBounds) {
+            if (immediate) {
+                this.setFixedBoundsView(target.focusBounds);
+            } else {
+                this.tweenToFixedBoundsView(target.focusBounds, CameraManager.SCOPE_TRANSITION_DURATION_MS);
+            }
+            this.isInScopedOverworldView = true;
+            return;
+        }
+
+        this.isInScopedOverworldView = false;
+        if (immediate) {
+            this.setFollowView(player, target.followZoom);
+            return;
+        }
+
+        if (force || wasInScopedOverworldView) {
+            this.tweenToFollowView(player, target.followZoom, CameraManager.SCOPE_TRANSITION_DURATION_MS);
+            return;
+        }
+
+        this.tweenFollowZoom(target.followZoom, CameraManager.FOLLOW_ZOOM_TRANSITION_DURATION_MS);
+    }
+
     /**
      * Smoothly pan the camera to a specific world position and back to a target
      * object, temporarily stopping camera follow for the duration.
@@ -238,6 +290,118 @@ export class CameraManager {
         }
     }
 
+    private setFixedBoundsView(bounds: CameraZoneBounds): void {
+        const camera = this.scene.cameras.main;
+        const { centerX, centerY, targetZoom } = this.calculateBoundsFit(bounds);
+        this.stopOverworldTweens();
+        camera.stopFollow();
+        camera.setZoom(targetZoom);
+        camera.centerOn(centerX, centerY);
+    }
+
+    private setFollowView(player: Phaser.GameObjects.Sprite, zoom: number): void {
+        const camera = this.scene.cameras.main;
+        this.stopOverworldTweens();
+        camera.stopFollow();
+        camera.setZoom(zoom);
+        camera.centerOn(player.x, player.y);
+        camera.startFollow(player);
+    }
+
+    private tweenToFixedBoundsView(bounds: CameraZoneBounds, duration: number): void {
+        const camera = this.scene.cameras.main;
+        const { centerX, centerY, targetZoom } = this.calculateBoundsFit(bounds);
+        this.stopOverworldTweens();
+        const proxy = this.createCameraTweenProxy();
+        camera.stopFollow();
+        this.explorationTween = this.scene.tweens.add({
+            targets: proxy,
+            centerX,
+            centerY,
+            zoom: targetZoom,
+            duration,
+            ease: 'Power2',
+            onUpdate: () => {
+                camera.setZoom(proxy.zoom);
+                camera.centerOn(proxy.centerX, proxy.centerY);
+            },
+            onComplete: () => {
+                camera.setZoom(targetZoom);
+                camera.centerOn(centerX, centerY);
+                this.explorationTween = undefined;
+            }
+        });
+    }
+
+    private tweenToFollowView(player: Phaser.GameObjects.Sprite, zoom: number, duration: number): void {
+        const camera = this.scene.cameras.main;
+        this.stopOverworldTweens();
+        const proxy = this.createCameraTweenProxy();
+        camera.stopFollow();
+        this.explorationTween = this.scene.tweens.add({
+            targets: proxy,
+            centerX: player.x,
+            centerY: player.y,
+            zoom,
+            duration,
+            ease: 'Power2',
+            onUpdate: () => {
+                camera.setZoom(proxy.zoom);
+                camera.centerOn(proxy.centerX, proxy.centerY);
+            },
+            onComplete: () => {
+                camera.setZoom(zoom);
+                camera.centerOn(player.x, player.y);
+                camera.startFollow(player);
+                this.explorationTween = undefined;
+            }
+        });
+    }
+
+    private tweenFollowZoom(zoom: number, duration: number): void {
+        const camera = this.scene.cameras.main;
+        this.explorationZoomTween?.stop();
+        const proxy = { zoom: camera.zoom };
+        this.explorationZoomTween = this.scene.tweens.add({
+            targets: proxy,
+            zoom,
+            duration,
+            ease: 'Power2',
+            onUpdate: () => {
+                camera.setZoom(proxy.zoom);
+            },
+            onComplete: () => {
+                camera.setZoom(zoom);
+                this.explorationZoomTween = undefined;
+            }
+        });
+    }
+
+    private calculateBoundsFit(bounds: CameraZoneBounds): { centerX: number; centerY: number; targetZoom: number } {
+        const camera = this.scene.cameras.main;
+        return {
+            centerX: bounds.x + bounds.width / 2,
+            centerY: bounds.y + bounds.height / 2,
+            targetZoom: Math.min(camera.width / bounds.width, camera.height / bounds.height)
+        };
+    }
+
+    private createCameraTweenProxy(): { centerX: number; centerY: number; zoom: number } {
+        const camera = this.scene.cameras.main;
+        return {
+            centerX: camera.scrollX + (camera.width / 2),
+            centerY: camera.scrollY + (camera.height / 2),
+            zoom: camera.zoom
+        };
+    }
+
+    private stopOverworldTweens(): void {
+        this.explorationTween?.stop();
+        this.explorationTween = undefined;
+        this.explorationZoomTween?.stop();
+        this.explorationZoomTween = undefined;
+    }
+
     /**
      * Clear stored state
      */
@@ -248,5 +412,8 @@ export class CameraManager {
         this.originalY = 0;
         this.originalCenterX = 0;
         this.originalCenterY = 0;
+        this.isInScopedOverworldView = false;
+        this.activeOverworldTargetKey = null;
+        this.stopOverworldTweens();
     }
 }

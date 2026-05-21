@@ -97,11 +97,12 @@ export class OverworldPuzzleController {
                 puzzleBounds.height
             );
 
+            // Store camera state and transition to puzzle view
+            this.cameraManager.storeCameraState();
+
             // Notify view to enter puzzle mode (disables player, hides cursor, etc.)
             onModeChange('puzzle');
 
-            // Store camera state and transition to puzzle view
-            this.cameraManager.storeCameraState();
             await this.cameraManager.transitionToPuzzle(boundsRect);
 
             // Clear baked overworld bridges now that the camera has arrived, so they vanish

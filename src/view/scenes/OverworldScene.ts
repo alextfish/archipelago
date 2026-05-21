@@ -43,6 +43,7 @@ import { NPCSpriteController } from '@view/NPCSpriteController';
 import { ConversationVariableSubstitutor } from '@model/conversation/ConversationVariableSubstitutor';
 import { PortalManager } from '@view/PortalManager';
 import { buildPuzzleEntryInteractables, createBridgesLayer, isPuzzleEntryTile } from '@view/MapPuzzleSceneHelpers';
+import { OverworldCameraZones } from '@model/overworld/OverworldCameraZones';
 
 /**
  * Depth value for overhead layers (roofs, canopies, etc.) that should always
@@ -74,6 +75,7 @@ export class OverworldScene extends Phaser.Scene {
   private collisionManager: CollisionManager;
   private bridgeManager?: OverworldBridgeManager;
   private cameraManager: CameraManager;
+  private overworldCameraZones: OverworldCameraZones = OverworldCameraZones.fromTiledLayers([]);
   private puzzleController?: OverworldPuzzleController; // New: replaces direct puzzle management
   private tiledMapData?: any;
   private gridMapper!: GridToWorldMapper;
@@ -460,8 +462,11 @@ export class OverworldScene extends Phaser.Scene {
     // Set up camera to follow player
     this.cameras.main.startFollow(this.player);
     this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
-    this.cameras.main.setZoom(2);
+    this.cameras.main.setZoom(this.cameraManager.getDefaultFollowZoom());
     this.cameras.main.roundPixels = true; // avoid subpixel gaps
+
+    this.loadOverworldCameraZones();
+    this.refreshOverworldCamera({ immediate: true, force: true });
 
     // Set up input and player controller
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -1379,7 +1384,31 @@ export class OverworldScene extends Phaser.Scene {
       if (this.roofManager && this.player) {
         this.roofManager.update(this.player.x, this.player.y);
       }
+
+      this.refreshOverworldCamera();
     }
+  }
+
+  private loadOverworldCameraZones(): void {
+    const layers = this.tiledMapData?.layers ?? [];
+    this.overworldCameraZones = OverworldCameraZones.fromTiledLayers(layers);
+    console.log(
+      `Loaded ${this.overworldCameraZones.getScopeZones().length} camera scope zone(s) and ` +
+      `${this.overworldCameraZones.getZoomZones().length} camera zoom zone(s)`
+    );
+  }
+
+  private refreshOverworldCamera(options: { immediate?: boolean; force?: boolean } = {}): void {
+    if (!this.player) {
+      return;
+    }
+
+    const target = this.overworldCameraZones.resolveAt(
+      this.player.x,
+      this.player.y,
+      this.cameraManager.getDefaultFollowZoom()
+    );
+    this.cameraManager.applyOverworldTarget(this.player, target, options);
   }
 
   /**
@@ -1441,6 +1470,8 @@ export class OverworldScene extends Phaser.Scene {
     } else {
       this.lastCheckedTile = '';
     }
+
+    this.refreshOverworldCamera({ immediate: true, force: true });
 
     if (data?.fadeInDurationMs) {
       const hud = this.overworldHUD;
@@ -2164,8 +2195,6 @@ export class OverworldScene extends Phaser.Scene {
       const exitResult = await this.puzzleController.exitPuzzle(success, (mode: 'exploration') => {
         console.log('[DIAGNOSTIC] onModeChange callback called, setting mode to:', mode);
         this.gameMode = mode;
-        // Resume camera follow after returning to exploration
-        this.cameras.main.startFollow(this.player);
       }, () => {
         // Called after collision is updated but before the camera pan begins —
         // update water tile visuals and pontoon states so they are correct during
@@ -2212,6 +2241,8 @@ export class OverworldScene extends Phaser.Scene {
           this.unlockDoor(this.currentSeries.id);
         }
       }
+
+      this.refreshOverworldCamera({ force: true });
 
       // Re-enable player movement (animateDoorChange also re-enables it, but we ensure
       // it is enabled here even when no door animations ran)
@@ -2406,6 +2437,7 @@ export class OverworldScene extends Phaser.Scene {
     if (!this.player) return;
     this.player.setPosition(start.x, start.y);
     this.playerController?.clearTargetPosition();
+    this.refreshOverworldCamera({ immediate: true, force: true });
     console.log(`[Warp] Teleported player to "${start.id}" at (${start.x}, ${start.y})`);
   }
 }

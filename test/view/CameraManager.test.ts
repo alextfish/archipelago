@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CameraManager } from '@view/CameraManager';
+import type { ActiveOverworldCameraTarget } from '@model/overworld/OverworldCameraZones';
 
 // Simple mock rectangle class
 class MockRectangle {
@@ -29,7 +30,9 @@ describe('CameraManager', () => {
             zoomTo: vi.fn(),
             setZoom: vi.fn(),
             centerOn: vi.fn(),
-            setScroll: vi.fn()
+            setScroll: vi.fn(),
+            stopFollow: vi.fn(),
+            startFollow: vi.fn()
         };
 
         mockScene = {
@@ -176,6 +179,80 @@ describe('CameraManager', () => {
             cameraManager.reset();
 
             expect(cameraManager.isInPuzzleView()).toBe(false);
+        });
+    });
+
+    describe('applyOverworldTarget', () => {
+        it('immediately focuses a scoped camera region', () => {
+            const target: ActiveOverworldCameraTarget = {
+                mode: 'scope',
+                key: 'scope:baysandbanks:7',
+                followZoom: 2,
+                focusBounds: { x: 200, y: 300, width: 400, height: 150 }
+            };
+
+            cameraManager.applyOverworldTarget({ x: 0, y: 0 } as any, target, { immediate: true, force: true });
+
+            expect(mockCamera.stopFollow).toHaveBeenCalled();
+            expect(mockCamera.setZoom).toHaveBeenCalledWith(2);
+            expect(mockCamera.centerOn).toHaveBeenCalledWith(400, 375);
+        });
+
+        it('immediately restores follow with a zoom-zone zoom', () => {
+            const player = { x: 320, y: 480 };
+            const target: ActiveOverworldCameraTarget = {
+                mode: 'follow',
+                key: 'zoom:harbour:4:3',
+                followZoom: 3
+            };
+
+            cameraManager.applyOverworldTarget(player as any, target, { immediate: true, force: true });
+
+            expect(mockCamera.stopFollow).toHaveBeenCalled();
+            expect(mockCamera.setZoom).toHaveBeenCalledWith(3);
+            expect(mockCamera.centerOn).toHaveBeenCalledWith(320, 480);
+            expect(mockCamera.startFollow).toHaveBeenCalledWith(player);
+        });
+
+        it('forces a tween back to player follow after leaving a scope', () => {
+            const player = { x: 320, y: 480 };
+
+            cameraManager.applyOverworldTarget({ x: 0, y: 0 } as any, {
+                mode: 'scope',
+                key: 'scope:baysandbanks:7',
+                followZoom: 2,
+                focusBounds: { x: 200, y: 300, width: 400, height: 150 }
+            }, { immediate: true, force: true });
+
+            cameraManager.applyOverworldTarget(player as any, {
+                mode: 'follow',
+                key: 'zoom:harbour:4:3',
+                followZoom: 3
+            }, { force: true });
+
+            expect(mockCamera.startFollow).toHaveBeenCalledWith(player);
+        });
+
+        it('captures tween start from the current camera midpoint, not the world-view centre', () => {
+            mockCamera.scrollX = 100;
+            mockCamera.scrollY = 200;
+            mockCamera.zoom = 2;
+
+            mockScene.tweens.add = vi.fn((config: { targets: { centerX: number; centerY: number }; onComplete?: () => void }) => {
+                expect(config.targets.centerX).toBe(500);
+                expect(config.targets.centerY).toBe(500);
+                config.onComplete?.();
+                return {} as any;
+            });
+
+            cameraManager.applyOverworldTarget({ x: 0, y: 0 } as any, {
+                mode: 'scope',
+                key: 'scope:baysandbanks:7',
+                followZoom: 2,
+                focusBounds: { x: 200, y: 300, width: 400, height: 150 }
+            }, { force: true });
+
+            expect(mockScene.tweens.add).toHaveBeenCalledTimes(1);
         });
     });
 });

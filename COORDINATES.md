@@ -50,7 +50,7 @@ The codebase uses three distinct coordinate spaces.  Understanding which space i
 
 | Context | Scene | Camera Zoom | Coordinate Space for Sprites | Tile / Cell Size | Origin for Sprites |
 |---|---|---|---|---|---|
-| **Overworld navigation** | `OverworldScene` | **2×** (fixed) | World | 32 px | bottom-left `(0, 1)` for NPCs |
+| **Overworld navigation** | `OverworldScene` | 2× (default), modified by camera zoom regions | World | 32 px | bottom-left `(0, 1)` for NPCs |
 | **Overworld conversation** | `ConversationScene` | N/A (no camera) | Screen | 32 px base / 64 px scaled | varies by element |
 | **Embedded overworld puzzle** | `OverworldScene` (same) | **Dynamic** (zooms from overworld's 2× to fit puzzle) | World + puzzle offset | 32 px | top-left `(0, 0)` |
 | **Standalone series puzzle** | `IslandMapScene` | **Dynamic** (fit-to-islands) | World (no offset) | 32 px | top-left `(0, 0)` |
