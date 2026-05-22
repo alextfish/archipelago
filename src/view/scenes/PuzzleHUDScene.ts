@@ -5,15 +5,24 @@ import type { PuzzleController } from '@controller/PuzzleController';
 
 export class PuzzleHUDScene extends Phaser.Scene {
     private static readonly SOLVED_OVERLAY_DURATION_MS = 1000;
+    private static readonly SOLVED_OVERLAY_TEXTURE_KEY = 'puzzle-solved-tick';
+    private static readonly SOLVED_OVERLAY_ALPHA = 0.8;
+    private static readonly SOLVED_OVERLAY_END_SCALE = 1.35;
     private sidebar: PuzzleSidebar | null = null;
     private counts: Record<string, number> = {};
     private types: BridgeType[] = [];
-    private solvedOverlay: Phaser.GameObjects.Container | null = null;
+    private solvedOverlay: Phaser.GameObjects.Image | null = null;
     private eventListeners: Array<{ emitter: Phaser.Events.EventEmitter; event: string; callback: Function }> = [];
     private backgroundRect: Phaser.GameObjects.Rectangle | null = null;
 
     constructor() {
         super({ key: 'PuzzleHUDScene' });
+    }
+
+    preload(): void {
+        if (!this.textures.exists(PuzzleHUDScene.SOLVED_OVERLAY_TEXTURE_KEY)) {
+            this.load.image(PuzzleHUDScene.SOLVED_OVERLAY_TEXTURE_KEY, 'resources/sprites/tick320.png');
+        }
     }
 
     create() {
@@ -232,26 +241,22 @@ export class PuzzleHUDScene extends Phaser.Scene {
         const centerX = (this.scale?.width ?? 800) / 2;
         const centerY = (this.scale?.height ?? 600) / 2;
 
-        const symbol = this.add.text(centerX, centerY, '☑', {
-            color: '#00ff00',
-            fontSize: '200px',
-            fontStyle: 'bold'
-        }).setOrigin(0.5, 0.5);
-
-        symbol.setScrollFactor(0);
-        symbol.setDepth(2001);
-
-        this.solvedOverlay = this.add.container(0, 0, [symbol]);
+        this.solvedOverlay = this.add.image(
+            centerX,
+            centerY,
+            PuzzleHUDScene.SOLVED_OVERLAY_TEXTURE_KEY
+        );
+        this.solvedOverlay.setOrigin(0.5, 0.5);
         this.solvedOverlay.setDepth(2000);
-        this.solvedOverlay.setAlpha(1);
+        this.solvedOverlay.setAlpha(PuzzleHUDScene.SOLVED_OVERLAY_ALPHA);
         this.solvedOverlay.setScale(1);
         this.solvedOverlay.setScrollFactor(0);
 
         this.tweens.add({
             targets: this.solvedOverlay,
             alpha: 0,
-            scaleX: 0,
-            scaleY: 0,
+            scaleX: PuzzleHUDScene.SOLVED_OVERLAY_END_SCALE,
+            scaleY: PuzzleHUDScene.SOLVED_OVERLAY_END_SCALE,
             duration: PuzzleHUDScene.SOLVED_OVERLAY_DURATION_MS,
             ease: 'Power2',
             onComplete: () => {

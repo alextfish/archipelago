@@ -2242,7 +2242,7 @@ export class OverworldScene extends Phaser.Scene {
         }
       }
 
-      this.refreshOverworldCamera({ force: true });
+      this.refreshOverworldCamera({ immediate: true, force: true });
 
       // Re-enable player movement (animateDoorChange also re-enables it, but we ensure
       // it is enabled here even when no door animations ran)

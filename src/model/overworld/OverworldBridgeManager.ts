@@ -16,10 +16,7 @@ export class OverworldBridgeManager {
     private static readonly BRIDGES_LAYER_NAME = 'bridges';
     private static readonly ENDPOINT_COMPOSITE_TEXTURE_PREFIX = 'bridge-endpoint-composite';
     private static readonly ENDPOINT_LAYER_ORDER: ReadonlyArray<EndpointDirection> = ['up', 'left', 'right', 'down'];
-    private static readonly BRIDGE_TILESET_IMAGES = [
-        'SproutLandsGrassIslands.png',
-        'terrains.png',
-    ] as const;
+    private static readonly BRIDGE_TILESET_IMAGE = 'SproutLandsGrassIslands.png';
 
     private bridgeTilesetFirstGid: number = 0;
 
@@ -44,12 +41,12 @@ export class OverworldBridgeManager {
         if (this.bridgeTilesetFirstGid > 0) {
             // fine
         } else {
-            console.error(`OverworldBridgeManager: Could not find bridge tileset image among ${OverworldBridgeManager.BRIDGE_TILESET_IMAGES.join(', ')}`);
+            console.error(`OverworldBridgeManager: Could not find bridge tileset image ${OverworldBridgeManager.BRIDGE_TILESET_IMAGE}`);
         }
     }
 
     /**
-     * Find the firstgid of the bridge tileset by searching for a known bridge tileset image filename.
+     * Find the firstgid of the bridge tileset by searching for the SproutLands bridge tileset image filename.
      */
     private findBridgeTilesetFirstGid(): number {
         // Search through all tilesets in the tiledMapData
@@ -59,9 +56,7 @@ export class OverworldBridgeManager {
         }
 
         for (const tilesetData of this.tiledMapData.tilesets) {
-            const matchesBridgeTilesetImage = OverworldBridgeManager.BRIDGE_TILESET_IMAGES
-                .some(imageName => tilesetData.image?.endsWith(imageName));
-            if (matchesBridgeTilesetImage) {
+            if (tilesetData.image?.endsWith(OverworldBridgeManager.BRIDGE_TILESET_IMAGE)) {
                 console.log(`OverworldBridgeManager: Found bridge tileset '${tilesetData.name}' with image ${tilesetData.image}`);
                 return tilesetData.firstgid;
             }

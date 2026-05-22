@@ -35,6 +35,23 @@ const mockTiledMapData = {
     ]
 };
 
+const mockTiledMapDataWithTerrainsFirst = {
+    tilewidth: 32,
+    tileheight: 32,
+    tilesets: [
+        {
+            name: 'terrains',
+            image: 'tilesets/terrains.png',
+            firstgid: 11,
+        },
+        {
+            name: 'SproutLands',
+            image: 'tilesets/SproutLandsGrassIslands.png',
+            firstgid: 3007,
+        }
+    ]
+};
+
 /**
  * Puzzle bounds anchored at world (0, 0) for simple tile ↔ world arithmetic.
  * At 32 px/tile, grid position (gx, gy) maps to world tile (gx, gy).
@@ -284,6 +301,31 @@ describe('OverworldBridgeManager', () => {
             expect(collisionManager.setCollisionAt).toHaveBeenCalledWith(3, 3, CollisionType.BLOCKED);
             expect(collisionManager.setCollisionAt).toHaveBeenCalledWith(4, 3, CollisionType.BLOCKED);
             expect(collisionManager.setCollisionAt).toHaveBeenCalledWith(5, 3, CollisionType.BLOCKED);
+        });
+    });
+
+    describe('tileset selection', () => {
+        it('prefers the SproutLands bridge tileset even when terrains appears first in the map export', () => {
+            const terrainsFirstManager = new OverworldBridgeManager(
+                bridgesLayer as any,
+                mockTiledMapDataWithTerrainsFirst,
+                collisionManager
+            );
+
+            const bridge: Bridge = {
+                id: 'tileset-priority',
+                start: { x: 1, y: 3 },
+                end: { x: 5, y: 3 },
+                type: { id: 'single' }
+            };
+
+            terrainsFirstManager.bakePuzzleBridges('tileset-priority', puzzleBounds, [bridge]);
+
+            expect(bridgesLayer.putTileAt).toHaveBeenNthCalledWith(1, 3007 + 55, 1, 3);
+            expect(bridgesLayer.putTileAt).toHaveBeenNthCalledWith(2, 3007 + 56, 2, 3);
+            expect(bridgesLayer.putTileAt).toHaveBeenNthCalledWith(3, 3007 + 56, 3, 3);
+            expect(bridgesLayer.putTileAt).toHaveBeenNthCalledWith(4, 3007 + 56, 4, 3);
+            expect(bridgesLayer.putTileAt).toHaveBeenNthCalledWith(5, 3007 + 57, 5, 3);
         });
     });
 });
