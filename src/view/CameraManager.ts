@@ -336,18 +336,23 @@ export class CameraManager {
     private tweenToFollowView(player: Phaser.GameObjects.Sprite, zoom: number, duration: number): void {
         const camera = this.scene.cameras.main;
         this.stopOverworldTweens();
-        const proxy = this.createCameraTweenProxy();
+        const startView = this.createCameraTweenProxy();
+        const proxy = {
+            progress: 0,
+            zoom: camera.zoom
+        };
         camera.stopFollow();
         this.explorationTween = this.scene.tweens.add({
             targets: proxy,
-            centerX: player.x,
-            centerY: player.y,
+            progress: 1,
             zoom,
             duration,
             ease: 'Power2',
             onUpdate: () => {
+                const dynamicCenterX = startView.centerX + ((player.x - startView.centerX) * proxy.progress);
+                const dynamicCenterY = startView.centerY + ((player.y - startView.centerY) * proxy.progress);
                 camera.setZoom(proxy.zoom);
-                camera.centerOn(proxy.centerX, proxy.centerY);
+                camera.centerOn(dynamicCenterX, dynamicCenterY);
             },
             onComplete: () => {
                 camera.setZoom(zoom);

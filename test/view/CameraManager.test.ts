@@ -254,5 +254,45 @@ describe('CameraManager', () => {
 
             expect(mockScene.tweens.add).toHaveBeenCalledTimes(1);
         });
+
+        it('retargets the follow tween to the player position as they move', () => {
+            const player = { x: 320, y: 480 };
+            mockCamera.scrollX = 100;
+            mockCamera.scrollY = 200;
+            mockCamera.zoom = 2;
+
+            mockScene.tweens.add = vi.fn((config: {
+                targets: { progress: number; zoom: number };
+                onUpdate?: () => void;
+                onComplete?: () => void;
+            }) => {
+                player.x = 700;
+                player.y = 900;
+                config.targets.progress = 0.5;
+                config.targets.zoom = 2.5;
+                config.onUpdate?.();
+                config.targets.progress = 1;
+                config.targets.zoom = 3;
+                config.onComplete?.();
+                return {} as any;
+            });
+
+            cameraManager.applyOverworldTarget({ x: 0, y: 0 } as any, {
+                mode: 'scope',
+                key: 'scope:baysandbanks:7',
+                followZoom: 2,
+                focusBounds: { x: 200, y: 300, width: 400, height: 150 }
+            }, { immediate: true, force: true });
+
+            cameraManager.applyOverworldTarget(player as any, {
+                mode: 'follow',
+                key: 'zoom:harbour:4:3',
+                followZoom: 3
+            }, { force: true });
+
+            expect(mockCamera.centerOn).toHaveBeenCalledWith(600, 700);
+            expect(mockCamera.centerOn).toHaveBeenCalledWith(700, 900);
+            expect(mockCamera.startFollow).toHaveBeenCalledWith(player);
+        });
     });
 });

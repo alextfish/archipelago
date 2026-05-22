@@ -69,37 +69,29 @@ export class RoofManager {
 
             console.log(`RoofManager: Processing layer "${fullPath}" with ${hideZoneLayer.objects.length} objects`);
 
-            // Process each polygon object in the layer
+            // Process each supported object in the layer
             for (const obj of hideZoneLayer.objects) {
-                if (obj.polygon) {
-                    const zone = this.createHideZone(obj, map);
-                    if (zone) {
-                        this.hideZones.push(zone);
-                        console.log(`RoofManager: Added hide zone "${zone.id}" with ${zone.tiles.length} tiles`);
-                    }
+                const zone = this.createHideZone(obj, map);
+                if (zone) {
+                    this.hideZones.push(zone);
+                    console.log(`RoofManager: Added hide zone "${zone.id}" with ${zone.tiles.length} tiles`);
                 }
             }
         }
     }
 
     /**
-     * Create a hide zone from a Tiled polygon object
+     * Create a hide zone from a Tiled polygon or rectangle object
      */
     private createHideZone(obj: any, map: Phaser.Tilemaps.Tilemap): RoofHideZone | null {
-        if (!obj.polygon || this.roofLayers.length === 0) {
+        if (this.roofLayers.length === 0) {
             return null;
         }
 
-        // Convert Tiled polygon points to world coordinates
-        // Tiled polygon points are relative to object position
-        const points = obj.polygon.map((point: any) => {
-            return new Phaser.Math.Vector2(
-                obj.x + point.x,
-                obj.y + point.y
-            );
-        });
-
-        const polygon = new Phaser.Geom.Polygon(points);
+        const polygon = this.createPolygonFromObject(obj);
+        if (!polygon) {
+            return null;
+        }
 
         // Find all roof tiles that are within or overlap this polygon
         const tiles = this.findTilesInPolygon(polygon, map);
@@ -110,6 +102,30 @@ export class RoofManager {
             tiles,
             isPlayerInside: false
         };
+    }
+
+    private createPolygonFromObject(obj: any): Phaser.Geom.Polygon | null {
+        if (obj.polygon) {
+            const points = obj.polygon.map((point: any) => {
+                return {
+                    x: obj.x + point.x,
+                    y: obj.y + point.y
+                };
+            });
+
+            return new Phaser.Geom.Polygon(points);
+        }
+
+        if (typeof obj.width === 'number' && typeof obj.height === 'number' && obj.width > 0 && obj.height > 0) {
+            return new Phaser.Geom.Polygon([
+                { x: obj.x, y: obj.y },
+                { x: obj.x + obj.width, y: obj.y },
+                { x: obj.x + obj.width, y: obj.y + obj.height },
+                { x: obj.x, y: obj.y + obj.height }
+            ]);
+        }
+
+        return null;
     }
 
     /**
