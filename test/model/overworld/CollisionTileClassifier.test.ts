@@ -161,6 +161,29 @@ describe('CollisionTileClassifier', () => {
             ]);
             expect(result.collisionType).toBe(CollisionType.ALWAYS_HIGH);
         });
+
+        it('classifies walkable_half=s as WALKABLE_HALF_S', () => {
+            const result = CollisionTileClassifier.classifyTile([{ properties: { walkable_half: 's' } }]);
+            expect(result.collisionType).toBe(CollisionType.WALKABLE_HALF_S);
+        });
+
+        it('classifies walkable_half=sw as WALKABLE_HALF_SW', () => {
+            const result = CollisionTileClassifier.classifyTile([{ properties: { walkable_half: 'sw' } }]);
+            expect(result.collisionType).toBe(CollisionType.WALKABLE_HALF_SW);
+        });
+
+        it('ignores invalid walkable_half values', () => {
+            const result = CollisionTileClassifier.classifyTile([{ properties: { walkable_half: 'bogus' } }]);
+            expect(result.collisionType).toBe(CollisionType.BLOCKED);
+        });
+
+        it('WALKABLE takes priority over walkable_half', () => {
+            const result = CollisionTileClassifier.classifyTile([
+                { properties: { walkable_half: 'sw' } },
+                { properties: { walkable: true } },
+            ]);
+            expect(result.collisionType).toBe(CollisionType.WALKABLE);
+        });
     });
 
     describe('toSubLayerValues', () => {
@@ -237,6 +260,16 @@ describe('CollisionTileClassifier', () => {
         it('returns upperGround=1 for NARROW_EW (treated as upper-ground)', () => {
             const result = CollisionTileClassifier.toSubLayerValues({
                 collisionType: CollisionType.NARROW_EW,
+                hasWalkable: false,
+                hasWalkableLow: false,
+                hasTile: true
+            });
+            expect(result).toEqual({ upperGround: 1, lowerGround: 0, blocked: 0 });
+        });
+
+        it('returns upperGround=1 for WALKABLE_HALF_SW (treated as upper-ground)', () => {
+            const result = CollisionTileClassifier.toSubLayerValues({
+                collisionType: CollisionType.WALKABLE_HALF_SW,
                 hasWalkable: false,
                 hasWalkableLow: false,
                 hasTile: true

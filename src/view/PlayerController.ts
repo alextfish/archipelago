@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CollisionType } from '@model/overworld/CollisionManager';
 import { isTestMode } from '@helpers/TestMarkers';
+import { isBoundaryCrossingWalkable, isPositionWalkableInTile, isWalkableHalfCollisionType } from '@model/overworld/WalkableHalfTile';
 
 /**
  * Movement constants for player character
@@ -200,12 +201,30 @@ export class PlayerController {
             this.playerLayer = 'upper';
         } else if (currentType === CollisionType.NARROW_NS || currentType === CollisionType.NARROW_EW) {
             this.playerLayer = 'upper';
+        } else if (isWalkableHalfCollisionType(currentType)) {
+            this.playerLayer = 'upper';
         }
         // BLOCKED or unknown: leave playerLayer unchanged
 
         if (isTestMode()) {
             if (this.playerLayer !== previousLayer) {
-                const typeNames: Record<number, string> = { 0: 'BLOCKED', 1: 'WALKABLE', 2: 'WALKABLE_LOW', 3: 'STAIRS', 4: 'ALWAYS_HIGH', 5: 'NARROW_NS', 6: 'NARROW_EW' };
+                const typeNames: Record<number, string> = {
+                    0: 'BLOCKED',
+                    1: 'WALKABLE',
+                    2: 'WALKABLE_LOW',
+                    3: 'STAIRS',
+                    4: 'ALWAYS_HIGH',
+                    5: 'NARROW_NS',
+                    6: 'NARROW_EW',
+                    7: 'WALKABLE_HALF_N',
+                    8: 'WALKABLE_HALF_S',
+                    9: 'WALKABLE_HALF_E',
+                    10: 'WALKABLE_HALF_W',
+                    11: 'WALKABLE_HALF_NE',
+                    12: 'WALKABLE_HALF_NW',
+                    13: 'WALKABLE_HALF_SE',
+                    14: 'WALKABLE_HALF_SW',
+                };
                 console.log(`[PlayerLayer] ${previousLayer} -> ${this.playerLayer} (tile ${tileX},${tileY} type=${typeNames[currentType] ?? currentType})`);
             }
             this.updateLayerDebugDisplay(tileX, tileY);
@@ -407,6 +426,10 @@ export class PlayerController {
 
             if (this.getCollisionAt) {
                 const currentType = this.getCollisionAt(currentTileX, currentTileY);
+                if (isWalkableHalfCollisionType(currentType) &&
+                    !isPositionWalkableInTile(currentType, finalX, finalY, currentTileX, currentTileY, TILE_SIZE)) {
+                    return false;
+                }
                 if (currentType === CollisionType.NARROW_NS) {
                     // Clamp x to the central band; allow y freely.
                     const centreX = tileCentre(currentTileX);
@@ -448,13 +471,68 @@ export class PlayerController {
             if (!this.canEnter(currentType, hType) || this.isNarrowEntryBlocked(currentType, hType, true, false)) {
                 return false;
             }
+            if (!isBoundaryCrossingWalkable(
+                currentType,
+                hType,
+                'x',
+                originalY,
+                currentTileX,
+                currentTileY,
+                nextTileX,
+                currentTileY,
+                TILE_SIZE
+            )) {
+                return false;
+            }
             if (!this.canEnter(currentType, vType) || this.isNarrowEntryBlocked(currentType, vType, false, true)) {
+                return false;
+            }
+            if (!isBoundaryCrossingWalkable(
+                currentType,
+                vType,
+                'y',
+                originalX,
+                currentTileX,
+                currentTileY,
+                currentTileX,
+                nextTileY,
+                TILE_SIZE
+            )) {
                 return false;
             }
         }
 
         if (!this.canEnter(currentType, targetType)) return false;
         if (this.isNarrowEntryBlocked(currentType, targetType, crossesX, crossesY)) return false;
+        if (!isPositionWalkableInTile(targetType, nextX, nextY, nextTileX, nextTileY, TILE_SIZE)) return false;
+        if (crossesX && !crossesY &&
+            !isBoundaryCrossingWalkable(
+                currentType,
+                targetType,
+                'x',
+                nextY,
+                currentTileX,
+                currentTileY,
+                nextTileX,
+                nextTileY,
+                TILE_SIZE
+            )) {
+            return false;
+        }
+        if (crossesY && !crossesX &&
+            !isBoundaryCrossingWalkable(
+                currentType,
+                targetType,
+                'y',
+                nextX,
+                currentTileX,
+                currentTileY,
+                nextTileX,
+                nextTileY,
+                TILE_SIZE
+            )) {
+            return false;
+        }
 
         // Move is valid — apply it.
         this.player.x = nextX;
@@ -478,7 +556,8 @@ export class PlayerController {
         // Keep playerLayer in sync immediately (also synced at the top of each update())
         if (targetType === CollisionType.WALKABLE ||
             targetType === CollisionType.NARROW_NS ||
-            targetType === CollisionType.NARROW_EW) {
+            targetType === CollisionType.NARROW_EW ||
+            isWalkableHalfCollisionType(targetType)) {
             this.playerLayer = 'upper';
         } else if (targetType === CollisionType.WALKABLE_LOW) {
             this.playerLayer = 'lower';
@@ -525,10 +604,12 @@ export class PlayerController {
         if (from === CollisionType.STAIRS) return true;
         // ALWAYS_HIGH and narrow passages are upper-ground; normalise to WALKABLE for layer matching.
         const normFrom = (from === CollisionType.ALWAYS_HIGH ||
-            from === CollisionType.NARROW_NS || from === CollisionType.NARROW_EW)
+            from === CollisionType.NARROW_NS || from === CollisionType.NARROW_EW ||
+            isWalkableHalfCollisionType(from))
             ? CollisionType.WALKABLE : from;
         const normTo = (to === CollisionType.ALWAYS_HIGH ||
-            to === CollisionType.NARROW_NS || to === CollisionType.NARROW_EW)
+            to === CollisionType.NARROW_NS || to === CollisionType.NARROW_EW ||
+            isWalkableHalfCollisionType(to))
             ? CollisionType.WALKABLE : to;
         return normFrom === normTo;
     }

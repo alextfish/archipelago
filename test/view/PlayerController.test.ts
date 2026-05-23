@@ -402,5 +402,70 @@ describe('PlayerController', () => {
                 expect(player.y).toBeLessThanOrEqual(TILE_3_CENTRE + NARROW_HALF_WIDTH);
             });
         });
+
+        describe('walkable-half tiles', () => {
+            const TILE_SIZE = 32;
+
+            function makeControllerWithCollisionMap(
+                getCollisionAt: (tx: number, ty: number) => CollisionType
+            ): { ctrl: PlayerController; player: MockSprite } {
+                const player: MockSprite = {
+                    x: 1 * TILE_SIZE + TILE_SIZE / 2,
+                    y: 1 * TILE_SIZE + TILE_SIZE / 2,
+                    width: TILE_SIZE,
+                    height: TILE_SIZE,
+                    setPosition: vi.fn(function (x: number, y: number) {
+                        player.x = x;
+                        player.y = y;
+                    }),
+                    anims: { play: vi.fn(), currentAnim: null }
+                };
+                const scene: MockScene = {
+                    anims: { create: vi.fn(), generateFrameNumbers: vi.fn(() => []), exists: vi.fn(() => false) },
+                    game: { loop: { delta: 16 } }
+                };
+                const cursors: MockCursors = {
+                    up: { isDown: false }, down: { isDown: false },
+                    left: { isDown: false }, right: { isDown: false }
+                };
+                const ctrl = new PlayerController(
+                    scene as unknown as Phaser.Scene,
+                    player as unknown as Phaser.GameObjects.Sprite,
+                    cursors as unknown as Phaser.Types.Input.Keyboard.CursorKeys,
+                    getCollisionAt
+                );
+                return { ctrl, player };
+            }
+
+            it('does not allow moving into the blocked half of a tile', () => {
+                const { ctrl, player } = makeControllerWithCollisionMap((tx: number, ty: number) => {
+                    if (tx === 1 && ty === 1) return CollisionType.WALKABLE_HALF_E;
+                    return CollisionType.WALKABLE;
+                });
+
+                const startX = player.x;
+                ctrl.setTargetPosition(player.x - 40, player.y);
+                ctrl.update();
+
+                expect(player.x).toBe(startX);
+            });
+
+            it('blocks crossing from east-only tile to west-only tile stacked vertically', () => {
+                const { ctrl, player } = makeControllerWithCollisionMap((tx: number, ty: number) => {
+                    if (tx === 1 && ty === 1) return CollisionType.WALKABLE_HALF_E;
+                    if (tx === 1 && ty === 2) return CollisionType.WALKABLE_HALF_W;
+                    return CollisionType.WALKABLE;
+                });
+
+                player.x = 1 * TILE_SIZE + 24;
+                player.y = 2 * TILE_SIZE - 2;
+                const startTileY = Math.floor(player.y / TILE_SIZE);
+
+                ctrl.setTargetPosition(player.x, player.y + 20);
+                ctrl.update();
+
+                expect(Math.floor(player.y / TILE_SIZE)).toBe(startTileY);
+            });
+        });
     });
 });
