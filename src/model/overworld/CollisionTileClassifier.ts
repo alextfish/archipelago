@@ -1,5 +1,5 @@
 import { CollisionType } from '@model/overworld/CollisionTypes';
-import { collisionTypeFromWalkableHalfDirection } from '@model/overworld/WalkableHalfTile';
+import { collisionTypeFromWalkableHalfDirection, isWalkableHalfCollisionType } from '@model/overworld/WalkableHalfTile';
 
 /**
  * The properties a Tiled collision tile can carry.
@@ -164,14 +164,7 @@ export class CollisionTileClassifier {
 
         if (result.collisionType === CollisionType.NARROW_NS ||
             result.collisionType === CollisionType.NARROW_EW ||
-            result.collisionType === CollisionType.WALKABLE_HALF_N ||
-            result.collisionType === CollisionType.WALKABLE_HALF_S ||
-            result.collisionType === CollisionType.WALKABLE_HALF_E ||
-            result.collisionType === CollisionType.WALKABLE_HALF_W ||
-            result.collisionType === CollisionType.WALKABLE_HALF_NE ||
-            result.collisionType === CollisionType.WALKABLE_HALF_NW ||
-            result.collisionType === CollisionType.WALKABLE_HALF_SE ||
-            result.collisionType === CollisionType.WALKABLE_HALF_SW) {
+            isWalkableHalfCollisionType(result.collisionType)) {
             // Narrow passages are upper-ground tiles; the directional movement
             // constraint is enforced by PlayerController, not by the sub-layer system.
             return { upperGround: 1, lowerGround: 0, blocked: 0 };

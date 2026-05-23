@@ -37,7 +37,9 @@ describe('WalkableHalfTile', () => {
         });
 
         it('checks half-tile geometry against world position', () => {
+            // Tile (1,1) spans x:[32..64), so x=58 is in its eastern half (x >= 48 centre line).
             expect(isPositionWalkableInTile(CollisionType.WALKABLE_HALF_E, 58, 40, 1, 1)).toBe(true);
+            // x=38 is in the western half of tile (1,1), so WALKABLE_HALF_E should reject it.
             expect(isPositionWalkableInTile(CollisionType.WALKABLE_HALF_E, 38, 40, 1, 1)).toBe(false);
         });
     });
