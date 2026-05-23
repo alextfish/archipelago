@@ -398,13 +398,13 @@ export class MapPuzzleExtractor {
         // Check relevant tile layers for island tiles
         let islandLayers: MapLayer[];
         if (definition.regionGroup) {
-            // Region-specific search: check all supported island source layers within this region
+            // Region-specific search: check all supported island source layers within this region.
             islandLayers = overworldPuzzleTileSourceLayerNames
                 .map(layerName => this.findLayerInRegion(tiledMap, definition.regionGroup!, layerName))
                 .filter(Boolean) as MapLayer[];
             console.log(`Extracting islands for ${definition.id} from region ${definition.regionGroup}`);
         } else {
-            // Fallback: global search for backward compatibility
+            // Fallback: global search for backward compatibility.
             islandLayers = ['terrain', 'islands', 'puzzle_elements', ...overworldPuzzleTileSourceLayerNames]
                 .map(name => this.findTileLayer(tiledMap, name))
                 .filter(Boolean) as MapLayer[];

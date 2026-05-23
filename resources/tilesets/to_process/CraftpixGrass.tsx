@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <tileset version="1.10" tiledversion="1.11.2" name="CraftpixGrass" tilewidth="16" tileheight="16" tilecount="806" columns="31">
+ <grid orientation="orthogonal" width="32" height="32"/>
  <image source="../CraftpixGrass.png" width="496" height="416"/>
  <wangsets>
   <wangset name="Unnamed Set" type="corner" tile="-1">

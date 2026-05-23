@@ -342,7 +342,7 @@ describe("MapPuzzleExtractor", () => {
                                 type: "tilelayer",
                                 width: 20,
                                 height: 20,
-                                data: Array(400).fill(0).map((_, i) => i === 11 ? 6 : 0),
+                                data: Array(400).fill(0).map((_, i) => i === 15 ? 6 : 0),
                                 visible: true,
                                 opacity: 1
                             }
@@ -351,7 +351,7 @@ describe("MapPuzzleExtractor", () => {
                 ]
             };
 
-            const puzzle = extractor.createBridgePuzzle(
+            const beachPuzzle = extractor.createBridgePuzzle(
                 {
                     id: "beach_puzzle",
                     regionGroup: "Beach",
@@ -361,7 +361,7 @@ describe("MapPuzzleExtractor", () => {
                 mapWithRegionalPuzzleTiles
             );
 
-            expect(puzzle.islands.length).toBe(2);
+            expect(beachPuzzle.islands.length).toBe(2);
         });
 
         it("should search all ground layers when no region specified", () => {
@@ -396,7 +396,7 @@ describe("MapPuzzleExtractor", () => {
         });
 
         it("should search puzzleTiles layers when no region is specified", () => {
-            const mapWithPuzzleTiles: TiledMapData = {
+            const mapWithPuzzleTilesLayer: TiledMapData = {
                 width: 10,
                 height: 10,
                 tilewidth: 32,
@@ -420,7 +420,7 @@ describe("MapPuzzleExtractor", () => {
                     bounds: { x: 0, y: 0, width: 320, height: 320 },
                     metadata: {}
                 },
-                mapWithPuzzleTiles
+                mapWithPuzzleTilesLayer
             );
 
             expect(puzzle.islands.length).toBe(1);

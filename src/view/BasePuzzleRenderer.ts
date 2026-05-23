@@ -6,8 +6,9 @@ import type { BridgeType } from '@model/puzzle/BridgeType';
 import type { Point } from '@model/puzzle/Point';
 import type { Bridge } from '@model/puzzle/Bridge';
 import { GridToWorldMapper } from './GridToWorldMapper';
-import { orientationForDelta, normalizeRenderOrder } from './PuzzleRenderer';
+import { normalizeRenderOrder } from './PuzzleRenderer';
 import { BridgeSpriteFrames, BridgeVisualConstants } from './BridgeSpriteFrameRegistry';
+import { buildBridgeStripLayout } from './BridgeStripLayout';
 import { ConstraintFeedbackDisplay } from './ConstraintFeedbackDisplay';
 import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
 import type { ConstraintDisplayItem } from '@model/puzzle/constraints/ConstraintDisplayItem';
@@ -488,68 +489,35 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
 
         if (!end) return;
 
-        // Normalise direction and compute geometry
-        const ordered = normalizeRenderOrder(start, end);
-        const startGrid = ordered.start;
-        const endGrid = ordered.end;
-        const startWorld = this.gridMapper.gridToWorld(startGrid.x, startGrid.y);
-        const endWorld = this.gridMapper.gridToWorld(endGrid.x, endGrid.y);
-        const worldLength = Math.sqrt((endWorld.x - startWorld.x) ** 2 + (endWorld.y - startWorld.y) ** 2);
-        const dxGrid = endGrid.x - startGrid.x;
-        const dyGrid = endGrid.y - startGrid.y;
-        const gridDist = Math.sqrt(dxGrid * dxGrid + dyGrid * dyGrid);
-        const segCount = Math.max(1, Math.ceil(gridDist - 0.01));
-        const worldStep = { x: (endWorld.x - startWorld.x) / segCount, y: (endWorld.y - startWorld.y) / segCount };
-        const angle = Math.atan2(endWorld.y - startWorld.y, endWorld.x - startWorld.x);
-        const spacing = Math.sqrt(worldStep.x * worldStep.x + worldStep.y * worldStep.y);
-        const scale = this.gridMapper.getCellSize() / 32;
-        const orient = orientationForDelta(startGrid, endGrid);
-
-        // Centre container at the midpoint (cell-centred coordinates)
         const cellSize = this.gridMapper.getCellSize();
-        const midX = (startWorld.x + endWorld.x) / 2 + cellSize / 2;
-        const midY = (startWorld.y + endWorld.y) / 2 + cellSize / 2;
-        const container = this.scene.add.container(midX, midY);
+        const scale = this.gridMapper.getCellSize() / 32;
+        const layout = buildBridgeStripLayout({
+            start,
+            end,
+            cellSize,
+            isDouble: (bridgeIds && bridgeIds.length >= 2) || false,
+            useEdges,
+            gridToWorld: (gridX: number, gridY: number) => this.gridMapper.gridToWorld(gridX, gridY),
+        });
+        const container = this.scene.add.container(layout.centreX, layout.centreY);
         container.setDepth(5);
-        container.setRotation(angle);
+        container.setRotation(layout.angle);
 
-        // Use double-bridge frames when two bridge ids share the same island-pair
-        const isDouble = (bridgeIds && bridgeIds.length >= 2) || false;
-        const chooseFrame = (i: number) => {
-            const base = (() => {
-                if (!useEdges) return orient === 'horizontal' ? BridgeSpriteFrames.H_BRIDGE_CENTRE : BridgeSpriteFrames.V_BRIDGE_MIDDLE;
-                if (orient === 'horizontal') {
-                    if (i === 0 && segCount === 1) return BridgeSpriteFrames.H_BRIDGE_SINGLE;
-                    if (i === 0) return BridgeSpriteFrames.H_BRIDGE_LEFT;
-                    if (i === segCount - 1) return BridgeSpriteFrames.H_BRIDGE_RIGHT;
-                    return BridgeSpriteFrames.H_BRIDGE_CENTRE;
-                } else {
-                    if (i === 0 && segCount === 1) return BridgeSpriteFrames.V_BRIDGE_SINGLE;
-                    if (i === 0) return BridgeSpriteFrames.V_BRIDGE_BOTTOM;
-                    if (i === segCount - 1) return BridgeSpriteFrames.V_BRIDGE_TOP;
-                    return BridgeSpriteFrames.V_BRIDGE_MIDDLE;
-                }
-            })();
-            return isDouble ? base + BridgeSpriteFrames.DOUBLE_BRIDGE_OFFSET : base;
-        };
-
-        // Place tile sprites along the container's local X axis, centred
-        const centreIndexOffset = (segCount - 1) / 2;
-        for (let i = 0; i < segCount; i++) {
-            const tile = this.scene.add.sprite(0, 0, this.textureKey, chooseFrame(i))
+        for (const segment of layout.segments) {
+            const tile = this.scene.add.sprite(0, 0, this.textureKey, segment.frame)
                 .setOrigin(0.5, 0.5)
                 .setScale(scale, scale);
             if (alpha !== undefined) tile.setAlpha(alpha);
             if (tint !== undefined) tile.setTintFill(tint);
-            tile.x = (i - centreIndexOffset) * spacing;
-            tile.y = 0;
-            if (orient !== 'horizontal') tile.setRotation(Math.PI / 2);
+            tile.x = segment.x;
+            tile.y = segment.y;
+            if (segment.rotation !== 0) tile.setRotation(segment.rotation);
             container.add(tile);
         }
 
         // For placed bridges: add interactive hit-area and hover outline
         if (target === 'placed') {
-            this.addClickableBridgeOutline(worldLength, container, opts);
+            this.addClickableBridgeOutline(layout.worldLength, container, opts);
         }
 
         // Register and store

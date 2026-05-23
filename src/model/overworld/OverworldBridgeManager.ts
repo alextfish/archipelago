@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { Bridge } from '@model/puzzle/Bridge';
 import type { OverworldGameState } from './OverworldGameState';
 import { BridgeSpriteFrames } from '@view/BridgeSpriteFrameRegistry';
+import { buildBridgeStripLayout } from '@view/BridgeStripLayout';
 import { CollisionType } from './CollisionManager';
 
 type EndpointDirection = 'up' | 'left' | 'right' | 'down';
@@ -14,6 +15,8 @@ type EndpointCombination = Record<EndpointDirection, EndpointLevel>;
  */
 export class OverworldBridgeManager {
     private static readonly BRIDGES_LAYER_NAME = 'bridges';
+    private static readonly BRIDGE_TEXTURE_KEY = 'sprout-tiles';
+    private static readonly BRIDGE_DEPTH_SORT_SCALE = 0.0001;
     private static readonly ENDPOINT_COMPOSITE_TEXTURE_PREFIX = 'bridge-endpoint-composite';
     private static readonly ENDPOINT_LAYER_ORDER: ReadonlyArray<EndpointDirection> = ['up', 'left', 'right', 'down'];
     private static readonly BRIDGE_TILESET_IMAGE = 'SproutLandsGrassIslands.png';
@@ -30,6 +33,10 @@ export class OverworldBridgeManager {
     }>> = new Map();
     // Endpoint overlay sprites created for each baked puzzle, keyed by puzzleId.
     private bakedEndpointSprites: Map<string, Phaser.GameObjects.Image[]> = new Map();
+    // Cached flattened bridge images keyed by puzzleId.
+    private bakedBridgeSprites: Map<string, Phaser.GameObjects.Image[]> = new Map();
+    // Cache from bridge visual key to generated texture key.
+    private bakedBridgeTextureCache: Map<string, string> = new Map();
 
     constructor(
         private bridgesLayer: Phaser.Tilemaps.TilemapLayer,
@@ -107,15 +114,21 @@ export class OverworldBridgeManager {
 
         const tileWidth = this.tiledMapData.tilewidth as number;
         const tileHeight = this.tiledMapData.tileheight as number;
+        const useSpritePrototype = this.hasBakedSpriteStripSupport();
 
         // Ensure the baked tile-tracking map exists for this puzzle.
         if (!this.bakedTiles.has(puzzleId)) {
             this.bakedTiles.set(puzzleId, new Map());
         }
+        this.destroyBridgeSprites(puzzleId);
         this.destroyEndpointSprites(puzzleId);
 
-        let tilesPlaced = 0;
+        if (useSpritePrototype) {
+            this.createBridgeStripSprites(puzzleId, puzzleBounds, bridges);
+        }
+
         const endpointCombinations = this.buildEndpointCombinationMap(bridges, puzzleBounds, bridgeCountPerPair);
+        let tilesPlaced = 0;
 
         for (const bridge of bridges) {
             if (!bridge.start || !bridge.end) {
@@ -149,19 +162,18 @@ export class OverworldBridgeManager {
                         baseFrame = BridgeSpriteFrames.H_BRIDGE_CENTRE;
                     }
                     const tileIndex = isDouble ? baseFrame + BridgeSpriteFrames.DOUBLE_BRIDGE_OFFSET : baseFrame;
-                    const gid = this.bridgeTilesetFirstGid + tileIndex;
                     const currentCollisionType = this.rememberBakedTileCollision(puzzleId, tileX, tileY);
 
-                    const tile = this.bridgesLayer.putTileAt(gid, tileX, tileY);
-                    if (tile) {
-                        tilesPlaced++;
+                    if (!useSpritePrototype) {
+                        const gid = this.bridgeTilesetFirstGid + tileIndex;
+                        const tile = this.bridgesLayer.putTileAt(gid, tileX, tileY);
+                        if (tile) {
+                            tilesPlaced++;
+                        }
                     }
 
                     const tileKey = `${tileX},${tileY}`;
                     const collisionType = tileCollisionMap.get(tileKey) ?? CollisionType.WALKABLE;
-                    // Preserve ALWAYS_HIGH — these island tiles are already walkable and must
-                    // remain immune to applyFlowWaterCollision; downgrading to WALKABLE would
-                    // allow wet-tile logic to subsequently block them.
                     if (currentCollisionType !== CollisionType.ALWAYS_HIGH) {
                         this.collisionManager.setCollisionAt(tileX, tileY, collisionType);
                     }
@@ -188,19 +200,18 @@ export class OverworldBridgeManager {
                         baseFrame = BridgeSpriteFrames.V_BRIDGE_MIDDLE;
                     }
                     const tileIndex = isDouble ? baseFrame + BridgeSpriteFrames.DOUBLE_BRIDGE_OFFSET : baseFrame;
-                    const gid = this.bridgeTilesetFirstGid + tileIndex;
                     const currentCollisionType = this.rememberBakedTileCollision(puzzleId, tileX, tileY);
 
-                    const tile = this.bridgesLayer.putTileAt(gid, tileX, tileY);
-                    if (tile) {
-                        tilesPlaced++;
+                    if (!useSpritePrototype) {
+                        const gid = this.bridgeTilesetFirstGid + tileIndex;
+                        const tile = this.bridgesLayer.putTileAt(gid, tileX, tileY);
+                        if (tile) {
+                            tilesPlaced++;
+                        }
                     }
 
                     const tileKey = `${tileX},${tileY}`;
                     const collisionType = tileCollisionMap.get(tileKey) ?? CollisionType.WALKABLE;
-                    // Preserve ALWAYS_HIGH — these island tiles are already walkable and must
-                    // remain immune to applyFlowWaterCollision; downgrading to WALKABLE would
-                    // allow wet-tile logic to subsequently block them.
                     if (currentCollisionType !== CollisionType.ALWAYS_HIGH) {
                         this.collisionManager.setCollisionAt(tileX, tileY, collisionType);
                     }
@@ -208,7 +219,9 @@ export class OverworldBridgeManager {
             }
         }
 
-        this.createEndpointCompositeSprites(puzzleId, endpointCombinations);
+        if (!useSpritePrototype) {
+            this.createEndpointCompositeSprites(puzzleId, endpointCombinations);
+        }
 
         console.log(`OverworldBridgeManager: Baked ${bridges.length} bridges (${tilesPlaced} tiles placed) for puzzle ${puzzleId}`);
     }
@@ -338,6 +351,8 @@ export class OverworldBridgeManager {
         const bakedTilesForPuzzle = this.bakedTiles.get(puzzleId);
         if (!bakedTilesForPuzzle || bakedTilesForPuzzle.size === 0) {
             console.log(`OverworldBridgeManager: No baked tile positions recorded for puzzle ${puzzleId}`);
+            this.destroyBridgeSprites(puzzleId);
+            this.destroyEndpointSprites(puzzleId);
             return;
         }
 
@@ -349,6 +364,7 @@ export class OverworldBridgeManager {
         }
 
         this.bakedTiles.delete(puzzleId);
+        this.destroyBridgeSprites(puzzleId);
         this.destroyEndpointSprites(puzzleId);
     }
 
@@ -380,6 +396,7 @@ export class OverworldBridgeManager {
             }
         }
 
+        this.destroyBridgeSprites(puzzleId);
         this.destroyEndpointSprites(puzzleId);
 
         console.log(`OverworldBridgeManager: Blanked region for puzzle ${puzzleId}`);
@@ -420,6 +437,183 @@ export class OverworldBridgeManager {
      */
     static getBridgesLayerName(): string {
         return OverworldBridgeManager.BRIDGES_LAYER_NAME;
+    }
+
+    private createBridgeStripSprites(
+        puzzleId: string,
+        puzzleBounds: Phaser.Geom.Rectangle,
+        bridges: Bridge[]
+    ): void {
+        const scene = this.bridgesLayer.scene;
+        if (!scene?.add) {
+            return;
+        }
+
+        const tileWidth = this.tiledMapData.tilewidth as number;
+        const tileHeight = this.tiledMapData.tileheight as number;
+        const sprites: Phaser.GameObjects.Image[] = [];
+        const bridgeGroups = this.groupBridgesForRendering(bridges);
+
+        for (const bridgeGroup of bridgeGroups.values()) {
+            const layout = buildBridgeStripLayout({
+                start: bridgeGroup.start,
+                end: bridgeGroup.end,
+                cellSize: tileWidth,
+                isDouble: bridgeGroup.bridges.length >= 2,
+                useEdges: true,
+                gridToWorld: (gridX: number, gridY: number) => ({
+                    x: puzzleBounds.x + gridX * tileWidth,
+                    y: puzzleBounds.y + gridY * tileHeight,
+                }),
+            });
+            const textureKey = this.getOrCreateBridgeStripTexture(bridgeGroup.typeKey, layout, tileWidth);
+            if (!textureKey) {
+                continue;
+            }
+
+            const sprite = scene.add.image(layout.centreX, layout.centreY, textureKey);
+            sprite.setDepth(this.bridgesLayer.depth + layout.depthY * OverworldBridgeManager.BRIDGE_DEPTH_SORT_SCALE);
+            sprites.push(sprite);
+        }
+
+        this.bakedBridgeSprites.set(puzzleId, sprites);
+    }
+
+    private groupBridgesForRendering(bridges: Bridge[]): Map<string, { key: string; typeKey: string; start: { x: number; y: number }; end: { x: number; y: number }; bridges: Bridge[] }> {
+        const groups = new Map<string, { key: string; typeKey: string; start: { x: number; y: number }; end: { x: number; y: number }; bridges: Bridge[] }>();
+
+        for (const bridge of bridges) {
+            if (!bridge.start || !bridge.end) continue;
+            const ordered = this.normaliseBridgeEndpoints(bridge.start, bridge.end);
+            const key = `${ordered.start.x},${ordered.start.y}:${ordered.end.x},${ordered.end.y}`;
+            const existing = groups.get(key);
+            if (existing) {
+                existing.bridges.push(bridge);
+            } else {
+                groups.set(key, {
+                    key,
+                    typeKey: this.bridgeTypeKey(bridge),
+                    start: ordered.start,
+                    end: ordered.end,
+                    bridges: [bridge],
+                });
+            }
+        }
+
+        return groups;
+    }
+
+    private normaliseBridgeEndpoints(
+        start: { x: number; y: number },
+        end: { x: number; y: number }
+    ): { start: { x: number; y: number }; end: { x: number; y: number } } {
+        const isHorizontal = start.y === end.y;
+        if (isHorizontal) {
+            if (start.x <= end.x) {
+                return { start, end };
+            }
+            return { start: end, end: start };
+        }
+
+        if (start.y >= end.y) {
+            return { start, end };
+        }
+        return { start: end, end: start };
+    }
+
+    private bridgeTypeKey(bridge: Bridge): string {
+        return bridge.type.id;
+    }
+
+    private bridgeStripCacheKey(typeKey: string, layout: ReturnType<typeof buildBridgeStripLayout>, cellSize: number): string {
+        return [
+            typeKey,
+            layout.orientation,
+            `segments=${layout.segmentCount}`,
+            `double=${layout.isDouble ? 1 : 0}`,
+            `cell=${cellSize}`,
+        ].join('|');
+    }
+
+    private getOrCreateBridgeStripTexture(
+        typeKey: string,
+        layout: ReturnType<typeof buildBridgeStripLayout>,
+        cellSize: number
+    ): string | null {
+        const scene = this.bridgesLayer.scene;
+        if (!scene?.textures) {
+            return null;
+        }
+
+        const cacheKey = this.bridgeStripCacheKey(typeKey, layout, cellSize);
+        const existingTextureKey = this.bakedBridgeTextureCache.get(cacheKey);
+        if (existingTextureKey && scene.textures.exists(existingTextureKey)) {
+            return existingTextureKey;
+        }
+
+        const textureKey = `bridge-strip-${this.encodeCacheKey(cacheKey)}`;
+        if (scene.textures.exists(textureKey)) {
+            this.bakedBridgeTextureCache.set(cacheKey, textureKey);
+            return textureKey;
+        }
+
+        const canvasTexture = scene.textures.createCanvas(textureKey, layout.width, layout.height);
+        if (!canvasTexture) {
+            return null;
+        }
+
+        const sourceTexture = scene.textures.get(OverworldBridgeManager.BRIDGE_TEXTURE_KEY);
+        const context = canvasTexture.context;
+        context.clearRect(0, 0, layout.width, layout.height);
+
+        for (const segment of layout.segments) {
+            const frame = sourceTexture.get(segment.frame);
+            if (!frame?.source?.image) continue;
+
+            const rotatedX = segment.x * Math.cos(layout.angle) - segment.y * Math.sin(layout.angle);
+            const rotatedY = segment.x * Math.sin(layout.angle) + segment.y * Math.cos(layout.angle);
+            const drawX = layout.width / 2 + rotatedX - cellSize / 2;
+            const drawY = layout.height / 2 + rotatedY - cellSize / 2;
+
+            if (segment.rotation !== 0) {
+                context.save();
+                context.translate(drawX + cellSize / 2, drawY + cellSize / 2);
+                context.rotate(layout.angle + segment.rotation);
+                context.drawImage(
+                    frame.source.image as CanvasImageSource,
+                    frame.cutX,
+                    frame.cutY,
+                    frame.cutWidth,
+                    frame.cutHeight,
+                    -cellSize / 2,
+                    -cellSize / 2,
+                    cellSize,
+                    cellSize
+                );
+                context.restore();
+                continue;
+            }
+
+            context.drawImage(
+                frame.source.image as CanvasImageSource,
+                frame.cutX,
+                frame.cutY,
+                frame.cutWidth,
+                frame.cutHeight,
+                drawX,
+                drawY,
+                cellSize,
+                cellSize
+            );
+        }
+
+        canvasTexture.refresh();
+        this.bakedBridgeTextureCache.set(cacheKey, textureKey);
+        return textureKey;
+    }
+
+    private encodeCacheKey(cacheKey: string): string {
+        return cacheKey.replace(/[^a-zA-Z0-9]+/g, '-');
     }
 
     private buildEndpointCombinationMap(
@@ -583,9 +777,25 @@ export class OverworldBridgeManager {
         this.bakedEndpointSprites.delete(puzzleId);
     }
 
+    private destroyBridgeSprites(puzzleId: string): void {
+        const sprites = this.bakedBridgeSprites.get(puzzleId);
+        if (!sprites || sprites.length === 0) return;
+        for (const sprite of sprites) {
+            if (sprite) {
+                sprite.destroy();
+            }
+        }
+        this.bakedBridgeSprites.delete(puzzleId);
+    }
+
     private hasEndpointCompositeSupport(): boolean {
         const scene = this.bridgesLayer.scene;
-        return !!scene?.textures?.exists('sprout-tiles');
+        return !!scene?.textures?.exists(OverworldBridgeManager.BRIDGE_TEXTURE_KEY);
+    }
+
+    private hasBakedSpriteStripSupport(): boolean {
+        const scene = this.bridgesLayer.scene;
+        return !!scene?.add && !!scene?.textures?.exists(OverworldBridgeManager.BRIDGE_TEXTURE_KEY);
     }
 
     private encodeEndpointCombination(combination: EndpointCombination): string {
