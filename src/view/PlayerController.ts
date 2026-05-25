@@ -22,6 +22,25 @@ function tileCentre(tileCoord: number): number {
     return (tileCoord + 0.5) * TILE_SIZE;
 }
 
+/** Human-readable names for each CollisionType value, used in test-mode diagnostic logging. */
+const COLLISION_TYPE_NAMES: Record<number, string> = {
+    0: 'BLOCKED',
+    1: 'WALKABLE',
+    2: 'WALKABLE_LOW',
+    3: 'STAIRS',
+    4: 'ALWAYS_HIGH',
+    5: 'NARROW_NS',
+    6: 'NARROW_EW',
+    7: 'WALKABLE_HALF_N',
+    8: 'WALKABLE_HALF_S',
+    9: 'WALKABLE_HALF_E',
+    10: 'WALKABLE_HALF_W',
+    11: 'WALKABLE_HALF_NE',
+    12: 'WALKABLE_HALF_NW',
+    13: 'WALKABLE_HALF_SE',
+    14: 'WALKABLE_HALF_SW',
+};
+
 /**
  * PlayerController manages the player character in the overworld.
  * Handles player movement, animations, and collision setup.
@@ -208,24 +227,7 @@ export class PlayerController {
 
         if (isTestMode()) {
             if (this.playerLayer !== previousLayer) {
-                const typeNames: Record<number, string> = {
-                    0: 'BLOCKED',
-                    1: 'WALKABLE',
-                    2: 'WALKABLE_LOW',
-                    3: 'STAIRS',
-                    4: 'ALWAYS_HIGH',
-                    5: 'NARROW_NS',
-                    6: 'NARROW_EW',
-                    7: 'WALKABLE_HALF_N',
-                    8: 'WALKABLE_HALF_S',
-                    9: 'WALKABLE_HALF_E',
-                    10: 'WALKABLE_HALF_W',
-                    11: 'WALKABLE_HALF_NE',
-                    12: 'WALKABLE_HALF_NW',
-                    13: 'WALKABLE_HALF_SE',
-                    14: 'WALKABLE_HALF_SW',
-                };
-                console.log(`[PlayerLayer] ${previousLayer} -> ${this.playerLayer} (tile ${tileX},${tileY} type=${typeNames[currentType] ?? currentType})`);
+                console.log(`[PlayerLayer] ${previousLayer} -> ${this.playerLayer} (tile ${tileX},${tileY} type=${COLLISION_TYPE_NAMES[currentType] ?? currentType})`);
             }
             this.updateLayerDebugDisplay(tileX, tileY);
         }

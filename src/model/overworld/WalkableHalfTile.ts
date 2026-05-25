@@ -59,9 +59,9 @@ export function isWalkableHalfDirectionAtLocalPosition(
             return localY > localX;
         case 'se':
             return localY + localX > tileSize;
-        case 'nw':
-            return localY < localX;
         case 'ne':
+            return localY < localX;
+        case 'nw':
             return localY + localX < tileSize;
     }
 }

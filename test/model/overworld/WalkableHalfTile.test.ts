@@ -29,6 +29,20 @@ describe('WalkableHalfTile', () => {
             expect(isWalkableHalfDirectionAtLocalPosition('se', 20, 20, 32)).toBe(true);
             expect(isWalkableHalfDirectionAtLocalPosition('se', 10, 10, 32)).toBe(false);
         });
+
+        it('uses y<x for northeast — includes NE corner, excludes NW corner', () => {
+            // NE corner (localX=31, localY=0): y<x → 0<31 = true
+            expect(isWalkableHalfDirectionAtLocalPosition('ne', 31, 0, 32)).toBe(true);
+            // NW corner (localX=0, localY=31): y<x → 31<0 = false
+            expect(isWalkableHalfDirectionAtLocalPosition('ne', 0, 31, 32)).toBe(false);
+        });
+
+        it('uses y+x<32 for northwest — includes NW corner, excludes SE corner', () => {
+            // NW corner (0,0): y+x = 0 < 32 = true
+            expect(isWalkableHalfDirectionAtLocalPosition('nw', 0, 0, 32)).toBe(true);
+            // SE corner (31,31): y+x = 62 > 32 = false
+            expect(isWalkableHalfDirectionAtLocalPosition('nw', 31, 31, 32)).toBe(false);
+        });
     });
 
     describe('isPositionWalkableInTile', () => {
