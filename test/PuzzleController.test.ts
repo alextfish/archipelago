@@ -143,7 +143,7 @@ function createMockPuzzle(): Partial<BridgePuzzle> {
     bridgesAt: vi.fn(() => [] as Bridge[]),
     availableCounts: vi.fn(() => ({})),
     inventory: { returnBridge: vi.fn() } as any,
-    bridgePassesThroughBlockedTile: vi.fn(() => false),
+    bridgePassesThroughBlockedTile: vi.fn((_start: { x: number; y: number }, _end: { x: number; y: number }) => false),
     couldPlaceBridgeOfType: vi.fn((startId: string, endId: string, _typeId?: string) => {
       // default behaviour: check existing placed bridges count vs maxNumBridges
       const startIsland = puzzle.islands.find((i: any) => i.id === startId);
