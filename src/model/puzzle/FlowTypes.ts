@@ -33,6 +33,7 @@ export interface FlowPuzzleSpec {
   type?: string;
   size: { width: number; height: number };
   islands: Island[];
+  blockedTiles?: Array<{ x: number; y: number }>;
   bridgeTypes: BridgeTypeSpec[];
   constraints: { type: string; params?: any }[];
   maxNumBridges: number;

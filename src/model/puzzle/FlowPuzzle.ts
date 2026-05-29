@@ -28,6 +28,7 @@ export class FlowPuzzle extends BridgePuzzle {
       type: spec.type,
       size: spec.size,
       islands: spec.islands,
+      blockedTiles: spec.blockedTiles,
       bridgeTypes: spec.bridgeTypes,
       constraints: spec.constraints,
       maxNumBridges: spec.maxNumBridges

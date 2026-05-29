@@ -15,6 +15,7 @@ class MockPuzzleRenderer implements PuzzleRenderer {
   clearHighlightsCalled = false;
   previewBridgeCalled = false;
   previewBridgeArg: any = undefined;
+  hidePreviewCalled = false;
   highlightStartCalled = false;
   flashInvalidCalled = false;
   violations: string[] = [];
@@ -58,7 +59,7 @@ class MockPuzzleRenderer implements PuzzleRenderer {
   }
 
   hidePreview(): void {
-    // no-op for tests
+    this.hidePreviewCalled = true;
   }
 
   setPlacing(_isPlacing: boolean): void {
@@ -142,11 +143,13 @@ function createMockPuzzle(): Partial<BridgePuzzle> {
     bridgesAt: vi.fn(() => [] as Bridge[]),
     availableCounts: vi.fn(() => ({})),
     inventory: { returnBridge: vi.fn() } as any,
+    bridgePassesThroughBlockedTile: vi.fn((_start: { x: number; y: number }, _end: { x: number; y: number }) => false),
     couldPlaceBridgeOfType: vi.fn((startId: string, endId: string, _typeId?: string) => {
       // default behaviour: check existing placed bridges count vs maxNumBridges
       const startIsland = puzzle.islands.find((i: any) => i.id === startId);
       const endIsland = puzzle.islands.find((i: any) => i.id === endId);
       if (!startIsland || !endIsland) return false;
+      if (puzzle.bridgePassesThroughBlockedTile(startIsland, endIsland)) return false;
       const existing = puzzle.bridges.filter((b: any) => {
         if (!b.start || !b.end) return false;
         const sMatches = (b.start.x === startIsland.x && b.start.y === startIsland.y && b.end.x === endIsland.x && b.end.y === endIsland.y);
@@ -425,6 +428,16 @@ describe("PuzzleController", () => {
 
       expect(mockRenderer.flashInvalidCalled).toBe(true);
       expect(mockRenderer.updateCalled).toBe(false);
+    });
+
+    it("rejects placements when the path crosses blocked tiles", () => {
+      mockPuzzle.bridgePassesThroughBlockedTile = vi.fn(() => true);
+
+      controller.tryPlaceAt(1, 2);
+      controller.tryPlaceAt(3, 2);
+
+      expect(mockRenderer.flashInvalidCalled).toBe(true);
+      expect(mockPuzzle.placeBridge).not.toHaveBeenCalled();
     });
 
     it("calls validate after successful placement", () => {
@@ -832,6 +845,18 @@ describe("PuzzleController", () => {
         expect(previewBridge.end.x).toBeCloseTo(3, 5);
         expect(previewBridge.end.y).toBeCloseTo(0, 5);
       });
+
+      it("hides preview when the bridge path crosses blocked tiles", () => {
+        mockPuzzle.bridgePassesThroughBlockedTile = vi.fn(() => true);
+        controller.tryPlaceFirstEndpoint(0, 0);
+        mockRenderer.previewBridgeCalled = false;
+        mockRenderer.hidePreviewCalled = false;
+
+        controller.onPointerMove(96, 0, 3, 0);
+
+        expect(mockRenderer.hidePreviewCalled).toBe(true);
+        expect(mockRenderer.previewBridgeCalled).toBe(false);
+      });
     });
 
     describe("onPointerUp snap-to-place", () => {
@@ -958,4 +983,3 @@ describe("PuzzleController", () => {
     });
   });
 });
-
