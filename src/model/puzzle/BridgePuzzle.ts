@@ -23,6 +23,7 @@ export interface PuzzleSpec { // can be loaded from JSON
   type?: string;
   size: { width: number; height: number };
   islands: Island[];
+  blockedTiles?: Array<{ x: number; y: number }>;
   bridgeTypes: BridgeTypeSpec[];
   constraints: { type: string; params?: any }[];
   maxNumBridges: number;
@@ -38,12 +39,14 @@ export class BridgePuzzle {
   inventory: BridgeInventory;
   maxNumBridges: number;
   givesFeedback: boolean;
+  private readonly blockedTileKeys: Set<string>;
 
   constructor(spec: PuzzleSpec) {
     this.id = spec.id;
     this.width = spec.size.width;
     this.height = spec.size.height;
     this.islands = spec.islands;
+    this.blockedTileKeys = new Set((spec.blockedTiles ?? []).map(tile => this.gridKey(tile.x, tile.y)));
     this.constraints = createConstraintsFromSpec(spec.constraints);
     this.givesFeedback = spec.givesFeedback ?? true;
     const bridgeTypes = spec.bridgeTypes.map(
@@ -98,7 +101,9 @@ export class BridgePuzzle {
   placeBridge(bridgeID: string, start: { x: number; y: number }, end: { x: number; y: number }): boolean {
     const bridge = this.inventory.bridges.find(b => b.id === bridgeID);
     if (!bridge) throw new Error(`No such bridge ${bridgeID}`);
-    // TODO validate whether this bridge allows these positions
+    if (this.bridgePassesThroughBlockedTile(start, end)) {
+      return false;
+    }
     bridge.start = start;
     bridge.end = end;
     return true;
@@ -174,6 +179,10 @@ export class BridgePuzzle {
       }
     }
 
+    if (this.bridgePassesThroughBlockedTile(startIsland, endIsland)) {
+      return false;
+    }
+
     if (bt.allowsSpan) {
       return bt.allowsSpan({ x: startIsland.x, y: startIsland.y }, { x: endIsland.x, y: endIsland.y });
     }
@@ -184,6 +193,22 @@ export class BridgePuzzle {
     const dy = endIsland.y - startIsland.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     return Math.abs(dist - len) <= 0.01;
+  }
+
+  bridgePassesThroughBlockedTile(start: { x: number; y: number }, end: { x: number; y: number }): boolean {
+    if (this.blockedTileKeys.size === 0) return false;
+
+    for (const key of this.blockedTileKeys) {
+      const [x, y] = key.split(',').map(Number);
+      if ((x === start.x && y === start.y) || (x === end.x && y === end.y)) {
+        continue;
+      }
+      if (this.segmentIntersectsTile(start, end, x, y)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -218,6 +243,56 @@ export class BridgePuzzle {
     }
 
     return false;
+  }
+
+  private gridKey(x: number, y: number): string {
+    return `${x},${y}`;
+  }
+
+  private segmentIntersectsTile(
+    start: { x: number; y: number },
+    end: { x: number; y: number },
+    tileX: number,
+    tileY: number
+  ): boolean {
+    const minX = tileX - 0.5;
+    const maxX = tileX + 0.5;
+    const minY = tileY - 0.5;
+    const maxY = tileY + 0.5;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+
+    let tMin = 0;
+    let tMax = 1;
+
+    const clip = (p: number, q: number): boolean => {
+      if (p === 0) {
+        return q >= 0;
+      }
+
+      const r = q / p;
+      if (p < 0) {
+        if (r > tMax) return false;
+        if (r > tMin) tMin = r;
+      } else {
+        if (r < tMin) return false;
+        if (r < tMax) tMax = r;
+      }
+
+      return true;
+    };
+
+    if (
+      !clip(-dx, start.x - minX) ||
+      !clip(dx, maxX - start.x) ||
+      !clip(-dy, start.y - minY) ||
+      !clip(dy, maxY - start.y)
+    ) {
+      return false;
+    }
+
+    const epsilon = 1e-9;
+    return tMax > epsilon && tMin < 1 - epsilon;
   }
   takeBridgeOfType(typeId: string): Bridge | undefined {
     return this.inventory.takeBridge(typeId);
@@ -318,6 +393,5 @@ export class BridgePuzzle {
     return result;
   }
 }
-
 
 
