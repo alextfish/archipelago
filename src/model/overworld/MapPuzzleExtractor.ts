@@ -237,6 +237,7 @@ export class MapPuzzleExtractor {
         const islands = this.extractIslands(definition, tiledMap);
         const constraints = this.extractConstraints(definition, tiledMap, islands);
         const bridgeTypes = this.extractBridgeTypes(definition);
+        const blockedTiles = this.extractBlockedTiles(definition, tiledMap);
         const maxNumBridges = this.calculateMaxBridges(definition);
 
         const givesFeedback = definition.metadata.givesFeedback !== 'false';
@@ -249,6 +250,7 @@ export class MapPuzzleExtractor {
                 height: puzzleHeightInTiles
             },
             islands,
+            blockedTiles,
             bridgeTypes,
             constraints,
             maxNumBridges,
@@ -272,6 +274,7 @@ export class MapPuzzleExtractor {
         const islands = this.extractIslands(definition, tiledMap);
         const constraints = this.extractConstraints(definition, tiledMap, islands);
         const bridgeTypes = this.extractBridgeTypes(definition);
+        const blockedTiles = this.extractBlockedTiles(definition, tiledMap);
         const maxNumBridges = this.calculateMaxBridges(definition);
 
         const flowSquares = this.extractFlowSquares(definition, tiledMap);
@@ -281,6 +284,7 @@ export class MapPuzzleExtractor {
             type: definition.metadata.type || 'overworld',
             size: { width: puzzleWidthInTiles, height: puzzleHeightInTiles },
             islands,
+            blockedTiles,
             bridgeTypes,
             constraints,
             maxNumBridges,
@@ -366,6 +370,55 @@ export class MapPuzzleExtractor {
         console.log(`Extracted ${flowSquares.length} flow squares for puzzle ${definition.id}`);
         return flowSquares;
     }
+
+    private extractBlockedTiles(
+        definition: MapPuzzleDefinition,
+        tiledMap: TiledMapData
+    ): Array<{ x: number; y: number }> {
+        const collisionLayers = TiledLayerUtils.findTileLayersByName(
+            tiledMap.layers as any[],
+            'collision'
+        );
+        const relevantLayers = definition.regionGroup
+            ? collisionLayers.filter(layer => layer.fullPath.startsWith(definition.regionGroup!))
+            : collisionLayers;
+
+        if (relevantLayers.length === 0) {
+            return [];
+        }
+
+        const puzzleOriginTileX = Math.floor(definition.bounds.x / tiledMap.tilewidth);
+        const puzzleOriginTileY = Math.floor(definition.bounds.y / tiledMap.tileheight);
+        const puzzleWidthInTiles = Math.ceil(definition.bounds.width / tiledMap.tilewidth);
+        const puzzleHeightInTiles = Math.ceil(definition.bounds.height / tiledMap.tileheight);
+        const blockedTiles: Array<{ x: number; y: number }> = [];
+        const seen = new Set<string>();
+        const tilesets: any[] = (tiledMap.tilesets ?? []) as any[];
+
+        for (const layer of relevantLayers) {
+            const tileData: number[] = (layer.data.data as number[]) ?? [];
+            for (let ty = puzzleOriginTileY; ty < puzzleOriginTileY + puzzleHeightInTiles; ty++) {
+                for (let tx = puzzleOriginTileX; tx < puzzleOriginTileX + puzzleWidthInTiles; tx++) {
+                    const gid = TiledLayerUtils.getGIDAt(tileData, tiledMap.width, tx, ty);
+                    if (gid === 0) continue;
+
+                    const props = TiledLayerUtils.getTileProperties(tilesets, gid);
+                    if (!props.blocksBridge) continue;
+
+                    const localX = tx - puzzleOriginTileX;
+                    const localY = ty - puzzleOriginTileY;
+                    const key = `${localX},${localY}`;
+                    if (seen.has(key)) continue;
+
+                    seen.add(key);
+                    blockedTiles.push({ x: localX, y: localY });
+                }
+            }
+        }
+
+        return blockedTiles;
+    }
+
     private createPuzzleDefinition(obj: MapObject, regionGroup?: string): MapPuzzleDefinition {
         const metadata = this.extractObjectProperties(obj);
 

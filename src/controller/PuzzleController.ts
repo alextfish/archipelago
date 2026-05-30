@@ -114,6 +114,16 @@ export class PuzzleController {
             }
         }
 
+        if (!previewEnd) {
+            this.renderer.hidePreview();
+            return;
+        }
+
+        if (this.puzzle.bridgePassesThroughBlockedTile(start, previewEnd)) {
+            this.renderer.hidePreview();
+            return;
+        }
+
         // Build a temporary bridge-like object for preview
         const previewBridge: Bridge = {
             id: this.currentBridge ? this.currentBridge.id : 'preview',

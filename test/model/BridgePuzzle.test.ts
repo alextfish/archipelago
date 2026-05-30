@@ -153,6 +153,42 @@ describe("BridgePuzzle", () => {
       expect(puzzle.couldPlaceBridgeAt("island1", "island2")).toBe(true);
       expect(puzzle.couldPlaceBridgeAt("island1", "nonexistent")).toBe(false);
     });
+
+    it("rejects bridges that pass through blocked tiles", () => {
+      const puzzle = new BridgePuzzle({
+        id: "blocked-puzzle",
+        size: { width: 4, height: 1 },
+        islands: [
+          { id: "left", x: 0, y: 0 },
+          { id: "right", x: 2, y: 0 }
+        ],
+        blockedTiles: [{ x: 1, y: 0 }],
+        bridgeTypes: [{ id: "wood", colour: "brown", count: 1 }],
+        constraints: [],
+        maxNumBridges: 2,
+      });
+
+      expect(puzzle.couldPlaceBridgeOfType("left", "right", "wood")).toBe(false);
+
+      const placed = puzzle.placeBridge(puzzle.bridges[0].id, { x: 0, y: 0 }, { x: 2, y: 0 });
+      expect(placed).toBe(false);
+      expect(puzzle.placedBridges).toHaveLength(0);
+    });
+
+    it("detects blocked tiles intersected by angled bridge previews", () => {
+      const puzzle = new BridgePuzzle({
+        id: "diagonal-blocked-puzzle",
+        size: { width: 4, height: 4 },
+        islands: [],
+        blockedTiles: [{ x: 1, y: 1 }],
+        bridgeTypes: [{ id: "wood", colour: "brown", count: 1 }],
+        constraints: [],
+        maxNumBridges: 2,
+      });
+
+      expect(puzzle.bridgePassesThroughBlockedTile({ x: 0, y: 0 }, { x: 2, y: 2 })).toBe(true);
+      expect(puzzle.bridgePassesThroughBlockedTile({ x: 0, y: 0 }, { x: 0, y: 2 })).toBe(false);
+    });
   });
 
   describe("parseBridgesString", () => {
