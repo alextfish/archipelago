@@ -16,6 +16,9 @@
  *                 west. Entry and exit from the north or south are blocked. While the player
  *                 occupies the tile, their y position is clamped to the central row. Used for
  *                 single horizontal bridge spans so the player cannot walk off the edges.
+ * - WALKABLE_HALF_*:
+ *                 Upper-ground tiles with per-pixel walkable regions defined by Tiled
+ *                 property `walkable_half` (n/s/e/w/ne/nw/se/sw).
  *
  * These constants are shared by:
  * - CollisionTileClassifier – pure, initialization-time tile classification from Tiled properties
@@ -29,6 +32,14 @@ export const CollisionType = {
     ALWAYS_HIGH: 4,
     NARROW_NS: 5,
     NARROW_EW: 6,
+    WALKABLE_HALF_N: 7,
+    WALKABLE_HALF_S: 8,
+    WALKABLE_HALF_E: 9,
+    WALKABLE_HALF_W: 10,
+    WALKABLE_HALF_NE: 11,
+    WALKABLE_HALF_NW: 12,
+    WALKABLE_HALF_SE: 13,
+    WALKABLE_HALF_SW: 14,
 } as const;
 
 export type CollisionType = typeof CollisionType[keyof typeof CollisionType];

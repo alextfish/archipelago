@@ -1,4 +1,5 @@
 import { CollisionType } from '@model/overworld/CollisionTypes';
+import { collisionTypeFromWalkableHalfDirection, isWalkableHalfCollisionType } from '@model/overworld/WalkableHalfTile';
 
 /**
  * The properties a Tiled collision tile can carry.
@@ -7,6 +8,7 @@ import { CollisionType } from '@model/overworld/CollisionTypes';
 export interface CollisionTileProperties {
     walkable?: boolean;
     walkable_low?: boolean;
+    walkable_half?: string;
     stairs?: boolean;
     alwaysHigh?: boolean;
     narrow_ns?: boolean;
@@ -64,6 +66,7 @@ export class CollisionTileClassifier {
         let hasAlwaysHigh = false;
         let hasNarrowNS = false;
         let hasNarrowEW = false;
+        let hasWalkableHalf = false;
         let hasTile = false;
 
         for (const tile of layerTiles) {
@@ -88,6 +91,18 @@ export class CollisionTileClassifier {
                         collisionType = CollisionType.WALKABLE_LOW;
                     }
                 }
+                if ('walkable_half' in tile.properties && typeof tile.properties.walkable_half === 'string') {
+                    const walkableHalfType = collisionTypeFromWalkableHalfDirection(tile.properties.walkable_half);
+                    if (walkableHalfType !== undefined) {
+                        hasWalkableHalf = true;
+                        if (collisionType !== CollisionType.ALWAYS_HIGH &&
+                            collisionType !== CollisionType.STAIRS &&
+                            !hasWalkable &&
+                            !hasWalkableLow) {
+                            collisionType = walkableHalfType;
+                        }
+                    }
+                }
                 if ('narrow_ns' in tile.properties && tile.properties.narrow_ns === true) {
                     hasNarrowNS = true;
                     if (collisionType !== CollisionType.ALWAYS_HIGH && collisionType !== CollisionType.STAIRS) {
@@ -108,7 +123,7 @@ export class CollisionTileClassifier {
             // A tile present with no walkable properties is blocked.
             // The guard ensures that a higher-priority type already assigned cannot be
             // overridden to BLOCKED by a later property-less tile.
-            if (!hasWalkable && !hasWalkableLow && !hasAlwaysHigh && !hasNarrowNS && !hasNarrowEW &&
+            if (!hasWalkable && !hasWalkableLow && !hasAlwaysHigh && !hasNarrowNS && !hasNarrowEW && !hasWalkableHalf &&
                 collisionType !== CollisionType.STAIRS) {
                 collisionType = CollisionType.BLOCKED;
             }
@@ -148,7 +163,8 @@ export class CollisionTileClassifier {
         }
 
         if (result.collisionType === CollisionType.NARROW_NS ||
-            result.collisionType === CollisionType.NARROW_EW) {
+            result.collisionType === CollisionType.NARROW_EW ||
+            isWalkableHalfCollisionType(result.collisionType)) {
             // Narrow passages are upper-ground tiles; the directional movement
             // constraint is enforced by PlayerController, not by the sub-layer system.
             return { upperGround: 1, lowerGround: 0, blocked: 0 };
