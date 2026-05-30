@@ -21,6 +21,11 @@ export class PuzzleController {
     currentBridgeType: BridgeType | null = null;
     currentBridge: Bridge | null = null;
     pendingStart: { x: number; y: number } | null = null;
+    private lastUnblockedPreview: {
+        end: { x: number; y: number };
+        isDouble: boolean;
+        isInvalid: boolean;
+    } | null = null;
 
     // Undo/redo manager (single source of truth for history)
     private undoManager: UndoRedoManager;
@@ -120,20 +125,27 @@ export class PuzzleController {
         }
 
         if (this.puzzle.bridgePassesThroughBlockedTile(start, previewEnd)) {
-            this.renderer.hidePreview();
+            if (!this.lastUnblockedPreview) {
+                this.renderer.hidePreview();
+                return;
+            }
+
+            this.renderPreviewBridge(
+                start,
+                this.lastUnblockedPreview.end,
+                this.lastUnblockedPreview.isDouble,
+                this.lastUnblockedPreview.isInvalid,
+            );
             return;
         }
 
-        // Build a temporary bridge-like object for preview
-        const previewBridge: Bridge = {
-            id: this.currentBridge ? this.currentBridge.id : 'preview',
-            type: this.currentBridgeType,
-            start: { x: start.x, y: start.y },
-            end: previewEnd
-        } as any;
+        this.lastUnblockedPreview = {
+            end: { ...previewEnd },
+            isDouble,
+            isInvalid,
+        };
 
-        // Call renderer preview with double/invalid flags
-        this.renderer.previewBridge(previewBridge, { isDouble, isInvalid });
+        this.renderPreviewBridge(start, previewEnd, isDouble, isInvalid);
     }
 
     /** Pointer up: attempt to finalize placement if pending start exists */
@@ -179,6 +191,7 @@ export class PuzzleController {
             this.currentBridge.end = undefined as any;
             this.currentBridge = null;
         }
+        this.lastUnblockedPreview = null;
         this.pendingStart = null;
         this.renderer.clearHighlights();
         this.renderer.setPlacing(false);
@@ -301,6 +314,7 @@ export class PuzzleController {
             if (this.currentBridge.id) this.puzzle.inventory.returnBridge(this.currentBridge.id);
             this.currentBridge = null;
         }
+        this.lastUnblockedPreview = null;
         this.pendingStart = null;
         this.renderer.clearHighlights();
         this.renderer.setPlacing(false);
@@ -335,6 +349,7 @@ export class PuzzleController {
         // Keep the allocated bridge until second endpoint
         this.currentBridge = bridge;
         this.pendingStart = bridge.start;
+        this.lastUnblockedPreview = null;
         // Enter placing mode so renderer disables clickable outlines.
         this.renderer.setPlacing(true);
         this.renderer.previewBridge(bridge);
@@ -378,6 +393,7 @@ export class PuzzleController {
             bridge.end = undefined as any;
             if (bridge.id) this.puzzle.inventory.returnBridge(bridge.id);
             this.currentBridge = null;
+            this.lastUnblockedPreview = null;
             this.pendingStart = null;
             this.renderer.clearHighlights();
             this.renderer.setPlacing(false);
@@ -395,6 +411,7 @@ export class PuzzleController {
             this.renderer.flashInvalidPlacement(this.pendingStart, endPoint);
             bridge.end = undefined;
             if (bridge.id) this.puzzle.inventory.returnBridge(bridge.id);
+            this.lastUnblockedPreview = null;
             this.pendingStart = null;
             this.currentBridge = null;
             this.renderer.setPlacing(false);
@@ -402,6 +419,7 @@ export class PuzzleController {
         }
 
         // Placement succeeded. Clear pending state and update visuals.
+        this.lastUnblockedPreview = null;
         this.pendingStart = null;
         // Clear any allocated bridge reference — it's now placed.
         this.currentBridge = null;
@@ -412,6 +430,22 @@ export class PuzzleController {
         this.notifyCountsChanged();
         this.validate();
         emitTestEvent('bridge_placed', { endX: x, endY: y });
+    }
+
+    private renderPreviewBridge(
+        start: { x: number; y: number },
+        end: { x: number; y: number },
+        isDouble: boolean,
+        isInvalid: boolean,
+    ): void {
+        const previewBridge: Bridge = {
+            id: this.currentBridge ? this.currentBridge.id : 'preview',
+            type: this.currentBridgeType,
+            start: { x: start.x, y: start.y },
+            end,
+        } as any;
+
+        this.renderer.previewBridge(previewBridge, { isDouble, isInvalid });
     }
 
     private selectAvailableBridgeType() {

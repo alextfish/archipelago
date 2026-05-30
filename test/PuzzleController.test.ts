@@ -846,7 +846,7 @@ describe("PuzzleController", () => {
         expect(previewBridge.end.y).toBeCloseTo(0, 5);
       });
 
-      it("hides preview when the bridge path crosses blocked tiles", () => {
+      it("hides preview when the first candidate crosses blocked tiles", () => {
         mockPuzzle.bridgePassesThroughBlockedTile = vi.fn(() => true);
         controller.tryPlaceFirstEndpoint(0, 0);
         mockRenderer.previewBridgeCalled = false;
@@ -856,6 +856,33 @@ describe("PuzzleController", () => {
 
         expect(mockRenderer.hidePreviewCalled).toBe(true);
         expect(mockRenderer.previewBridgeCalled).toBe(false);
+      });
+
+      it("keeps showing the last unblocked preview while the cursor passes through blocked tiles", () => {
+        mockPuzzle.bridgePassesThroughBlockedTile = vi.fn((_start, end) => end.y > 1);
+        controller.tryPlaceFirstEndpoint(0, 0);
+
+        controller.onPointerMove(96, 0, 3, 0);
+
+        expect(mockRenderer.previewBridgeCalled).toBe(true);
+        expect(mockRenderer.previewBridgeArg.end.x).toBeCloseTo(3, 5);
+        expect(mockRenderer.previewBridgeArg.end.y).toBeCloseTo(0, 5);
+
+        mockRenderer.previewBridgeCalled = false;
+        mockRenderer.hidePreviewCalled = false;
+        controller.onPointerMove(0, 96, 0, 3);
+
+        expect(mockRenderer.hidePreviewCalled).toBe(false);
+        expect(mockRenderer.previewBridgeCalled).toBe(true);
+        expect(mockRenderer.previewBridgeArg.end.x).toBeCloseTo(3, 5);
+        expect(mockRenderer.previewBridgeArg.end.y).toBeCloseTo(0, 5);
+
+        mockRenderer.previewBridgeCalled = false;
+        controller.onPointerMove(0, -96, 0, -3);
+
+        expect(mockRenderer.previewBridgeCalled).toBe(true);
+        expect(mockRenderer.previewBridgeArg.end.x).toBeCloseTo(0, 1);
+        expect(mockRenderer.previewBridgeArg.end.y).toBeCloseTo(-3, 1);
       });
     });
 
