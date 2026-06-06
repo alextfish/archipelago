@@ -8,6 +8,11 @@ import { PlayerTranslationDictionary } from '@model/translation/PlayerTranslatio
 import { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
 import type { PlayerOverworldDisplayItem } from './PlayerOverworldDisplay';
 
+interface NPCConversationState {
+    currentConversationFile?: string;
+    conversationHistory: string[];
+}
+
 /**
  * Manages state persistence for overworld puzzles
  * Tracks active puzzle, progress, and completion status
@@ -26,6 +31,7 @@ export class OverworldGameState {
 
     /** Collectible object IDs the player has already picked up. */
     private collectedCollectibleIDs: Set<string> = new Set();
+    private npcConversationStates: Map<string, NPCConversationState> = new Map();
 
     // FlowPuzzle-specific state
     /** Track solved FlowPuzzles and their edge outputs (local coordinates) */
@@ -354,6 +360,7 @@ export class OverworldGameState {
         this.unlockedDoors.clear();
         this.collectedJewels.clear();
         this.collectedCollectibleIDs.clear();
+        this.npcConversationStates.clear();
 
         // Reset FlowPuzzle state
         this.flowPuzzleOutputs.clear();
@@ -523,6 +530,7 @@ export class OverworldGameState {
         flowPuzzleInputs: Record<string, { x: number; y: number }[]>;
         overworldWaterState: string[];
         translationDictionary: Record<string, string>;
+        npcConversationStates: Record<string, NPCConversationState>;
         currentInteriorID?: string;
         interiorReturnX?: number;
         interiorReturnY?: number;
@@ -557,6 +565,15 @@ export class OverworldGameState {
                     ([frame, text]) => [String(frame), text]
                 )
             ),
+            npcConversationStates: Object.fromEntries(
+                Array.from(this.npcConversationStates.entries()).map(([npcId, state]) => [
+                    npcId,
+                    {
+                        currentConversationFile: state.currentConversationFile,
+                        conversationHistory: [...state.conversationHistory],
+                    },
+                ])
+            ),
             currentInteriorID: this.currentInteriorID,
             interiorReturnX: this.interiorReturnX,
             interiorReturnY: this.interiorReturnY,
@@ -578,6 +595,7 @@ export class OverworldGameState {
         flowPuzzleInputs?: Record<string, { x: number; y: number }[]>;
         overworldWaterState?: string[];
         translationDictionary?: Record<string, string>;
+        npcConversationStates?: Record<string, NPCConversationState>;
         currentInteriorID?: string;
         interiorReturnX?: number;
         interiorReturnY?: number;
@@ -621,10 +639,44 @@ export class OverworldGameState {
             }
         }
 
+        this.npcConversationStates = new Map(
+            Object.entries(state.npcConversationStates ?? {}).map(([npcId, npcState]) => [
+                npcId,
+                {
+                    currentConversationFile: npcState?.currentConversationFile,
+                    conversationHistory: Array.isArray(npcState?.conversationHistory)
+                        ? [...npcState.conversationHistory]
+                        : [],
+                },
+            ])
+        );
+
         // Interior tracking
         this.currentInteriorID = state.currentInteriorID;
         this.interiorReturnX = state.interiorReturnX;
         this.interiorReturnY = state.interiorReturnY;
+    }
+
+    getNPCConversationState(npcId: string): NPCConversationState {
+        const state = this.npcConversationStates.get(npcId);
+        if (!state) {
+            return { conversationHistory: [] };
+        }
+        return {
+            currentConversationFile: state.currentConversationFile,
+            conversationHistory: [...state.conversationHistory],
+        };
+    }
+
+    setNPCConversationState(
+        npcId: string,
+        currentConversationFile?: string,
+        conversationHistory: string[] = []
+    ): void {
+        this.npcConversationStates.set(npcId, {
+            currentConversationFile,
+            conversationHistory: [...conversationHistory],
+        });
     }
 
     private serialisePuzzleProgress(puzzle: BridgePuzzle): PersistedPuzzleProgress {

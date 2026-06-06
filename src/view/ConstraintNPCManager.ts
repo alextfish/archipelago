@@ -271,6 +271,8 @@ export class ConstraintNPCManager {
             npc.seriesFile,
             npc.conversationVariables,
             npc.animate,
+            npc.getCurrentConversationFile(),
+            [...npc.getConversationHistory()],
         );
     }
 

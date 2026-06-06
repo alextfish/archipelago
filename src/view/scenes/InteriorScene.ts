@@ -864,20 +864,33 @@ export class InteriorScene extends Phaser.Scene {
                 useSolvedConversation = state?.isSeriesCompleted() ?? false;
             }
 
-            const conversationPath = npc.getConversationPath(useSolvedConversation);
-            const response = await fetch(conversationPath);
-            if (!response.ok) throw new Error(`Failed to load conversation: ${response.statusText}`);
+            const storedConversationState = this.gameState.getNPCConversationState(npc.id);
+            npc.setConversationState(
+                storedConversationState.currentConversationFile,
+                [...storedConversationState.conversationHistory],
+            );
 
-            const conversationSpec: ConversationSpec = await response.json();
+            const conversationFile = npc.getConversationFile(useSolvedConversation);
+            npc.recordConversationTransition(conversationFile);
+
+            const conversationSpec = await this.loadConversationSpec(conversationFile, npc);
+            const conversationHistorySpecs = await Promise.all(
+                npc.getConversationHistory().map(async (historyFile) => ({
+                    conversationFile: historyFile,
+                    spec: await this.loadConversationSpec(historyFile, npc),
+                })),
+            );
+            this.gameState.setNPCConversationState(
+                npc.id,
+                npc.getCurrentConversationFile(),
+                [...npc.getConversationHistory()],
+            );
+            this.saveStateCallback();
 
             const startNodeId = ConversationConditionEvaluator.resolveStartNode(
                 conversationSpec,
                 { getJewelCount: (colour) => this.gameState.getJewelCount(colour) }
             );
-
-            if (npc.conversationVariables) {
-                ConversationVariableSubstitutor.applyTo(conversationSpec, npc.conversationVariables);
-            }
 
             const conversationNPC = this.constraintNPCManager?.getConversationNPC(npc, useSolvedConversation) ?? npc;
 
@@ -903,11 +916,11 @@ export class InteriorScene extends Phaser.Scene {
 
             if (!this.scene.isActive('ConversationScene')) {
                 conversationScene.events.once('create', () => {
-                    conversationScene.startConversation(conversationSpec, conversationNPC, startNodeId);
+                    conversationScene.startConversation(conversationSpec, conversationNPC, startNodeId, conversationHistorySpecs);
                 });
                 this.scene.launch('ConversationScene');
             } else {
-                conversationScene.startConversation(conversationSpec, conversationNPC, startNodeId);
+                conversationScene.startConversation(conversationSpec, conversationNPC, startNodeId, conversationHistorySpecs);
             }
 
         } catch (error) {
@@ -915,6 +928,19 @@ export class InteriorScene extends Phaser.Scene {
             this.playerController?.setEnabled(true);
             this.gameMode = 'exploration';
         }
+    }
+
+    private async loadConversationSpec(conversationFile: string, npc: NPC): Promise<ConversationSpec> {
+        const conversationPath = `resources/conversations/${conversationFile}`;
+        const response = await fetch(conversationPath);
+        if (!response.ok) throw new Error(`Failed to load conversation: ${response.statusText}`);
+
+        const conversationSpec: ConversationSpec = await response.json();
+        if (npc.conversationVariables) {
+            ConversationVariableSubstitutor.applyTo(conversationSpec, npc.conversationVariables);
+        }
+
+        return conversationSpec;
     }
 
     private onConversationEnded(): void {

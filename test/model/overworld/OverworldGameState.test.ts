@@ -292,5 +292,22 @@ describe('OverworldGameState', () => {
             expect(restored?.placedBridges[0].start).toEqual({ x: 1, y: 1 });
             expect(restored?.placedBridges[0].end).toEqual({ x: 3, y: 1 });
         });
+
+        it('should persist NPC conversation history state through export/import', () => {
+            gameState.setNPCConversationState(
+                'npc-1',
+                'latest-conversation.json',
+                ['old-conversation.json']
+            );
+
+            const exported = gameState.exportState();
+            const reloadedState = new OverworldGameState();
+            reloadedState.importState(exported);
+
+            expect(reloadedState.getNPCConversationState('npc-1')).toEqual({
+                currentConversationFile: 'latest-conversation.json',
+                conversationHistory: ['old-conversation.json'],
+            });
+        });
     });
 });

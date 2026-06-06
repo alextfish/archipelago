@@ -21,6 +21,8 @@ export class NPC {
     readonly appearanceId: string;              // ID for looking up sprite in registry
     readonly conversationVariables?: Record<string, string>;  // Template variables for conversation glyphs
     readonly animate: boolean;                  // Whether the NPC should play its idle animation
+    private currentConversationFile?: string;
+    private conversationHistory: string[];
 
     constructor(
         id: string,
@@ -33,7 +35,9 @@ export class NPC {
         conversationFileSolved?: string,
         seriesFile?: string,
         conversationVariables?: Record<string, string>,
-        animate: boolean = false
+        animate: boolean = false,
+        currentConversationFile?: string,
+        conversationHistory: string[] = []
     ) {
         this.id = id;
         this.name = name;
@@ -46,6 +50,8 @@ export class NPC {
         this.seriesFile = seriesFile;
         this.conversationVariables = conversationVariables;
         this.animate = animate;
+        this.currentConversationFile = currentConversationFile;
+        this.conversationHistory = [...conversationHistory];
     }
 
     /**
@@ -67,6 +73,13 @@ export class NPC {
      * @param seriesSolved - Whether the series is solved (to select appropriate conversation)
      */
     getConversationPath(seriesSolved: boolean = false): string {
+        return `resources/conversations/${this.getConversationFile(seriesSolved)}`;
+    }
+
+    /**
+     * Get the conversation filename to use.
+     */
+    getConversationFile(seriesSolved: boolean = false): string {
         const file = seriesSolved && this.conversationFileSolved
             ? this.conversationFileSolved
             : this.conversationFile;
@@ -74,7 +87,41 @@ export class NPC {
         if (!file) {
             throw new Error(`NPC ${this.id} has no conversation file`);
         }
-        return `resources/conversations/${file}`;
+        return file;
+    }
+
+    getCurrentConversationFile(): string | undefined {
+        return this.currentConversationFile;
+    }
+
+    getConversationHistory(): ReadonlyArray<string> {
+        return this.conversationHistory;
+    }
+
+    setConversationState(currentConversationFile?: string, conversationHistory: string[] = []): void {
+        this.currentConversationFile = currentConversationFile;
+        this.conversationHistory = [...conversationHistory];
+    }
+
+    /**
+     * Track the currently active conversation for this NPC.
+     * If the conversation changes, the previous file is retained in history.
+     */
+    recordConversationTransition(nextConversationFile: string): void {
+        if (!this.currentConversationFile) {
+            this.currentConversationFile = nextConversationFile;
+            return;
+        }
+
+        if (this.currentConversationFile === nextConversationFile) {
+            return;
+        }
+
+        if (!this.conversationHistory.includes(this.currentConversationFile)) {
+            this.conversationHistory.push(this.currentConversationFile);
+        }
+
+        this.currentConversationFile = nextConversationFile;
     }
 
     /**

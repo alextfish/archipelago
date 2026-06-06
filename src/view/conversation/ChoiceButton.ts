@@ -107,4 +107,15 @@ export class ChoiceButton extends Phaser.GameObjects.Container {
         this.setInteractive(enabled);
         this.setAlpha(enabled ? 1 : 0.5);
     }
+
+    setGreyscale(enabled: boolean): void {
+        if (enabled) {
+            this.textLabel.setColor('#dddddd');
+            this.setAlpha(0.9);
+            return;
+        }
+
+        this.textLabel.setColor(this.textColor);
+        this.setAlpha(1);
+    }
 }

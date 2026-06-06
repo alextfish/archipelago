@@ -1749,14 +1749,31 @@ export class OverworldScene extends Phaser.Scene {
         useSolvedConversation = state?.isSeriesCompleted() ?? false;
       }
 
-      // Load conversation JSON
-      const conversationPath = npc.getConversationPath(useSolvedConversation);
-      const response = await fetch(conversationPath);
-      if (!response.ok) {
-        throw new Error(`Failed to load conversation: ${response.statusText}`);
-      }
+      const storedConversationState = this.gameState.getNPCConversationState(npc.id);
+      // Sync persisted history onto this in-memory NPC model before resolving
+      // whether this interaction switches to a newer conversation variant.
+      npc.setConversationState(
+        storedConversationState.currentConversationFile,
+        [...storedConversationState.conversationHistory],
+      );
 
-      const conversationSpec: ConversationSpec = await response.json();
+      const conversationFile = npc.getConversationFile(useSolvedConversation);
+      npc.recordConversationTransition(conversationFile);
+
+      const conversationSpec = await this.loadConversationSpec(conversationFile, npc);
+      const conversationHistorySpecs = await Promise.all(
+        npc.getConversationHistory().map(async (historyFile) => ({
+          conversationFile: historyFile,
+          spec: await this.loadConversationSpec(historyFile, npc),
+        })),
+      );
+      // Persist updated history only after all conversation specs loaded.
+      this.gameState.setNPCConversationState(
+        npc.id,
+        npc.getCurrentConversationFile(),
+        [...npc.getConversationHistory()],
+      );
+      this.saveGameState();
 
       // Evaluate conditional start branches (e.g. jewel count checks) to pick
       // the correct starting node for this conversation.
@@ -1766,10 +1783,6 @@ export class OverworldScene extends Phaser.Scene {
       );
 
       // Apply conversation variable substitution (e.g. {{count}} → '2')
-      if (npc.conversationVariables) {
-        ConversationVariableSubstitutor.applyTo(conversationSpec, npc.conversationVariables);
-      }
-
       const conversationNPC = this.constraintNPCManager?.getConversationNPC(npc, useSolvedConversation) ?? npc;
 
       // Switch to conversation mode
@@ -1802,18 +1815,33 @@ export class OverworldScene extends Phaser.Scene {
       if (!this.scene.isActive('ConversationScene')) {
         // Wait for the scene to be created before starting conversation
         conversationScene.events.once('create', () => {
-          conversationScene.startConversation(conversationSpec, conversationNPC, startNodeId);
+          conversationScene.startConversation(conversationSpec, conversationNPC, startNodeId, conversationHistorySpecs);
         });
         this.scene.launch('ConversationScene');
       } else {
         // Scene already running, start conversation immediately
-        conversationScene.startConversation(conversationSpec, conversationNPC, startNodeId);
+        conversationScene.startConversation(conversationSpec, conversationNPC, startNodeId, conversationHistorySpecs);
       }
 
     } catch (error) {
       console.error('Error starting conversation:', error);
       this.gameMode = 'exploration';
     }
+  }
+
+  private async loadConversationSpec(conversationFile: string, npc: NPC): Promise<ConversationSpec> {
+    const conversationPath = `resources/conversations/${conversationFile}`;
+    const response = await fetch(conversationPath);
+    if (!response.ok) {
+      throw new Error(`Failed to load conversation: ${response.statusText}`);
+    }
+
+    const conversationSpec: ConversationSpec = await response.json();
+    if (npc.conversationVariables) {
+      ConversationVariableSubstitutor.applyTo(conversationSpec, npc.conversationVariables);
+    }
+
+    return conversationSpec;
   }
 
   /**

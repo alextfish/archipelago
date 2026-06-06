@@ -229,4 +229,44 @@ describe('NPC', () => {
             expect(() => npc.getSeriesPath()).toThrow('NPC fisherman1 has no series file');
         });
     });
+
+    describe('conversation history', () => {
+        it('tracks conversation transitions and keeps previous files as history', () => {
+            const npc = new NPC(
+                'sailor1',
+                'Sailor',
+                10,
+                20,
+                'grass',
+                'sailorNS',
+                'sailor1_vertical.json',
+                'sailor1_solved.json',
+            );
+
+            npc.recordConversationTransition('sailor1_vertical.json');
+            npc.recordConversationTransition('sailor1_solved.json');
+            npc.recordConversationTransition('sailor1_solved.json');
+
+            expect(npc.getCurrentConversationFile()).toBe('sailor1_solved.json');
+            expect(npc.getConversationHistory()).toEqual(['sailor1_vertical.json']);
+        });
+
+        it('allows restoring conversation state from saved data', () => {
+            const npc = new NPC(
+                'sailor1',
+                'Sailor',
+                10,
+                20,
+                'grass',
+                'sailorNS',
+                'sailor1_vertical.json',
+                'sailor1_solved.json',
+            );
+
+            npc.setConversationState('sailor1_solved.json', ['sailor1_vertical.json']);
+
+            expect(npc.getCurrentConversationFile()).toBe('sailor1_solved.json');
+            expect(npc.getConversationHistory()).toEqual(['sailor1_vertical.json']);
+        });
+    });
 });

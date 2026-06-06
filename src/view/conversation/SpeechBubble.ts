@@ -248,6 +248,32 @@ export class SpeechBubble {
     }
 
     /**
+     * Apply a tint to all bubble tiles/glyphs.
+     * Used by conversation history replay mode to present a greyscale view.
+     */
+    setTint(tint: number): void {
+        for (const tile of this.backgroundTiles) {
+            tile.setTint(tint);
+        }
+        for (const glyph of this.glyphSprites) {
+            glyph.setTint(tint);
+        }
+    }
+
+    /**
+     * Remove tint from all bubble tiles/glyphs.
+     * Called when leaving history replay mode.
+     */
+    clearTint(): void {
+        for (const tile of this.backgroundTiles) {
+            tile.clearTint();
+        }
+        for (const glyph of this.glyphSprites) {
+            glyph.clearTint();
+        }
+    }
+
+    /**
      * Get the container for additional manipulation
      */
     getContainer(): Phaser.GameObjects.Container {
@@ -328,4 +354,3 @@ export class SpeechBubble {
         this.container.destroy();
     }
 }
-

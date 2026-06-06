@@ -16,6 +16,11 @@ import { attachTestMarker, isTestMode } from '@helpers/TestMarkers';
 import { loadNPCSprites } from '../NPCSpriteHelper';
 import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
 
+interface ConversationHistoryEntry {
+    conversationFile: string;
+    spec: ConversationSpec;
+}
+
 export class ConversationScene extends Phaser.Scene implements ConversationHost {
     private controller: ConversationController | null = null;
     private glyphRegistry: LanguageGlyphRegistry;
@@ -34,9 +39,16 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     private npcPortrait: Phaser.GameObjects.Container | null = null;
     private playerPortrait: Phaser.GameObjects.Container | null = null;
     private currentNPC: NPC | null = null;
+    private currentSpec: ConversationSpec | null = null;
+    private currentStartNodeId: string | undefined = undefined;
+    private conversationHistoryEntries: ConversationHistoryEntry[] = [];
+    private historyIcon: Phaser.GameObjects.Image | Phaser.GameObjects.Text | null = null;
+    private historyMode: boolean = false;
+    private activeHistoryIndex: number = -1;
 
     // Constants
     private readonly TILESET_KEY = 'language';
+    private readonly HISTORY_ICON_KEY = 'conversation-history-clock';
     private readonly SPEECH_BUBBLE_Y = 150;
     private readonly SPEECH_BUBBLE_SCALE = 2;
     private readonly CHOICES_START_Y = 400;
@@ -82,6 +94,10 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
 
         // Load all NPC spritesheets and face portraits
         loadNPCSprites(this.load);
+
+        if (!this.textures.exists(this.HISTORY_ICON_KEY)) {
+            this.load.image(this.HISTORY_ICON_KEY, 'resources/sprites/clock.png');
+        }
     }
 
     /**
@@ -111,6 +127,20 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         // Set up keyboard navigation for choices
         this.setupKeyboardNavigation();
 
+        const historyIconX = this.scale.width / 2;
+        const historyIconY = this.scale.height - 32;
+        if (this.textures.exists(this.HISTORY_ICON_KEY)) {
+            this.historyIcon = this.add.image(historyIconX, historyIconY, this.HISTORY_ICON_KEY);
+            this.historyIcon.setDisplaySize(32, 32);
+        } else {
+            this.historyIcon = this.add.text(historyIconX, historyIconY, '🕒', { fontSize: '28px' });
+            this.historyIcon.setOrigin(0.5, 0.5);
+        }
+        this.historyIcon.setDepth(20);
+        this.historyIcon.setVisible(false);
+        this.historyIcon.setInteractive({ useHandCursor: true });
+        this.historyIcon.on('pointerdown', () => this.onHistoryIconClicked());
+
         // Initially hidden
         this.setVisible(false);
     }
@@ -123,10 +153,22 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
      * @param startNodeId Optional override for the starting node (used when a
      *                    condition evaluator has already resolved the branch).
      */
-    startConversation(spec: ConversationSpec, npc: NPC, startNodeId?: string): void {
+    startConversation(
+        spec: ConversationSpec,
+        npc: NPC,
+        startNodeId?: string,
+        historyEntries: ConversationHistoryEntry[] = [],
+    ): void {
         console.log('ConversationScene: startConversation called', { spec, npc });
 
         this.currentNPC = npc;
+        this.currentSpec = spec;
+        this.currentStartNodeId = startNodeId;
+        this.conversationHistoryEntries = [...historyEntries];
+        this.historyMode = false;
+        this.activeHistoryIndex = -1;
+        this.updateHistoryIconState();
+        this.applyGreyscaleMode(false);
 
         // Create controller if not exists
         if (!this.controller) {
@@ -307,6 +349,12 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
      * Handle continue button click (when conversation has ended with final message)
      */
     private onContinueClicked(): void {
+        if (this.historyMode) {
+            // In history mode, continue should only return to the latest conversation,
+            // not end the active NPC interaction.
+            this.exitHistoryMode();
+            return;
+        }
         console.log('ConversationScene: Continue button clicked, ending conversation');
         if (this.controller) {
             this.controller.endConversation(); // Emit test event and clear state
@@ -341,6 +389,10 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
      * ConversationHost interface: Apply conversation effects
      */
     applyEffects(effects: ConversationEffect[]): void {
+        if (this.historyMode) {
+            // Replayed conversations are read-only and must not trigger gameplay changes.
+            return;
+        }
         // This will be handled by the game state/overworld scene
         // For now, just emit an event
         this.events.emit('conversationEffects', effects);
@@ -350,6 +402,10 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
      * ConversationHost interface: Conversation ended
      */
     onConversationEnd(): void {
+        if (this.historyMode) {
+            this.exitHistoryMode();
+            return;
+        }
         console.log('ConversationScene: onConversationEnd called');
 
         // Notify overworld that conversation has ended
@@ -379,6 +435,7 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
 
         if (this.npcPortrait) this.npcPortrait.setVisible(visible);
         if (this.playerPortrait) this.playerPortrait.setVisible(visible);
+        if (this.historyIcon) this.historyIcon.setVisible(visible && this.conversationHistoryEntries.length > 0);
     }
 
     /**
@@ -530,5 +587,111 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         if (sprite) {
             sprite.setTexture(spriteKey, 0);
         }
+    }
+
+    private onHistoryIconClicked(): void {
+        if (this.conversationHistoryEntries.length === 0 || !this.currentNPC) {
+            return;
+        }
+
+        if (!this.historyMode) {
+            this.activeHistoryIndex = this.conversationHistoryEntries.length - 1;
+            this.enterHistoryMode(this.activeHistoryIndex);
+            return;
+        }
+
+        const nextIndex = this.activeHistoryIndex - 1;
+        if (nextIndex < 0) {
+            this.exitHistoryMode();
+            return;
+        }
+
+        this.activeHistoryIndex = nextIndex;
+        this.enterHistoryMode(this.activeHistoryIndex);
+    }
+
+    private enterHistoryMode(index: number): void {
+        if (!this.controller || !this.currentNPC) {
+            return;
+        }
+
+        const entry = this.conversationHistoryEntries[index];
+        if (!entry) {
+            return;
+        }
+
+        this.historyMode = true;
+        this.applyGreyscaleMode(true);
+        this.updateHistoryIconState();
+        this.controller.startConversation(entry.spec, this.currentNPC);
+    }
+
+    private exitHistoryMode(): void {
+        if (!this.controller || !this.currentNPC || !this.currentSpec) {
+            return;
+        }
+
+        this.historyMode = false;
+        this.activeHistoryIndex = -1;
+        this.applyGreyscaleMode(false);
+        this.updateHistoryIconState();
+        this.controller.startConversation(this.currentSpec, this.currentNPC, this.currentStartNodeId);
+    }
+
+    private updateHistoryIconState(): void {
+        if (!this.historyIcon) {
+            return;
+        }
+        const visible = this.conversationHistoryEntries.length > 0;
+        this.historyIcon.setVisible(visible);
+        this.historyIcon.setAlpha(this.historyMode ? 1 : 0.8);
+    }
+
+    private applyGreyscaleMode(enabled: boolean): void {
+        if (this.overlay) {
+            this.overlay.setFillStyle(enabled ? 0x777777 : 0xffffff, enabled ? 0.7 : 0.5);
+        }
+
+        if (this.speechBubble) {
+            if (enabled) {
+                this.speechBubble.setTint(0x999999);
+            } else {
+                this.speechBubble.clearTint();
+            }
+        }
+
+        for (const button of this.choiceButtons) {
+            button.setGreyscale(enabled);
+        }
+
+        const tint = enabled ? 0x999999 : 0xffffff;
+        if (this.npcPortrait) {
+            this.applyTintToPortrait(this.npcPortrait, tint);
+        }
+        if (this.playerPortrait) {
+            this.applyTintToPortrait(this.playerPortrait, tint);
+        }
+
+        if (this.historyIcon) {
+            const icon = this.historyIcon as Phaser.GameObjects.GameObject;
+            if (this.hasTintSetter(icon)) {
+                icon.setTint(tint);
+            }
+        }
+    }
+
+    private applyTintToPortrait(portrait: Phaser.GameObjects.Container, tint: number): void {
+        portrait.iterate((child: Phaser.GameObjects.GameObject) => {
+            if (child && this.hasTintSetter(child)) {
+                child.setTint(tint);
+            }
+            return true;
+        });
+    }
+
+    private hasTintSetter(
+        child: Phaser.GameObjects.GameObject,
+    ): child is Phaser.GameObjects.GameObject & { setTint: (color: number) => void } {
+        return typeof (child as { setTint?: unknown }).setTint === 'function';
     }
 }
