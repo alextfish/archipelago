@@ -63,6 +63,7 @@ When generating or modifying code:
 * Use meaningful names: `bridgeStart` not `s`
 * Keep classes small and focused (< 200 lines ideally)
 * Extract shared logic to avoid duplication
+* Prefer consistency with surrounding code, especially in how similar functions are named and called
 * Prefer explicit code over implicit magic
 
 ### When In Doubt
@@ -96,6 +97,7 @@ When providing code completions:
 2. **Follow existing patterns**: Match the style and structure of surrounding code
 3. **Use path aliases**: Always suggest imports using `@model`, `@view`, `@controller`, `@helpers` aliases
 4. **British spelling**: Suggest British spellings in variable names, comments, and strings (except when interfacing with external APIs)
+5. **Keep call sites consistent**: Prefer to call similar functions in the same way unless there is a clear local convention to change
 
 ### Inline Suggestions
 
@@ -256,6 +258,7 @@ When modifying existing code:
 3. **Minimal changes**: Make the smallest change possible to achieve the goal
 4. **Update tests**: If changing behaviour, update the corresponding tests
 5. **Preserve structure**: Don't reorganise or refactor unless specifically asked
+6. **Check inconsistent requests**: If a requested change would be inconsistent with surrounding or similar code, stop and double-check with the user before implementing it
 
 ## Integration with Development Workflow
 

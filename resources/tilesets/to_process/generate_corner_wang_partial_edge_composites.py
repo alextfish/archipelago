@@ -38,6 +38,7 @@ CornerSignature = tuple[int, int, int, int]
 EdgeSignature = tuple[int, int, int, int]
 TileChoice = tuple[int | None, int | None, int | None, int | None]
 QuadrantSignatureChoice = tuple[CornerSignature, CornerSignature, CornerSignature, CornerSignature]
+PointGrid = tuple[int, int, int, int, int, int, int, int, int]
 
 
 @dataclass(frozen=True)
@@ -85,6 +86,22 @@ def parse_args() -> argparse.Namespace:
         '--output-dir',
         default=SCRIPT_DIR,
         help='Directory for the generated PNG and TSX output.',
+    )
+    parser.add_argument(
+        '--edge-colour-ids',
+        nargs='*',
+        type=int,
+        help='Optional exact palette of Wang colour IDs to use on the output edges. When omitted, all source colours are considered.',
+    )
+    parser.add_argument(
+        '--point-colour-ids',
+        nargs='*',
+        type=int,
+        help='Optional palette of Wang colour IDs allowed at the five free 3x3 corner points. Defaults to the edge palette when --edge-colour-ids is set.',
+    )
+    parser.add_argument(
+        '--output-tag',
+        help='Optional tag inserted into the generated PNG/TSX filenames.',
     )
     parser.add_argument(
         '--include-unsolved',
@@ -158,6 +175,34 @@ def discover_images(explicit_images: list[str], tsx_path: str, meta: TilesetMeta
     return [resolve_image_path(tsx_dir, meta.image_source)]
 
 
+def normalise_colour_ids(
+    requested_ids: list[int] | None,
+    colour_by_id: dict[int, WangColour],
+    *,
+    allow_zero: bool,
+    argument_name: str,
+) -> list[int] | None:
+    if requested_ids is None:
+        return None
+
+    colour_ids: list[int] = []
+    for colour_id in requested_ids:
+        if colour_id == 0 and allow_zero:
+            if colour_id not in colour_ids:
+                colour_ids.append(colour_id)
+            continue
+        if colour_id not in colour_by_id:
+            allowed_ids = [0, *sorted(colour_by_id)] if allow_zero else sorted(colour_by_id)
+            raise ValueError(f'Unknown Wang colour ID {colour_id} for {argument_name}. Available IDs: {allowed_ids}')
+        if colour_id not in colour_ids:
+            colour_ids.append(colour_id)
+
+    if not colour_ids:
+        raise ValueError(f'{argument_name} must not be empty when provided.')
+
+    return colour_ids
+
+
 def build_tile_cache(source_image: Image.Image, meta: TilesetMeta) -> dict[int, Image.Image]:
     cache: dict[int, Image.Image] = {}
     for tile_id in range(meta.tile_count):
@@ -198,12 +243,91 @@ def build_quadrant_signatures(
     )
 
 
+def build_signature_set_from_points(points: PointGrid) -> QuadrantSignatureChoice:
+    top_left, top_centre, top_right, centre_left, centre_centre, centre_right, bottom_left, bottom_centre, bottom_right = points
+    return (
+        (top_left, top_centre, centre_centre, centre_left),
+        (top_centre, top_right, centre_right, centre_centre),
+        (centre_left, centre_centre, bottom_centre, bottom_left),
+        (centre_centre, centre_right, bottom_right, bottom_centre),
+    )
+
+
+def build_pair_point_grids(edge_signature: EdgeSignature) -> list[PointGrid]:
+    top, right, bottom, left = edge_signature
+    labels = list(dict.fromkeys(edge_signature))
+    if len(labels) == 1:
+        return [(top, top, top, top, top, top, top, top, top)]
+    if len(labels) != 2:
+        return []
+
+    counts = {label: edge_signature.count(label) for label in labels}
+    minority_label = next((label for label, count in counts.items() if count == 1), None)
+    if minority_label is not None:
+        majority_label = next(label for label in labels if label != minority_label)
+        if top == minority_label:
+            return [(minority_label, minority_label, minority_label, majority_label, majority_label, majority_label, majority_label, majority_label, majority_label)]
+        if right == minority_label:
+            return [(majority_label, majority_label, minority_label, majority_label, majority_label, minority_label, majority_label, majority_label, minority_label)]
+        if bottom == minority_label:
+            return [(majority_label, majority_label, majority_label, majority_label, majority_label, majority_label, minority_label, minority_label, minority_label)]
+        return [(minority_label, majority_label, majority_label, minority_label, majority_label, majority_label, minority_label, majority_label, majority_label)]
+
+    if top == bottom and right == left:
+        return [
+            (top, top, top, right, right, right, top, top, top),
+            (top, right, top, top, right, top, top, right, top),
+        ]
+
+    top_left_corner = top if top == left else None
+    top_right_corner = top if top == right else None
+    bottom_left_corner = bottom if bottom == left else None
+    bottom_right_corner = bottom if bottom == right else None
+    ambiguous_label_options = list(dict.fromkeys(edge_signature))
+    candidates: list[PointGrid] = []
+
+    for ambiguous_label in ambiguous_label_options:
+        centre_label = next(label for label in ambiguous_label_options if label != ambiguous_label)
+        candidates.append(
+            (
+                top_left_corner if top_left_corner is not None else ambiguous_label,
+                top,
+                top_right_corner if top_right_corner is not None else ambiguous_label,
+                left,
+                centre_label,
+                right,
+                bottom_left_corner if bottom_left_corner is not None else ambiguous_label,
+                bottom,
+                bottom_right_corner if bottom_right_corner is not None else ambiguous_label,
+            )
+        )
+
+    return candidates
+
+
 def compute_candidate_signature_sets(
     edge_signature: EdgeSignature,
     lookup: dict[CornerSignature, list[int]],
+    point_palette: list[int] | None = None,
 ) -> list[QuadrantSignatureChoice]:
     candidates: list[QuadrantSignatureChoice] = []
     seen: set[QuadrantSignatureChoice] = set()
+
+    if point_palette is not None:
+        if len(point_palette) == 2 and set(edge_signature).issubset(point_palette):
+            for points in build_pair_point_grids(edge_signature):
+                signature_set = build_signature_set_from_points(points)
+                if all(signature in lookup for signature in signature_set) and signature_set not in seen:
+                    seen.add(signature_set)
+                    candidates.append(signature_set)
+            return candidates
+
+        for free_corners in product(point_palette, repeat=5):
+            signature_set = build_quadrant_signatures(edge_signature, free_corners)
+            if all(signature in lookup for signature in signature_set) and signature_set not in seen:
+                seen.add(signature_set)
+                candidates.append(signature_set)
+        return candidates
 
     top, right, bottom, left = edge_signature
     fixed_top_left = min(top, left)
@@ -261,8 +385,9 @@ def generate_variants_for_edge_signature(
     variant_count: int,
     lookup: dict[CornerSignature, list[int]],
     rng: random.Random,
+    point_palette: list[int] | None = None,
 ) -> list[TileChoice]:
-    candidate_signature_sets = compute_candidate_signature_sets(edge_signature, lookup)
+    candidate_signature_sets = compute_candidate_signature_sets(edge_signature, lookup, point_palette)
     if not candidate_signature_sets:
         return []
 
@@ -305,14 +430,16 @@ def edge_signature_to_wangid(edge_signature: EdgeSignature) -> str:
     return f'{top},0,{right},0,{bottom},0,{left},0'
 
 
-def output_png_path_for_image(image_path: str, output_dir: str) -> str:
+def output_png_path_for_image(image_path: str, output_dir: str, output_tag: str | None = None) -> str:
     stem, _ = os.path.splitext(os.path.basename(image_path))
-    return os.path.join(output_dir, f'{stem}{OUTPUT_SUFFIX}')
+    tag_suffix = f'_{output_tag}' if output_tag else ''
+    return os.path.join(output_dir, f'{stem}{tag_suffix}{OUTPUT_SUFFIX}')
 
 
-def output_tsx_path_for_image(image_path: str, output_dir: str) -> str:
+def output_tsx_path_for_image(image_path: str, output_dir: str, output_tag: str | None = None) -> str:
     stem, _ = os.path.splitext(os.path.basename(image_path))
-    return os.path.join(output_dir, f'{stem}{TSX_OUTPUT_SUFFIX}')
+    tag_suffix = f'_{output_tag}' if output_tag else ''
+    return os.path.join(output_dir, f'{stem}{tag_suffix}{TSX_OUTPUT_SUFFIX}')
 
 
 def build_output_sheet(
@@ -424,11 +551,42 @@ def main() -> None:
     meta, colours, lookup = parse_source_tileset(tsx_path)
     image_paths = discover_images(args.images, tsx_path, meta)
     wangset_name = os.path.splitext(os.path.basename(tsx_path))[0]
-    palette = [0] + [colour.wang_id for colour in colours]
-    all_edge_signatures = [edge_signature for edge_signature in iter_edge_signatures(palette) if is_allowed_edge_signature(edge_signature)]
+    colour_by_id = {colour.wang_id: colour for colour in colours}
+    edge_palette = normalise_colour_ids(
+        args.edge_colour_ids,
+        colour_by_id,
+        allow_zero=True,
+        argument_name='--edge-colour-ids',
+    )
+    point_palette = normalise_colour_ids(
+        args.point_colour_ids,
+        colour_by_id,
+        allow_zero=True,
+        argument_name='--point-colour-ids',
+    )
 
-    print(f'Using corner-Wang TSX metadata from: {tsx_path}')
-    print('Output edge signatures use constrained exact-label solving with only edge labels plus 0 allowed internally.')
+    if edge_palette is not None and point_palette is None:
+        point_palette = edge_palette[:]
+
+    if edge_palette is None:
+        palette = [0] + [colour.wang_id for colour in colours]
+        all_edge_signatures = [edge_signature for edge_signature in iter_edge_signatures(palette) if is_allowed_edge_signature(edge_signature)]
+        print(f'Using corner-Wang TSX metadata from: {tsx_path}')
+        print('Output edge signatures use constrained exact-label solving with only edge labels plus 0 allowed internally.')
+    else:
+        all_edge_signatures = iter_edge_signatures(edge_palette)
+        print(f'Using corner-Wang TSX metadata from: {tsx_path}')
+        print(
+            'Output edge signatures are restricted to '
+            f'{edge_palette}, with free corner points drawn from {point_palette}.'
+        )
+
+    output_tag = args.output_tag
+    if output_tag is None and edge_palette is not None:
+        output_tag = '_'.join(
+            colour_by_id[colour_id].name if colour_id in colour_by_id else str(colour_id)
+            for colour_id in edge_palette
+        )
 
     for image_path in image_paths:
         source_image = Image.open(image_path).convert('RGBA')
@@ -442,6 +600,7 @@ def main() -> None:
                 variant_count=args.variants,
                 lookup=lookup,
                 rng=rng,
+                point_palette=point_palette,
             )
             if variants:
                 variants_by_signature[edge_signature] = variants
@@ -450,8 +609,8 @@ def main() -> None:
         if not args.include_unsolved:
             edge_signatures = [edge_signature for edge_signature in all_edge_signatures if edge_signature in variants_by_signature]
 
-        png_path = output_png_path_for_image(image_path, args.output_dir)
-        tsx_output_path = output_tsx_path_for_image(image_path, args.output_dir)
+        png_path = output_png_path_for_image(image_path, args.output_dir, output_tag)
+        tsx_output_path = output_tsx_path_for_image(image_path, args.output_dir, output_tag)
         build_output_sheet(
             output_path=png_path,
             edge_signatures=edge_signatures,

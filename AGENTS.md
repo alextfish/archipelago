@@ -63,10 +63,16 @@ When generating or modifying code:
 * Use meaningful names: `bridgeStart` not `s`
 * Keep classes small and focused (< 200 lines ideally)
 * Extract shared logic to avoid duplication
+* Prefer consistency with surrounding code, especially in how similar functions are named and called
 * Prefer explicit code over implicit magic
 
 ### When In Doubt
 Prioritise: **Clarity → Testability → Architectural Consistency**
+
+### Consistency with Existing Code
+* Treat consistency as a requirement, not a nice-to-have
+* Prefer to call similar functions in the same way across the codebase unless there is a clear reason not to
+* If a requested change would be inconsistent with surrounding or similar code, stop and double-check with the user before implementing it
 
 ## Coding Style
 
