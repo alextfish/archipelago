@@ -61,7 +61,8 @@ export class OverworldPuzzleController {
     public async enterPuzzle(
         puzzleId: string,
         onModeChange: (mode: 'puzzle') => void,
-        onFlowTileChanged?: (lx: number, ly: number, hasWater: boolean) => void
+        onFlowTileChanged?: (lx: number, ly: number, hasWater: boolean) => void,
+        alwaysDryStartPoint?: { x: number; y: number } | null
     ): Promise<void> {
         console.log(`OverworldPuzzleController: Entering puzzle: ${puzzleId}`);
 
@@ -75,6 +76,10 @@ export class OverworldPuzzleController {
         if (!puzzle) {
             console.error(`Puzzle not found: ${puzzleId}`);
             throw new Error(`Puzzle not found: ${puzzleId}`);
+        }
+
+        if (puzzle instanceof FlowPuzzle) {
+            puzzle.setStartPointMustBeAlwaysDryConstraint(alwaysDryStartPoint ?? null);
         }
 
         // Get puzzle bounds

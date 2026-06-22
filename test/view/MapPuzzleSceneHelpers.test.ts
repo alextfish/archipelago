@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { isPuzzleEntryTileOnLayer } from '@view/MapPuzzleSceneHelpers';
+import {
+  getPuzzleEntryRequiredPlayerLayerOnLayer,
+  isPuzzleEntryTileOnLayer,
+} from '@view/MapPuzzleSceneHelpers';
 
 describe('MapPuzzleSceneHelpers', () => {
   it('finds puzzle entry tiles on a rendered layer', () => {
@@ -37,5 +40,27 @@ describe('MapPuzzleSceneHelpers', () => {
     };
 
     expect(isPuzzleEntryTileOnLayer(layer, 0, 0)).toBe(false);
+  });
+
+  it('marks low-ground puzzle starts as lower-layer entry points', () => {
+    const layer = {
+      name: 'puzzleTiles',
+      data: [
+        [{ properties: { puzzleStart: true, isLowGround: true } }],
+      ],
+    };
+
+    expect(getPuzzleEntryRequiredPlayerLayerOnLayer(layer, 0, 0)).toBe('lower');
+  });
+
+  it('marks regular puzzle starts as upper-layer entry points', () => {
+    const layer = {
+      name: 'puzzleTiles',
+      data: [
+        [{ properties: { puzzleStart: true } }],
+      ],
+    };
+
+    expect(getPuzzleEntryRequiredPlayerLayerOnLayer(layer, 0, 0)).toBe('upper');
   });
 });

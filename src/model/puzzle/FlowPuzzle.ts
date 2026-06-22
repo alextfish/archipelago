@@ -2,6 +2,7 @@ import { BridgePuzzle, type PuzzleSpec } from "@model/puzzle/BridgePuzzle";
 import type { FlowPuzzleSpec, FlowSquareSpec, GridKey, WaterChangeWaves } from "./FlowTypes";
 import { gridKey, parseGridKey } from "./FlowTypes";
 import { ConnectivityManager } from "@model/ConnectivityManager";
+import { StartPointMustBeAlwaysDryConstraint } from "./constraints/StartPointMustBeAlwaysDryConstraint";
 
 const DIR_DELTA: Record<string, { dx: number; dy: number }> = {
   N: { dx: 0, dy: -1 },
@@ -20,6 +21,7 @@ export class FlowPuzzle extends BridgePuzzle {
   private edgeInputs: Set<GridKey> = new Set();
   private edgeOutputCache: Set<GridKey> = new Set();
   private pendingWaterChange: { waves: WaterChangeWaves; flooding: boolean } | null = null;
+  private startPointMustBeAlwaysDryConstraint: StartPointMustBeAlwaysDryConstraint | null = null;
 
   constructor(spec: FlowPuzzleSpec) {
     // Convert FlowPuzzleSpec to PuzzleSpec for base class
@@ -82,6 +84,22 @@ export class FlowPuzzle extends BridgePuzzle {
     this.recomputeWater();
   }
 
+  setStartPointMustBeAlwaysDryConstraint(startPoint: { x: number; y: number } | null): void {
+    if (this.startPointMustBeAlwaysDryConstraint) {
+      this.constraints = this.constraints.filter(
+        constraint => constraint !== this.startPointMustBeAlwaysDryConstraint
+      );
+      this.startPointMustBeAlwaysDryConstraint = null;
+    }
+
+    if (!startPoint) {
+      return;
+    }
+
+    this.startPointMustBeAlwaysDryConstraint = new StartPointMustBeAlwaysDryConstraint(startPoint.x, startPoint.y);
+    this.constraints.push(this.startPointMustBeAlwaysDryConstraint);
+  }
+
   /**
    * Consume and return the pending water change recorded by the last
    * placeBridge / removeBridge call. Returns null if no change is pending
@@ -100,6 +118,12 @@ export class FlowPuzzle extends BridgePuzzle {
     const ok = super.placeBridge(bridgeID, start, end);
     if (ok) {
       this.recomputeWater();
+      if (this.violatesAlwaysDryStartPointConstraint()) {
+        super.removeBridge(bridgeID);
+        this.recomputeWater();
+        this.pendingWaterChange = null;
+        return false;
+      }
       const bridgedCells = this.getBridgeCoveredCells(start, end);
       const driedUp = new Set<GridKey>();
       for (const k of oldWater) if (!this.hasWater.has(k)) driedUp.add(k);
@@ -113,12 +137,20 @@ export class FlowPuzzle extends BridgePuzzle {
 
   removeBridge(bridgeID: string) {
     const bridge = this.placedBridges.find(b => b.id === bridgeID);
-    const bridgedCells = bridge?.start && bridge?.end
-      ? this.getBridgeCoveredCells(bridge.start, bridge.end)
+    const previousStart = bridge?.start ? { x: bridge.start.x, y: bridge.start.y } : null;
+    const previousEnd = bridge?.end ? { x: bridge.end.x, y: bridge.end.y } : null;
+    const bridgedCells = previousStart && previousEnd
+      ? this.getBridgeCoveredCells(previousStart, previousEnd)
       : [];
     const oldWater = new Set(this.hasWater);
     super.removeBridge(bridgeID);
     this.recomputeWater();
+    if (previousStart && previousEnd && this.violatesAlwaysDryStartPointConstraint()) {
+      super.placeBridge(bridgeID, previousStart, previousEnd);
+      this.recomputeWater();
+      this.pendingWaterChange = null;
+      throw new Error("Bridge removal would flood the required dry start point");
+    }
     const gained = new Set<GridKey>();
     for (const k of this.hasWater) if (!oldWater.has(k)) gained.add(k);
     this.pendingWaterChange = {
@@ -371,5 +403,13 @@ export class FlowPuzzle extends BridgePuzzle {
       getFlowSquare: (x, y) => this.getFlowSquare(x, y),
       placedBridges: this.placedBridges
     });
+  }
+
+  private violatesAlwaysDryStartPointConstraint(): boolean {
+    if (!this.startPointMustBeAlwaysDryConstraint) {
+      return false;
+    }
+
+    return !this.startPointMustBeAlwaysDryConstraint.check(this).satisfied;
   }
 }

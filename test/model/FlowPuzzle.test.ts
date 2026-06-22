@@ -364,3 +364,82 @@ describe("FlowPuzzle water change wave sequences", () => {
   });
 });
 
+describe("FlowPuzzle StartPointMustBeAlwaysDryConstraint incremental enforcement", () => {
+  it("rejects bridge removal that would flood the required dry start point", () => {
+    const spec: FlowPuzzleSpec = {
+      id: "flow-dry-start-removal",
+      size: { width: 3, height: 3 },
+      islands: [
+        { id: "A", x: 1, y: 0 },
+        { id: "B", x: 1, y: 2 }
+      ],
+      bridgeTypes: [{ id: "wood", colour: "brown", count: 1 }],
+      flowSquares: [
+        { x: 1, y: 0, outgoing: ["S"], isSource: true },
+        { x: 1, y: 1, outgoing: ["S"] },
+        { x: 1, y: 2, outgoing: [] }
+      ],
+      edgeInputs: [],
+      constraints: [],
+      maxNumBridges: 2
+    };
+
+    const puzzle = new FlowPuzzle(spec);
+    puzzle.setStartPointMustBeAlwaysDryConstraint({ x: 1, y: 1 });
+
+    // Place bridge first so the required dry start point is protected by a dam.
+    const bridge = puzzle.takeBridgeOfType("wood");
+    expect(bridge).toBeDefined();
+    if (!bridge) {
+      return;
+    }
+
+    const placed = puzzle.placeBridge(bridge.id, { x: 1, y: 0 }, { x: 1, y: 2 });
+    expect(placed).toBe(true);
+    expect(puzzle.tileHasWater(1, 1)).toBe(false);
+
+    // Removing the bridge would re-flood (1,1), so removal must be rejected.
+    expect(() => puzzle.removeBridge(bridge.id)).toThrow("Bridge removal would flood the required dry start point");
+
+    // Bridge remains placed after rejected removal, and start point stays dry.
+    const stillPlaced = puzzle.placedBridges.find((b) => b.id === bridge.id);
+    expect(stillPlaced).toBeDefined();
+    expect(puzzle.tileHasWater(1, 1)).toBe(false);
+  });
+
+  it("allows removals after clearing the dry-start constraint", () => {
+    const spec: FlowPuzzleSpec = {
+      id: "flow-dry-start-clear",
+      size: { width: 3, height: 3 },
+      islands: [
+        { id: "A", x: 1, y: 0 },
+        { id: "B", x: 1, y: 2 }
+      ],
+      bridgeTypes: [{ id: "wood", colour: "brown", count: 1 }],
+      flowSquares: [
+        { x: 1, y: 0, outgoing: ["S"], isSource: true },
+        { x: 1, y: 1, outgoing: ["S"] },
+        { x: 1, y: 2, outgoing: [] }
+      ],
+      edgeInputs: [],
+      constraints: [],
+      maxNumBridges: 2
+    };
+
+    const puzzle = new FlowPuzzle(spec);
+    puzzle.setStartPointMustBeAlwaysDryConstraint({ x: 1, y: 1 });
+
+    const bridge = puzzle.takeBridgeOfType("wood");
+    expect(bridge).toBeDefined();
+    if (!bridge) {
+      return;
+    }
+
+    expect(puzzle.placeBridge(bridge.id, { x: 1, y: 0 }, { x: 1, y: 2 })).toBe(true);
+    puzzle.setStartPointMustBeAlwaysDryConstraint(null);
+
+    expect(() => puzzle.removeBridge(bridge.id)).not.toThrow();
+    expect(puzzle.tileHasWater(1, 1)).toBe(true);
+    expect(puzzle.placedBridges.find((b) => b.id === bridge.id)).toBeUndefined();
+  });
+});

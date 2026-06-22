@@ -9,6 +9,8 @@ type PuzzleEntryTileLike = {
     properties?: Record<string, unknown>;
 };
 
+export type PuzzleEntryRequiredPlayerLayer = 'upper' | 'lower';
+
 type PuzzleEntryLayerLike = {
     name?: string;
     tilemapLayer?: {
@@ -21,26 +23,63 @@ function hasPuzzleEntryProperty(tile: PuzzleEntryTileLike | null | undefined): b
     return tile?.properties?.puzzleStart === true;
 }
 
+function getRequiredPlayerLayerForEntryTile(
+    tile: PuzzleEntryTileLike | null | undefined
+): PuzzleEntryRequiredPlayerLayer | null {
+    if (!hasPuzzleEntryProperty(tile)) {
+        return null;
+    }
+
+    return tile?.properties?.isLowGround === true ? 'lower' : 'upper';
+}
+
 export function isPuzzleEntryTileOnLayer(layer: PuzzleEntryLayerLike, tileX: number, tileY: number): boolean {
+    return getPuzzleEntryRequiredPlayerLayerOnLayer(layer, tileX, tileY) !== null;
+}
+
+export function getPuzzleEntryRequiredPlayerLayerOnLayer(
+    layer: PuzzleEntryLayerLike,
+    tileX: number,
+    tileY: number
+): PuzzleEntryRequiredPlayerLayer | null {
     if (layer.tilemapLayer) {
-        return hasPuzzleEntryProperty(layer.tilemapLayer.getTileAt(tileX, tileY));
+        return getRequiredPlayerLayerForEntryTile(layer.tilemapLayer.getTileAt(tileX, tileY));
     }
 
     if (!isOverworldPuzzleTileSourceLayerName(layer.name)) {
-        return false;
+        return null;
     }
 
-    return hasPuzzleEntryProperty(layer.data?.[tileY]?.[tileX]);
+    return getRequiredPlayerLayerForEntryTile(layer.data?.[tileY]?.[tileX]);
 }
 
 export function isPuzzleEntryTile(map: Phaser.Tilemaps.Tilemap, tileX: number, tileY: number): boolean {
+    return getPuzzleEntryRequiredPlayerLayer(map, tileX, tileY) !== null;
+}
+
+export function getPuzzleEntryRequiredPlayerLayer(
+    map: Phaser.Tilemaps.Tilemap,
+    tileX: number,
+    tileY: number
+): PuzzleEntryRequiredPlayerLayer | null {
     for (const layer of map.layers) {
-        if (isPuzzleEntryTileOnLayer(layer, tileX, tileY)) {
-            return true;
+        const requiredLayer = getPuzzleEntryRequiredPlayerLayerOnLayer(layer, tileX, tileY);
+        if (requiredLayer !== null) {
+            return requiredLayer;
         }
     }
 
-    return false;
+    return null;
+}
+
+export function isPuzzleEntryTileAccessibleForPlayerLayer(
+    map: Phaser.Tilemaps.Tilemap,
+    tileX: number,
+    tileY: number,
+    playerLayer: 'upper' | 'lower' | 'stairs'
+): boolean {
+    const requiredLayer = getPuzzleEntryRequiredPlayerLayer(map, tileX, tileY);
+    return requiredLayer !== null && requiredLayer === playerLayer;
 }
 
 export function buildPuzzleEntryInteractables(
@@ -75,6 +114,7 @@ export function buildPuzzleEntryInteractables(
                     type: 'puzzle',
                     tileX: entryTileX,
                     tileY: entryTileY,
+                    requiredPlayerLayer: getPuzzleEntryRequiredPlayerLayer(map, entryTileX, entryTileY) ?? 'upper',
                     data: { puzzleId },
                 });
             }

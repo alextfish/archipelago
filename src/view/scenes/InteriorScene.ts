@@ -23,7 +23,13 @@ import { ConversationConditionEvaluator } from '@model/conversation/Conversation
 import { ConversationVariableSubstitutor } from '@model/conversation/ConversationVariableSubstitutor';
 import { RoofManager } from '@view/RoofManager';
 import { SceneTransitionCoordinator } from '@view/SceneTransitionCoordinator';
-import { buildPuzzleEntryInteractables, createBridgesLayer, isPuzzleEntryTile } from '@view/MapPuzzleSceneHelpers';
+import {
+    buildPuzzleEntryInteractables,
+    createBridgesLayer,
+    getPuzzleEntryRequiredPlayerLayer,
+    isPuzzleEntryTileAccessibleForPlayerLayer
+} from '@view/MapPuzzleSceneHelpers';
+import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
 import type { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
@@ -289,7 +295,10 @@ export class InteriorScene extends Phaser.Scene {
                 const pos = this.playerController.getPosition();
                 const { x: tx, y: ty } = this.gridMapper.worldToGrid(pos.x, pos.y);
                 this.interactionCursor.setFacing(this.playerController.getFacingDirection());
-                this.interactionCursor.update(tx, ty, this.interactables);
+                const visibleInteractables = this.interactables.filter((interactable) =>
+                    this.isInteractableAccessibleForCurrentLayer(interactable)
+                );
+                this.interactionCursor.update(tx, ty, visibleInteractables);
             }
 
             if (this.roofManager && this.player) {
@@ -785,7 +794,9 @@ export class InteriorScene extends Phaser.Scene {
             const tileDy = Math.abs(clickTileY - playerTileY);
             if (tileDx <= 1 && tileDy <= 1) {
                 const clicked = this.interactables.find(
-                    (i) => i.tileX === clickTileX && i.tileY === clickTileY
+                    (i) => i.tileX === clickTileX
+                        && i.tileY === clickTileY
+                        && this.isInteractableAccessibleForCurrentLayer(i)
                 );
                 if (clicked) {
                     this.isPointerHeld = false;
@@ -823,10 +834,14 @@ export class InteriorScene extends Phaser.Scene {
     }
 
     private interactWithTarget(target: Interactable): void {
+        if (!this.isInteractableAccessibleForCurrentLayer(target)) {
+            return;
+        }
+
         switch (target.type) {
             case 'puzzle':
                 if (target.data?.puzzleId) {
-                    void this.enterOverworldPuzzle(target.data.puzzleId);
+                    void this.enterOverworldPuzzle(target.data.puzzleId, { x: target.tileX, y: target.tileY });
                 }
                 break;
             case 'npc':
@@ -928,22 +943,30 @@ export class InteriorScene extends Phaser.Scene {
     }
 
     private checkForPuzzleEntry(): void {
-        if (!this.tiledMapData || !this.player || !this.map) {
+        if (!this.tiledMapData || !this.player || !this.map || !this.playerController) {
             return;
         }
 
         const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
-        if (!isPuzzleEntryTile(this.map, tileX, tileY)) {
+        if (!isPuzzleEntryTileAccessibleForPlayerLayer(
+            this.map,
+            tileX,
+            tileY,
+            this.playerController.getPlayerLayer()
+        )) {
             return;
         }
 
         const puzzle = this.puzzleManager.getPuzzleAtPosition(this.player.x, this.player.y, this.tiledMapData);
         if (puzzle) {
-            void this.enterOverworldPuzzle(puzzle.id);
+            void this.enterOverworldPuzzle(puzzle.id, { x: tileX, y: tileY });
         }
     }
 
-    public async enterOverworldPuzzle(puzzleId: string): Promise<void> {
+    public async enterOverworldPuzzle(
+        puzzleId: string,
+        entryTile?: { x: number; y: number }
+    ): Promise<void> {
         if (!this.puzzleController) {
             console.error('[InteriorScene] Puzzle controller not initialized');
             return;
@@ -970,10 +993,12 @@ export class InteriorScene extends Phaser.Scene {
             this.events.on('bridge-clicked', this.handleBridgeClicked, this);
             this.input.keyboard?.on('keydown-ESC', this.handleEscapeKey, this);
 
+            const alwaysDryStartPoint = this.getFlowAlwaysDryStartPointForEntry(puzzleId, entryTile);
+
             await this.puzzleController.enterPuzzle(puzzleId, (mode: 'puzzle') => {
                 this.gameMode = mode;
                 this.cameras.main.stopFollow();
-            });
+            }, undefined, alwaysDryStartPoint);
 
             this.constraintNPCManager?.hideConstraintNPCsForPuzzle(puzzleId);
 
@@ -1115,6 +1140,52 @@ export class InteriorScene extends Phaser.Scene {
 
     private handleBridgeClicked(bridgeId: string): void {
         this.puzzleController?.handleBridgeClicked(bridgeId);
+    }
+
+    private isInteractableAccessibleForCurrentLayer(interactable: Interactable): boolean {
+        if (interactable.requiredPlayerLayer === undefined) {
+            return true;
+        }
+
+        return this.playerController?.getPlayerLayer() === interactable.requiredPlayerLayer;
+    }
+
+    private getFlowAlwaysDryStartPointForEntry(
+        puzzleId: string,
+        entryTile?: { x: number; y: number }
+    ): { x: number; y: number } | null {
+        if (!entryTile || !this.playerController || !this.map || !this.tiledMapData) {
+            return null;
+        }
+
+        if (this.playerController.getPlayerLayer() !== 'lower') {
+            return null;
+        }
+
+        const requiredLayer = getPuzzleEntryRequiredPlayerLayer(this.map, entryTile.x, entryTile.y);
+        if (requiredLayer !== 'lower') {
+            return null;
+        }
+
+        const puzzle = this.puzzleManager.getPuzzleById(puzzleId);
+        if (!(puzzle instanceof FlowPuzzle)) {
+            return null;
+        }
+
+        const bounds = this.puzzleManager.getPuzzleBounds(puzzleId);
+        if (!bounds) {
+            return null;
+        }
+
+        const tileW = this.tiledMapData.tilewidth ?? 32;
+        const tileH = this.tiledMapData.tileheight ?? 32;
+        const originTileX = Math.floor(bounds.x / tileW);
+        const originTileY = Math.floor(bounds.y / tileH);
+
+        return {
+            x: entryTile.x - originTileX,
+            y: entryTile.y - originTileY,
+        };
     }
 
     private async handleConversationEffects(effects: any[], npc?: NPC): Promise<void> {

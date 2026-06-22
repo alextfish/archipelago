@@ -465,7 +465,12 @@ export class PuzzleController {
         if (this.wasSolved) return;
         this.cancelPlacement();
         const cmd = new RemoveBridgeCommand(this.puzzle, bridgeId);
-        this.undoManager.executeCommand(cmd);
+        try {
+            this.undoManager.executeCommand(cmd);
+        } catch (error) {
+            console.warn(`[PuzzleController] Bridge removal rejected for ${bridgeId}:`, error);
+            return;
+        }
         this.renderer.updateFromPuzzle(this.puzzle);
         this.selectAvailableBridgeType();
         this.notifyCountsChanged();

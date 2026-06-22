@@ -12,6 +12,7 @@ export interface Interactable {
     type: InteractableType;
     tileX: number;
     tileY: number;
+    requiredPlayerLayer?: 'upper' | 'lower';
     data?: any; // Additional data specific to the interactable type
 }
 

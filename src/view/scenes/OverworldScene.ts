@@ -42,7 +42,12 @@ import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
 import { NPCSpriteController } from '@view/NPCSpriteController';
 import { ConversationVariableSubstitutor } from '@model/conversation/ConversationVariableSubstitutor';
 import { PortalManager } from '@view/PortalManager';
-import { buildPuzzleEntryInteractables, createBridgesLayer, isPuzzleEntryTile } from '@view/MapPuzzleSceneHelpers';
+import {
+  buildPuzzleEntryInteractables,
+  createBridgesLayer,
+  getPuzzleEntryRequiredPlayerLayer,
+  isPuzzleEntryTileAccessibleForPlayerLayer
+} from '@view/MapPuzzleSceneHelpers';
 import { OverworldCameraZones } from '@model/overworld/OverworldCameraZones';
 
 /**
@@ -1377,7 +1382,10 @@ export class OverworldScene extends Phaser.Scene {
         this.interactionCursor.setFacing(this.playerController.getFacingDirection());
 
         // Update cursor to show nearest interactable
-        this.interactionCursor.update(playerTileX, playerTileY, this.interactables);
+        const visibleInteractables = this.interactables.filter((interactable) =>
+          this.isInteractableAccessibleForCurrentLayer(interactable)
+        );
+        this.interactionCursor.update(playerTileX, playerTileY, visibleInteractables);
       }
 
       // Update roof manager to hide/show roofs based on player position
@@ -1640,7 +1648,9 @@ export class OverworldScene extends Phaser.Scene {
       if (withinRange) {
         // Check if clicking on an interactable
         const clickedInteractable = this.interactables.find(
-          i => i.tileX === clickTileX && i.tileY === clickTileY
+          i => i.tileX === clickTileX
+            && i.tileY === clickTileY
+            && this.isInteractableAccessibleForCurrentLayer(i)
         );
 
         if (clickedInteractable) {
@@ -1698,10 +1708,14 @@ export class OverworldScene extends Phaser.Scene {
    * Interact with a target (puzzle, NPC, lever, etc.)
    */
   private interactWithTarget(target: Interactable): void {
+    if (!this.isInteractableAccessibleForCurrentLayer(target)) {
+      return;
+    }
+
     switch (target.type) {
       case 'puzzle':
         if (target.data?.puzzleId) {
-          this.enterOverworldPuzzle(target.data.puzzleId);
+          this.enterOverworldPuzzle(target.data.puzzleId, { x: target.tileX, y: target.tileY });
         }
         break;
       case 'npc':
@@ -2058,24 +2072,40 @@ export class OverworldScene extends Phaser.Scene {
 
     if (puzzle) {
       console.log(`Found puzzle: ${puzzle.id}`);
-      this.enterOverworldPuzzle(puzzle.id);
+      this.enterOverworldPuzzle(puzzle.id, { x: tileX, y: tileY });
     } else {
       console.log('No puzzle found at player position');
     }
   }
 
   private isPuzzleEntryTile(tileX: number, tileY: number): boolean {
-    if (!this.map) {
+    if (!this.map || !this.playerController) {
       return false;
     }
 
-    return isPuzzleEntryTile(this.map, tileX, tileY);
+    return isPuzzleEntryTileAccessibleForPlayerLayer(
+      this.map,
+      tileX,
+      tileY,
+      this.playerController.getPlayerLayer()
+    );
+  }
+
+  private isInteractableAccessibleForCurrentLayer(interactable: Interactable): boolean {
+    if (interactable.requiredPlayerLayer === undefined) {
+      return true;
+    }
+
+    return this.playerController?.getPlayerLayer() === interactable.requiredPlayerLayer;
   }
 
   /**
    * Enter overworld puzzle mode
    */
-  public async enterOverworldPuzzle(puzzleId: string): Promise<void> {
+  public async enterOverworldPuzzle(
+    puzzleId: string,
+    entryTile?: { x: number; y: number }
+  ): Promise<void> {
     if (!this.puzzleController) {
       console.error('Puzzle controller not initialized');
       return;
@@ -2121,6 +2151,8 @@ export class OverworldScene extends Phaser.Scene {
       const tileW = this.tiledMapData?.tilewidth ?? 32;
       const tileH = this.tiledMapData?.tileheight ?? 32;
 
+      const alwaysDryStartPoint = this.getFlowAlwaysDryStartPointForEntry(puzzleId, entryTile);
+
       await this.puzzleController.enterPuzzle(puzzleId, (mode: 'puzzle') => {
         this.gameMode = mode;
         // Stop camera follow so it doesn't snap back to player after zoom
@@ -2133,7 +2165,8 @@ export class OverworldScene extends Phaser.Scene {
             hasWater
           );
         }
-        : undefined
+        : undefined,
+        alwaysDryStartPoint
       );
 
       // Hide overworld constraint NPCs after camera transition completes
@@ -2145,6 +2178,44 @@ export class OverworldScene extends Phaser.Scene {
     } catch (error) {
       console.error(`Failed to enter overworld puzzle: ${puzzleId}`, error);
       this.exitOverworldPuzzle(false);
+    }
+
+    private getFlowAlwaysDryStartPointForEntry(
+      puzzleId: string,
+      entryTile?: { x: number; y: number }
+    ): { x: number; y: number } | null {
+      if (!entryTile || !this.playerController || !this.map || !this.tiledMapData) {
+        return null;
+      }
+
+      if (this.playerController.getPlayerLayer() !== 'lower') {
+        return null;
+      }
+
+      const requiredLayer = getPuzzleEntryRequiredPlayerLayer(this.map, entryTile.x, entryTile.y);
+      if (requiredLayer !== 'lower') {
+        return null;
+      }
+
+      const puzzle = this.puzzleManager.getPuzzleById(puzzleId);
+      if (!(puzzle instanceof FlowPuzzle)) {
+        return null;
+      }
+
+      const bounds = this.puzzleManager.getPuzzleBounds(puzzleId);
+      if (!bounds) {
+        return null;
+      }
+
+      const tileW = this.tiledMapData.tilewidth ?? 32;
+      const tileH = this.tiledMapData.tileheight ?? 32;
+      const originTileX = Math.floor(bounds.x / tileW);
+      const originTileY = Math.floor(bounds.y / tileH);
+
+      return {
+        x: entryTile.x - originTileX,
+        y: entryTile.y - originTileY,
+      };
     }
   }
 
