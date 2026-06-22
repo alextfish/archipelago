@@ -2179,44 +2179,44 @@ export class OverworldScene extends Phaser.Scene {
       console.error(`Failed to enter overworld puzzle: ${puzzleId}`, error);
       this.exitOverworldPuzzle(false);
     }
+  }
 
-    private getFlowAlwaysDryStartPointForEntry(
-      puzzleId: string,
-      entryTile?: { x: number; y: number }
-    ): { x: number; y: number } | null {
-      if (!entryTile || !this.playerController || !this.map || !this.tiledMapData) {
-        return null;
-      }
-
-      if (this.playerController.getPlayerLayer() !== 'lower') {
-        return null;
-      }
-
-      const requiredLayer = getPuzzleEntryRequiredPlayerLayer(this.map, entryTile.x, entryTile.y);
-      if (requiredLayer !== 'lower') {
-        return null;
-      }
-
-      const puzzle = this.puzzleManager.getPuzzleById(puzzleId);
-      if (!(puzzle instanceof FlowPuzzle)) {
-        return null;
-      }
-
-      const bounds = this.puzzleManager.getPuzzleBounds(puzzleId);
-      if (!bounds) {
-        return null;
-      }
-
-      const tileW = this.tiledMapData.tilewidth ?? 32;
-      const tileH = this.tiledMapData.tileheight ?? 32;
-      const originTileX = Math.floor(bounds.x / tileW);
-      const originTileY = Math.floor(bounds.y / tileH);
-
-      return {
-        x: entryTile.x - originTileX,
-        y: entryTile.y - originTileY,
-      };
+  private getFlowAlwaysDryStartPointForEntry(
+    puzzleId: string,
+    entryTile?: { x: number; y: number }
+  ): { x: number; y: number } | null {
+    if (!entryTile || !this.playerController || !this.map || !this.tiledMapData) {
+      return null;
     }
+
+    if (this.playerController.getPlayerLayer() !== 'lower') {
+      return null;
+    }
+
+    const requiredLayer = getPuzzleEntryRequiredPlayerLayer(this.map, entryTile.x, entryTile.y);
+    if (requiredLayer !== 'lower') {
+      return null;
+    }
+
+    const puzzle = this.puzzleManager.getPuzzleById(puzzleId);
+    if (!(puzzle instanceof FlowPuzzle)) {
+      return null;
+    }
+
+    const bounds = this.puzzleManager.getPuzzleBounds(puzzleId);
+    if (!bounds) {
+      return null;
+    }
+
+    const tileW = this.tiledMapData.tilewidth ?? 32;
+    const tileH = this.tiledMapData.tileheight ?? 32;
+    const originTileX = Math.floor(bounds.x / tileW);
+    const originTileY = Math.floor(bounds.y / tileH);
+
+    return {
+      x: entryTile.x - originTileX,
+      y: entryTile.y - originTileY,
+    };
   }
 
   /**
