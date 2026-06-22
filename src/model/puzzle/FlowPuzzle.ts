@@ -137,17 +137,19 @@ export class FlowPuzzle extends BridgePuzzle {
 
   removeBridge(bridgeID: string) {
     const bridge = this.placedBridges.find(b => b.id === bridgeID);
-    const previousStart = bridge?.start ? { x: bridge.start.x, y: bridge.start.y } : null;
-    const previousEnd = bridge?.end ? { x: bridge.end.x, y: bridge.end.y } : null;
+    const previousStart = bridge?.start ?? null;
+    const previousEnd = bridge?.end ?? null;
     const bridgedCells = previousStart && previousEnd
       ? this.getBridgeCoveredCells(previousStart, previousEnd)
       : [];
     const oldWater = new Set(this.hasWater);
     super.removeBridge(bridgeID);
     this.recomputeWater();
-    if (previousStart && previousEnd && this.violatesAlwaysDryStartPointConstraint()) {
-      super.placeBridge(bridgeID, previousStart, previousEnd);
-      this.recomputeWater();
+    if (this.violatesAlwaysDryStartPointConstraint()) {
+      if (previousStart && previousEnd) {
+        super.placeBridge(bridgeID, previousStart, previousEnd);
+        this.recomputeWater();
+      }
       this.pendingWaterChange = null;
       throw new Error("Bridge removal would flood the required dry start point");
     }
