@@ -403,15 +403,7 @@ export class MapPuzzleExtractor {
                     if (gid === 0) continue;
 
                     const props = TiledLayerUtils.getTileProperties(tilesets, gid);
-                    const hasWalkableCollisionBehaviour = props.walkable === true
-                        || props.walkable_low === true
-                        || props.stairs === true
-                        || props.alwaysHigh === true
-                        || props.narrow_ns === true
-                        || props.narrow_ew === true
-                        || (typeof props.walkable_half === 'string' && props.walkable_half.length > 0);
-                    const blocksBridge = props.blocksBridge === true || !hasWalkableCollisionBehaviour;
-                    if (!blocksBridge) continue;
+                    if (!this.shouldTileBlockBridges(props)) continue;
 
                     const localX = tx - puzzleOriginTileX;
                     const localY = ty - puzzleOriginTileY;
@@ -425,6 +417,20 @@ export class MapPuzzleExtractor {
         }
 
         return blockedTiles;
+    }
+
+    private shouldTileBlockBridges(props: Record<string, any>): boolean {
+        const hasWalkableCollisionBehaviour = props.walkable === true
+            || props.walkable_low === true
+            || props.stairs === true
+            || props.alwaysHigh === true
+            || props.narrow_ns === true
+            || props.narrow_ew === true
+            || (typeof props.walkable_half === 'string' && props.walkable_half.length > 0);
+
+        // Collision tiles block bridge paths by default; only explicitly walkable
+        // collision tile variants are treated as non-blocking.
+        return props.blocksBridge === true || !hasWalkableCollisionBehaviour;
     }
 
     private createPuzzleDefinition(obj: MapObject, regionGroup?: string): MapPuzzleDefinition {

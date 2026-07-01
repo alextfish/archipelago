@@ -24,7 +24,9 @@ export interface PuzzleSpec { // can be loaded from JSON
   size: { width: number; height: number };
   islands: Island[];
   blockedTiles?: Array<{ x: number; y: number }>;
+  /** Legacy/authoring alias used by some data sources. BLOCKED cells are value 0 (matches CollisionType.BLOCKED). */
   collisionMatrix?: number[][];
+  /** Runtime naming used by overworld collision systems. BLOCKED cells are value 0 (matches CollisionType.BLOCKED). */
   collisionArray?: number[][];
   bridgeTypes: BridgeTypeSpec[];
   constraints: { type: string; params?: any }[];
@@ -423,4 +425,3 @@ export class BridgePuzzle {
     return result;
   }
 }
-

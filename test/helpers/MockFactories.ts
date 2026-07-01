@@ -9,6 +9,7 @@ export const makeMockPuzzle = (
     height: 2,
     islands: [],
     bridges: [],
+    isBlockedTile: () => false,
     bridgesFromIsland: () => [],
     allBridgesPlaced: () => true,
     ...overrides

@@ -150,7 +150,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     // Mark blocked tiles as occupied
     for (let y = 0; y <= puzzle.height; y++) {
       for (let x = 0; x <= puzzle.width; x++) {
-        if ((puzzle as any).isBlockedTile?.(x, y) === true) {
+        if (puzzle.isBlockedTile(x, y)) {
           matrix[y][x] = 1;
         }
       }
