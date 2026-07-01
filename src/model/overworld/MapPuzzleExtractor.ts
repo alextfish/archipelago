@@ -420,17 +420,7 @@ export class MapPuzzleExtractor {
     }
 
     private shouldTileBlockBridges(props: Record<string, any>): boolean {
-        const hasWalkableCollisionBehaviour = props.walkable === true
-            || props.walkable_low === true
-            || props.stairs === true
-            || props.alwaysHigh === true
-            || props.narrow_ns === true
-            || props.narrow_ew === true
-            || (typeof props.walkable_half === 'string' && props.walkable_half.length > 0);
-
-        // Collision tiles block bridge paths by default; only explicitly walkable
-        // collision tile variants are treated as non-blocking.
-        return props.blocksBridge === true || !hasWalkableCollisionBehaviour;
+        return props.blocksBridge === true;
     }
 
     private createPuzzleDefinition(obj: MapObject, regionGroup?: string): MapPuzzleDefinition {

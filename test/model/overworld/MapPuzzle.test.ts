@@ -604,7 +604,7 @@ describe("MapPuzzleExtractor", () => {
             expect(puzzle.bridgePassesThroughBlockedTile({ x: 0, y: 0 }, { x: 2, y: 0 })).toBe(true);
         });
 
-        it("treats non-walkable collision tiles as blocked bridge tiles", () => {
+        it("does not treat non-walkable collision tiles (water) as blocked bridge tiles", () => {
             const mapData: TiledMapData = {
                 width: 3,
                 height: 1,
@@ -642,7 +642,7 @@ describe("MapPuzzleExtractor", () => {
 
             const puzzle = extractor.createBridgePuzzle(
                 {
-                    id: "implicit_blocked_puzzle",
+                    id: "water_puzzle",
                     regionGroup: "Beach",
                     bounds: { x: 0, y: 0, width: 96, height: 32 },
                     metadata: {}
@@ -650,7 +650,8 @@ describe("MapPuzzleExtractor", () => {
                 mapData
             );
 
-            expect(puzzle.bridgePassesThroughBlockedTile({ x: 0, y: 0 }, { x: 2, y: 0 })).toBe(true);
+            // Water tiles (non-walkable but without blocksBridge) must not block bridges
+            expect(puzzle.bridgePassesThroughBlockedTile({ x: 0, y: 0 }, { x: 2, y: 0 })).toBe(false);
         });
     });
 
