@@ -603,6 +603,55 @@ describe("MapPuzzleExtractor", () => {
 
             expect(puzzle.bridgePassesThroughBlockedTile({ x: 0, y: 0 }, { x: 2, y: 0 })).toBe(true);
         });
+
+        it("treats non-walkable collision tiles as blocked bridge tiles", () => {
+            const mapData: TiledMapData = {
+                width: 3,
+                height: 1,
+                tilewidth: 32,
+                tileheight: 32,
+                layers: [
+                    {
+                        name: "Beach",
+                        type: "group",
+                        visible: true,
+                        opacity: 1,
+                        layers: [
+                            {
+                                name: "collision",
+                                type: "tilelayer",
+                                width: 3,
+                                height: 1,
+                                data: [0, 3, 0],
+                                visible: true,
+                                opacity: 1
+                            }
+                        ]
+                    }
+                ],
+                tilesets: [
+                    {
+                        firstgid: 1,
+                        name: "collision",
+                        tiles: [
+                            { id: 2, properties: [] }
+                        ]
+                    }
+                ]
+            };
+
+            const puzzle = extractor.createBridgePuzzle(
+                {
+                    id: "implicit_blocked_puzzle",
+                    regionGroup: "Beach",
+                    bounds: { x: 0, y: 0, width: 96, height: 32 },
+                    metadata: {}
+                },
+                mapData
+            );
+
+            expect(puzzle.bridgePassesThroughBlockedTile({ x: 0, y: 0 }, { x: 2, y: 0 })).toBe(true);
+        });
     });
 
     describe("givesFeedback extraction from Tiled metadata", () => {

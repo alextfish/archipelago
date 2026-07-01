@@ -24,6 +24,8 @@ export interface PuzzleSpec { // can be loaded from JSON
   size: { width: number; height: number };
   islands: Island[];
   blockedTiles?: Array<{ x: number; y: number }>;
+  collisionMatrix?: number[][];
+  collisionArray?: number[][];
   bridgeTypes: BridgeTypeSpec[];
   constraints: { type: string; params?: any }[];
   maxNumBridges: number;
@@ -39,6 +41,7 @@ export class BridgePuzzle {
   inventory: BridgeInventory;
   maxNumBridges: number;
   givesFeedback: boolean;
+  private readonly blockedTiles: Array<{ x: number; y: number }>;
   private readonly blockedTileKeys: Set<string>;
 
   constructor(spec: PuzzleSpec) {
@@ -46,7 +49,9 @@ export class BridgePuzzle {
     this.width = spec.size.width;
     this.height = spec.size.height;
     this.islands = spec.islands;
-    this.blockedTileKeys = new Set((spec.blockedTiles ?? []).map(tile => this.gridKey(tile.x, tile.y)));
+    const blockedTilesFromMatrix = this.extractBlockedTilesFromCollisionMatrix(spec.collisionMatrix ?? spec.collisionArray);
+    this.blockedTiles = [...(spec.blockedTiles ?? []), ...blockedTilesFromMatrix];
+    this.blockedTileKeys = new Set(this.blockedTiles.map(tile => this.gridKey(tile.x, tile.y)));
     this.constraints = createConstraintsFromSpec(spec.constraints);
     this.givesFeedback = spec.givesFeedback ?? true;
     const bridgeTypes = spec.bridgeTypes.map(
@@ -211,6 +216,10 @@ export class BridgePuzzle {
     return false;
   }
 
+  isBlockedTile(x: number, y: number): boolean {
+    return this.blockedTileKeys.has(this.gridKey(x, y));
+  }
+
   /**
    * Check if a bridge between two islands would cross over any other islands.
    * Returns true if any island lies strictly between the start and end islands.
@@ -247,6 +256,27 @@ export class BridgePuzzle {
 
   private gridKey(x: number, y: number): string {
     return `${x},${y}`;
+  }
+
+  private extractBlockedTilesFromCollisionMatrix(
+    collisionMatrix?: number[][]
+  ): Array<{ x: number; y: number }> {
+    if (!collisionMatrix || collisionMatrix.length === 0) {
+      return [];
+    }
+
+    const blockedTiles: Array<{ x: number; y: number }> = [];
+    for (let y = 0; y < collisionMatrix.length; y++) {
+      const row = collisionMatrix[y];
+      if (!Array.isArray(row)) continue;
+      for (let x = 0; x < row.length; x++) {
+        if (row[x] === 0) {
+          blockedTiles.push({ x, y });
+        }
+      }
+    }
+
+    return blockedTiles;
   }
 
   private segmentIntersectsTile(
@@ -393,5 +423,4 @@ export class BridgePuzzle {
     return result;
   }
 }
-
 

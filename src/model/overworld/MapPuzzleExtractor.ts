@@ -403,7 +403,15 @@ export class MapPuzzleExtractor {
                     if (gid === 0) continue;
 
                     const props = TiledLayerUtils.getTileProperties(tilesets, gid);
-                    if (!props.blocksBridge) continue;
+                    const hasWalkableCollisionBehaviour = props.walkable === true
+                        || props.walkable_low === true
+                        || props.stairs === true
+                        || props.alwaysHigh === true
+                        || props.narrow_ns === true
+                        || props.narrow_ew === true
+                        || (typeof props.walkable_half === 'string' && props.walkable_half.length > 0);
+                    const blocksBridge = props.blocksBridge === true || !hasWalkableCollisionBehaviour;
+                    if (!blocksBridge) continue;
 
                     const localX = tx - puzzleOriginTileX;
                     const localY = ty - puzzleOriginTileY;
