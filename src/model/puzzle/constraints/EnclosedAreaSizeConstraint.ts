@@ -132,7 +132,7 @@ export class EnclosedAreaSizeConstraint extends Constraint {
   }
 
   /**
-   * Create a matrix marking occupied cells (1 = bridge or island, 0 = empty)
+   * Create a matrix marking occupied cells (1 = bridge, island, or blocked tile, 0 = empty)
    */
   private createOccupancyMatrix(puzzle: BridgePuzzle): number[][] {
     const matrix: number[][] = [];
@@ -145,6 +145,15 @@ export class EnclosedAreaSizeConstraint extends Constraint {
     // Mark islands as occupied
     for (const island of puzzle.islands) {
       matrix[island.y][island.x] = 1;
+    }
+
+    // Mark blocked tiles as occupied
+    for (let y = 0; y <= puzzle.height; y++) {
+      for (let x = 0; x <= puzzle.width; x++) {
+        if (puzzle.isBlockedTile(x, y)) {
+          matrix[y][x] = 1;
+        }
+      }
     }
 
     // Mark bridge positions as occupied

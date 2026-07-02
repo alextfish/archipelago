@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import { EnclosedAreaSizeConstraint } from '@model/puzzle/constraints/EnclosedAreaSizeConstraint';
 import { makeMockPuzzle } from "../helpers/MockFactories";
 
@@ -144,6 +145,45 @@ describe("EnclosedAreaSizeConstraint", () => {
     const result = constraint.check(puzzle as any);
 
     expect(result.satisfied).toBe(true);
+  });
+
+  it("treats blocked tiles as enclosure boundaries for area size checks", () => {
+    const bridgePlacements = [
+      { start: { x: 1, y: 1 }, end: { x: 3, y: 1 } },
+      { start: { x: 1, y: 3 }, end: { x: 3, y: 3 } },
+      { start: { x: 1, y: 1 }, end: { x: 1, y: 3 } },
+    ];
+
+    const baseSpec = {
+      id: "blocked-enclosure",
+      size: { width: 5, height: 5 },
+      islands: [
+        { id: "A", x: 1, y: 1 },
+        { id: "B", x: 3, y: 1 },
+        { id: "C", x: 1, y: 3 },
+        { id: "D", x: 3, y: 3 },
+      ],
+      bridgeTypes: [{ id: "wood", colour: "#8B4513", count: 3 }],
+      constraints: [],
+      maxNumBridges: 2,
+    };
+
+    const puzzleWithFence = new BridgePuzzle({
+      ...baseSpec,
+      blockedTiles: [{ x: 3, y: 2 }],
+    });
+    bridgePlacements.forEach((placement, index) => {
+      puzzleWithFence.placeBridge(puzzleWithFence.bridges[index].id, placement.start, placement.end);
+    });
+
+    const puzzleWithoutFence = new BridgePuzzle(baseSpec);
+    bridgePlacements.forEach((placement, index) => {
+      puzzleWithoutFence.placeBridge(puzzleWithoutFence.bridges[index].id, placement.start, placement.end);
+    });
+
+    const constraint = new EnclosedAreaSizeConstraint(2, 2, 1);
+    expect(constraint.check(puzzleWithFence).satisfied).toBe(true);
+    expect(constraint.check(puzzleWithoutFence).satisfied).toBe(false);
   });
 });
 

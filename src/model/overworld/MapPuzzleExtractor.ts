@@ -403,7 +403,7 @@ export class MapPuzzleExtractor {
                     if (gid === 0) continue;
 
                     const props = TiledLayerUtils.getTileProperties(tilesets, gid);
-                    if (!props.blocksBridge) continue;
+                    if (!this.shouldTileBlockBridges(props)) continue;
 
                     const localX = tx - puzzleOriginTileX;
                     const localY = ty - puzzleOriginTileY;
@@ -417,6 +417,10 @@ export class MapPuzzleExtractor {
         }
 
         return blockedTiles;
+    }
+
+    private shouldTileBlockBridges(props: Record<string, any>): boolean {
+        return props.blocksBridge === true;
     }
 
     private createPuzzleDefinition(obj: MapObject, regionGroup?: string): MapPuzzleDefinition {
