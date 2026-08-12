@@ -13,6 +13,7 @@ export interface SpellRect {
     y: number;
     width: number;
     height: number;
+    objectName?: string;
 }
 
 export type SpellIslandRef = string | SpellGridPoint;
@@ -36,6 +37,15 @@ export interface SpellGlyphPlacement {
     scale?: number;
 }
 
+export interface SpellNearbyGlyphPlacement extends SpellGlyphPlacement {
+    word: string;
+    language?: 'grass' | 'fire';
+}
+
+export interface SpellRectReference {
+    objectName: string;
+}
+
 export interface IslandSpellEffectSpec {
     type: 'island';
     island: Island;
@@ -52,8 +62,8 @@ export interface BridgeSpellEffectSpec {
 export interface OpenSpellEffectSpec {
     type: 'open';
     openedTiles: SpellGridPoint[];
-    leftWall?: SpellRect;
-    rightWall?: SpellRect;
+    leftWall?: SpellRect | SpellRectReference | string;
+    rightWall?: SpellRect | SpellRectReference | string;
 }
 
 export type PuzzleSpellEffectSpec =
@@ -64,9 +74,11 @@ export type PuzzleSpellEffectSpec =
 export interface PuzzleSpellSpec {
     id: string;
     glyph: PuzzleSpellGlyph;
+    glyphLanguage?: 'grass' | 'fire';
     trace: {
         components: SpellTraceComponentSpec[];
     };
     glyphPlacement?: SpellGlyphPlacement;
+    nearbyGlyphs?: SpellNearbyGlyphPlacement[];
     effect: PuzzleSpellEffectSpec;
 }

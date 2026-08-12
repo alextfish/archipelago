@@ -3,10 +3,12 @@ import type { Island } from '@model/puzzle/Island';
 import type { PuzzleSpellSpec, SpellIslandRef } from '@model/spell/PuzzleSpell';
 
 export class PuzzleSpellDetector {
+    static getMatchedSpells(puzzle: BridgePuzzle): PuzzleSpellSpec[] {
+        return puzzle.getSpellSpecs().filter((spell) => this.matchesSpell(puzzle, spell));
+    }
+
     static getTriggeredSpells(puzzle: BridgePuzzle): PuzzleSpellSpec[] {
-        return puzzle.getSpellSpecs().filter((spell) =>
-            !puzzle.hasCastSpell(spell.id) && this.matchesSpell(puzzle, spell)
-        );
+        return this.getMatchedSpells(puzzle).filter((spell) => !puzzle.hasCastSpell(spell.id));
     }
 
     static matchesSpell(puzzle: BridgePuzzle, spell: PuzzleSpellSpec): boolean {

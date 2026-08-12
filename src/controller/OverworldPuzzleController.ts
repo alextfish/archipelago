@@ -389,6 +389,7 @@ export class OverworldPuzzleController {
             }
 
             this.applyOpenSpellCollisionOverrides(activeData.puzzle, activeData.id);
+            this.applyIslandSpellCollisionOverrides(activeData.puzzle, activeData.id);
 
             if (isSolvedFlow) {
                 // Run the wave animation and camera transition in parallel.
@@ -521,6 +522,7 @@ export class OverworldPuzzleController {
             }
 
             this.applyOpenSpellCollisionOverrides(puzzle, puzzleId);
+            this.applyIslandSpellCollisionOverrides(puzzle, puzzleId);
         }
     }
 
@@ -556,15 +558,20 @@ export class OverworldPuzzleController {
                 console.log('OverworldPuzzleController: Bridge counts changed, emitting updateCounts');
                 this.scene.events.emit('updateCounts', counts);
             },
-            onSpellCast: async (spell: PuzzleSpellSpec, controller: PuzzleController) => {
+            onSpellCast: async (spell: PuzzleSpellSpec, controller: PuzzleController, options?: { isRepeat?: boolean }) => {
                 const animator = this.createSpellAnimator();
                 await animator.play(spell, async () => {
-                    await controller.applySpellEffect(spell);
+                    if (!options?.isRepeat) {
+                        await controller.applySpellEffect(spell);
+                    }
                     const activePuzzle = this.getActivePuzzle() ?? controller.getPuzzle();
                     this.applyOpenSpellCollisionOverrides(activePuzzle, puzzleId);
-                    this.gameState.saveOverworldPuzzleProgress(puzzleId, activePuzzle);
-                    this.saveStateCallback?.();
-                });
+                    this.applyIslandSpellCollisionOverrides(activePuzzle, puzzleId);
+                    if (!options?.isRepeat) {
+                        this.gameState.saveOverworldPuzzleProgress(puzzleId, activePuzzle);
+                        this.saveStateCallback?.();
+                    }
+                }, options);
             },
         };
     }
@@ -590,16 +597,20 @@ export class OverworldPuzzleController {
         const gridToWorld = (x: number, y: number) => renderer?.gridToWorld(x, y) ?? { x, y };
 
         return {
-            play: async (spell: PuzzleSpellSpec, applyEffect: () => Promise<void>) => {
+            play: async (
+                spell: PuzzleSpellSpec,
+                applyEffect: () => Promise<void>,
+                options?: { isRepeat?: boolean }
+            ) => {
                 if (spell.effect.type === 'island') {
-                    await new IslandSpellAnimator(this.scene, gridToWorld).play(spell, applyEffect);
+                    await new IslandSpellAnimator(this.scene, gridToWorld).play(spell, applyEffect, options);
                     return;
                 }
                 if (spell.effect.type === 'bridge') {
-                    await new BridgeSpellAnimator(this.scene, gridToWorld).play(spell, applyEffect);
+                    await new BridgeSpellAnimator(this.scene, gridToWorld).play(spell, applyEffect, options);
                     return;
                 }
-                await new OpenSpellAnimator(this.scene, gridToWorld).play(spell, applyEffect);
+                await new OpenSpellAnimator(this.scene, gridToWorld).play(spell, applyEffect, options);
             }
         };
     }
@@ -627,6 +638,30 @@ export class OverworldPuzzleController {
                     CollisionType.WALKABLE
                 );
             }
+        }
+    }
+
+    private applyIslandSpellCollisionOverrides(puzzle: BridgePuzzle, puzzleId: string): void {
+        const bounds = this.puzzleManager.getPuzzleBounds(puzzleId);
+        if (!bounds) {
+            return;
+        }
+
+        const tileW = this.tiledMapData?.tilewidth ?? 32;
+        const tileH = this.tiledMapData?.tileheight ?? 32;
+        const originTileX = Math.floor(bounds.x / tileW);
+        const originTileY = Math.floor(bounds.y / tileH);
+
+        for (const spell of puzzle.getSpellSpecs()) {
+            if (!puzzle.hasCastSpell(spell.id) || spell.effect.type !== 'island') {
+                continue;
+            }
+
+            this.collisionManager.setCollisionAt(
+                originTileX + spell.effect.island.x,
+                originTileY + spell.effect.island.y,
+                CollisionType.WALKABLE,
+            );
         }
     }
 }

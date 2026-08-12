@@ -18,10 +18,8 @@ export class PhaserPuzzleRenderer extends BasePuzzleRenderer {
   }
 
   screenToGrid(screenX: number, screenY: number): Point {
-    const camera = this.scene.cameras.main;
-    const worldX = (screenX - camera.x) / camera.zoom;
-    const worldY = (screenY - camera.y) / camera.zoom;
-    const gridPos = this.gridMapper.worldToGrid(worldX, worldY);
+    const worldPoint = this.scene.cameras.main.getWorldPoint(screenX, screenY);
+    const gridPos = this.gridMapper.worldToGrid(worldPoint.x, worldPoint.y);
     return { x: gridPos.x, y: gridPos.y };
   }
 

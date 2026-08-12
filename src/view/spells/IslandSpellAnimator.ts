@@ -1,13 +1,20 @@
 import type { PuzzleSpellSpec } from '@model/spell/PuzzleSpell';
-import { SpellAnimator } from './SpellAnimator';
+import { SpellAnimator, type SpellAnimationOptions } from './SpellAnimator';
 
 export class IslandSpellAnimator extends SpellAnimator {
     protected async animateEffect(
         spell: PuzzleSpellSpec,
-        applyEffect: () => Promise<void> | void
+        applyEffect: () => Promise<void> | void,
+        options: SpellAnimationOptions
     ): Promise<void> {
         if (spell.effect.type !== 'island') {
             await applyEffect();
+            return;
+        }
+
+        if (options.isRepeat) {
+            await applyEffect();
+            await this.wait(700);
             return;
         }
 

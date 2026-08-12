@@ -423,5 +423,43 @@ describe("BridgePuzzle", () => {
       });
       expect(puzzle.getCastSpellIDs()).toEqual(["raise-island", "add-bridge"]);
     });
+
+    it("keeps matching cast spells out of triggered list while still reporting them as matched", () => {
+      const puzzle = new BridgePuzzle({
+        id: "repeat-spell-puzzle",
+        size: { width: 4, height: 2 },
+        islands: [
+          { id: "a", x: 0, y: 0 },
+          { id: "b", x: 1, y: 0 },
+        ],
+        bridgeTypes: [{ id: "wood", count: 1 }],
+        constraints: [],
+        maxNumBridges: 2,
+        glyphSpells: [
+          {
+            id: "bridge-spell",
+            glyph: "bridge",
+            trace: {
+              components: [{
+                bridges: [{ start: "a", end: "b" }]
+              }]
+            },
+            effect: {
+              type: "bridge",
+              bridgeId: "spell-bridge",
+              bridgeType: { id: "wood", count: 1 },
+              start: { x: 0, y: 0 },
+              end: { x: 1, y: 0 },
+            }
+          }
+        ]
+      });
+
+      puzzle.placeBridge("b1", { x: 0, y: 0 }, { x: 1, y: 0 });
+      puzzle.markSpellCast("bridge-spell");
+
+      expect(PuzzleSpellDetector.getTriggeredSpells(puzzle)).toEqual([]);
+      expect(PuzzleSpellDetector.getMatchedSpells(puzzle).map((spell) => spell.id)).toEqual(["bridge-spell"]);
+    });
   });
 });

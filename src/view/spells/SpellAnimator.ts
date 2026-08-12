@@ -1,10 +1,20 @@
 import Phaser from 'phaser';
 import { BridgeSpriteFrames } from '@view/BridgeSpriteFrameRegistry';
-import type { PuzzleSpellSpec, SpellGridPoint } from '@model/spell/PuzzleSpell';
+import type {
+    PuzzleSpellSpec,
+    SpellGridPoint,
+    SpellNearbyGlyphPlacement,
+} from '@model/spell/PuzzleSpell';
 import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
+
+export interface SpellAnimationOptions {
+    isRepeat?: boolean;
+}
 
 export abstract class SpellAnimator {
     protected readonly glyphRegistry: LanguageGlyphRegistry = new LanguageGlyphRegistry();
+    protected static readonly REPEAT_TINT = 0x8a8a8a;
+    protected static readonly DEFAULT_TINT = 0xffffff;
 
     constructor(
         protected readonly scene: Phaser.Scene,
@@ -13,29 +23,39 @@ export abstract class SpellAnimator {
         protected readonly bridgeTextureKey: string = 'sprout-tiles',
     ) { }
 
-    async play(spell: PuzzleSpellSpec, applyEffect: () => Promise<void> | void): Promise<void> {
-        const traceGraphics = this.createTraceGraphics(spell);
-        const glyphSprite = this.createGlyphSprite(spell);
+    async play(
+        spell: PuzzleSpellSpec,
+        applyEffect: () => Promise<void> | void,
+        options: SpellAnimationOptions = {}
+    ): Promise<void> {
+        const tint = this.getTint(options);
+        const traceGraphics = this.createTraceGraphics(spell, tint);
+        const glyphSprites = this.createGlyphSprites(spell, tint);
 
-        await Promise.all([
+        const fadeInTargets: Promise<void>[] = [
             this.fadeGameObject(traceGraphics, 1, 1000),
-            glyphSprite ? this.fadeGameObject(glyphSprite, 1, 1000) : Promise.resolve()
-        ]);
+            ...glyphSprites.map((glyphSprite) => this.fadeGameObject(glyphSprite, 1, 1000))
+        ];
+        await Promise.all(fadeInTargets);
 
-        await this.animateEffect(spell, applyEffect);
+        await this.animateEffect(spell, applyEffect, options);
 
-        await Promise.all([
+        const fadeOutTargets: Promise<void>[] = [
             this.fadeGameObject(traceGraphics, 0, 600),
-            glyphSprite ? this.fadeGameObject(glyphSprite, 0, 600) : Promise.resolve()
-        ]);
+            ...glyphSprites.map((glyphSprite) => this.fadeGameObject(glyphSprite, 0, 600))
+        ];
+        await Promise.all(fadeOutTargets);
 
         traceGraphics.destroy();
-        glyphSprite?.destroy();
+        for (const glyphSprite of glyphSprites) {
+            glyphSprite.destroy();
+        }
     }
 
     protected abstract animateEffect(
         spell: PuzzleSpellSpec,
-        applyEffect: () => Promise<void> | void
+        applyEffect: () => Promise<void> | void,
+        options: SpellAnimationOptions
     ): Promise<void>;
 
     protected createIslandSprite(point: SpellGridPoint): Phaser.GameObjects.Sprite {
@@ -66,11 +86,15 @@ export abstract class SpellAnimator {
         });
     }
 
-    private createTraceGraphics(spell: PuzzleSpellSpec): Phaser.GameObjects.Graphics {
+    protected getTint(options: SpellAnimationOptions): number {
+        return options.isRepeat ? SpellAnimator.REPEAT_TINT : SpellAnimator.DEFAULT_TINT;
+    }
+
+    private createTraceGraphics(spell: PuzzleSpellSpec, tint: number): Phaser.GameObjects.Graphics {
         const graphics = this.scene.add.graphics();
         graphics.setDepth(240);
         graphics.setAlpha(0);
-        graphics.lineStyle(8, 0xffffff, 1);
+        graphics.lineStyle(8, tint, 1);
 
         for (const component of spell.trace.components) {
             for (const bridge of component.bridges) {
@@ -92,31 +116,58 @@ export abstract class SpellAnimator {
         return graphics;
     }
 
-    private createGlyphSprite(spell: PuzzleSpellSpec): Phaser.GameObjects.Sprite | null {
-        if (!spell.glyphPlacement) {
+    private createGlyphSprites(spell: PuzzleSpellSpec, tint: number): Phaser.GameObjects.Sprite[] {
+        const sprites: Phaser.GameObjects.Sprite[] = [];
+        const mainGlyphSprite = this.createGlyphSprite(
+            spell.glyphPlacement,
+            spell.glyphLanguage ?? 'fire',
+            spell.glyph,
+            tint
+        );
+        if (mainGlyphSprite) {
+            sprites.push(mainGlyphSprite);
+        }
+
+        for (const nearbyGlyph of spell.nearbyGlyphs ?? []) {
+            const glyphSprite = this.createNearbyGlyphSprite(nearbyGlyph, tint);
+            if (glyphSprite) {
+                sprites.push(glyphSprite);
+            }
+        }
+
+        return sprites;
+    }
+
+    private createNearbyGlyphSprite(nearbyGlyph: SpellNearbyGlyphPlacement, tint: number): Phaser.GameObjects.Sprite | null {
+        return this.createGlyphSprite(
+            nearbyGlyph,
+            nearbyGlyph.language ?? 'fire',
+            nearbyGlyph.word,
+            tint
+        );
+    }
+
+    private createGlyphSprite(
+        glyphPlacement: PuzzleSpellSpec['glyphPlacement'] | SpellNearbyGlyphPlacement | undefined,
+        language: 'grass' | 'fire',
+        glyphWord: PuzzleSpellSpec['glyph'] | string,
+        tint: number
+    ): Phaser.GameObjects.Sprite | null {
+        if (!glyphPlacement) {
             return null;
         }
 
-        const frame = spell.glyphPlacement.frame ?? this.defaultGlyphFrame(spell.glyph);
-        const position = spell.glyphPlacement.coordinateSpace === 'world'
-            ? { x: spell.glyphPlacement.x, y: spell.glyphPlacement.y }
-            : this.gridToWorld(spell.glyphPlacement.x, spell.glyphPlacement.y);
+        const frame = glyphPlacement.frame ?? this.glyphRegistry.getGlyphFrame(language, glyphWord);
+        const position = glyphPlacement.coordinateSpace === 'world'
+            ? { x: glyphPlacement.x, y: glyphPlacement.y }
+            : this.gridToWorld(glyphPlacement.x, glyphPlacement.y);
 
         return this.scene.add.sprite(position.x, position.y, this.languageTextureKey, frame)
             .setOrigin(0, 0)
-            .setScale(spell.glyphPlacement.scale ?? 1)
+            .setScale(glyphPlacement.scale ?? 1)
             .setDepth(245)
+            .setTint(tint)
             .setAlpha(0);
-    }
-
-    private defaultGlyphFrame(glyph: PuzzleSpellSpec['glyph']): number {
-        if (glyph === 'island') {
-            return this.glyphRegistry.getGlyphFrame('grass', 'island');
-        }
-        if (glyph === 'bridge') {
-            return this.glyphRegistry.getGlyphFrame('grass', 'bridge');
-        }
-        return this.glyphRegistry.getGlyphFrame('grass', 'good');
     }
 
     private resolveSpellPoint(ref: string | SpellGridPoint): SpellGridPoint | null {

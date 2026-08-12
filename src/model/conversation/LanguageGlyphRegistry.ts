@@ -118,7 +118,9 @@ export class LanguageGlyphRegistry {
 
         // Fire language
         const fireGlyphs = new Map<string, number>([
-            // TODO: Add fire language glyphs when available
+            ['island', 30],
+            ['bridge', 31],
+            ['open', 32],
         ]);
 
         this.languages.set('fire', {

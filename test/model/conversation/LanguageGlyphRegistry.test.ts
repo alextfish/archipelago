@@ -94,6 +94,14 @@ describe('LanguageGlyphRegistry', () => {
             expect(registry.getGlyphFrame('fire', 'unknown')).toBe(7);
         });
 
+        it('should return frames for fire spell glyph words', () => {
+            const registry = new LanguageGlyphRegistry();
+
+            expect(registry.getGlyphFrame('fire', 'island')).toBe(30);
+            expect(registry.getGlyphFrame('fire', 'bridge')).toBe(31);
+            expect(registry.getGlyphFrame('fire', 'open')).toBe(32);
+        });
+
         it('should throw error for unknown language', () => {
             const registry = new LanguageGlyphRegistry();
 

@@ -1,10 +1,11 @@
 import type { PuzzleSpellSpec } from '@model/spell/PuzzleSpell';
-import { SpellAnimator } from './SpellAnimator';
+import { SpellAnimator, type SpellAnimationOptions } from './SpellAnimator';
 
 export class BridgeSpellAnimator extends SpellAnimator {
     protected async animateEffect(
         spell: PuzzleSpellSpec,
-        applyEffect: () => Promise<void> | void
+        applyEffect: () => Promise<void> | void,
+        options: SpellAnimationOptions
     ): Promise<void> {
         if (spell.effect.type !== 'bridge') {
             await applyEffect();
@@ -12,7 +13,7 @@ export class BridgeSpellAnimator extends SpellAnimator {
         }
 
         const graphics = this.scene.add.graphics().setDepth(246).setAlpha(0);
-        graphics.lineStyle(6, 0xffffff, 1);
+        graphics.lineStyle(6, this.getTint(options), 1);
         const start = this.gridToWorld(spell.effect.start.x, spell.effect.start.y);
         const end = this.gridToWorld(spell.effect.end.x, spell.effect.end.y);
         graphics.beginPath();

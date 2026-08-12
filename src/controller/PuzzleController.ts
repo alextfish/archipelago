@@ -599,19 +599,40 @@ export class PuzzleController {
         }
 
         const triggeredSpell = PuzzleSpellDetector.getTriggeredSpells(this.puzzle)[0];
-        if (!triggeredSpell || !this.host.onSpellCast) {
+        if (!this.host.onSpellCast) {
             return false;
         }
 
         this.spellAnimating = true;
-        void this.runSpellCast(triggeredSpell);
+        if (triggeredSpell) {
+            void this.runSpellCast(triggeredSpell);
+            return true;
+        }
+
+        const repeatedSpell = PuzzleSpellDetector.getMatchedSpells(this.puzzle)
+            .find((spell) => this.puzzle.hasCastSpell(spell.id));
+        if (!repeatedSpell) {
+            this.spellAnimating = false;
+            return false;
+        }
+
+        void this.runSpellCast(repeatedSpell, true);
         return true;
     }
 
-    private async runSpellCast(spell: PuzzleSpellSpec): Promise<void> {
+    private async runSpellCast(spell: PuzzleSpellSpec, isRepeat: boolean = false): Promise<void> {
         try {
-            this.puzzle.markSpellCast(spell.id);
-            await this.host.onSpellCast?.(spell, this);
+            if (!isRepeat) {
+                this.puzzle.markSpellCast(spell.id);
+            }
+
+            await this.host.onSpellCast?.(spell, this, { isRepeat });
+
+            if (isRepeat) {
+                this.validate();
+                return;
+            }
+
             const chainedSpell = PuzzleSpellDetector.getTriggeredSpells(this.puzzle)[0];
             if (chainedSpell) {
                 await this.runSpellCast(chainedSpell);

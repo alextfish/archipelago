@@ -377,15 +377,17 @@ export class BridgePuzzleScene extends Phaser.Scene {
                 const hud = this.scene.get('PuzzleHUDScene');
                 hud.events.emit('setSelectedType', typeId);
             },
-            onSpellCast: async (spell: PuzzleSpellSpec, controller: PuzzleController) => {
+            onSpellCast: async (spell: PuzzleSpellSpec, controller: PuzzleController, options?: { isRepeat?: boolean }) => {
                 const animator = this.createSpellAnimator();
                 await animator.play(spell, async () => {
-                    await controller.applySpellEffect(spell);
-                    if (this.gameState && this.progressKey && this.puzzle) {
+                    if (!options?.isRepeat) {
+                        await controller.applySpellEffect(spell);
+                    }
+                    if (!options?.isRepeat && this.gameState && this.progressKey && this.puzzle) {
                         this.gameState.saveOverworldPuzzleProgress(this.progressKey, this.puzzle);
                         this.saveStateCallback?.();
                     }
-                });
+                }, options);
             },
         };
     }
@@ -451,16 +453,20 @@ export class BridgePuzzleScene extends Phaser.Scene {
         };
 
         return {
-            play: async (spell: PuzzleSpellSpec, applyEffect: () => Promise<void>) => {
+            play: async (
+                spell: PuzzleSpellSpec,
+                applyEffect: () => Promise<void>,
+                options?: { isRepeat?: boolean }
+            ) => {
                 if (spell.effect.type === 'island') {
-                    await new IslandSpellAnimator(this, gridToWorld).play(spell, applyEffect);
+                    await new IslandSpellAnimator(this, gridToWorld).play(spell, applyEffect, options);
                     return;
                 }
                 if (spell.effect.type === 'bridge') {
-                    await new BridgeSpellAnimator(this, gridToWorld).play(spell, applyEffect);
+                    await new BridgeSpellAnimator(this, gridToWorld).play(spell, applyEffect, options);
                     return;
                 }
-                await new OpenSpellAnimator(this, gridToWorld).play(spell, applyEffect);
+                await new OpenSpellAnimator(this, gridToWorld).play(spell, applyEffect, options);
             }
         };
     }

@@ -7,7 +7,8 @@ import type {
     PuzzleSpellSpec,
     SpellGridPoint,
     SpellIslandRef,
-    SpellRect
+    SpellRect,
+    SpellRectReference,
 } from '@model/spell/PuzzleSpell';
 import { overworldPuzzleTileSourceLayerNames } from '@model/overworld/PuzzleTileSourceLayers';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
@@ -525,8 +526,36 @@ export class MapPuzzleExtractor {
         return this.toLocalGridPoint(definition, resolved);
     }
 
-    private resolveSpellRect(_layerObjects: ReadonlyArray<MapObject>, rect: SpellRect | undefined): SpellRect | undefined {
-        return rect;
+    private resolveSpellRect(
+        layerObjects: ReadonlyArray<MapObject>,
+        rect: SpellRect | SpellRectReference | string | undefined
+    ): SpellRect | undefined {
+        if (!rect) {
+            return undefined;
+        }
+
+        if (typeof rect === 'string') {
+            const resolved = this.findLayerObject(layerObjects, rect);
+            return resolved ? this.toWorldRect(resolved) : undefined;
+        }
+
+        if ('objectName' in rect && rect.objectName) {
+            const resolved = this.findLayerObject(layerObjects, rect.objectName);
+            if (resolved) {
+                return this.toWorldRect(resolved);
+            }
+        }
+
+        if (rect.width === undefined || rect.height === undefined) {
+            return undefined;
+        }
+
+        return {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+        };
     }
 
     private resolveSpellPoint(
@@ -563,6 +592,15 @@ export class MapPuzzleExtractor {
         return {
             x: Math.floor((object.x - definition.bounds.x) / 32),
             y: Math.floor((object.y - definition.bounds.y) / 32),
+        };
+    }
+
+    private toWorldRect(object: MapObject): SpellRect {
+        return {
+            x: object.x,
+            y: object.y,
+            width: object.width,
+            height: object.height,
         };
     }
 

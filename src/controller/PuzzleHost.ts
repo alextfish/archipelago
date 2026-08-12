@@ -24,7 +24,11 @@ export interface PuzzleHost {
      * Allows host to update the HUD with current available counts.
      */
     onBridgeCountsChanged?(counts: Record<string, number>): void;
-    onSpellCast?(spell: PuzzleSpellSpec, controller: PuzzleController): Promise<void>;
+    onSpellCast?(
+        spell: PuzzleSpellSpec,
+        controller: PuzzleController,
+        options?: { isRepeat?: boolean }
+    ): Promise<void>;
 }
 
 // PhaserPuzzleHost: Implements PuzzleHost using Phaser for rendering and input handling.
