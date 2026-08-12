@@ -79,7 +79,8 @@ export abstract class SpellAnimator {
             this.scene.tweens.add({
                 ...config,
                 onComplete: () => {
-                    config.onComplete?.();
+                    const onComplete = config.onComplete as (() => void) | undefined;
+                    onComplete?.();
                     resolve();
                 }
             });

@@ -62,9 +62,10 @@ export class OpenSpellAnimator extends SpellAnimator {
             return false;
         }
 
-        return typeof rect.x === 'number' &&
-            typeof rect.y === 'number' &&
-            typeof rect.width === 'number' &&
-            typeof rect.height === 'number';
+        const candidate = rect as Partial<SpellRect>;
+        return typeof candidate.x === 'number' &&
+            typeof candidate.y === 'number' &&
+            typeof candidate.width === 'number' &&
+            typeof candidate.height === 'number';
     }
 }

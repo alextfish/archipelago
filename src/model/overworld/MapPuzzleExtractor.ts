@@ -546,7 +546,7 @@ export class MapPuzzleExtractor {
             }
         }
 
-        if (rect.width === undefined || rect.height === undefined) {
+        if (!this.isSpellRect(rect)) {
             return undefined;
         }
 
@@ -556,6 +556,13 @@ export class MapPuzzleExtractor {
             width: rect.width,
             height: rect.height,
         };
+    }
+
+    private isSpellRect(rect: SpellRect | SpellRectReference): rect is SpellRect {
+        return typeof (rect as Partial<SpellRect>).x === 'number' &&
+            typeof (rect as Partial<SpellRect>).y === 'number' &&
+            typeof (rect as Partial<SpellRect>).width === 'number' &&
+            typeof (rect as Partial<SpellRect>).height === 'number';
     }
 
     private resolveSpellPoint(
