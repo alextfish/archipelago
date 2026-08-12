@@ -4,6 +4,7 @@
 import type { PuzzleRenderer } from "@view/PuzzleRenderer";
 
 import type { BridgePuzzle } from "@model/puzzle/BridgePuzzle";
+import type { PuzzleSpellSpec } from "@model/spell/PuzzleSpell";
 import { PuzzleController } from "./PuzzleController";
 
 export interface PuzzleHost {
@@ -23,6 +24,7 @@ export interface PuzzleHost {
      * Allows host to update the HUD with current available counts.
      */
     onBridgeCountsChanged?(counts: Record<string, number>): void;
+    onSpellCast?(spell: PuzzleSpellSpec, controller: PuzzleController): Promise<void>;
 }
 
 // PhaserPuzzleHost: Implements PuzzleHost using Phaser for rendering and input handling.

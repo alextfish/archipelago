@@ -7,6 +7,7 @@ import type { Point } from '@model/puzzle/Point';
 import { GridToWorldMapper } from './GridToWorldMapper';
 import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
 import { BasePuzzleRenderer } from './BasePuzzleRenderer';
+import { BridgeSpriteFrames } from './BridgeSpriteFrameRegistry';
 
 /**
  * Puzzle renderer that works embedded within the overworld scene.
@@ -120,6 +121,23 @@ export class EmbeddedPuzzleRenderer extends BasePuzzleRenderer implements IPuzzl
                     (child as { clearTint(): void }).clearTint();
                 }
             });
+        }
+    }
+
+    protected override syncIslandSprites(puzzle: BridgePuzzle): void {
+        const scale = this.gridMapper.getCellSize() / 32;
+        for (const island of puzzle.islands) {
+            if (!island.renderAsOverlay || this.islandGraphics.has(island.id)) {
+                continue;
+            }
+
+            const worldPos = this.gridMapper.gridToWorld(island.x, island.y);
+            const sprite = this.scene.add.sprite(worldPos.x, worldPos.y, this.textureKey, BridgeSpriteFrames.FRAME_ISLAND)
+                .setOrigin(0, 0)
+                .setScale(scale, scale)
+                .setDepth(9);
+            this.islandGraphics.set(island.id, sprite);
+            this.onGameObjectCreated(sprite);
         }
     }
 

@@ -7,6 +7,7 @@ import { BridgeLengthConstraint } from './constraints/BridgeLengthConstraint';
 import { BridgeMustCoverIslandConstraint } from './constraints/BridgeMustCoverIslandConstraint';
 import { createBridgeType, type BridgeType } from "./BridgeType";
 import { StrutBridge } from './StrutBridge';
+import type { PuzzleSpellSpec } from '@model/spell/PuzzleSpell';
 
 export interface BridgeTypeSpec {
   id: string;
@@ -15,6 +16,7 @@ export interface BridgeTypeSpec {
   count?: number;
   width?: number;
   style?: string;
+  canCoverIsland?: boolean;
   mustCoverIsland?: boolean;
 }
 
@@ -30,6 +32,7 @@ export interface PuzzleSpec { // can be loaded from JSON
   constraints: { type: string; params?: any }[];
   maxNumBridges: number;
   givesFeedback?: boolean; // defaults to true; when false, no constraint feedback is shown for invalid solutions
+  glyphSpells?: PuzzleSpellSpec[];
 }
 
 export class BridgePuzzle {
@@ -43,6 +46,8 @@ export class BridgePuzzle {
   givesFeedback: boolean;
   private readonly blockedTiles: Array<{ x: number; y: number }>;
   private readonly blockedTileKeys: Set<string>;
+  private readonly spellSpecs: PuzzleSpellSpec[];
+  private readonly castSpellIDs: Set<string>;
 
   constructor(spec: PuzzleSpec) {
     this.id = spec.id;
@@ -54,6 +59,8 @@ export class BridgePuzzle {
     this.blockedTileKeys = new Set(this.blockedTiles.map(tile => this.gridKey(tile.x, tile.y)));
     this.constraints = createConstraintsFromSpec(spec.constraints);
     this.givesFeedback = spec.givesFeedback ?? true;
+    this.spellSpecs = [...(spec.glyphSpells ?? [])];
+    this.castSpellIDs = new Set<string>();
     const bridgeTypes = spec.bridgeTypes.map(
       (spec) => ({
         ...createBridgeType({
@@ -101,6 +108,64 @@ export class BridgePuzzle {
   /** Get all placed bridges */
   get placedBridges(): Bridge[] {
     return this.inventory.bridges.filter(b => b.start && b.end);
+  }
+
+  getSpellSpecs(): readonly PuzzleSpellSpec[] {
+    return this.spellSpecs;
+  }
+
+  hasCastSpell(spellID: string): boolean {
+    return this.castSpellIDs.has(spellID);
+  }
+
+  getCastSpellIDs(): string[] {
+    return Array.from(this.castSpellIDs);
+  }
+
+  markSpellCast(spellID: string): void {
+    this.castSpellIDs.add(spellID);
+  }
+
+  applySpellEffect(spell: PuzzleSpellSpec): void {
+    this.markSpellCast(spell.id);
+
+    if (spell.effect.type === 'island') {
+      const island = spell.effect.island;
+      if (!this.islands.some((existingIsland) => existingIsland.id === island.id)) {
+        this.islands.push({
+          ...island,
+          renderAsOverlay: island.renderAsOverlay ?? true,
+        });
+      }
+      return;
+    }
+
+    if (spell.effect.type === 'bridge') {
+      const bridgeID = spell.effect.bridgeId ?? `${spell.id}-bridge`;
+      if (this.inventory.hasBridge(bridgeID)) {
+        return;
+      }
+
+      const bridgeType = createBridgeType({
+        id: spell.effect.bridgeType.id,
+        colour: spell.effect.bridgeType.colour,
+        length: spell.effect.bridgeType.length,
+        width: spell.effect.bridgeType.width,
+        style: spell.effect.bridgeType.style,
+        canCoverIsland: spell.effect.bridgeType.canCoverIsland,
+        mustCoverIsland: spell.effect.bridgeType.mustCoverIsland,
+      });
+      const addedBridge = this.inventory.addBridge(
+        bridgeType,
+        bridgeID,
+        spell.effect.start,
+        spell.effect.end,
+      );
+
+      if (addedBridge instanceof StrutBridge || bridgeType.mustCoverIsland) {
+        this.constraints.push(new BridgeMustCoverIslandConstraint(addedBridge.id));
+      }
+    }
   }
 
   placeBridge(bridgeID: string, start: { x: number; y: number }, end: { x: number; y: number }): boolean {
@@ -335,6 +400,13 @@ export class BridgePuzzle {
 
   availableCounts(): Record<string, number> {
     return this.inventory.countsByType();
+  }
+
+  restoreCastSpellIDs(spellIDs: ReadonlyArray<string>): void {
+    this.castSpellIDs.clear();
+    for (const spellID of spellIDs) {
+      this.castSpellIDs.add(spellID);
+    }
   }
 
   /**

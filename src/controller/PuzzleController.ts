@@ -10,6 +10,8 @@ import { UndoRedoManager } from "@model/UndoRedoManager";
 import { BuildBridgeCommand } from "@model/commands/BuildBridgeCommand";
 import { RemoveBridgeCommand } from "@model/commands/RemoveBridgeCommand";
 import { emitTestEvent } from '@helpers/TestEvents';
+import { PuzzleSpellDetector } from '@model/spell/PuzzleSpellDetector';
+import type { PuzzleSpellSpec } from '@model/spell/PuzzleSpell';
 
 
 export class PuzzleController {
@@ -31,6 +33,7 @@ export class PuzzleController {
     private undoManager: UndoRedoManager;
     // Track whether puzzle was previously solved to detect transitions
     private wasSolved: boolean = false;
+    private spellAnimating: boolean = false;
 
     constructor(puzzle: BridgePuzzle, renderer: PuzzleRenderer, host: PuzzleHost, undoManager?: UndoRedoManager) {
         this.puzzle = puzzle;
@@ -44,8 +47,7 @@ export class PuzzleController {
     // --- Pointer-driven placement API (for drag and mouseover preview flows)
     /** Pointer down at world coords + grid coords */
     onPointerDown(_worldX: number, _worldY: number, gridX: number, gridY: number) {
-        // Block all interactions while the puzzle-solved screen is visible
-        if (this.wasSolved) return;
+        if (this.isInteractionBlocked()) return;
         // If we've already got a pending bridge placement, this is click-and-click: ignore further pointer downs
         if (this.pendingStart) return;
         // If pointer down is on an island, begin placement (allocates a bridge)
@@ -60,8 +62,7 @@ export class PuzzleController {
 
     /** Pointer move: update preview if we have a pending start */
     onPointerMove(_worldX: number, _worldY: number, gridX: number, gridY: number) {
-        // Block all interactions while the puzzle-solved screen is visible
-        if (this.wasSolved) return;
+        if (this.isInteractionBlocked()) return;
         // Nothing to do on mouse move if we don't have a pending start
         if (!this.pendingStart || !this.currentBridgeType) return;
         // Compute preview end point depending on fixed/variable length and snapping
@@ -150,8 +151,7 @@ export class PuzzleController {
 
     /** Pointer up: attempt to finalize placement if pending start exists */
     onPointerUp(_worldX: number, _worldY: number, gridX: number, gridY: number) {
-        // Block all interactions while the puzzle-solved screen is visible
-        if (this.wasSolved) return;
+        if (this.isInteractionBlocked()) return;
         if (!this.pendingStart) return;
         // If pointer up is on an island, attempt to finish placement
         const island = this.puzzle.islands.find(i => i.x === gridX && i.y === gridY);
@@ -256,11 +256,13 @@ export class PuzzleController {
 
     /** Player selects a specific bridge to place. */
     selectBridgeType(bridgeType: BridgeType) {
+        if (this.isInteractionBlocked()) return;
         this.currentBridgeType = bridgeType;
         // Keep HUD in sync
         this.host.setSelectedBridgeType?.(bridgeType.id);
     }
     nextOrPreviousBridgeType(next: boolean) {
+        if (this.isInteractionBlocked()) return;
         if (!this.currentBridgeType) {
             this.selectDefaultBridge();
             return;
@@ -308,6 +310,7 @@ export class PuzzleController {
         this.nextOrPreviousBridgeType(false);
     }
     cancelPlacement() {
+        if (this.isInteractionBlocked()) return;
         // If a bridge was already allocated for preview (happens at first endpoint),
         // return it to inventory so it is not permanently lost.
         if (this.currentBridge) {
@@ -321,6 +324,7 @@ export class PuzzleController {
     }
 
     tryPlaceAt(x: number, y: number) {
+        if (this.isInteractionBlocked()) return;
         if (!this.selectedBridgeId) {
             this.selectDefaultBridge();
         }
@@ -428,7 +432,9 @@ export class PuzzleController {
         this.renderer.updateFromPuzzle(this.puzzle);
         this.selectAvailableBridgeType();
         this.notifyCountsChanged();
-        this.validate();
+        if (!this.maybeTriggerSpellCast()) {
+            this.validate();
+        }
         emitTestEvent('bridge_placed', { endX: x, endY: y });
     }
 
@@ -461,15 +467,16 @@ export class PuzzleController {
     }
 
     removeBridge(bridgeId: string) {
-        // Block bridge removal while the puzzle-solved screen is visible
-        if (this.wasSolved) return;
+        if (this.isInteractionBlocked()) return;
         this.cancelPlacement();
         const cmd = new RemoveBridgeCommand(this.puzzle, bridgeId);
         this.undoManager.executeCommand(cmd);
         this.renderer.updateFromPuzzle(this.puzzle);
         this.selectAvailableBridgeType();
         this.notifyCountsChanged();
-        this.validate();
+        if (!this.maybeTriggerSpellCast()) {
+            this.validate();
+        }
     }
 
     getBridgeAt(x: number, y: number): Bridge | null {
@@ -478,31 +485,33 @@ export class PuzzleController {
     }
 
     undo(): void {
-        // Block undo when puzzle is currently solved
-        if (this.wasSolved) return;
+        if (this.isInteractionBlocked()) return;
         if (this.undoManager.undo()) {
             this.renderer.updateFromPuzzle(this.puzzle);
             this.notifyCountsChanged();
-            this.validate();
+            if (!this.maybeTriggerSpellCast()) {
+                this.validate();
+            }
         }
     }
 
     redo(): void {
-        // Block redo when puzzle is currently solved
-        if (this.wasSolved) return;
+        if (this.isInteractionBlocked()) return;
         if (this.undoManager.redo()) {
             this.renderer.updateFromPuzzle(this.puzzle);
             this.notifyCountsChanged();
-            this.validate();
+            if (!this.maybeTriggerSpellCast()) {
+                this.validate();
+            }
         }
     }
 
     canUndo(): boolean {
-        return !this.wasSolved && this.undoManager.canUndo();
+        return !this.isInteractionBlocked() && this.undoManager.canUndo();
     }
 
     canRedo(): boolean {
-        return !this.wasSolved && this.undoManager.canRedo();
+        return !this.isInteractionBlocked() && this.undoManager.canRedo();
     }
 
     validate() {
@@ -559,8 +568,53 @@ export class PuzzleController {
         this.renderer.update(dt);
     }
 
+    getPuzzle(): BridgePuzzle {
+        return this.puzzle;
+    }
+
+    async applySpellEffect(spell: PuzzleSpellSpec): Promise<void> {
+        this.puzzle.applySpellEffect(spell);
+        this.renderer.updateFromPuzzle(this.puzzle);
+        this.selectAvailableBridgeType();
+        this.notifyCountsChanged();
+    }
+
     private notifyCountsChanged(): void {
         const counts = this.puzzle.availableCounts();
         this.host.onBridgeCountsChanged?.(counts);
+    }
+
+    private isInteractionBlocked(): boolean {
+        return this.wasSolved || this.spellAnimating;
+    }
+
+    private maybeTriggerSpellCast(): boolean {
+        if (this.spellAnimating || this.wasSolved) {
+            return false;
+        }
+
+        const triggeredSpell = PuzzleSpellDetector.getTriggeredSpells(this.puzzle)[0];
+        if (!triggeredSpell || !this.host.onSpellCast) {
+            return false;
+        }
+
+        this.spellAnimating = true;
+        void this.runSpellCast(triggeredSpell);
+        return true;
+    }
+
+    private async runSpellCast(spell: PuzzleSpellSpec): Promise<void> {
+        try {
+            this.puzzle.markSpellCast(spell.id);
+            await this.host.onSpellCast?.(spell, this);
+            const chainedSpell = PuzzleSpellDetector.getTriggeredSpells(this.puzzle)[0];
+            if (chainedSpell) {
+                await this.runSpellCast(chainedSpell);
+                return;
+            }
+            this.validate();
+        } finally {
+            this.spellAnimating = false;
+        }
     }
 }

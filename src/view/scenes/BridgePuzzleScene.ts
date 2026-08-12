@@ -6,6 +6,11 @@ import { Environment } from '@helpers/Environment';
 import { emitTestEvent } from '@helpers/TestEvents';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 import type { IslandMapScene } from '@view/scenes/IslandMapScene';
+import type { OverworldGameState } from '@model/overworld/OverworldGameState';
+import type { PuzzleSpellSpec } from '@model/spell/PuzzleSpell';
+import { IslandSpellAnimator } from '@view/spells/IslandSpellAnimator';
+import { BridgeSpellAnimator } from '@view/spells/BridgeSpellAnimator';
+import { OpenSpellAnimator } from '@view/spells/OpenSpellAnimator';
 
 export class BridgePuzzleScene extends Phaser.Scene {
     private puzzle: BridgePuzzle | null = null;
@@ -14,16 +19,29 @@ export class BridgePuzzleScene extends Phaser.Scene {
     private seriesMode: boolean = false;
     /** Key of the scene that launched this puzzle in series mode. */
     private callerSceneKey: string = 'OverworldScene';
+    private gameState?: OverworldGameState;
+    private progressKey?: string;
+    private saveStateCallback?: () => void;
 
     constructor() {
         super({ key: 'BridgePuzzleScene' });
     }
 
-    init(data?: { puzzleData?: any; seriesMode?: boolean; callerSceneKey?: string }) {
+    init(data?: {
+        puzzleData?: any;
+        seriesMode?: boolean;
+        callerSceneKey?: string;
+        gameState?: OverworldGameState;
+        progressKey?: string;
+        saveStateCallback?: () => void;
+    }) {
         if (data) {
             this.puzzleData = data.puzzleData || null;
             this.seriesMode = data.seriesMode || false;
             this.callerSceneKey = data.callerSceneKey ?? 'OverworldScene';
+            this.gameState = data.gameState;
+            this.progressKey = data.progressKey;
+            this.saveStateCallback = data.saveStateCallback;
         }
     }
 
@@ -53,6 +71,9 @@ export class BridgePuzzleScene extends Phaser.Scene {
             // Instantiate BridgePuzzle from spec
             console.log('[BridgePuzzleScene] About to create BridgePuzzle from data:', puzzleData);
             this.puzzle = new BridgePuzzle(puzzleData);
+            if (this.gameState && this.progressKey) {
+                this.gameState.restorePuzzleState(this.progressKey, this.puzzle);
+            }
             console.log('[BridgePuzzleScene] BridgePuzzle created successfully, id:', this.puzzle.id);
 
             // Emit test event for automation (especially for series mode)
@@ -355,7 +376,17 @@ export class BridgePuzzleScene extends Phaser.Scene {
                 // Forward selection to HUD scene so sidebar updates visually
                 const hud = this.scene.get('PuzzleHUDScene');
                 hud.events.emit('setSelectedType', typeId);
-            }
+            },
+            onSpellCast: async (spell: PuzzleSpellSpec, controller: PuzzleController) => {
+                const animator = this.createSpellAnimator();
+                await animator.play(spell, async () => {
+                    await controller.applySpellEffect(spell);
+                    if (this.gameState && this.progressKey && this.puzzle) {
+                        this.gameState.saveOverworldPuzzleProgress(this.progressKey, this.puzzle);
+                        this.saveStateCallback?.();
+                    }
+                });
+            },
         };
     }
 
@@ -367,6 +398,11 @@ export class BridgePuzzleScene extends Phaser.Scene {
 
     onPuzzleExited(success: boolean): void {
         console.log(`Puzzle exited: ${success ? 'solved' : 'unsolved'}`);
+
+        if (this.gameState && this.progressKey && this.puzzle) {
+            this.gameState.saveOverworldPuzzleProgress(this.progressKey, this.puzzle);
+            this.saveStateCallback?.();
+        }
 
         // If in series mode and puzzle was solved, notify the caller scene
         if (this.seriesMode && success && this.puzzle) {
@@ -406,5 +442,26 @@ export class BridgePuzzleScene extends Phaser.Scene {
                 text.destroy();
             }
         });
+    }
+
+    private createSpellAnimator() {
+        const gridToWorld = (x: number, y: number) => {
+            const mapScene = this.scene.get('IslandMapScene') as IslandMapScene;
+            return mapScene.getGridMapper()?.gridToWorld(x, y) ?? { x, y };
+        };
+
+        return {
+            play: async (spell: PuzzleSpellSpec, applyEffect: () => Promise<void>) => {
+                if (spell.effect.type === 'island') {
+                    await new IslandSpellAnimator(this, gridToWorld).play(spell, applyEffect);
+                    return;
+                }
+                if (spell.effect.type === 'bridge') {
+                    await new BridgeSpellAnimator(this, gridToWorld).play(spell, applyEffect);
+                    return;
+                }
+                await new OpenSpellAnimator(this, gridToWorld).play(spell, applyEffect);
+            }
+        };
     }
 }

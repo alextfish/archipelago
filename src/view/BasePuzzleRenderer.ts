@@ -101,6 +101,10 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
         // no-op: PhaserPuzzleRenderer leaves objects directly in scene
     }
 
+    protected syncIslandSprites(_puzzle: BridgePuzzle): void {
+        // no-op by default
+    }
+
     // -------------------------------------------------------------------------
     // Shared protected helpers
     // -------------------------------------------------------------------------
@@ -164,6 +168,7 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
     // -------------------------------------------------------------------------
 
     updateFromPuzzle(puzzle: BridgePuzzle): void {
+        this.syncIslandSprites(puzzle);
         this.destroyBridges();
         if (this.previewGraphics) {
             this.previewGraphics.destroy();

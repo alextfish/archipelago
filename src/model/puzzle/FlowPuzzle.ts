@@ -31,7 +31,8 @@ export class FlowPuzzle extends BridgePuzzle {
       blockedTiles: spec.blockedTiles,
       bridgeTypes: spec.bridgeTypes,
       constraints: spec.constraints,
-      maxNumBridges: spec.maxNumBridges
+      maxNumBridges: spec.maxNumBridges,
+      glyphSpells: spec.glyphSpells,
     };
     super(baseSpec);
 

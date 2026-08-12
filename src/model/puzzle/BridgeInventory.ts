@@ -5,25 +5,12 @@ import { StrutBridge } from "./StrutBridge";
 
 export class BridgeInventory {
   private allBridges: Bridge[] = [];
+  private bridgeCounter: number = 0;
 
   constructor(types: (BridgeType & { count: number })[]) {
-    let counter = 0;
     for (const t of types) {
       for (let i = 0; i < t.count; i++) {
-        const bridgeType: BridgeType = {
-          id: t.id,
-          colour: t.colour,
-          width: t.width,
-          style: t.style,
-          length: t.length,
-          mustCoverIsland: t.mustCoverIsland,
-          canCoverIsland: t.canCoverIsland,
-        };
-        if (t.mustCoverIsland) {
-          this.allBridges.push(new StrutBridge(`b${++counter}`, bridgeType));
-        } else {
-          this.allBridges.push({ id: `b${++counter}`, type: bridgeType });
-        }
+        this.addBridgeTypeInstance(t);
       }
     }
   }
@@ -58,6 +45,69 @@ export class BridgeInventory {
       delete bridge.start;
       delete bridge.end;
     }
+  }
+
+  hasBridge(bridgeId: string): boolean {
+    return this.allBridges.some((bridge) => bridge.id === bridgeId);
+  }
+
+  addBridge(
+    type: BridgeType,
+    bridgeId?: string,
+    start?: { x: number; y: number },
+    end?: { x: number; y: number },
+  ): Bridge {
+    const created = this.createBridge(type, bridgeId);
+    if (start) {
+      created.start = { ...start };
+    }
+    if (end) {
+      created.end = { ...end };
+    }
+    this.allBridges.push(created);
+    return created;
+  }
+
+  private addBridgeTypeInstance(type: BridgeType): Bridge {
+    const created = this.createBridge(type);
+    this.allBridges.push(created);
+    return created;
+  }
+
+  private createBridge(type: BridgeType, bridgeId?: string): Bridge {
+    const resolvedID = bridgeId ?? this.nextBridgeID();
+    this.syncCounterFromBridgeID(resolvedID);
+    const bridgeType: BridgeType = {
+      id: type.id,
+      colour: type.colour,
+      width: type.width,
+      style: type.style,
+      length: type.length,
+      mustCoverIsland: type.mustCoverIsland,
+      canCoverIsland: type.canCoverIsland,
+      hasLength: type.hasLength,
+      allowsSpan: type.allowsSpan,
+    };
+
+    if (type.mustCoverIsland) {
+      return new StrutBridge(resolvedID, bridgeType);
+    }
+
+    return { id: resolvedID, type: bridgeType };
+  }
+
+  private nextBridgeID(): string {
+    this.bridgeCounter += 1;
+    return `b${this.bridgeCounter}`;
+  }
+
+  private syncCounterFromBridgeID(bridgeID: string): void {
+    const match = /^b(\d+)$/.exec(bridgeID);
+    if (!match) {
+      return;
+    }
+
+    this.bridgeCounter = Math.max(this.bridgeCounter, Number(match[1]));
   }
 
   /** Number of remaining bridges of each type */

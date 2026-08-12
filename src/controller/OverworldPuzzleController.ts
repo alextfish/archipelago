@@ -12,6 +12,11 @@ import type { PuzzleHost } from '@controller/PuzzleHost';
 import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
+import type { PuzzleSpellSpec } from '@model/spell/PuzzleSpell';
+import { IslandSpellAnimator } from '@view/spells/IslandSpellAnimator';
+import { BridgeSpellAnimator } from '@view/spells/BridgeSpellAnimator';
+import { OpenSpellAnimator } from '@view/spells/OpenSpellAnimator';
+import { CollisionType } from '@model/overworld/CollisionTypes';
 
 /**
  * Result returned from exitPuzzle(), describing what happened to the puzzle state.
@@ -48,7 +53,8 @@ export class OverworldPuzzleController {
         private cameraManager: CameraManager,
         private collisionManager: CollisionManager,
         private bridgeManager: OverworldBridgeManager | undefined,
-        private tiledMapData: any
+        private tiledMapData: any,
+        private saveStateCallback?: () => void,
     ) { }
 
     /**
@@ -382,6 +388,8 @@ export class OverworldPuzzleController {
                 }
             }
 
+            this.applyOpenSpellCollisionOverrides(activeData.puzzle, activeData.id);
+
             if (isSolvedFlow) {
                 // Run the wave animation and camera transition in parallel.
                 // waitForAnimation is capped at the camera duration so both finish
@@ -505,6 +513,17 @@ export class OverworldPuzzleController {
         return this.currentPuzzleId;
     }
 
+    public applyPersistentSpellWorldEffects(): void {
+        for (const puzzleId of this.puzzleManager.getAllPuzzleIds()) {
+            const puzzle = this.puzzleManager.getPuzzleById(puzzleId);
+            if (!puzzle) {
+                continue;
+            }
+
+            this.applyOpenSpellCollisionOverrides(puzzle, puzzleId);
+        }
+    }
+
     /**
      * Create puzzle host callbacks for overworld puzzles
      */
@@ -536,7 +555,17 @@ export class OverworldPuzzleController {
             onBridgeCountsChanged: (counts: Record<string, number>) => {
                 console.log('OverworldPuzzleController: Bridge counts changed, emitting updateCounts');
                 this.scene.events.emit('updateCounts', counts);
-            }
+            },
+            onSpellCast: async (spell: PuzzleSpellSpec, controller: PuzzleController) => {
+                const animator = this.createSpellAnimator();
+                await animator.play(spell, async () => {
+                    await controller.applySpellEffect(spell);
+                    const activePuzzle = this.getActivePuzzle() ?? controller.getPuzzle();
+                    this.applyOpenSpellCollisionOverrides(activePuzzle, puzzleId);
+                    this.gameState.saveOverworldPuzzleProgress(puzzleId, activePuzzle);
+                    this.saveStateCallback?.();
+                });
+            },
         };
     }
 
@@ -554,5 +583,50 @@ export class OverworldPuzzleController {
         }
         this.activePuzzleController = undefined;
         this.currentPuzzleId = undefined;
+    }
+
+    private createSpellAnimator() {
+        const renderer = this.puzzleRenderer;
+        const gridToWorld = (x: number, y: number) => renderer?.gridToWorld(x, y) ?? { x, y };
+
+        return {
+            play: async (spell: PuzzleSpellSpec, applyEffect: () => Promise<void>) => {
+                if (spell.effect.type === 'island') {
+                    await new IslandSpellAnimator(this.scene, gridToWorld).play(spell, applyEffect);
+                    return;
+                }
+                if (spell.effect.type === 'bridge') {
+                    await new BridgeSpellAnimator(this.scene, gridToWorld).play(spell, applyEffect);
+                    return;
+                }
+                await new OpenSpellAnimator(this.scene, gridToWorld).play(spell, applyEffect);
+            }
+        };
+    }
+
+    private applyOpenSpellCollisionOverrides(puzzle: BridgePuzzle, puzzleId: string): void {
+        const bounds = this.puzzleManager.getPuzzleBounds(puzzleId);
+        if (!bounds) {
+            return;
+        }
+
+        const tileW = this.tiledMapData?.tilewidth ?? 32;
+        const tileH = this.tiledMapData?.tileheight ?? 32;
+        const originTileX = Math.floor(bounds.x / tileW);
+        const originTileY = Math.floor(bounds.y / tileH);
+
+        for (const spell of puzzle.getSpellSpecs()) {
+            if (!puzzle.hasCastSpell(spell.id) || spell.effect.type !== 'open') {
+                continue;
+            }
+
+            for (const tile of spell.effect.openedTiles) {
+                this.collisionManager.setCollisionAt(
+                    originTileX + tile.x,
+                    originTileY + tile.y,
+                    CollisionType.WALKABLE
+                );
+            }
+        }
     }
 }

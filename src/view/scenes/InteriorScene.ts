@@ -658,6 +658,8 @@ export class InteriorScene extends Phaser.Scene {
             return;
         }
 
+        this.gameState.restorePuzzleProgress(puzzles);
+
         const bridgesLayer = createBridgesLayer(this.map, tilesets);
         if (bridgesLayer) {
             this.bridgeManager = new OverworldBridgeManager(bridgesLayer, this.tiledMapData, this);
@@ -679,8 +681,10 @@ export class InteriorScene extends Phaser.Scene {
             this.cameraManager,
             this.collisionManager,
             this.bridgeManager,
-            this.tiledMapData
+            this.tiledMapData,
+            this.saveStateCallback
         );
+        this.puzzleController.applyPersistentSpellWorldEffects();
 
         this.interactables.push(
             ...buildPuzzleEntryInteractables(
@@ -1205,6 +1209,9 @@ export class InteriorScene extends Phaser.Scene {
             puzzleData,
             seriesMode: true,
             callerSceneKey: 'InteriorScene',
+            gameState: this.gameState,
+            progressKey: `series:${this.currentSeries.id}:${firstUnsolvedId}`,
+            saveStateCallback: this.saveStateCallback,
         });
     }
 

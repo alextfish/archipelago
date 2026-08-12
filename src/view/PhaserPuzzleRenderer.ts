@@ -13,10 +13,31 @@ export class PhaserPuzzleRenderer extends BasePuzzleRenderer {
 
   init(puzzle: BridgePuzzle): void {
     // Create island sprites and constraint NPC indicators for each island
-    for (const island of puzzle.islands) {
-      const worldPos = this.gridMapper.gridToWorld(island.x, island.y);
-      const scale = this.gridMapper.getCellSize() / 32;
+    this.syncIslandSprites(puzzle);
+    this.createConstraintNPCsFromPuzzleConstraints(puzzle);
+  }
 
+  screenToGrid(screenX: number, screenY: number): Point {
+    const camera = this.scene.cameras.main;
+    const worldX = (screenX - camera.x) / camera.zoom;
+    const worldY = (screenY - camera.y) / camera.zoom;
+    const gridPos = this.gridMapper.worldToGrid(worldX, worldY);
+    return { x: gridPos.x, y: gridPos.y };
+  }
+
+  highlightPreviewSegment(start: { x: number; y: number }, end: { x: number; y: number }): void {
+    this.clearHighlights();
+    this.previewBridge({ start, end } as Parameters<typeof this.previewBridge>[0]);
+  }
+
+  protected override syncIslandSprites(puzzle: BridgePuzzle): void {
+    const scale = this.gridMapper.getCellSize() / 32;
+    for (const island of puzzle.islands) {
+      if (this.islandGraphics.has(island.id)) {
+        continue;
+      }
+
+      const worldPos = this.gridMapper.gridToWorld(island.x, island.y);
       const sprite = this.scene.add.sprite(worldPos.x, worldPos.y, this.textureKey, BridgeSpriteFrames.FRAME_ISLAND)
         .setInteractive({ useHandCursor: true })
         .setOrigin(0, 0)
@@ -34,19 +55,5 @@ export class PhaserPuzzleRenderer extends BasePuzzleRenderer {
 
       this.islandGraphics.set(island.id, sprite);
     }
-    this.createConstraintNPCsFromPuzzleConstraints(puzzle);
-  }
-
-  screenToGrid(screenX: number, screenY: number): Point {
-    const camera = this.scene.cameras.main;
-    const worldX = (screenX - camera.x) / camera.zoom;
-    const worldY = (screenY - camera.y) / camera.zoom;
-    const gridPos = this.gridMapper.worldToGrid(worldX, worldY);
-    return { x: gridPos.x, y: gridPos.y };
-  }
-
-  highlightPreviewSegment(start: { x: number; y: number }, end: { x: number; y: number }): void {
-    this.clearHighlights();
-    this.previewBridge({ start, end } as Parameters<typeof this.previewBridge>[0]);
   }
 }

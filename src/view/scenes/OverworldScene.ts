@@ -588,9 +588,11 @@ export class OverworldScene extends Phaser.Scene {
         this.cameraManager,
         this.collisionManager,
         this.bridgeManager,
-        this.tiledMapData
+        this.tiledMapData,
+        () => this.saveGameState()
       );
       console.log('OverworldPuzzleController created');
+      this.puzzleController.applyPersistentSpellWorldEffects();
 
       // Set up puzzle interaction checking
       this.setupPuzzleInteraction();
@@ -1945,7 +1947,13 @@ export class OverworldScene extends Phaser.Scene {
 
     // Launch BridgePuzzleScene with the puzzle data
     this.overworldHUD?.setJewelHUDVisible(false);
-    this.scene.launch('BridgePuzzleScene', { puzzleData, seriesMode: true });
+    this.scene.launch('BridgePuzzleScene', {
+      puzzleData,
+      seriesMode: true,
+      gameState: this.gameState,
+      progressKey: `series:${this.currentSeries.id}:${firstUnsolvedId}`,
+      saveStateCallback: () => this.saveGameState(),
+    });
   }
 
   private async animateDoorChange(door: Door, unlock: boolean): Promise<void> {

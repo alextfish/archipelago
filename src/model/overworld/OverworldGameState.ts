@@ -495,13 +495,9 @@ export class OverworldGameState {
         this.puzzleProgress.clear();
 
         for (const [puzzleId, puzzle] of puzzles) {
-            const persisted = this.persistedPuzzleProgress.get(puzzleId);
-            if (!persisted) {
-                continue;
+            if (this.restorePuzzleState(puzzleId, puzzle)) {
+                this.puzzleProgress.set(puzzleId, puzzle);
             }
-
-            this.applyPersistedPuzzleProgress(puzzle, persisted, puzzleId);
-            this.puzzleProgress.set(puzzleId, puzzle);
         }
 
         this.activePuzzleState = this.activePuzzleId
@@ -630,6 +626,7 @@ export class OverworldGameState {
     private serialisePuzzleProgress(puzzle: BridgePuzzle): PersistedPuzzleProgress {
         return {
             id: puzzle.id,
+            castSpellIDs: puzzle.getCastSpellIDs(),
             bridges: puzzle.bridges.map((bridge) => ({
                 id: bridge.id,
                 typeId: bridge.type.id,
@@ -644,6 +641,17 @@ export class OverworldGameState {
         persisted: PersistedPuzzleProgress,
         puzzleId: string
     ): void {
+        const castSpellIDs = Array.isArray(persisted.castSpellIDs) ? persisted.castSpellIDs : [];
+        puzzle.restoreCastSpellIDs([]);
+        for (const spellID of castSpellIDs) {
+            const spell = puzzle.getSpellSpecs().find((candidate) => candidate.id === spellID);
+            if (!spell) {
+                continue;
+            }
+            puzzle.applySpellEffect(spell);
+        }
+        puzzle.restoreCastSpellIDs(castSpellIDs);
+
         for (const bridge of [...puzzle.placedBridges]) {
             puzzle.removeBridge(bridge.id);
         }
@@ -661,10 +669,35 @@ export class OverworldGameState {
             }
         }
     }
+
+    restorePuzzleState(puzzleId: string, puzzle: BridgePuzzle): boolean {
+        const persisted = this.persistedPuzzleProgress.get(puzzleId);
+        if (!persisted) {
+            return false;
+        }
+
+        this.applyPersistedPuzzleProgress(puzzle, persisted, puzzleId);
+        this.puzzleProgress.set(puzzleId, puzzle);
+        if (this.activePuzzleId === puzzleId) {
+            this.activePuzzleState = puzzle;
+        }
+        return true;
+    }
+
+    getCastSpellIDs(puzzleId: string): string[] {
+        const livePuzzle = this.puzzleProgress.get(puzzleId);
+        if (livePuzzle) {
+            return livePuzzle.getCastSpellIDs();
+        }
+
+        const persisted = this.persistedPuzzleProgress.get(puzzleId);
+        return Array.isArray(persisted?.castSpellIDs) ? persisted!.castSpellIDs! : [];
+    }
 }
 
 interface PersistedPuzzleProgress {
     id?: string;
+    castSpellIDs?: string[];
     bridges?: Array<{
         id?: string;
         typeId?: string;
