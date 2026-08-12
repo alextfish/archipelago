@@ -4,6 +4,7 @@ import type { BridgeTypeSpec, PuzzleSpec } from "@model/puzzle/BridgePuzzle";
 import { BridgePuzzle } from "@model/puzzle/BridgePuzzle";
 import { StrutBridge } from "@model/puzzle/StrutBridge";
 import { BridgeMustCoverIslandConstraint } from "@model/puzzle/constraints/BridgeMustCoverIslandConstraint";
+import { PuzzleSpellDetector } from "@model/spell/PuzzleSpellDetector";
 
 describe("BridgePuzzle", () => {
   let mockIslands: Island[];
@@ -325,6 +326,102 @@ describe("BridgePuzzle", () => {
     it("is false when set to false in spec", () => {
       const puzzle = new BridgePuzzle({ ...puzzleSpec, givesFeedback: false });
       expect(puzzle.givesFeedback).toBe(false);
+    });
+  });
+
+  describe("glyph spells", () => {
+    it("detects an exact traced spell component and blocks extra extensions", () => {
+      const puzzle = new BridgePuzzle({
+        id: "spell-puzzle",
+        size: { width: 4, height: 4 },
+        islands: [
+          { id: "a", x: 0, y: 0 },
+          { id: "b", x: 1, y: 0 },
+          { id: "c", x: 1, y: 1 },
+          { id: "d", x: 2, y: 1 },
+        ],
+        bridgeTypes: [
+          { id: "wood", count: 3 }
+        ],
+        constraints: [],
+        maxNumBridges: 2,
+        glyphSpells: [
+          {
+            id: "bridge-spell",
+            glyph: "bridge",
+            trace: {
+              components: [{
+                islands: ["a", "b", "c"],
+                bridges: [
+                  { start: "a", end: "b" },
+                  { start: "b", end: "c" },
+                ]
+              }]
+            },
+            effect: {
+              type: "bridge",
+              bridgeId: "spell-bridge",
+              bridgeType: { id: "wood", count: 1 },
+              start: { x: 1, y: 1 },
+              end: { x: 2, y: 1 },
+            }
+          }
+        ]
+      });
+
+      puzzle.placeBridge("b1", { x: 0, y: 0 }, { x: 1, y: 0 });
+      puzzle.placeBridge("b2", { x: 1, y: 0 }, { x: 1, y: 1 });
+      expect(PuzzleSpellDetector.getTriggeredSpells(puzzle).map((spell) => spell.id)).toEqual(["bridge-spell"]);
+
+      puzzle.placeBridge("b3", { x: 1, y: 1 }, { x: 2, y: 1 });
+      expect(PuzzleSpellDetector.getTriggeredSpells(puzzle)).toEqual([]);
+    });
+
+    it("applies permanent island and bridge spell effects", () => {
+      const puzzle = new BridgePuzzle({
+        id: "spell-effect-puzzle",
+        size: { width: 5, height: 5 },
+        islands: [
+          { id: "start", x: 0, y: 0 },
+          { id: "end", x: 2, y: 0 },
+        ],
+        bridgeTypes: [{ id: "wood", count: 1 }],
+        constraints: [],
+        maxNumBridges: 2,
+      });
+
+      puzzle.applySpellEffect({
+        id: "raise-island",
+        glyph: "island",
+        trace: { components: [] },
+        effect: {
+          type: "island",
+          island: { id: "raised", x: 1, y: 1 }
+        }
+      });
+      puzzle.applySpellEffect({
+        id: "add-bridge",
+        glyph: "bridge",
+        trace: { components: [] },
+        effect: {
+          type: "bridge",
+          bridgeId: "spell-bridge",
+          bridgeType: { id: "wood", count: 1 },
+          start: { x: 0, y: 0 },
+          end: { x: 2, y: 0 },
+        }
+      });
+
+      expect(puzzle.islands.find((island) => island.id === "raised")).toMatchObject({
+        x: 1,
+        y: 1,
+        renderAsOverlay: true,
+      });
+      expect(puzzle.bridges.find((bridge) => bridge.id === "spell-bridge")).toMatchObject({
+        start: { x: 0, y: 0 },
+        end: { x: 2, y: 0 },
+      });
+      expect(puzzle.getCastSpellIDs()).toEqual(["raise-island", "add-bridge"]);
     });
   });
 });

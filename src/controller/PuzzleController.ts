@@ -593,6 +593,11 @@ export class PuzzleController {
             return false;
         }
 
+        if (typeof (this.puzzle as Partial<BridgePuzzle>).getSpellSpecs !== 'function' ||
+            typeof (this.puzzle as Partial<BridgePuzzle>).hasCastSpell !== 'function') {
+            return false;
+        }
+
         const triggeredSpell = PuzzleSpellDetector.getTriggeredSpells(this.puzzle)[0];
         if (!triggeredSpell || !this.host.onSpellCast) {
             return false;

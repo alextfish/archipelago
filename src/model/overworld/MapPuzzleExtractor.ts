@@ -449,125 +449,121 @@ export class MapPuzzleExtractor {
                 height: obj.height
             },
             metadata
+        };
+    }
+
+    private extractGlyphSpells(definition: MapPuzzleDefinition): PuzzleSpellSpec[] {
+        const raw = definition.metadata.glyphSpells;
+        if (!raw) {
+            return [];
         }
 
-        private extractGlyphSpells(definition: MapPuzzleDefinition): PuzzleSpellSpec[] {
-            const raw = definition.metadata.glyphSpells;
-            if (!raw) {
-                return [];
-            }
-
-            try {
-                const parsed = JSON.parse(raw) as PuzzleSpellSpec[];
-                return parsed.map((spell) => this.resolveSpellObjectReferences(definition, spell));
-            } catch (error) {
-                console.warn(`Failed to parse glyphSpells metadata for puzzle ${definition.id}`, error);
-                return [];
-            }
+        try {
+            const parsed = JSON.parse(raw) as PuzzleSpellSpec[];
+            return parsed.map((spell) => this.resolveSpellObjectReferences(definition, spell));
+        } catch (error) {
+            console.warn(`Failed to parse glyphSpells metadata for puzzle ${definition.id}`, error);
+            return [];
         }
+    }
 
-        private resolveSpellObjectReferences(definition: MapPuzzleDefinition, spell: PuzzleSpellSpec): PuzzleSpellSpec {
-            const layerObjects = definition.layerObjects ?? [];
+    private resolveSpellObjectReferences(definition: MapPuzzleDefinition, spell: PuzzleSpellSpec): PuzzleSpellSpec {
+        const layerObjects = definition.layerObjects ?? [];
 
-            if (spell.effect.type === 'open') {
-                return {
-                    ...spell,
-                    effect: {
-                        ...spell.effect,
-                        leftWall: this.resolveSpellRect(layerObjects, spell.effect.leftWall),
-                        rightWall: this.resolveSpellRect(layerObjects, spell.effect.rightWall),
-                    }
-                };
-            }
-
-            if (spell.effect.type === 'bridge') {
-                return {
-                    ...spell,
-                    effect: {
-                        ...spell.effect,
-                        start: this.resolveSpellPoint(definition, layerObjects, spell.effect.start),
-                        end: this.resolveSpellPoint(definition, layerObjects, spell.effect.end),
-                    }
-                };
-            }
-
-            if (spell.effect.type === 'island') {
-                return {
-                    ...spell,
-                    effect: {
-                        ...spell.effect,
-                        island: {
-                            ...spell.effect.island,
-                            ...this.resolveOptionalIslandLocation(definition, layerObjects, spell.effect.island as Island & { objectName?: string })
-                        }
-                    }
-                };
-            }
-
-            return spell;
-        }
-
-        private resolveOptionalIslandLocation(
-            definition: MapPuzzleDefinition,
-            layerObjects: ReadonlyArray<MapObject>,
-            island: Island & { objectName?: string }
-        ): Partial<Island> {
-            if (!island.objectName) {
-                return {};
-            }
-
-            const resolved = this.findLayerObject(layerObjects, island.objectName);
-            if (!resolved) {
-                return {};
-            }
-
-            return this.toLocalGridPoint(definition, resolved);
-        }
-
-        private resolveSpellRect(layerObjects: ReadonlyArray<MapObject>, rect: SpellRect | undefined): SpellRect | undefined {
-            if (!rect || !('width' in rect) || !('height' in rect)) {
-                return rect;
-            }
-
-            return rect;
-        }
-
-        private resolveSpellPoint(
-            definition: MapPuzzleDefinition,
-            layerObjects: ReadonlyArray<MapObject>,
-            point: SpellGridPoint
-        ): SpellGridPoint {
-            const resolved = this.resolveSpellIslandRef(definition, layerObjects, point);
-            return typeof resolved === 'string' ? point : resolved;
-        }
-
-        private resolveSpellIslandRef(
-            definition: MapPuzzleDefinition,
-            layerObjects: ReadonlyArray<MapObject>,
-            ref: SpellIslandRef
-        ): SpellIslandRef {
-            if (typeof ref !== 'string') {
-                return ref;
-            }
-
-            const resolved = this.findLayerObject(layerObjects, ref);
-            if (!resolved) {
-                return ref;
-            }
-
-            return this.toLocalGridPoint(definition, resolved);
-        }
-
-        private findLayerObject(layerObjects: ReadonlyArray<MapObject>, objectName: string): MapObject | null {
-            return layerObjects.find((candidate) => candidate.name === objectName) ?? null;
-        }
-
-        private toLocalGridPoint(definition: MapPuzzleDefinition, object: MapObject): SpellGridPoint {
+        if (spell.effect.type === 'open') {
             return {
-                x: Math.floor((object.x - definition.bounds.x) / 32),
-                y: Math.floor((object.y - definition.bounds.y) / 32),
+                ...spell,
+                effect: {
+                    ...spell.effect,
+                    leftWall: this.resolveSpellRect(layerObjects, spell.effect.leftWall),
+                    rightWall: this.resolveSpellRect(layerObjects, spell.effect.rightWall),
+                }
             };
         }
+
+        if (spell.effect.type === 'bridge') {
+            return {
+                ...spell,
+                effect: {
+                    ...spell.effect,
+                    start: this.resolveSpellPoint(definition, layerObjects, spell.effect.start),
+                    end: this.resolveSpellPoint(definition, layerObjects, spell.effect.end),
+                }
+            };
+        }
+
+        if (spell.effect.type === 'island') {
+            return {
+                ...spell,
+                effect: {
+                    ...spell.effect,
+                    island: {
+                        ...spell.effect.island,
+                        ...this.resolveOptionalIslandLocation(definition, layerObjects, spell.effect.island as Island & { objectName?: string })
+                    }
+                }
+            };
+        }
+
+        return spell;
+    }
+
+    private resolveOptionalIslandLocation(
+        definition: MapPuzzleDefinition,
+        layerObjects: ReadonlyArray<MapObject>,
+        island: Island & { objectName?: string }
+    ): Partial<Island> {
+        if (!island.objectName) {
+            return {};
+        }
+
+        const resolved = this.findLayerObject(layerObjects, island.objectName);
+        if (!resolved) {
+            return {};
+        }
+
+        return this.toLocalGridPoint(definition, resolved);
+    }
+
+    private resolveSpellRect(_layerObjects: ReadonlyArray<MapObject>, rect: SpellRect | undefined): SpellRect | undefined {
+        return rect;
+    }
+
+    private resolveSpellPoint(
+        definition: MapPuzzleDefinition,
+        layerObjects: ReadonlyArray<MapObject>,
+        point: SpellGridPoint
+    ): SpellGridPoint {
+        const resolved = this.resolveSpellIslandRef(definition, layerObjects, point);
+        return typeof resolved === 'string' ? point : resolved;
+    }
+
+    private resolveSpellIslandRef(
+        definition: MapPuzzleDefinition,
+        layerObjects: ReadonlyArray<MapObject>,
+        ref: SpellIslandRef
+    ): SpellIslandRef {
+        if (typeof ref !== 'string') {
+            return ref;
+        }
+
+        const resolved = this.findLayerObject(layerObjects, ref);
+        if (!resolved) {
+            return ref;
+        }
+
+        return this.toLocalGridPoint(definition, resolved);
+    }
+
+    private findLayerObject(layerObjects: ReadonlyArray<MapObject>, objectName: string): MapObject | null {
+        return layerObjects.find((candidate) => candidate.name === objectName) ?? null;
+    }
+
+    private toLocalGridPoint(definition: MapPuzzleDefinition, object: MapObject): SpellGridPoint {
+        return {
+            x: Math.floor((object.x - definition.bounds.x) / 32),
+            y: Math.floor((object.y - definition.bounds.y) / 32),
+        };
     }
 
     /**

@@ -88,6 +88,69 @@ describe('OverworldGameState', () => {
             const activePuzzle = gameState.getActivePuzzle();
             expect(activePuzzle?.puzzle).toBe(newMockPuzzle);
         });
+
+        it('persists cast spell effects and restores them onto a fresh puzzle instance', () => {
+            const spellPuzzle = new BridgePuzzle({
+                id: 'spell-puzzle',
+                size: { width: 5, height: 5 },
+                islands: [
+                    { id: 'left', x: 0, y: 0 },
+                    { id: 'right', x: 2, y: 0 }
+                ],
+                bridgeTypes: [{ id: 'wood', count: 1 }],
+                constraints: [],
+                maxNumBridges: 2,
+                glyphSpells: [
+                    {
+                        id: 'raise-island',
+                        glyph: 'island',
+                        trace: { components: [] },
+                        effect: {
+                            type: 'island',
+                            island: { id: 'raised', x: 1, y: 1 }
+                        }
+                    },
+                    {
+                        id: 'add-bridge',
+                        glyph: 'bridge',
+                        trace: { components: [] },
+                        effect: {
+                            type: 'bridge',
+                            bridgeId: 'spell-bridge',
+                            bridgeType: { id: 'wood', count: 1 },
+                            start: { x: 0, y: 0 },
+                            end: { x: 2, y: 0 }
+                        }
+                    }
+                ]
+            });
+
+            spellPuzzle.applySpellEffect(spellPuzzle.getSpellSpecs()[0]);
+            spellPuzzle.applySpellEffect(spellPuzzle.getSpellSpecs()[1]);
+            gameState.saveOverworldPuzzleProgress('spell-progress', spellPuzzle);
+
+            const exported = gameState.exportState();
+            const restoredState = new OverworldGameState();
+            restoredState.importState(exported);
+
+            const freshPuzzle = new BridgePuzzle({
+                id: 'spell-puzzle',
+                size: { width: 5, height: 5 },
+                islands: [
+                    { id: 'left', x: 0, y: 0 },
+                    { id: 'right', x: 2, y: 0 }
+                ],
+                bridgeTypes: [{ id: 'wood', count: 1 }],
+                constraints: [],
+                maxNumBridges: 2,
+                glyphSpells: spellPuzzle.getSpellSpecs() as any
+            });
+
+            expect(restoredState.restorePuzzleState('spell-progress', freshPuzzle)).toBe(true);
+            expect(freshPuzzle.getCastSpellIDs()).toEqual(['raise-island', 'add-bridge']);
+            expect(freshPuzzle.islands.find((island) => island.id === 'raised')).toBeTruthy();
+            expect(freshPuzzle.bridges.find((bridge) => bridge.id === 'spell-bridge')).toBeTruthy();
+        });
     });
 
     describe('loadOverworldPuzzleProgress', () => {
