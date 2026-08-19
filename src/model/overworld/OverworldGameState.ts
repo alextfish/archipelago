@@ -7,6 +7,12 @@ import type { OverworldPuzzleManager } from './OverworldPuzzleManager';
 import { PlayerTranslationDictionary } from '@model/translation/PlayerTranslationDictionary';
 import { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
 import type { PlayerOverworldDisplayItem } from './PlayerOverworldDisplay';
+import {
+    EMPTY_SPELL_PROGRESS,
+    recordCast,
+    type PuzzleSpellProgress,
+} from '@model/spell/PuzzleSpellProgress';
+import type { SpellKind } from '@model/spell/SpellPatternRegistry';
 
 /**
  * Manages state persistence for overworld puzzles
@@ -20,6 +26,9 @@ export class OverworldGameState {
     private persistedPuzzleProgress: Map<string, PersistedPuzzleProgress> = new Map();
     private completedPuzzles: Set<string> = new Set();
     private unlockedDoors: Set<string> = new Set();
+
+    /** Spell cast progress keyed by puzzle ID. */
+    private spellProgressByPuzzleID: Map<string, PuzzleSpellProgress> = new Map();
 
     /** Jewels the player has collected, keyed by colour (e.g. 'red'). */
     private collectedJewels: Map<string, number> = new Map();
@@ -119,6 +128,36 @@ export class OverworldGameState {
         if (this.activePuzzleId === puzzleId) {
             this.activePuzzleState = puzzle;
         }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Spell progress
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Return the spell progress for the given puzzle, or an empty record if
+     * no spell has been cast yet.
+     */
+    getSpellProgress(puzzleID: string): PuzzleSpellProgress {
+        return this.spellProgressByPuzzleID.get(puzzleID) ?? EMPTY_SPELL_PROGRESS;
+    }
+
+    /**
+     * Record that a spell of the given kind has been cast in the given puzzle.
+     * Idempotent: repeated calls for the same kind have no further effect.
+     */
+    recordSpellCast(puzzleID: string, kind: SpellKind): void {
+        const current = this.getSpellProgress(puzzleID);
+        this.spellProgressByPuzzleID.set(puzzleID, recordCast(current, kind));
+    }
+
+    /** Return a plain-object representation of all spell progress for persistence. */
+    private serialiseSpellProgress(): Record<string, readonly SpellKind[]> {
+        const result: Record<string, readonly SpellKind[]> = {};
+        for (const [id, progress] of this.spellProgressByPuzzleID) {
+            result[id] = progress.castSpellKinds;
+        }
+        return result;
     }
 
     /**
@@ -364,6 +403,9 @@ export class OverworldGameState {
         this.currentInteriorID = undefined;
         this.interiorReturnX = undefined;
         this.interiorReturnY = undefined;
+
+        // Reset spell progress
+        this.spellProgressByPuzzleID.clear();
     }
 
     /**
@@ -526,6 +568,7 @@ export class OverworldGameState {
         currentInteriorID?: string;
         interiorReturnX?: number;
         interiorReturnY?: number;
+        spellProgress: Record<string, readonly SpellKind[]>;
     } {
         const puzzleProgressObj: Record<string, PersistedPuzzleProgress> = {};
         const persistedEntries = new Map(this.persistedPuzzleProgress);
@@ -560,6 +603,7 @@ export class OverworldGameState {
             currentInteriorID: this.currentInteriorID,
             interiorReturnX: this.interiorReturnX,
             interiorReturnY: this.interiorReturnY,
+            spellProgress: this.serialiseSpellProgress(),
         };
     }
 
@@ -581,6 +625,7 @@ export class OverworldGameState {
         currentInteriorID?: string;
         interiorReturnX?: number;
         interiorReturnY?: number;
+        spellProgress?: Record<string, readonly SpellKind[]>;
     }): void {
         console.log('OverworldGameState: Importing state');
 
@@ -625,6 +670,14 @@ export class OverworldGameState {
         this.currentInteriorID = state.currentInteriorID;
         this.interiorReturnX = state.interiorReturnX;
         this.interiorReturnY = state.interiorReturnY;
+
+        // Spell progress
+        this.spellProgressByPuzzleID.clear();
+        if (state.spellProgress) {
+            for (const [id, kinds] of Object.entries(state.spellProgress)) {
+                this.spellProgressByPuzzleID.set(id, { castSpellKinds: kinds });
+            }
+        }
     }
 
     private serialisePuzzleProgress(puzzle: BridgePuzzle): PersistedPuzzleProgress {

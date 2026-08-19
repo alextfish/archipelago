@@ -31,6 +31,8 @@ export class PuzzleController {
     private undoManager: UndoRedoManager;
     // Track whether puzzle was previously solved to detect transitions
     private wasSolved: boolean = false;
+    // Set to true while a spell animation sequence is active
+    private inputLockedBySpell: boolean = false;
 
     constructor(puzzle: BridgePuzzle, renderer: PuzzleRenderer, host: PuzzleHost, undoManager?: UndoRedoManager) {
         this.puzzle = puzzle;
@@ -44,8 +46,8 @@ export class PuzzleController {
     // --- Pointer-driven placement API (for drag and mouseover preview flows)
     /** Pointer down at world coords + grid coords */
     onPointerDown(_worldX: number, _worldY: number, gridX: number, gridY: number) {
-        // Block all interactions while the puzzle-solved screen is visible
-        if (this.wasSolved) return;
+        // Block all interactions while input is locked (solved or spell animating)
+        if (this.isInputLocked) return;
         // If we've already got a pending bridge placement, this is click-and-click: ignore further pointer downs
         if (this.pendingStart) return;
         // If pointer down is on an island, begin placement (allocates a bridge)
@@ -60,8 +62,8 @@ export class PuzzleController {
 
     /** Pointer move: update preview if we have a pending start */
     onPointerMove(_worldX: number, _worldY: number, gridX: number, gridY: number) {
-        // Block all interactions while the puzzle-solved screen is visible
-        if (this.wasSolved) return;
+        // Block all interactions while input is locked (solved or spell animating)
+        if (this.isInputLocked) return;
         // Nothing to do on mouse move if we don't have a pending start
         if (!this.pendingStart || !this.currentBridgeType) return;
         // Compute preview end point depending on fixed/variable length and snapping
@@ -150,8 +152,8 @@ export class PuzzleController {
 
     /** Pointer up: attempt to finalize placement if pending start exists */
     onPointerUp(_worldX: number, _worldY: number, gridX: number, gridY: number) {
-        // Block all interactions while the puzzle-solved screen is visible
-        if (this.wasSolved) return;
+        // Block all interactions while input is locked (solved or spell animating)
+        if (this.isInputLocked) return;
         if (!this.pendingStart) return;
         // If pointer up is on an island, attempt to finish placement
         const island = this.puzzle.islands.find(i => i.x === gridX && i.y === gridY);
@@ -461,8 +463,8 @@ export class PuzzleController {
     }
 
     removeBridge(bridgeId: string) {
-        // Block bridge removal while the puzzle-solved screen is visible
-        if (this.wasSolved) return;
+        // Block bridge removal while input is locked
+        if (this.isInputLocked) return;
         this.cancelPlacement();
         const cmd = new RemoveBridgeCommand(this.puzzle, bridgeId);
         this.undoManager.executeCommand(cmd);
@@ -478,8 +480,8 @@ export class PuzzleController {
     }
 
     undo(): void {
-        // Block undo when puzzle is currently solved
-        if (this.wasSolved) return;
+        // Block undo when input is locked
+        if (this.isInputLocked) return;
         if (this.undoManager.undo()) {
             this.renderer.updateFromPuzzle(this.puzzle);
             this.notifyCountsChanged();
@@ -488,8 +490,8 @@ export class PuzzleController {
     }
 
     redo(): void {
-        // Block redo when puzzle is currently solved
-        if (this.wasSolved) return;
+        // Block redo when input is locked
+        if (this.isInputLocked) return;
         if (this.undoManager.redo()) {
             this.renderer.updateFromPuzzle(this.puzzle);
             this.notifyCountsChanged();
@@ -498,11 +500,11 @@ export class PuzzleController {
     }
 
     canUndo(): boolean {
-        return !this.wasSolved && this.undoManager.canUndo();
+        return !this.isInputLocked && this.undoManager.canUndo();
     }
 
     canRedo(): boolean {
-        return !this.wasSolved && this.undoManager.canRedo();
+        return !this.isInputLocked && this.undoManager.canRedo();
     }
 
     validate() {
@@ -552,6 +554,32 @@ export class PuzzleController {
         const results = this.validator.validateAll();
         const nowSolved = results.allSatisfied && (results.perConstraint?.length ?? 0) > 0;
         return nowSolved;
+    }
+
+    /**
+     * Returns true when all pointer and keyboard input should be blocked.
+     *
+     * Input is locked when the puzzle is solved (the solved-state overlay is
+     * visible) or when a spell animation sequence is currently active.
+     */
+    get isInputLocked(): boolean {
+        return this.wasSolved || this.inputLockedBySpell;
+    }
+
+    /**
+     * Lock input because a spell animation is starting.
+     * Called by PuzzleSpellController before it begins playing an animation.
+     */
+    lockInputForSpell(): void {
+        this.inputLockedBySpell = true;
+    }
+
+    /**
+     * Unlock input after the spell animation has finished.
+     * Called by PuzzleSpellController after play() resolves.
+     */
+    unlockInputForSpell(): void {
+        this.inputLockedBySpell = false;
     }
 
     update(dt: number): void {
