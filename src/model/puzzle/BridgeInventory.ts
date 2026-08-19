@@ -60,6 +60,16 @@ export class BridgeInventory {
     }
   }
 
+  /**
+   * Add a pre-constructed bridge to the inventory.
+   * Used by the spell system to inject runtime bridges (e.g. the bridge spell).
+   * The bridge is added as-is, with its start/end already set if it should
+   * appear placed in the puzzle.
+   */
+  addBridge(bridge: Bridge): void {
+    this.allBridges.push(bridge);
+  }
+
   /** Number of remaining bridges of each type */
   countsByType(): Record<string, number> {
     // Ensure every declared bridge type appears in the result (even if zero)

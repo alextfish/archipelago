@@ -422,4 +422,95 @@ export class BridgePuzzle {
 
     return result;
   }
+
+  // ---------------------------------------------------------------------------
+  // Runtime spell mutation APIs
+  //
+  // These methods are called by the spell system to apply one-time effects to
+  // the puzzle model. Each is idempotent: calling it a second time with the
+  // same arguments has no further effect. This makes it safe to reapply spell
+  // effects on every load without duplicating state.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Add a runtime island to the puzzle exactly once.
+   *
+   * If an island with the same ID already exists, this is a no-op (idempotent
+   * for load-time reapplication).
+   */
+  addRuntimeIsland(island: Island): void {
+    if (this.islands.some(i => i.id === island.id)) return;
+    this.islands.push(island);
+  }
+
+  /**
+   * Add a runtime bridge that appears already placed in the puzzle.
+   *
+   * The bridge is added to the inventory and immediately placed at the given
+   * start and end coordinates. The player may subsequently pick it up and
+   * reposition it, so it participates in all constraint checks like any other
+   * bridge. Calling this more than once for the same type spec is idempotent:
+   * if a bridge with the derived ID already exists in the inventory, it will
+   * not be duplicated.
+   *
+   * @param start     Puzzle-local grid coordinates for the bridge start.
+   * @param end       Puzzle-local grid coordinates for the bridge end.
+   * @param typeSpec  Bridge type definition. The spec's `id` is used to detect
+   *                  duplicates; it should be stable and unique per spell.
+   */
+  addRuntimeBridge(
+    start: { x: number; y: number },
+    end: { x: number; y: number },
+    typeSpec: BridgeTypeSpec,
+  ): Bridge {
+    const runtimeID = `runtime_${typeSpec.id}`;
+
+    // Idempotency: check if a bridge with this ID already exists.
+    const existing = this.inventory.bridges.find(b => b.id === runtimeID);
+    if (existing) {
+      // Ensure it is placed at the correct position (may have been moved, but
+      // on fresh reapplication after load we restore the original location).
+      if (!existing.start || !existing.end) {
+        existing.start = { ...start };
+        existing.end = { ...end };
+      }
+      return existing;
+    }
+
+    const bridgeType = createBridgeType({
+      id: typeSpec.id,
+      colour: typeSpec.colour,
+      length: typeSpec.length,
+      width: typeSpec.width,
+      style: typeSpec.style,
+      mustCoverIsland: typeSpec.mustCoverIsland,
+    });
+
+    const bridge: Bridge = {
+      id: runtimeID,
+      type: bridgeType,
+      start: { ...start },
+      end: { ...end },
+    };
+
+    this.inventory.addBridge(bridge);
+    return bridge;
+  }
+
+  /**
+   * Mark the given tiles as no longer blocked (opened by an Open spell).
+   *
+   * Idempotent: tiles not in the blocked set are silently ignored. Only tiles
+   * that were previously blocked are removed.
+   */
+  markTilesOpened(tiles: ReadonlyArray<{ x: number; y: number }>): void {
+    for (const tile of tiles) {
+      const key = this.gridKey(tile.x, tile.y);
+      this.blockedTileKeys.delete(key);
+    }
+    // Rebuild the blockedTiles array to stay consistent with the key set.
+    const remaining = this.blockedTiles.filter(t => this.blockedTileKeys.has(this.gridKey(t.x, t.y)));
+    this.blockedTiles.length = 0;
+    this.blockedTiles.push(...remaining);
+  }
 }
