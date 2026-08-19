@@ -403,6 +403,9 @@ export class OverworldGameState {
         this.currentInteriorID = undefined;
         this.interiorReturnX = undefined;
         this.interiorReturnY = undefined;
+
+        // Reset spell progress
+        this.spellProgressByPuzzleID.clear();
     }
 
     /**
