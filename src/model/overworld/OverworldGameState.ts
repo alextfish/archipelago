@@ -13,6 +13,8 @@ import {
     type PuzzleSpellProgress,
 } from '@model/spell/PuzzleSpellProgress';
 import type { SpellKind } from '@model/spell/SpellPatternRegistry';
+import { getSpellDefinitionByKind } from '@model/spell/PuzzleSpellManifest';
+import { applySpellPermanentEffect } from '@model/spell/BridgePuzzleSpellEffects';
 
 /**
  * Manages state persistence for overworld puzzles
@@ -537,8 +539,10 @@ export class OverworldGameState {
         this.puzzleProgress.clear();
 
         for (const [puzzleId, puzzle] of puzzles) {
+            this.applyPersistedSpellProgress(puzzle, puzzleId);
             const persisted = this.persistedPuzzleProgress.get(puzzleId);
             if (!persisted) {
+                this.puzzleProgress.set(puzzleId, puzzle);
                 continue;
             }
 
@@ -711,6 +715,19 @@ export class OverworldGameState {
                 puzzle.placeBridge(bridgeState.id, bridgeState.start, bridgeState.end);
             } catch (error) {
                 console.warn(`OverworldGameState: Failed to restore bridge ${bridgeState.id} for puzzle ${puzzleId}`, error);
+            }
+        }
+
+        private applyPersistedSpellProgress(puzzle: BridgePuzzle, puzzleId: string): void {
+            const progress = this.getSpellProgress(puzzleId);
+            if (!puzzle.spellManifest || progress.castSpellKinds.length === 0) {
+                return;
+            }
+
+            for (const kind of progress.castSpellKinds) {
+                const spell = getSpellDefinitionByKind(puzzle.spellManifest, kind);
+                if (!spell) continue;
+                applySpellPermanentEffect(puzzle, spell);
             }
         }
     }

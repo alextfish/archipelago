@@ -1,5 +1,6 @@
 import type { Island } from "./Island";
 import type { BridgeTypeSpec } from "./BridgePuzzle";
+import type { PuzzleSpellManifest } from "@model/spell/PuzzleSpellManifest";
 
 export type Direction = "N" | "S" | "E" | "W";
 
@@ -37,6 +38,7 @@ export interface FlowPuzzleSpec {
   bridgeTypes: BridgeTypeSpec[];
   constraints: { type: string; params?: any }[];
   maxNumBridges: number;
+  spellManifest?: PuzzleSpellManifest;
   flowSquares?: FlowSquareSpec[]; // per-tile flow metadata
   edgeInputs?: { x: number; y: number }[]; // coordinates that supply water in from the edge
 }

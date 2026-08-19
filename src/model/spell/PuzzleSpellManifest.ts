@@ -13,6 +13,10 @@ import type { SpellKind } from './SpellPatternRegistry';
  */
 export interface IslandSpellEffect {
     readonly spawnObjectID: number;
+    /** Resolved puzzle-local spawn tile (required at runtime for spell execution). */
+    readonly spawnLocal?: { x: number; y: number };
+    /** Optional resolved overworld world-tile spawn location for collision updates. */
+    readonly spawnWorldTile?: { tileX: number; tileY: number };
     /** Optional: distance in pixels the island rises during the animation. Defaults to 64. */
     readonly riseDistancePx?: number;
     /** Optional: animation duration in milliseconds. Defaults to 800. */
@@ -30,6 +34,10 @@ export interface IslandSpellEffect {
 export interface BridgeSpellEffect {
     readonly startObjectID: number;
     readonly endObjectID: number;
+    /** Resolved puzzle-local bridge start tile (required at runtime for spell execution). */
+    readonly startLocal?: { x: number; y: number };
+    /** Resolved puzzle-local bridge end tile (required at runtime for spell execution). */
+    readonly endLocal?: { x: number; y: number };
     readonly bridgeType: 'normal' | 'strut';
     /** Optional: particle colour for the appearance animation. Defaults to 'blue'. */
     readonly particleColour?: string;
@@ -48,6 +56,10 @@ export interface OpenSpellEffect {
     readonly leftShiftTiles: number;
     /** Number of tiles to shift the right wall rightward. */
     readonly rightShiftTiles: number;
+    /** Resolved puzzle-local tiles that become opened/walkable after first cast. */
+    readonly openedLocalTiles?: ReadonlyArray<{ x: number; y: number }>;
+    /** Optional resolved overworld world tiles that become walkable after first cast. */
+    readonly openedWorldTiles?: ReadonlyArray<{ tileX: number; tileY: number }>;
     /** Optional: particle colour. Defaults to 'blue' for water context. */
     readonly particleColour?: string;
 }
@@ -84,6 +96,17 @@ export interface PuzzleSpellDefinition {
  */
 export interface PuzzleSpellManifest {
     readonly spells: readonly PuzzleSpellDefinition[];
+}
+
+/**
+ * Return the spell definition for a given kind from a manifest.
+ */
+export function getSpellDefinitionByKind(
+    manifest: PuzzleSpellManifest | undefined,
+    kind: SpellKind,
+): PuzzleSpellDefinition | undefined {
+    if (!manifest) return undefined;
+    return manifest.spells.find(spell => spell.kind === kind);
 }
 
 // ---------------------------------------------------------------------------

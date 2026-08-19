@@ -7,6 +7,7 @@ import { BridgeLengthConstraint } from './constraints/BridgeLengthConstraint';
 import { BridgeMustCoverIslandConstraint } from './constraints/BridgeMustCoverIslandConstraint';
 import { createBridgeType, type BridgeType } from "./BridgeType";
 import { StrutBridge } from './StrutBridge';
+import type { PuzzleSpellManifest } from '@model/spell/PuzzleSpellManifest';
 
 export interface BridgeTypeSpec {
   id: string;
@@ -30,6 +31,8 @@ export interface PuzzleSpec { // can be loaded from JSON
   constraints: { type: string; params?: any }[];
   maxNumBridges: number;
   givesFeedback?: boolean; // defaults to true; when false, no constraint feedback is shown for invalid solutions
+  /** Optional spell manifest for this puzzle. */
+  spellManifest?: PuzzleSpellManifest;
 }
 
 export class BridgePuzzle {
@@ -41,6 +44,7 @@ export class BridgePuzzle {
   inventory: BridgeInventory;
   maxNumBridges: number;
   givesFeedback: boolean;
+  spellManifest?: PuzzleSpellManifest;
   private readonly blockedTiles: Array<{ x: number; y: number }>;
   private readonly blockedTileKeys: Set<string>;
 
@@ -54,6 +58,7 @@ export class BridgePuzzle {
     this.blockedTileKeys = new Set(this.blockedTiles.map(tile => this.gridKey(tile.x, tile.y)));
     this.constraints = createConstraintsFromSpec(spec.constraints);
     this.givesFeedback = spec.givesFeedback ?? true;
+    this.spellManifest = spec.spellManifest;
     const bridgeTypes = spec.bridgeTypes.map(
       (spec) => ({
         ...createBridgeType({
