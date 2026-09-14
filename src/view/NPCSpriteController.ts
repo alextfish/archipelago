@@ -116,7 +116,8 @@ export class NPCSpriteController {
             });
 
             const { x: worldX, y: worldY } = this.gridMapper.gridToWorld(tileX, tileY + 1);
-            const sprite = this.scene.add.sprite(worldX, worldY, appearanceId);
+            const spriteKey = this.npcAppearanceRegistry.getAppearance(appearanceId).spriteKey;
+            const sprite = this.scene.add.sprite(worldX, worldY, spriteKey);
             sprite.setOrigin(0, 1);
             sprite.setDepth(worldY);
             this.npcSprites.set(npc.id, sprite);

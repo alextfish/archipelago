@@ -12,8 +12,8 @@ describe('NPCAppearanceRegistry', () => {
 
             expect(registry.hasAppearance('sailorNS')).toBe(true);
             expect(registry.hasAppearance('sailorEW')).toBe(true);
-            expect(registry.hasAppearance('Townfolk-Child-M-002 light')).toBe(true);
-            expect(registry.hasAppearance('Townfolk-Child-F-001 dark')).toBe(true);
+            expect(registry.hasAppearance('Child1')).toBe(true);
+            expect(registry.hasAppearance('Child2')).toBe(true);
         });
 
         it('should not have unknown appearances', () => {
@@ -29,9 +29,9 @@ describe('NPCAppearanceRegistry', () => {
             const appearance = registry.getAppearance('sailorNS');
 
             expect(appearance.spriteKey).toBe('sailorNS');
-            expect(appearance.expressions.neutral).toBe(0);
-            expect(appearance.expressions.happy).toBe(2);
-            expect(appearance.expressions.sad).toBe(1);
+            expect(appearance.expressions?.neutral).toBe(0);
+            expect(appearance.expressions?.happy).toBe(2);
+            expect(appearance.expressions?.sad).toBe(1);
         });
 
         it('should return correct appearance data for sailorEW', () => {
@@ -39,9 +39,9 @@ describe('NPCAppearanceRegistry', () => {
             const appearance = registry.getAppearance('sailorEW');
 
             expect(appearance.spriteKey).toBe('sailorEW');
-            expect(appearance.expressions.neutral).toBe(0);
-            expect(appearance.expressions.happy).toBe(2);
-            expect(appearance.expressions.sad).toBe(1);
+            expect(appearance.expressions?.neutral).toBe(0);
+            expect(appearance.expressions?.happy).toBe(2);
+            expect(appearance.expressions?.sad).toBe(1);
         });
 
         it('should throw error for unknown appearance', () => {
@@ -83,7 +83,7 @@ describe('NPCAppearanceRegistry', () => {
 
             const appearance = registry.getAppearance('customNPC');
             expect(appearance.spriteKey).toBe('custom');
-            expect(appearance.expressions.neutral).toBe('neutral_frame');
+            expect(appearance.expressions?.neutral).toBe('neutral_frame');
         });
 
         it('should allow overwriting existing appearances', () => {
@@ -100,7 +100,7 @@ describe('NPCAppearanceRegistry', () => {
 
             const appearance = registry.getAppearance('sailorNS');
             expect(appearance.spriteKey).toBe('newSailor');
-            expect(appearance.expressions.neutral).toBe(10);
+            expect(appearance.expressions?.neutral).toBe(10);
         });
     });
 
@@ -108,10 +108,10 @@ describe('NPCAppearanceRegistry', () => {
         it('should return the child portrait override for all supported expressions', () => {
             const registry = new NPCAppearanceRegistry();
 
-            expect(registry.getFaceTextureKey('Townfolk-Child-M-002 light', 'neutral')).toBe('faces/Townfolk-Child-M-002 light');
-            expect(registry.getFaceTextureKey('Townfolk-Child-M-002 light', 'happy')).toBe('faces/Townfolk-Child-M-002 light');
-            expect(registry.getFaceTextureKey('Townfolk-Child-M-002 light', 'frown')).toBe('faces/Townfolk-Child-M-002 light');
-            expect(registry.getFaceTextureKey('Townfolk-Child-F-001 dark', 'happy')).toBe('faces/Townfolk-Child-F-001 dark');
+            expect(registry.getFaceTextureKey('Child1', 'neutral')).toBe('faces/Townfolk-Child-F-001 dark');
+            expect(registry.getFaceTextureKey('Child1', 'happy')).toBe('faces/Townfolk-Child-F-001 dark');
+            expect(registry.getFaceTextureKey('Child1', 'frown')).toBe('faces/Townfolk-Child-F-001 dark');
+            expect(registry.getFaceTextureKey('Child2', 'happy')).toBe('faces/Townfolk-Child-M-002 light');
         });
     });
 
@@ -127,8 +127,8 @@ describe('NPCAppearanceRegistry', () => {
         it('should fall back to neutral for appearances without explicit expression frames', () => {
             const registry = new NPCAppearanceRegistry();
 
-            expect(registry.getExpressionFrame('Townfolk-Child-M-002 light', 'happy')).toBe(0);
-            expect(registry.getExpressionFrame('Townfolk-Child-F-001 dark', 'sad')).toBe(0);
+            expect(registry.getExpressionFrame('Child1', 'happy')).toBe(0);
+            expect(registry.getExpressionFrame('Child2', 'sad')).toBe(0);
         });
     });
 });
