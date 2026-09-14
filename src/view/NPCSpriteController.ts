@@ -2,12 +2,30 @@ import Phaser from 'phaser';
 import { NPC } from '@model/conversation/NPC';
 import { NPCSeriesState } from '@model/conversation/NPCSeriesState';
 import { NPCAppearanceRegistry } from '@model/conversation/NPCAppearanceRegistry';
+import { LoopPath, getClosestCardinalDirection, type CardinalDirection, type PathPoint } from '@model/overworld/LoopPath';
+import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import type { SeriesManager } from '@model/series/SeriesFactory';
 import type { GridToWorldMapper } from '@view/GridToWorldMapper';
 import type { Interactable } from '@view/InteractionCursor';
 import { NPCIconConfig } from '@view/NPCIconConfig';
-import { getNPCIdleAnimationKey, registerNPCAnimations } from '@view/NPCSpriteHelper';
+import {
+    getNPCDirectionalIdleFrame,
+    getNPCDirectionalWalkAnimationKey,
+    getNPCIdleAnimationKey,
+    registerNPCAnimations,
+} from '@view/NPCSpriteHelper';
 import { attachTestMarker, isTestMode } from '@helpers/TestMarkers';
+
+interface MovingNPC {
+    npcId: string;
+    appearanceId: string;
+    sprite: Phaser.GameObjects.Sprite;
+    interactable: Interactable;
+    path: LoopPath;
+    distance: number;
+    speedPixelsPerSecond: number;
+    direction: CardinalDirection;
+}
 
 /**
  * Manages regular (non-constraint) NPC sprites and their associated series
@@ -34,6 +52,10 @@ export class NPCSpriteController {
     readonly npcSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
     /** Icon image (incomplete / complete badge) for each NPC, keyed by NPC ID. */
     private readonly npcIcons: Map<string, Phaser.GameObjects.Image> = new Map();
+    /** Named path loops loaded from Tiled `paths` object layers. */
+    private readonly paths: Map<string, LoopPath> = new Map();
+    /** Active overworld NPCs currently moving along a Tiled path. */
+    private readonly movingNPCs: MovingNPC[] = [];
     /** Series state for every NPC (null series for NPCs without a series). */
     readonly npcSeriesStates: Map<string, NPCSeriesState> = new Map();
     /** NPC appearance registry, populated from the registry JSON on creation. */
@@ -56,6 +78,7 @@ export class NPCSpriteController {
         this.addNPC = addNPC;
         this.addInteractable = addInteractable;
         this.addSeriesPuzzleData = addSeriesPuzzleData;
+        this.loadPaths();
     }
 
     /**
@@ -91,6 +114,8 @@ export class NPCSpriteController {
             const language = properties?.find((p: any) => p.name === 'language')?.value || 'grass';
             const appearanceId = properties?.find((p: any) => p.name === 'appearance')?.value || 'sailorNS';
             const animate = properties?.find((p: any) => p.name === 'animate')?.value === true;
+            const pathName = properties?.find((p: any) => p.name === 'path')?.value;
+            const speed = Number(properties?.find((p: any) => p.name === 'speed')?.value ?? 0);
 
             const npc = new NPC(
                 String(obj.id),
@@ -108,12 +133,13 @@ export class NPCSpriteController {
 
             this.addNPC(npc);
 
-            this.addInteractable({
+            const interactable: Interactable = {
                 type: 'npc',
                 tileX,
                 tileY,
                 data: { npc }
-            });
+            };
+            this.addInteractable(interactable);
 
             const { x: worldX, y: worldY } = this.gridMapper.gridToWorld(tileX, tileY + 1);
             const spriteKey = this.npcAppearanceRegistry.getAppearance(appearanceId).spriteKey;
@@ -133,7 +159,14 @@ export class NPCSpriteController {
                 console.log(`[TEST] Added test marker for NPC: ${npc.id} at tile (${tileX}, ${tileY}), world (${worldX}, ${worldY})`);
             }
 
-            if (npc.animate) {
+            const movingNPC = typeof pathName === 'string' && pathName.length > 0
+                ? this.createMovingNPC(npc.id, appearanceId, sprite, interactable, pathName, speed, { x: obj.x, y: obj.y })
+                : null;
+
+            if (movingNPC) {
+                this.applyMovingNPCState(movingNPC);
+                this.movingNPCs.push(movingNPC);
+            } else if (npc.animate) {
                 const animKey = getNPCIdleAnimationKey(appearanceId, this.npcAppearanceRegistry);
                 if (animKey) sprite.play(animKey);
             }
@@ -213,6 +246,113 @@ export class NPCSpriteController {
             icon.setOrigin(0.5, 0.5);
             icon.setDepth(npcSprite.depth + NPCIconConfig.ICON_DEPTH_OFFSET);
             this.npcIcons.set(npc.id, icon);
+        }
+    }
+
+    update(delta: number): void {
+        for (const movingNPC of this.movingNPCs) {
+            if (movingNPC.speedPixelsPerSecond > 0) {
+                movingNPC.distance = movingNPC.path.wrapDistance(
+                    movingNPC.distance + (movingNPC.speedPixelsPerSecond * delta) / 1000
+                );
+            }
+
+            const segmentDelta = movingNPC.path.getSegmentDeltaAt(movingNPC.distance);
+            if (segmentDelta.x !== 0 || segmentDelta.y !== 0) {
+                movingNPC.direction = getClosestCardinalDirection(segmentDelta.x, segmentDelta.y);
+            }
+
+            this.applyMovingNPCState(movingNPC);
+        }
+    }
+
+    private loadPaths(): void {
+        const pathLayers = TiledLayerUtils.findObjectLayersByName(this.tiledMapData?.layers ?? [], 'paths');
+
+        for (const layerInfo of pathLayers) {
+            for (const obj of layerInfo.data?.objects ?? []) {
+                if (!obj?.name) continue;
+                const points = this.getAbsolutePathPoints(obj);
+                if (!points) continue;
+
+                try {
+                    this.paths.set(obj.name, new LoopPath(points));
+                } catch (error) {
+                    console.warn(`Failed to load NPC path "${obj.name}" from ${layerInfo.fullPath}:`, error);
+                }
+            }
+        }
+    }
+
+    private getAbsolutePathPoints(obj: any): PathPoint[] | null {
+        const points = Array.isArray(obj.polygon) ? obj.polygon : Array.isArray(obj.polyline) ? obj.polyline : null;
+        if (!points || points.length < 2 || typeof obj.x !== 'number' || typeof obj.y !== 'number') {
+            return null;
+        }
+
+        return points.map((point: any) => ({
+            x: obj.x + point.x,
+            y: obj.y + point.y,
+        }));
+    }
+
+    private createMovingNPC(
+        npcId: string,
+        appearanceId: string,
+        sprite: Phaser.GameObjects.Sprite,
+        interactable: Interactable,
+        pathName: string,
+        speed: number,
+        initialPosition: PathPoint,
+    ): MovingNPC | null {
+        const path = this.paths.get(pathName);
+        if (!path) {
+            console.warn(`NPC ${npcId} references unknown path "${pathName}"`);
+            return null;
+        }
+
+        const distance = path.getClosestDistance(initialPosition);
+        const initialDelta = path.getSegmentDeltaAt(distance);
+
+        return {
+            npcId,
+            appearanceId,
+            sprite,
+            interactable,
+            path,
+            distance,
+            speedPixelsPerSecond: Math.max(0, speed) * this.gridMapper.getCellSize(),
+            direction: getClosestCardinalDirection(initialDelta.x, initialDelta.y),
+        };
+    }
+
+    private applyMovingNPCState(movingNPC: MovingNPC): void {
+        const topLeft = movingNPC.path.getPointAt(movingNPC.distance);
+        movingNPC.sprite.setPosition(topLeft.x, topLeft.y + this.gridMapper.getCellSize());
+        movingNPC.sprite.setDepth(movingNPC.sprite.y);
+
+        const walkAnimationKey = getNPCDirectionalWalkAnimationKey(
+            movingNPC.appearanceId,
+            movingNPC.direction,
+            this.npcAppearanceRegistry,
+        );
+        if (this.scene.anims.exists(walkAnimationKey)) {
+            movingNPC.sprite.play(walkAnimationKey, true);
+        } else {
+            movingNPC.sprite.setFrame(getNPCDirectionalIdleFrame(movingNPC.direction));
+        }
+
+        const tilePosition = this.gridMapper.worldToGrid(topLeft.x, topLeft.y);
+        movingNPC.interactable.tileX = tilePosition.x;
+        movingNPC.interactable.tileY = tilePosition.y;
+
+        const icon = this.npcIcons.get(movingNPC.npcId);
+        if (icon) {
+            icon.setPosition(
+                movingNPC.sprite.x,
+                movingNPC.sprite.y + NPCIconConfig.ICON_OFFSET_Y,
+            );
+            icon.setDepth(movingNPC.sprite.depth + NPCIconConfig.ICON_DEPTH_OFFSET);
         }
     }
 }

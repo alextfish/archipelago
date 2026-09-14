@@ -1360,6 +1360,10 @@ export class OverworldScene extends Phaser.Scene {
       this.player.setDepth(this.player.y);
     }
 
+    if (this.gameMode === 'exploration') {
+      this.npcSpriteController?.update(delta);
+    }
+
     // Only handle player movement in exploration mode
     if (this.gameMode === 'exploration' && this.playerController) {
       this.playerController.update();
