@@ -150,6 +150,10 @@ export class OverworldScene extends Phaser.Scene {
     this.seriesManager = new SeriesManager(seriesFactory, progressStore);
   }
 
+  private canPlayerMoveAroundAndInteract(): boolean {
+    return this.gameMode === 'exploration';
+  }
+
   preload() {
     // Load external tilesets (these reference images outside the map file)
     this.load.image('beachTileset', 'resources/tilesets/beach.png');
@@ -1359,7 +1363,7 @@ export class OverworldScene extends Phaser.Scene {
 
   update(_time: number, delta: number) {
     this.tileAnimationManager?.update(delta);
-    this.npcSpriteController?.update(delta, this.gameMode === 'exploration');
+    this.npcSpriteController?.update(delta, this.canPlayerMoveAroundAndInteract());
 
     // Update player depth for Y-sorting so sprites above/below sort correctly
     if (this.player) {
@@ -1367,7 +1371,7 @@ export class OverworldScene extends Phaser.Scene {
     }
 
     // Only handle player movement in exploration mode
-    if (this.gameMode === 'exploration' && this.playerController) {
+    if (this.canPlayerMoveAroundAndInteract() && this.playerController) {
       this.playerController.update();
       this.overworldHUD?.setPlayerLayerDisplay(this.playerController.getPlayerLayer());
 
@@ -1579,7 +1583,7 @@ export class OverworldScene extends Phaser.Scene {
     // Add E key for interacting with focused target or entering puzzles
     this.input.keyboard?.on('keydown-E', () => {
       console.log('[DIAGNOSTIC] E key pressed, gameMode:', this.gameMode);
-      if (this.gameMode !== 'exploration') return;
+      if (!this.canPlayerMoveAroundAndInteract()) return;
       // If there's a focused target, interact with it
       const focusedTarget = this.interactionCursor?.getCurrentTarget();
       if (focusedTarget) {
@@ -1598,7 +1602,7 @@ export class OverworldScene extends Phaser.Scene {
       console.log('[DIAGNOSTIC] pointerdown handler called, gameMode:', this.gameMode, 'worldPos:', pointer.worldX.toFixed(0), pointer.worldY.toFixed(0));
 
       // Only handle clicks in exploration mode
-      if (this.gameMode !== 'exploration') {
+      if (!this.canPlayerMoveAroundAndInteract()) {
         console.log('[DIAGNOSTIC] Ignoring click - not in exploration mode');
         return;
       }
@@ -1676,7 +1680,7 @@ export class OverworldScene extends Phaser.Scene {
     // Add pointer move handler for continuous movement while held
     this.pointerMoveHandler = (pointer: Phaser.Input.Pointer) => {
       // Only update destination if pointer is held and in exploration mode
-      if (!this.isPointerHeld || this.gameMode !== 'exploration') {
+      if (!this.isPointerHeld || !this.canPlayerMoveAroundAndInteract()) {
         return;
       }
 

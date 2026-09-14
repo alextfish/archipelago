@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LoopPath, getClosestCardinalDirection } from '@model/overworld/LoopPath';
+import { LoopPath, PathRoute, getClosestCardinalDirection } from '@model/overworld/LoopPath';
 
 describe('LoopPath', () => {
     it('walks around a closed loop and wraps distances', () => {
@@ -14,6 +14,21 @@ describe('LoopPath', () => {
         expect(path.getPointAt(5)).toEqual({ x: 5, y: 0 });
         expect(path.getPointAt(15)).toEqual({ x: 10, y: 5 });
         expect(path.getPointAt(45)).toEqual({ x: 5, y: 0 });
+    });
+
+    describe('PathRoute', () => {
+        it('can clamp travel along a one-way path', () => {
+            const path = new PathRoute([
+                { x: 0, y: 0 },
+                { x: 10, y: 0 },
+                { x: 20, y: 0 },
+            ], 'one-way');
+
+            expect(path.getTotalLength()).toBe(20);
+            expect(path.getPointAt(-5)).toEqual({ x: 0, y: 0 });
+            expect(path.getPointAt(8)).toEqual({ x: 8, y: 0 });
+            expect(path.getPointAt(25)).toEqual({ x: 20, y: 0 });
+        });
     });
 
     it('projects a nearby point onto the closest segment', () => {

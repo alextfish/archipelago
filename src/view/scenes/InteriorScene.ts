@@ -269,18 +269,14 @@ export class InteriorScene extends Phaser.Scene {
     update(_time: number, delta: number): void {
         this.npcSpriteController?.update(
             delta,
-            !this.isSceneTransitioning && this.gameMode === 'exploration',
+            this.canPlayerMoveAroundAndInteract(),
         );
 
         if (this.player) {
             this.player.setDepth(this.player.y);
         }
 
-        if (this.isSceneTransitioning) {
-            return;
-        }
-
-        if (this.gameMode !== 'exploration') {
+        if (!this.canPlayerMoveAroundAndInteract()) {
             return;
         }
 
@@ -773,7 +769,7 @@ export class InteriorScene extends Phaser.Scene {
 
     private setupPointerInput(): void {
         this.pointerDownHandler = (pointer: Phaser.Input.Pointer) => {
-            if (!this.playerController || this.gameMode !== 'exploration' || this.isSceneTransitioning) return;
+            if (!this.playerController || !this.canPlayerMoveAroundAndInteract()) return;
 
             this.isPointerHeld = true;
             const { x: worldX, y: worldY } = { x: pointer.worldX, y: pointer.worldY };
@@ -807,7 +803,7 @@ export class InteriorScene extends Phaser.Scene {
         };
 
         this.pointerMoveHandler = (pointer: Phaser.Input.Pointer) => {
-            if (!this.isPointerHeld || !this.playerController || !pointer.isDown) return;
+            if (!this.isPointerHeld || !this.playerController || !pointer.isDown || !this.canPlayerMoveAroundAndInteract()) return;
             this.playerController.setTargetPosition(pointer.worldX, pointer.worldY);
         };
 
@@ -819,7 +815,7 @@ export class InteriorScene extends Phaser.Scene {
     }
 
     private onInteractKey(): void {
-        if (this.isSceneTransitioning || this.gameMode !== 'exploration') {
+        if (!this.canPlayerMoveAroundAndInteract()) {
             return;
         }
 
@@ -853,6 +849,10 @@ export class InteriorScene extends Phaser.Scene {
             default:
                 break;
         }
+    }
+
+    private canPlayerMoveAroundAndInteract(): boolean {
+        return !this.isSceneTransitioning && this.gameMode === 'exploration';
     }
 
     // ── Conversation handling (mirrors OverworldScene) ────────────────────────

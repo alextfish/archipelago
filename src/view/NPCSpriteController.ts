@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { NPC } from '@model/conversation/NPC';
 import { NPCSeriesState } from '@model/conversation/NPCSeriesState';
 import { NPCAppearanceRegistry } from '@model/conversation/NPCAppearanceRegistry';
-import { LoopPath, getClosestCardinalDirection, type CardinalDirection, type PathPoint } from '@model/overworld/LoopPath';
+import { PathRoute, getClosestCardinalDirection, type CardinalDirection, type PathPoint } from '@model/overworld/LoopPath';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import type { SeriesManager } from '@model/series/SeriesFactory';
 import type { GridToWorldMapper } from '@view/GridToWorldMapper';
@@ -21,14 +21,14 @@ interface MovingNPC {
     appearanceId: string;
     sprite: Phaser.GameObjects.Sprite;
     interactable: Interactable;
-    path: LoopPath;
+    path: PathRoute;
     distance: number;
     speedPixelsPerSecond: number;
     direction: CardinalDirection;
 }
 
 interface MovingNPCSeed {
-    path: LoopPath;
+    path: PathRoute;
     distance: number;
     speedPixelsPerSecond: number;
     direction: CardinalDirection;
@@ -60,7 +60,7 @@ export class NPCSpriteController {
     /** Icon image (incomplete / complete badge) for each NPC, keyed by NPC ID. */
     private readonly npcIcons: Map<string, Phaser.GameObjects.Image> = new Map();
     /** Named path loops loaded from Tiled `paths` object layers. */
-    private readonly paths: Map<string, LoopPath> = new Map();
+    private readonly paths: Map<string, PathRoute> = new Map();
     /** Active overworld NPCs currently moving along a Tiled path. */
     private readonly movingNPCs: MovingNPC[] = [];
     /** Series state for every NPC (null series for NPCs without a series). */
@@ -286,9 +286,11 @@ export class NPCSpriteController {
             }
 
             if (movingNPC.speedPixelsPerSecond > 0) {
-                movingNPC.distance = movingNPC.path.wrapDistance(
+                movingNPC.distance = movingNPC.path.normaliseDistance(
                     movingNPC.distance + (movingNPC.speedPixelsPerSecond * delta) / 1000
                 );
+            } else {
+                movingNPC.distance = movingNPC.path.normaliseDistance(movingNPC.distance);
             }
 
             const segmentDelta = movingNPC.path.getSegmentDeltaAt(movingNPC.distance);
@@ -310,7 +312,7 @@ export class NPCSpriteController {
                 if (!points) continue;
 
                 try {
-                    this.paths.set(obj.name, new LoopPath(points));
+                    this.paths.set(obj.name, new PathRoute(points, 'loop'));
                 } catch (error) {
                     console.warn(`Failed to load NPC path "${obj.name}" from ${layerInfo.fullPath}:`, error);
                 }

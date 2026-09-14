@@ -3,6 +3,8 @@ export interface PathPoint {
     y: number;
 }
 
+export type PathTraversalMode = 'loop' | 'one-way';
+
 interface PathSegment {
     start: PathPoint;
     end: PathPoint;
@@ -15,21 +17,24 @@ interface PathSegment {
 export type CardinalDirection = 'up' | 'down' | 'left' | 'right';
 
 /**
- * Closed loop path made of straight line segments.
+ * Path made of straight line segments.
  */
-export class LoopPath {
+export class PathRoute {
     private readonly segments: PathSegment[];
     private readonly totalLength: number;
+    private readonly traversalMode: PathTraversalMode;
 
-    constructor(points: readonly PathPoint[]) {
+    constructor(points: readonly PathPoint[], traversalMode: PathTraversalMode = 'loop') {
         if (points.length < 2) {
-            throw new Error('LoopPath requires at least 2 points');
+            throw new Error('PathRoute requires at least 2 points');
         }
 
         this.segments = [];
+        this.traversalMode = traversalMode;
         let totalLength = 0;
 
-        for (let i = 0; i < points.length; i++) {
+        const lastIndex = traversalMode === 'loop' ? points.length : points.length - 1;
+        for (let i = 0; i < lastIndex; i++) {
             const start = points[i];
             const end = points[(i + 1) % points.length];
             const deltaX = end.x - start.x;
@@ -49,7 +54,7 @@ export class LoopPath {
         }
 
         if (totalLength === 0) {
-            throw new Error('LoopPath requires at least one non-zero segment');
+            throw new Error('PathRoute requires at least one non-zero segment');
         }
 
         this.totalLength = totalLength;
@@ -59,7 +64,10 @@ export class LoopPath {
         return this.totalLength;
     }
 
-    wrapDistance(distance: number): number {
+    normaliseDistance(distance: number): number {
+        if (this.traversalMode === 'one-way') {
+            return Math.max(0, Math.min(this.totalLength, distance));
+        }
         return ((distance % this.totalLength) + this.totalLength) % this.totalLength;
     }
 
@@ -103,14 +111,14 @@ export class LoopPath {
     }
 
     private getSegmentAt(distance: number): { segment: PathSegment; offset: number } {
-        const wrappedDistance = this.wrapDistance(distance);
+        const normalisedDistance = this.normaliseDistance(distance);
 
         for (const segment of this.segments) {
             const segmentEndDistance = segment.startDistance + segment.length;
-            if (wrappedDistance < segmentEndDistance) {
+            if (normalisedDistance < segmentEndDistance) {
                 return {
                     segment,
-                    offset: wrappedDistance - segment.startDistance,
+                    offset: normalisedDistance - segment.startDistance,
                 };
             }
         }
@@ -120,6 +128,12 @@ export class LoopPath {
             segment: lastSegment,
             offset: lastSegment.length,
         };
+    }
+}
+
+export class LoopPath extends PathRoute {
+    constructor(points: readonly PathPoint[]) {
+        super(points, 'loop');
     }
 }
 
