@@ -150,9 +150,9 @@ export class OverworldScene extends Phaser.Scene {
     this.seriesManager = new SeriesManager(seriesFactory, progressStore);
   }
 
-  /** Canonical gate for exploration-time movement and interaction checks in the overworld. */
+  /** Canonical gate for overworld exploration-time movement/input; disabled player control also blocks interaction. */
   private canPlayerMoveAroundAndInteract(): boolean {
-    return this.gameMode === 'exploration';
+    return this.gameMode === 'exploration' && (this.playerController?.isEnabled() ?? false);
   }
 
   preload() {
