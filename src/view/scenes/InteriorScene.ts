@@ -730,6 +730,16 @@ export class InteriorScene extends Phaser.Scene {
         this.npcSpriteController.registerAnimations();
 
         const npcsLayers = TiledLayerUtils.findObjectLayersByName(this.tiledMapData.layers, 'npcs');
+        this.loadNPCLayers(npcsLayers);
+
+        if (this.npcs.length > 0) {
+            this.npcSpriteController.loadNPCSeries(this.npcs);
+        }
+    }
+
+    private loadNPCLayers(npcsLayers: ReturnType<typeof TiledLayerUtils.findObjectLayersByName>): void {
+        if (!this.npcSpriteController) return;
+
         for (const layerInfo of npcsLayers) {
             let layer = this.map.getObjectLayer(layerInfo.fullPath);
             if (!layer) layer = this.map.getObjectLayer(layerInfo.name);
@@ -740,10 +750,6 @@ export class InteriorScene extends Phaser.Scene {
                 layerInfo.offsetX,
                 layerInfo.offsetY,
             );
-        }
-
-        if (this.npcs.length > 0) {
-            this.npcSpriteController.loadNPCSeries(this.npcs);
         }
     }
 

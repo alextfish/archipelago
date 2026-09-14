@@ -1044,23 +1044,7 @@ export class OverworldScene extends Phaser.Scene {
     } else {
       console.log(`Found ${npcsLayers.length} NPC layers`);
 
-      for (const layerInfo of npcsLayers) {
-        let npcsLayer = this.map.getObjectLayer(layerInfo.fullPath);
-        if (!npcsLayer) {
-          npcsLayer = this.map.getObjectLayer(layerInfo.name);
-        }
-        if (!npcsLayer) {
-          console.warn(`Failed to get object layer: ${layerInfo.fullPath} or ${layerInfo.name}`);
-          continue;
-        }
-        console.log(`Loading NPCs from layer: ${layerInfo.fullPath}`);
-        this.npcSpriteController.loadNPCsFromLayerWithOffset(
-          npcsLayer,
-          layerInfo.fullPath,
-          layerInfo.offsetX,
-          layerInfo.offsetY,
-        );
-      }
+      this.loadNPCLayers(npcsLayers);
 
       // Load series for NPCs and create icons (once after all NPCs loaded)
       this.npcSpriteController.loadNPCSeries(this.npcs);
@@ -1074,6 +1058,28 @@ export class OverworldScene extends Phaser.Scene {
 
     // Load collectibles from "collectibles" object layers
     this.collectibleManager.loadCollectibles();
+  }
+
+  private loadNPCLayers(npcsLayers: ReturnType<typeof TiledLayerUtils.findObjectLayersByName>): void {
+    if (!this.npcSpriteController) return;
+
+    for (const layerInfo of npcsLayers) {
+      let npcsLayer = this.map.getObjectLayer(layerInfo.fullPath);
+      if (!npcsLayer) {
+        npcsLayer = this.map.getObjectLayer(layerInfo.name);
+      }
+      if (!npcsLayer) {
+        console.warn(`Failed to get object layer: ${layerInfo.fullPath} or ${layerInfo.name}`);
+        continue;
+      }
+      console.log(`Loading NPCs from layer: ${layerInfo.fullPath}`);
+      this.npcSpriteController.loadNPCsFromLayerWithOffset(
+        npcsLayer,
+        layerInfo.fullPath,
+        layerInfo.offsetX,
+        layerInfo.offsetY,
+      );
+    }
   }
 
 
