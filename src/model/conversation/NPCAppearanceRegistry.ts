@@ -106,6 +106,35 @@ export class NPCAppearanceRegistry {
             },
         });
 
+        // Town children appearances
+        this.appearances.set('Townfolk-Child-M-002 light', {
+            spriteKey: 'Townfolk-Child-M-002 light',
+            faceTextureOverrides: {
+                neutral: 'faces/Townfolk-Child-M-002 light',
+                happy: 'faces/Townfolk-Child-M-002 light',
+                sad: 'faces/Townfolk-Child-M-002 light',
+            },
+            expressions: {
+                neutral: 0,
+                happy: 0,
+                sad: 0,
+            },
+        });
+
+        this.appearances.set('Townfolk-Child-F-001 dark', {
+            spriteKey: 'Townfolk-Child-F-001 dark',
+            faceTextureOverrides: {
+                neutral: 'faces/Townfolk-Child-F-001 dark',
+                happy: 'faces/Townfolk-Child-F-001 dark',
+                sad: 'faces/Townfolk-Child-F-001 dark',
+            },
+            expressions: {
+                neutral: 0,
+                happy: 0,
+                sad: 0,
+            },
+        });
+
         // Pirate-M appearance (IslandPassingBridgeCountConstraint, IslandDirectionalBridgeConstraint)
         this.appearances.set('Pirate-M', {
             spriteKey: 'Pirate-M',

@@ -58,6 +58,8 @@ export function loadNPCSprites(loader: Phaser.Loader.LoaderPlugin): void {
     sheet('Pirate-M', 'resources/sprites/Pirate-M.png'); // IslandPassingBridgeCountConstraint, IslandDirectionalBridgeConstraint
     sheet('Pirate-F', 'resources/sprites/Pirate-F.png'); // IslandVisibilityConstraint
     sheet('Lyuba', 'resources/sprites/Lyuba.png');
+    sheet('Townfolk-Child-M-002 light', 'resources/sprites/Townfolk-Child-M-002 light.png');
+    sheet('Townfolk-Child-F-001 dark', 'resources/sprites/Townfolk-Child-F-001 dark.png');
     sheet('Cultist-01', 'resources/sprites/Cultist-01.png');
     sheet('Cultist-02', 'resources/sprites/Cultist-02.png');
     sheet('Cultist-03', 'resources/sprites/Cultist-03.png');
@@ -97,6 +99,8 @@ export function loadNPCSprites(loader: Phaser.Loader.LoaderPlugin): void {
     loader.image('faces/Yan neutral', 'resources/sprites/faces/Yan_face_casual_neutral.png');
     loader.image('faces/Yan happy', 'resources/sprites/faces/Yan_face_casual_happy.png');
     loader.image('faces/Yan frown', 'resources/sprites/faces/Yan_face_casual_dislike.png');
+    loader.image('faces/Townfolk-Child-M-002 light', 'resources/sprites/faces/Townfolk-Child-M-002 light.png');
+    loader.image('faces/Townfolk-Child-F-001 dark', 'resources/sprites/faces/Townfolk-Child-F-001 dark.png');
     loader.image('faces/Cultist-01 neutral', 'resources/sprites/faces/Cultist-01.png');
     loader.image('faces/Cultist-02 neutral', 'resources/sprites/faces/Cultist-02.png');
     loader.image('faces/Cultist-03 neutral', 'resources/sprites/faces/Cultist-03.png');

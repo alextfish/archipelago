@@ -1,0 +1,14 @@
+{
+  "id": "child2",
+  "npcId": "child2",
+  "start": "intro",
+  "nodes": {
+    "intro": {
+      "npc": {
+        "expression": "happy",
+        "glyphs": "you no catch me exclamation"
+      },
+      "end": true
+    }
+  }
+}

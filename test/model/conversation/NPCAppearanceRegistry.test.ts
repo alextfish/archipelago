@@ -12,6 +12,8 @@ describe('NPCAppearanceRegistry', () => {
 
             expect(registry.hasAppearance('sailorNS')).toBe(true);
             expect(registry.hasAppearance('sailorEW')).toBe(true);
+            expect(registry.hasAppearance('Townfolk-Child-M-002 light')).toBe(true);
+            expect(registry.hasAppearance('Townfolk-Child-F-001 dark')).toBe(true);
         });
 
         it('should not have unknown appearances', () => {
@@ -99,6 +101,17 @@ describe('NPCAppearanceRegistry', () => {
             const appearance = registry.getAppearance('sailorNS');
             expect(appearance.spriteKey).toBe('newSailor');
             expect(appearance.expressions.neutral).toBe(10);
+        });
+    });
+
+    describe('getFaceTextureKey', () => {
+        it('should return the child portrait override for all supported expressions', () => {
+            const registry = new NPCAppearanceRegistry();
+
+            expect(registry.getFaceTextureKey('Townfolk-Child-M-002 light', 'neutral')).toBe('faces/Townfolk-Child-M-002 light');
+            expect(registry.getFaceTextureKey('Townfolk-Child-M-002 light', 'happy')).toBe('faces/Townfolk-Child-M-002 light');
+            expect(registry.getFaceTextureKey('Townfolk-Child-M-002 light', 'sad')).toBe('faces/Townfolk-Child-M-002 light');
+            expect(registry.getFaceTextureKey('Townfolk-Child-F-001 dark', 'happy')).toBe('faces/Townfolk-Child-F-001 dark');
         });
     });
 });
