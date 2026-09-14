@@ -30,8 +30,8 @@ describe('NPCAppearanceRegistry', () => {
 
             expect(appearance.spriteKey).toBe('sailorNS');
             expect(appearance.expressions.neutral).toBe(0);
-            expect(appearance.expressions.happy).toBe(1);
-            expect(appearance.expressions.sad).toBe(2);
+            expect(appearance.expressions.happy).toBe(2);
+            expect(appearance.expressions.sad).toBe(1);
         });
 
         it('should return correct appearance data for sailorEW', () => {
@@ -40,8 +40,8 @@ describe('NPCAppearanceRegistry', () => {
 
             expect(appearance.spriteKey).toBe('sailorEW');
             expect(appearance.expressions.neutral).toBe(0);
-            expect(appearance.expressions.happy).toBe(1);
-            expect(appearance.expressions.sad).toBe(2);
+            expect(appearance.expressions.happy).toBe(2);
+            expect(appearance.expressions.sad).toBe(1);
         });
 
         it('should throw error for unknown appearance', () => {
@@ -110,8 +110,25 @@ describe('NPCAppearanceRegistry', () => {
 
             expect(registry.getFaceTextureKey('Townfolk-Child-M-002 light', 'neutral')).toBe('faces/Townfolk-Child-M-002 light');
             expect(registry.getFaceTextureKey('Townfolk-Child-M-002 light', 'happy')).toBe('faces/Townfolk-Child-M-002 light');
-            expect(registry.getFaceTextureKey('Townfolk-Child-M-002 light', 'sad')).toBe('faces/Townfolk-Child-M-002 light');
+            expect(registry.getFaceTextureKey('Townfolk-Child-M-002 light', 'frown')).toBe('faces/Townfolk-Child-M-002 light');
             expect(registry.getFaceTextureKey('Townfolk-Child-F-001 dark', 'happy')).toBe('faces/Townfolk-Child-F-001 dark');
+        });
+    });
+
+    describe('getExpressionFrame', () => {
+        it('should map happy and frown to the conventional NPC spritesheet frames', () => {
+            const registry = new NPCAppearanceRegistry();
+
+            expect(registry.getExpressionFrame('sailorNS', 'neutral')).toBe(0);
+            expect(registry.getExpressionFrame('sailorNS', 'happy')).toBe(2);
+            expect(registry.getExpressionFrame('sailorNS', 'frown')).toBe(1);
+        });
+
+        it('should fall back to neutral for appearances without explicit expression frames', () => {
+            const registry = new NPCAppearanceRegistry();
+
+            expect(registry.getExpressionFrame('Townfolk-Child-M-002 light', 'happy')).toBe(0);
+            expect(registry.getExpressionFrame('Townfolk-Child-F-001 dark', 'sad')).toBe(0);
         });
     });
 });

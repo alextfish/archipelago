@@ -9,15 +9,16 @@ export interface NPCAnimationFrame {
     duration: number; // milliseconds
 }
 
+export type NPCExpressionName = 'neutral' | 'happy' | 'sad';
+
+type NPCExpressionFrames = Partial<Record<NPCExpressionName, string | number>>;
+
 export interface NPCAppearance {
     spriteKey: string;         // Phaser asset key for sprite sheet
     faceId?: string;           // Override for face texture lookup (e.g. 'Yan' for 'Farmer')
-    faceTextureOverrides?: Partial<Record<'neutral' | 'happy' | 'sad', string>>;
-    expressions: {
-        neutral: string | number;  // Frame name or index
-        happy: string | number;
-        sad: string | number;
-    };
+    defaultFaceTexture?: string;
+    faceTextureOverrides?: Partial<Record<NPCExpressionName, string>>;
+    expressions?: NPCExpressionFrames;
     /** Idle animation frames to loop when the NPC has `animate: true`. Omit for static sprites. */
     idleAnimation?: NPCAnimationFrame[];
 }
@@ -39,8 +40,8 @@ export class NPCAppearanceRegistry {
             spriteKey: 'sailorNS',
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
         });
 
@@ -49,8 +50,8 @@ export class NPCAppearanceRegistry {
             spriteKey: 'sailorEW',
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
         });
 
@@ -59,8 +60,8 @@ export class NPCAppearanceRegistry {
             spriteKey: 'Mage4',
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
         });
 
@@ -69,8 +70,8 @@ export class NPCAppearanceRegistry {
             spriteKey: 'Lyuba',
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
         });
 
@@ -79,8 +80,8 @@ export class NPCAppearanceRegistry {
             spriteKey: 'Ruby',
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
         });
 
@@ -90,8 +91,8 @@ export class NPCAppearanceRegistry {
             faceId: 'Evan',
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
         });
 
@@ -101,38 +102,20 @@ export class NPCAppearanceRegistry {
             faceId: 'Yan',
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
         });
 
         // Town children appearances
         this.appearances.set('Townfolk-Child-M-002 light', {
             spriteKey: 'Townfolk-Child-M-002 light',
-            faceTextureOverrides: {
-                neutral: 'faces/Townfolk-Child-M-002 light',
-                happy: 'faces/Townfolk-Child-M-002 light',
-                sad: 'faces/Townfolk-Child-M-002 light',
-            },
-            expressions: {
-                neutral: 0,
-                happy: 0,
-                sad: 0,
-            },
+            defaultFaceTexture: 'faces/Townfolk-Child-M-002 light',
         });
 
         this.appearances.set('Townfolk-Child-F-001 dark', {
             spriteKey: 'Townfolk-Child-F-001 dark',
-            faceTextureOverrides: {
-                neutral: 'faces/Townfolk-Child-F-001 dark',
-                happy: 'faces/Townfolk-Child-F-001 dark',
-                sad: 'faces/Townfolk-Child-F-001 dark',
-            },
-            expressions: {
-                neutral: 0,
-                happy: 0,
-                sad: 0,
-            },
+            defaultFaceTexture: 'faces/Townfolk-Child-F-001 dark',
         });
 
         // Pirate-M appearance (IslandPassingBridgeCountConstraint, IslandDirectionalBridgeConstraint)
@@ -140,8 +123,8 @@ export class NPCAppearanceRegistry {
             spriteKey: 'Pirate-M',
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
         });
 
@@ -150,8 +133,8 @@ export class NPCAppearanceRegistry {
             spriteKey: 'Pirate-F',
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
             idleAnimation: [
                 { frame: 11, duration: 200 },
@@ -165,8 +148,8 @@ export class NPCAppearanceRegistry {
             spriteKey: 'Cultist-01',
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
         });
 
@@ -174,8 +157,8 @@ export class NPCAppearanceRegistry {
             spriteKey: 'Cultist-02',
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
         });
 
@@ -183,8 +166,8 @@ export class NPCAppearanceRegistry {
             spriteKey: 'Cultist-03',
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
         });
 
@@ -196,8 +179,8 @@ export class NPCAppearanceRegistry {
             },
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
         });
 
@@ -209,8 +192,8 @@ export class NPCAppearanceRegistry {
             },
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
         });
 
@@ -222,8 +205,8 @@ export class NPCAppearanceRegistry {
             },
             expressions: {
                 neutral: 0,
-                happy: 1,
-                sad: 2,
+                happy: 2,
+                sad: 1,
             },
         });
     }
@@ -278,6 +261,17 @@ export class NPCAppearanceRegistry {
     }
 
     /**
+     * Resolve a spritesheet frame for a conversation expression.
+     * Falls back to neutral when an appearance does not define a frame.
+     */
+    getExpressionFrame(appearanceId: string, expression: string): string | number {
+        const appearance = this.getAppearance(appearanceId);
+        const expressionKey = this.getSpriteExpressionName(expression);
+
+        return appearance.expressions?.[expressionKey] ?? appearance.expressions?.neutral ?? 0;
+    }
+
+    /**
      * Get the high-resolution face texture key for a given appearance and expression.
      * Returns the texture key in format "faces/{appearanceId} {expression}" if it exists,
      * otherwise returns undefined (fallback to sprite-based portrait).
@@ -288,15 +282,32 @@ export class NPCAppearanceRegistry {
      */
     getFaceTextureKey(appearanceId: string, expression: string): string | undefined {
         // Use faceId override if present (e.g. Farmer → Yan, Fisherman → Evan)
-        const appearance = this.appearances.get(appearanceId);
-        const expressionKey = expression as 'neutral' | 'happy' | 'sad';
+        const appearance = this.getAppearance(appearanceId);
+        const expressionKey = this.getSpriteExpressionName(expression);
         const overrideKey = appearance?.faceTextureOverrides?.[expressionKey];
         if (overrideKey) {
             return overrideKey;
         }
 
+        if (appearance.defaultFaceTexture) {
+            return appearance.defaultFaceTexture;
+        }
+
         const faceId = appearance?.faceId ?? appearanceId;
         const faceKey = `faces/${faceId} ${expression}`;
         return faceKey;
+    }
+
+    private getSpriteExpressionName(expression: string): NPCExpressionName {
+        switch (expression) {
+            case 'happy':
+                return 'happy';
+            case 'sad':
+            case 'frown':
+                return 'sad';
+            case 'neutral':
+            default:
+                return 'neutral';
+        }
     }
 }

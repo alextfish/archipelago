@@ -180,10 +180,11 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
 
         // Update NPC portrait
         if (this.npcPortrait && this.currentNPC) {
-            let frameKey = customFrame;
+            let textureKey = customFrame;
+            let frame: string | number = 0;
 
             // If no custom frame provided, try to get face texture from appearance registry
-            if (!frameKey) {
+            if (!textureKey) {
                 const faceKey = this.appearanceRegistry.getFaceTextureKey(
                     this.currentNPC.appearanceId,
                     expression
@@ -191,12 +192,16 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
 
                 // Only use face texture if it exists
                 if (faceKey && this.textures.exists(faceKey)) {
-                    frameKey = faceKey;
+                    textureKey = faceKey;
+                } else {
+                    const appearance = this.appearanceRegistry.getAppearance(this.currentNPC.appearanceId);
+                    textureKey = appearance.spriteKey;
+                    frame = this.appearanceRegistry.getExpressionFrame(this.currentNPC.appearanceId, expression);
                 }
             }
 
-            if (frameKey) {
-                this.updatePortraitFrame(this.npcPortrait, frameKey);
+            if (textureKey) {
+                this.updatePortraitFrame(this.npcPortrait, textureKey, frame);
             }
         }
     }
@@ -473,7 +478,7 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         // Create NPC portrait (top left)
         this.npcPortrait = this.createPortrait(
             appearance.spriteKey,
-            0, // neutral expression
+            this.appearanceRegistry.getExpressionFrame(npc.appearanceId, 'neutral'),
             this.PORTRAIT_PADDING,
             this.PORTRAIT_PADDING
         );
@@ -491,7 +496,7 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     /**
      * Create a single portrait sprite with border
      */
-    private createPortrait(spriteKey: string, frame: number, x: number, y: number): Phaser.GameObjects.Container {
+    private createPortrait(spriteKey: string, frame: string | number, x: number, y: number): Phaser.GameObjects.Container {
         const container = this.add.container(x, y);
 
         // Create border background (slightly larger than sprite)
@@ -524,11 +529,11 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     /**
      * Update portrait to use a different sprite frame
      */
-    private updatePortraitFrame(portrait: Phaser.GameObjects.Container, spriteKey: string): void {
+    private updatePortraitFrame(portrait: Phaser.GameObjects.Container, spriteKey: string, frame: string | number = 0): void {
         // Get the sprite from the container (index 1, after the border)
         const sprite = portrait.getAt(1) as Phaser.GameObjects.Sprite;
         if (sprite) {
-            sprite.setTexture(spriteKey, 0);
+            sprite.setTexture(spriteKey, frame);
         }
     }
 }
