@@ -857,6 +857,7 @@ export class InteriorScene extends Phaser.Scene {
         }
     }
 
+    /** Canonical gate for interior movement/input; scene transitions keep this disabled even in exploration mode. */
     private canPlayerMoveAroundAndInteract(): boolean {
         return !this.isSceneTransitioning && this.gameMode === 'exploration';
     }
