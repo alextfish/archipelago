@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import { StrutBridge } from '@model/puzzle/StrutBridge';
+import type { CardinalDirection } from '@model/overworld/LoopPath';
 import type { GridToWorldMapper } from './GridToWorldMapper';
 import { NPCAppearanceRegistry } from '@model/conversation/NPCAppearanceRegistry';
 
@@ -10,6 +11,13 @@ export const NPC_FRAME = {
     FROWN: 1,
     HAPPY: 2,
 } as const;
+
+const NPC_DIRECTION_FRAMES: Record<CardinalDirection, { start: number; end: number; idle: number }> = {
+    down: { start: 0, end: 2, idle: 1 },
+    left: { start: 3, end: 5, idle: 4 },
+    up: { start: 6, end: 8, idle: 7 },
+    right: { start: 9, end: 11, idle: 10 },
+};
 
 /**
  * Returns the base sprite key (texture atlas key) to use for the NPC that
@@ -173,9 +181,9 @@ export function updateStrutBridgeNPCSprites(
 export function registerNPCAnimations(scene: Phaser.Scene, registry: NPCAppearanceRegistry): void {
     for (const id of registry.getAllAppearanceIDs()) {
         const frames = registry.getIdleAnimation(id);
+        const appearance = registry.getAppearance(id);
         if (!frames) continue;
 
-        const appearance = registry.getAppearance(id);
         const key = `${appearance.spriteKey}-idle`;
         if (scene.anims.exists(key)) continue;
 
@@ -190,6 +198,24 @@ export function registerNPCAnimations(scene: Phaser.Scene, registry: NPCAppearan
             repeat: -1,
         });
     }
+
+    for (const id of registry.getAllAppearanceIDs()) {
+        const appearance = registry.getAppearance(id);
+        const texture = scene.textures.get(appearance.spriteKey);
+        if (!texture || !texture.getFrameNames().some((frameName) => Number(frameName) === 11)) continue;
+
+        for (const [direction, frameInfo] of Object.entries(NPC_DIRECTION_FRAMES) as Array<[CardinalDirection, { start: number; end: number; idle: number }]>) {
+            const walkKey = `${appearance.spriteKey}-walk-${direction}`;
+            if (!scene.anims.exists(walkKey)) {
+                scene.anims.create({
+                    key: walkKey,
+                    frames: scene.anims.generateFrameNumbers(appearance.spriteKey, { start: frameInfo.start, end: frameInfo.end }),
+                    frameRate: 8,
+                    repeat: -1,
+                });
+            }
+        }
+    }
 }
 
 /**
@@ -201,4 +227,17 @@ export function getNPCIdleAnimationKey(appearanceId: string, registry: NPCAppear
     if (!frames) return undefined;
     const appearance = registry.getAppearance(appearanceId);
     return `${appearance.spriteKey}-idle`;
+}
+
+export function getNPCDirectionalWalkAnimationKey(
+    appearanceId: string,
+    direction: CardinalDirection,
+    registry: NPCAppearanceRegistry,
+): string {
+    const appearance = registry.getAppearance(appearanceId);
+    return `${appearance.spriteKey}-walk-${direction}`;
+}
+
+export function getNPCDirectionalIdleFrame(direction: CardinalDirection): number {
+    return NPC_DIRECTION_FRAMES[direction].idle;
 }

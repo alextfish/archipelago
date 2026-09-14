@@ -150,6 +150,11 @@ export class OverworldScene extends Phaser.Scene {
     this.seriesManager = new SeriesManager(seriesFactory, progressStore);
   }
 
+  /** Canonical gate for overworld exploration-time movement/input; disabled player control also blocks interaction. */
+  private canPlayerMoveAroundAndInteract(): boolean {
+    return this.gameMode === 'exploration' && (this.playerController?.isEnabled() ?? false);
+  }
+
   preload() {
     // Load external tilesets (these reference images outside the map file)
     this.load.image('beachTileset', 'resources/tilesets/beach.png');
@@ -1040,18 +1045,7 @@ export class OverworldScene extends Phaser.Scene {
     } else {
       console.log(`Found ${npcsLayers.length} NPC layers`);
 
-      for (const layerInfo of npcsLayers) {
-        let npcsLayer = this.map.getObjectLayer(layerInfo.fullPath);
-        if (!npcsLayer) {
-          npcsLayer = this.map.getObjectLayer(layerInfo.name);
-        }
-        if (!npcsLayer) {
-          console.warn(`Failed to get object layer: ${layerInfo.fullPath} or ${layerInfo.name}`);
-          continue;
-        }
-        console.log(`Loading NPCs from layer: ${layerInfo.fullPath}`);
-        this.npcSpriteController.loadNPCsFromLayer(npcsLayer, layerInfo.fullPath);
-      }
+      this.loadNPCLayers(npcsLayers);
 
       // Load series for NPCs and create icons (once after all NPCs loaded)
       this.npcSpriteController.loadNPCSeries(this.npcs);
@@ -1065,6 +1059,28 @@ export class OverworldScene extends Phaser.Scene {
 
     // Load collectibles from "collectibles" object layers
     this.collectibleManager.loadCollectibles();
+  }
+
+  private loadNPCLayers(npcsLayers: ReturnType<typeof TiledLayerUtils.findObjectLayersByName>): void {
+    if (!this.npcSpriteController) return;
+
+    for (const layerInfo of npcsLayers) {
+      let npcsLayer = this.map.getObjectLayer(layerInfo.fullPath);
+      if (!npcsLayer) {
+        npcsLayer = this.map.getObjectLayer(layerInfo.name);
+      }
+      if (!npcsLayer) {
+        console.warn(`Failed to get object layer: ${layerInfo.fullPath} or ${layerInfo.name}`);
+        continue;
+      }
+      console.log(`Loading NPCs from layer: ${layerInfo.fullPath}`);
+      this.npcSpriteController.loadNPCsFromLayerWithOffset(
+        npcsLayer,
+        layerInfo.fullPath,
+        layerInfo.offsetX,
+        layerInfo.offsetY,
+      );
+    }
   }
 
 
@@ -1354,6 +1370,7 @@ export class OverworldScene extends Phaser.Scene {
 
   update(_time: number, delta: number) {
     this.tileAnimationManager?.update(delta);
+    this.npcSpriteController?.update(delta, this.canPlayerMoveAroundAndInteract());
 
     // Update player depth for Y-sorting so sprites above/below sort correctly
     if (this.player) {
@@ -1361,7 +1378,7 @@ export class OverworldScene extends Phaser.Scene {
     }
 
     // Only handle player movement in exploration mode
-    if (this.gameMode === 'exploration' && this.playerController) {
+    if (this.canPlayerMoveAroundAndInteract() && this.playerController) {
       this.playerController.update();
       this.overworldHUD?.setPlayerLayerDisplay(this.playerController.getPlayerLayer());
 
@@ -1573,7 +1590,7 @@ export class OverworldScene extends Phaser.Scene {
     // Add E key for interacting with focused target or entering puzzles
     this.input.keyboard?.on('keydown-E', () => {
       console.log('[DIAGNOSTIC] E key pressed, gameMode:', this.gameMode);
-      if (this.gameMode !== 'exploration') return;
+      if (!this.canPlayerMoveAroundAndInteract()) return;
       // If there's a focused target, interact with it
       const focusedTarget = this.interactionCursor?.getCurrentTarget();
       if (focusedTarget) {
@@ -1592,7 +1609,7 @@ export class OverworldScene extends Phaser.Scene {
       console.log('[DIAGNOSTIC] pointerdown handler called, gameMode:', this.gameMode, 'worldPos:', pointer.worldX.toFixed(0), pointer.worldY.toFixed(0));
 
       // Only handle clicks in exploration mode
-      if (this.gameMode !== 'exploration') {
+      if (!this.canPlayerMoveAroundAndInteract()) {
         console.log('[DIAGNOSTIC] Ignoring click - not in exploration mode');
         return;
       }
@@ -1602,9 +1619,6 @@ export class OverworldScene extends Phaser.Scene {
         return;
       }
 
-      // Mark pointer as held
-      this.isPointerHeld = true;
-
       // Get world coordinates of the click (accounting for camera position)
       const worldX = pointer.worldX;
       const worldY = pointer.worldY;
@@ -1613,6 +1627,9 @@ export class OverworldScene extends Phaser.Scene {
       if (!this.player || !this.tiledMapData || !this.playerController || !this.interactionCursor) {
         return;
       }
+
+      // Mark pointer as held once we know the scene can process continuous movement.
+      this.isPointerHeld = true;
 
       const playerX = this.player.x;
       const playerY = this.player.y;
@@ -1670,7 +1687,7 @@ export class OverworldScene extends Phaser.Scene {
     // Add pointer move handler for continuous movement while held
     this.pointerMoveHandler = (pointer: Phaser.Input.Pointer) => {
       // Only update destination if pointer is held and in exploration mode
-      if (!this.isPointerHeld || this.gameMode !== 'exploration') {
+      if (!this.isPointerHeld || !this.canPlayerMoveAroundAndInteract()) {
         return;
       }
 

@@ -8,6 +8,10 @@ export interface TiledObjectLayerResult {
     name: string;
     /** Full path including parent group names (e.g. "Beach/npcs") */
     fullPath: string;
+    /** Resolved pixel offset inherited from parent groups and the layer itself. */
+    offsetX: number;
+    /** Resolved pixel offset inherited from parent groups and the layer itself. */
+    offsetY: number;
     /** The raw Tiled layer data object */
     data: any;
 }
@@ -48,21 +52,31 @@ export class TiledLayerUtils {
     static findObjectLayersByName(
         layers: any[],
         suffix: string,
-        parentPath: string = ''
+        parentPath: string = '',
+        parentOffsetX: number = 0,
+        parentOffsetY: number = 0,
     ): TiledObjectLayerResult[] {
         const results: TiledObjectLayerResult[] = [];
 
         for (const layer of layers) {
             const fullPath = parentPath ? `${parentPath}/${layer.name}` : layer.name;
+            const layerOffsetX = parentOffsetX + TiledLayerUtils.getLayerOffset(layer, 'x');
+            const layerOffsetY = parentOffsetY + TiledLayerUtils.getLayerOffset(layer, 'y');
 
             if (layer.name && TiledLayerUtils.getLayerSuffix(layer.name) === suffix && layer.type === 'objectgroup') {
-                results.push({ name: layer.name, fullPath, data: layer });
+                results.push({ name: layer.name, fullPath, offsetX: layerOffsetX, offsetY: layerOffsetY, data: layer });
             }
 
             if (layer.type === 'group' && layer.layers) {
                 // Pass layer.name (not fullPath) to preserve existing path-building behaviour
                 // for nested groups
-                results.push(...TiledLayerUtils.findObjectLayersByName(layer.layers, suffix, layer.name));
+                results.push(...TiledLayerUtils.findObjectLayersByName(
+                    layer.layers,
+                    suffix,
+                    fullPath,
+                    layerOffsetX,
+                    layerOffsetY,
+                ));
             }
         }
 
@@ -145,5 +159,11 @@ export class TiledLayerUtils {
         const idx = tileY * mapWidth + tileX;
         if (idx < 0 || idx >= layerData.length) return 0;
         return layerData[idx] ?? 0;
+    }
+
+    private static getLayerOffset(layer: any, axis: 'x' | 'y'): number {
+        const offsetKey = axis === 'x' ? 'offsetx' : 'offsety';
+        const value = layer?.[offsetKey] ?? layer?.[axis] ?? 0;
+        return typeof value === 'number' ? value : Number(value) || 0;
     }
 }

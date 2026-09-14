@@ -266,16 +266,17 @@ export class InteriorScene extends Phaser.Scene {
         console.log(`[InteriorScene] "${this.mapKey}" created at spawn (${startPos.x}, ${startPos.y})`);
     }
 
-    update(_time: number, _delta: number): void {
+    update(_time: number, delta: number): void {
+        this.npcSpriteController?.update(
+            delta,
+            this.canPlayerMoveAroundAndInteract(),
+        );
+
         if (this.player) {
             this.player.setDepth(this.player.y);
         }
 
-        if (this.isSceneTransitioning) {
-            return;
-        }
-
-        if (this.gameMode !== 'exploration') {
+        if (!this.canPlayerMoveAroundAndInteract()) {
             return;
         }
 
@@ -729,15 +730,26 @@ export class InteriorScene extends Phaser.Scene {
         this.npcSpriteController.registerAnimations();
 
         const npcsLayers = TiledLayerUtils.findObjectLayersByName(this.tiledMapData.layers, 'npcs');
+        this.loadNPCLayers(npcsLayers);
+
+        if (this.npcs.length > 0) {
+            this.npcSpriteController.loadNPCSeries(this.npcs);
+        }
+    }
+
+    private loadNPCLayers(npcsLayers: ReturnType<typeof TiledLayerUtils.findObjectLayersByName>): void {
+        if (!this.npcSpriteController) return;
+
         for (const layerInfo of npcsLayers) {
             let layer = this.map.getObjectLayer(layerInfo.fullPath);
             if (!layer) layer = this.map.getObjectLayer(layerInfo.name);
             if (!layer) continue;
-            this.npcSpriteController.loadNPCsFromLayer(layer, layerInfo.fullPath);
-        }
-
-        if (this.npcs.length > 0) {
-            this.npcSpriteController.loadNPCSeries(this.npcs);
+            this.npcSpriteController.loadNPCsFromLayerWithOffset(
+                layer,
+                layerInfo.fullPath,
+                layerInfo.offsetX,
+                layerInfo.offsetY,
+            );
         }
     }
 
@@ -763,12 +775,12 @@ export class InteriorScene extends Phaser.Scene {
 
     private setupPointerInput(): void {
         this.pointerDownHandler = (pointer: Phaser.Input.Pointer) => {
-            if (!this.playerController || this.gameMode !== 'exploration' || this.isSceneTransitioning) return;
+            if (!this.playerController || !this.canPlayerMoveAroundAndInteract()) return;
 
-            this.isPointerHeld = true;
             const { x: worldX, y: worldY } = { x: pointer.worldX, y: pointer.worldY };
 
             if (!this.player) return;
+            this.isPointerHeld = true;
             const { x: clickTileX, y: clickTileY } = this.gridMapper.worldToGrid(worldX, worldY);
             const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(
                 this.player.x, this.player.y
@@ -797,7 +809,7 @@ export class InteriorScene extends Phaser.Scene {
         };
 
         this.pointerMoveHandler = (pointer: Phaser.Input.Pointer) => {
-            if (!this.isPointerHeld || !this.playerController || !pointer.isDown) return;
+            if (!this.isPointerHeld || !this.playerController || !pointer.isDown || !this.canPlayerMoveAroundAndInteract()) return;
             this.playerController.setTargetPosition(pointer.worldX, pointer.worldY);
         };
 
@@ -809,7 +821,7 @@ export class InteriorScene extends Phaser.Scene {
     }
 
     private onInteractKey(): void {
-        if (this.isSceneTransitioning || this.gameMode !== 'exploration') {
+        if (!this.canPlayerMoveAroundAndInteract()) {
             return;
         }
 
@@ -843,6 +855,13 @@ export class InteriorScene extends Phaser.Scene {
             default:
                 break;
         }
+    }
+
+    /** Canonical gate for interior movement/input; scene transitions or disabled player control keep this off even in exploration mode. */
+    private canPlayerMoveAroundAndInteract(): boolean {
+        return !this.isSceneTransitioning
+            && this.gameMode === 'exploration'
+            && (this.playerController?.isEnabled() ?? false);
     }
 
     // ── Conversation handling (mirrors OverworldScene) ────────────────────────
@@ -1018,7 +1037,8 @@ export class InteriorScene extends Phaser.Scene {
 
             const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
             hud?.setJewelHUDVisible(true);
-            this.playerController?.setEnabled(true);
+            this.isPointerHeld = false;
+            this.playerController?.setEnabled(!this.isSceneTransitioning && this.gameMode === 'exploration');
 
             if (exitResult.wasSolved || exitResult.wasUnsolved) {
                 this.saveStateCallback();
