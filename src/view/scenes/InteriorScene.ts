@@ -777,10 +777,10 @@ export class InteriorScene extends Phaser.Scene {
         this.pointerDownHandler = (pointer: Phaser.Input.Pointer) => {
             if (!this.playerController || !this.canPlayerMoveAroundAndInteract()) return;
 
-            this.isPointerHeld = true;
             const { x: worldX, y: worldY } = { x: pointer.worldX, y: pointer.worldY };
 
             if (!this.player) return;
+            this.isPointerHeld = true;
             const { x: clickTileX, y: clickTileY } = this.gridMapper.worldToGrid(worldX, worldY);
             const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(
                 this.player.x, this.player.y

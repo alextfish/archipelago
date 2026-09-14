@@ -1619,9 +1619,6 @@ export class OverworldScene extends Phaser.Scene {
         return;
       }
 
-      // Mark pointer as held
-      this.isPointerHeld = true;
-
       // Get world coordinates of the click (accounting for camera position)
       const worldX = pointer.worldX;
       const worldY = pointer.worldY;
@@ -1630,6 +1627,9 @@ export class OverworldScene extends Phaser.Scene {
       if (!this.player || !this.tiledMapData || !this.playerController || !this.interactionCursor) {
         return;
       }
+
+      // Mark pointer as held once we know the scene can process continuous movement.
+      this.isPointerHeld = true;
 
       const playerX = this.player.x;
       const playerY = this.player.y;
