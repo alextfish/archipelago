@@ -1035,6 +1035,7 @@ export class InteriorScene extends Phaser.Scene {
 
             const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
             hud?.setJewelHUDVisible(true);
+            this.isPointerHeld = false;
             this.playerController?.setEnabled(true);
 
             if (exitResult.wasSolved || exitResult.wasUnsolved) {
