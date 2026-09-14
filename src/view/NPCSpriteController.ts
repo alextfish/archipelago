@@ -27,6 +27,13 @@ interface MovingNPC {
     direction: CardinalDirection;
 }
 
+interface MovingNPCSeed {
+    path: LoopPath;
+    distance: number;
+    speedPixelsPerSecond: number;
+    direction: CardinalDirection;
+}
+
 /**
  * Manages regular (non-constraint) NPC sprites and their associated series
  * state in the overworld.
@@ -141,7 +148,14 @@ export class NPCSpriteController {
             };
             this.addInteractable(interactable);
 
-            const { x: worldX, y: worldY } = this.gridMapper.gridToWorld(tileX, tileY + 1);
+            const movingNPCSeed = typeof pathName === 'string' && pathName.length > 0
+                ? this.createMovingNPCSeed(pathName, speed, { x: obj.x, y: obj.y })
+                : null;
+
+            const staticWorldPosition = this.gridMapper.gridToWorld(tileX, tileY + 1);
+            const movingTopLeft = movingNPCSeed?.path.getPointAt(movingNPCSeed.distance);
+            const worldX = movingTopLeft?.x ?? staticWorldPosition.x;
+            const worldY = (movingTopLeft?.y ?? (staticWorldPosition.y - this.gridMapper.getCellSize())) + this.gridMapper.getCellSize();
             const spriteKey = this.npcAppearanceRegistry.getAppearance(appearanceId).spriteKey;
             const sprite = this.scene.add.sprite(worldX, worldY, spriteKey);
             sprite.setOrigin(0, 1);
@@ -159,15 +173,13 @@ export class NPCSpriteController {
                 console.log(`[TEST] Added test marker for NPC: ${npc.id} at tile (${tileX}, ${tileY}), world (${worldX}, ${worldY})`);
             }
 
-            const movingNPC = typeof pathName === 'string' && pathName.length > 0
+            const movingNPC = movingNPCSeed
                 ? this.createMovingNPC(
                     npc.id,
                     appearanceId,
                     sprite,
                     interactable,
-                    pathName,
-                    speed,
-                    this.gridMapper.gridToWorld(tileX, tileY),
+                    movingNPCSeed,
                 )
                 : null;
 
@@ -309,18 +321,10 @@ export class NPCSpriteController {
         }));
     }
 
-    private createMovingNPC(
-        npcId: string,
-        appearanceId: string,
-        sprite: Phaser.GameObjects.Sprite,
-        interactable: Interactable,
-        pathName: string,
-        speed: number,
-        initialPosition: PathPoint,
-    ): MovingNPC | null {
+    private createMovingNPCSeed(pathName: string, speed: number, initialPosition: PathPoint): MovingNPCSeed | null {
         const path = this.paths.get(pathName);
         if (!path) {
-            console.warn(`NPC ${npcId} references unknown path "${pathName}"`);
+            console.warn(`NPC references unknown path "${pathName}"`);
             return null;
         }
 
@@ -328,14 +332,29 @@ export class NPCSpriteController {
         const initialDelta = path.getSegmentDeltaAt(distance);
 
         return {
-            npcId,
-            appearanceId,
-            sprite,
-            interactable,
             path,
             distance,
             speedPixelsPerSecond: Math.max(0, speed) * this.gridMapper.getCellSize(),
             direction: getClosestCardinalDirection(initialDelta.x, initialDelta.y),
+        };
+    }
+
+    private createMovingNPC(
+        npcId: string,
+        appearanceId: string,
+        sprite: Phaser.GameObjects.Sprite,
+        interactable: Interactable,
+        seed: MovingNPCSeed,
+    ): MovingNPC {
+        return {
+            npcId,
+            appearanceId,
+            sprite,
+            interactable,
+            path: seed.path,
+            distance: seed.distance,
+            speedPixelsPerSecond: seed.speedPixelsPerSecond,
+            direction: seed.direction,
         };
     }
 

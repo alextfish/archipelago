@@ -202,7 +202,7 @@ export function registerNPCAnimations(scene: Phaser.Scene, registry: NPCAppearan
     for (const id of registry.getAllAppearanceIDs()) {
         const appearance = registry.getAppearance(id);
         const texture = scene.textures.get(appearance.spriteKey);
-        if (!texture || !texture.getFrameNames().includes('11')) continue;
+        if (!texture || !texture.getFrameNames().some((frameName) => Number(frameName) === 11)) continue;
 
         for (const [direction, frameInfo] of Object.entries(NPC_DIRECTION_FRAMES) as Array<[CardinalDirection, { start: number; end: number; idle: number }]>) {
             const walkKey = `${appearance.spriteKey}-walk-${direction}`;

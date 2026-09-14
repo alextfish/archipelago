@@ -153,7 +153,7 @@ describe('NPCSpriteController path-following NPCs', () => {
         expect(interactables[0]).toMatchObject({ tileX: 1, tileY: 0 });
     });
 
-    it('keeps zero-speed path NPCs snapped to their initial tile and idle frame', () => {
+    it('keeps zero-speed path NPCs on their authored path position and idle frame', () => {
         controller.loadNPCsFromLayer({
             objects: [
                 {
@@ -172,17 +172,41 @@ describe('NPCSpriteController path-following NPCs', () => {
 
         const sprite = controller.npcSprites.get('1') as any;
 
-        expect(sprite.x).toBe(0);
+        expect(sprite.x).toBe(5);
         expect(sprite.y).toBe(32);
         expect(sprite.play).not.toHaveBeenCalled();
         expect(sprite.setFrame).toHaveBeenLastCalledWith(10);
 
         controller.update(1000, true);
 
-        expect(sprite.x).toBe(0);
+        expect(sprite.x).toBe(5);
         expect(sprite.y).toBe(32);
         expect(sprite.play).not.toHaveBeenCalled();
         expect(sprite.setFrame).toHaveBeenLastCalledWith(10);
+    });
+
+    it('preserves a non-grid-aligned authored start when projecting onto a path', () => {
+        controller.loadNPCsFromLayer({
+            objects: [
+                {
+                    id: 1,
+                    name: 'Child1',
+                    x: 11,
+                    y: 0,
+                    properties: [
+                        { name: 'appearance', value: 'Child1' },
+                        { name: 'path', value: 'child_run' },
+                        { name: 'speed', value: 1 },
+                    ],
+                },
+            ],
+        } as any, 'npcs');
+
+        const sprite = controller.npcSprites.get('1') as any;
+
+        expect(sprite.x).toBe(11);
+        expect(sprite.y).toBe(32);
+        expect(interactables[0]).toMatchObject({ tileX: 0, tileY: 0 });
     });
 
     it('pauses path followers when the overworld is not active', () => {
