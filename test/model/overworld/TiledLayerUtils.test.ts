@@ -71,6 +71,29 @@ describe('TiledLayerUtils', () => {
             expect(results[0].fullPath).toBe('Beach/npcs');
         });
 
+        it('preserves the full path through multiple nested groups', () => {
+            const layers = [
+                {
+                    name: 'World',
+                    type: 'group',
+                    layers: [
+                        {
+                            name: 'Beach',
+                            type: 'group',
+                            layers: [
+                                { name: 'npcs', type: 'objectgroup', objects: [] }
+                            ]
+                        }
+                    ]
+                }
+            ];
+
+            const results = TiledLayerUtils.findObjectLayersByName(layers, 'npcs');
+
+            expect(results).toHaveLength(1);
+            expect(results[0].fullPath).toBe('World/Beach/npcs');
+        });
+
         it('finds object layers in multiple groups', () => {
             const layers = [
                 {

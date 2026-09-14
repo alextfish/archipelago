@@ -733,7 +733,12 @@ export class InteriorScene extends Phaser.Scene {
             let layer = this.map.getObjectLayer(layerInfo.fullPath);
             if (!layer) layer = this.map.getObjectLayer(layerInfo.name);
             if (!layer) continue;
-            this.npcSpriteController.loadNPCsFromLayer(layer, layerInfo.fullPath);
+            this.npcSpriteController.loadNPCsFromLayerWithOffset(
+                layer,
+                layerInfo.fullPath,
+                layerInfo.offsetX,
+                layerInfo.offsetY,
+            );
         }
 
         if (this.npcs.length > 0) {

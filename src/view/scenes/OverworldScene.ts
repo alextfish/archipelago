@@ -1050,7 +1050,12 @@ export class OverworldScene extends Phaser.Scene {
           continue;
         }
         console.log(`Loading NPCs from layer: ${layerInfo.fullPath}`);
-        this.npcSpriteController.loadNPCsFromLayer(npcsLayer, layerInfo.fullPath);
+        this.npcSpriteController.loadNPCsFromLayerWithOffset(
+          npcsLayer,
+          layerInfo.fullPath,
+          layerInfo.offsetX,
+          layerInfo.offsetY,
+        );
       }
 
       // Load series for NPCs and create icons (once after all NPCs loaded)

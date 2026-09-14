@@ -73,7 +73,7 @@ export class TiledLayerUtils {
                 results.push(...TiledLayerUtils.findObjectLayersByName(
                     layer.layers,
                     suffix,
-                    layer.name,
+                    fullPath,
                     layerOffsetX,
                     layerOffsetY,
                 ));

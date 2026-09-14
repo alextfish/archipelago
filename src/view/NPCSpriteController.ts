@@ -101,6 +101,15 @@ export class NPCSpriteController {
      * Load NPC objects from a single Phaser ObjectLayer and create sprites.
      */
     loadNPCsFromLayer(npcsLayer: Phaser.Tilemaps.ObjectLayer, layerName: string): void {
+        this.loadNPCsFromLayerWithOffset(npcsLayer, layerName, 0, 0);
+    }
+
+    loadNPCsFromLayerWithOffset(
+        npcsLayer: Phaser.Tilemaps.ObjectLayer,
+        layerName: string,
+        layerOffsetX: number,
+        layerOffsetY: number,
+    ): void {
         if (!npcsLayer.objects) {
             console.warn(`No objects in layer: ${layerName}`);
             return;
@@ -149,7 +158,7 @@ export class NPCSpriteController {
             this.addInteractable(interactable);
 
             const movingNPCSeed = typeof pathName === 'string' && pathName.length > 0
-                ? this.createMovingNPCSeed(pathName, speed, { x: obj.x, y: obj.y })
+                ? this.createMovingNPCSeed(pathName, speed, { x: obj.x + layerOffsetX, y: obj.y + layerOffsetY })
                 : null;
 
             const staticWorldPosition = this.gridMapper.gridToWorld(tileX, tileY + 1);
