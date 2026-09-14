@@ -209,7 +209,7 @@ describe('NPCSpriteController path-following NPCs', () => {
         expect(interactables[0]).toMatchObject({ tileX: 0, tileY: 0 });
     });
 
-    it('pauses path followers when the overworld is not active', () => {
+    it('pauses path followers when the shared movement/input gate is closed', () => {
         controller.loadNPCsFromLayer({
             objects: [
                 {

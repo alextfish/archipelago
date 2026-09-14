@@ -857,9 +857,11 @@ export class InteriorScene extends Phaser.Scene {
         }
     }
 
-    /** Canonical gate for interior movement/input; scene transitions keep this disabled even in exploration mode. */
+    /** Canonical gate for interior movement/input; scene transitions or disabled player control keep this off even in exploration mode. */
     private canPlayerMoveAroundAndInteract(): boolean {
-        return !this.isSceneTransitioning && this.gameMode === 'exploration';
+        return !this.isSceneTransitioning
+            && this.gameMode === 'exploration'
+            && (this.playerController?.isEnabled() ?? false);
     }
 
     // ── Conversation handling (mirrors OverworldScene) ────────────────────────
