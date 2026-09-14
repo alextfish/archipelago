@@ -160,11 +160,19 @@ export class NPCSpriteController {
             }
 
             const movingNPC = typeof pathName === 'string' && pathName.length > 0
-                ? this.createMovingNPC(npc.id, appearanceId, sprite, interactable, pathName, speed, { x: obj.x, y: obj.y })
+                ? this.createMovingNPC(
+                    npc.id,
+                    appearanceId,
+                    sprite,
+                    interactable,
+                    pathName,
+                    speed,
+                    this.gridMapper.gridToWorld(tileX, tileY),
+                )
                 : null;
 
             if (movingNPC) {
-                this.applyMovingNPCState(movingNPC);
+                this.applyMovingNPCState(movingNPC, movingNPC.speedPixelsPerSecond > 0);
                 this.movingNPCs.push(movingNPC);
             } else if (npc.animate) {
                 const animKey = getNPCIdleAnimationKey(appearanceId, this.npcAppearanceRegistry);
@@ -249,8 +257,13 @@ export class NPCSpriteController {
         }
     }
 
-    update(delta: number): void {
+    update(delta: number, isActive: boolean = true): void {
         for (const movingNPC of this.movingNPCs) {
+            if (!isActive) {
+                this.applyMovingNPCState(movingNPC, false);
+                continue;
+            }
+
             if (movingNPC.speedPixelsPerSecond > 0) {
                 movingNPC.distance = movingNPC.path.wrapDistance(
                     movingNPC.distance + (movingNPC.speedPixelsPerSecond * delta) / 1000
@@ -262,7 +275,7 @@ export class NPCSpriteController {
                 movingNPC.direction = getClosestCardinalDirection(segmentDelta.x, segmentDelta.y);
             }
 
-            this.applyMovingNPCState(movingNPC);
+            this.applyMovingNPCState(movingNPC, movingNPC.speedPixelsPerSecond > 0);
         }
     }
 
@@ -272,7 +285,7 @@ export class NPCSpriteController {
         for (const layerInfo of pathLayers) {
             for (const obj of layerInfo.data?.objects ?? []) {
                 if (!obj?.name) continue;
-                const points = this.getAbsolutePathPoints(obj);
+                const points = this.getAbsolutePathPoints(obj, layerInfo.offsetX, layerInfo.offsetY);
                 if (!points) continue;
 
                 try {
@@ -284,15 +297,15 @@ export class NPCSpriteController {
         }
     }
 
-    private getAbsolutePathPoints(obj: any): PathPoint[] | null {
+    private getAbsolutePathPoints(obj: any, layerOffsetX: number, layerOffsetY: number): PathPoint[] | null {
         const points = Array.isArray(obj.polygon) ? obj.polygon : Array.isArray(obj.polyline) ? obj.polyline : null;
         if (!points || points.length < 2 || typeof obj.x !== 'number' || typeof obj.y !== 'number') {
             return null;
         }
 
         return points.map((point: any) => ({
-            x: obj.x + point.x,
-            y: obj.y + point.y,
+            x: layerOffsetX + obj.x + point.x,
+            y: layerOffsetY + obj.y + point.y,
         }));
     }
 
@@ -326,7 +339,7 @@ export class NPCSpriteController {
         };
     }
 
-    private applyMovingNPCState(movingNPC: MovingNPC): void {
+    private applyMovingNPCState(movingNPC: MovingNPC, animate: boolean): void {
         const topLeft = movingNPC.path.getPointAt(movingNPC.distance);
         movingNPC.sprite.setPosition(topLeft.x, topLeft.y + this.gridMapper.getCellSize());
         movingNPC.sprite.setDepth(movingNPC.sprite.y);
@@ -336,9 +349,10 @@ export class NPCSpriteController {
             movingNPC.direction,
             this.npcAppearanceRegistry,
         );
-        if (this.scene.anims.exists(walkAnimationKey)) {
+        if (animate && this.scene.anims.exists(walkAnimationKey)) {
             movingNPC.sprite.play(walkAnimationKey, true);
         } else {
+            movingNPC.sprite.anims.stop();
             movingNPC.sprite.setFrame(getNPCDirectionalIdleFrame(movingNPC.direction));
         }
 

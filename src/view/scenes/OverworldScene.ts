@@ -1354,7 +1354,7 @@ export class OverworldScene extends Phaser.Scene {
 
   update(_time: number, delta: number) {
     this.tileAnimationManager?.update(delta);
-    this.npcSpriteController?.update(delta);
+    this.npcSpriteController?.update(delta, this.gameMode === 'exploration');
 
     // Update player depth for Y-sorting so sprites above/below sort correctly
     if (this.player) {
