@@ -266,7 +266,12 @@ export class InteriorScene extends Phaser.Scene {
         console.log(`[InteriorScene] "${this.mapKey}" created at spawn (${startPos.x}, ${startPos.y})`);
     }
 
-    update(_time: number, _delta: number): void {
+    update(_time: number, delta: number): void {
+        this.npcSpriteController?.update(
+            delta,
+            !this.isSceneTransitioning && this.gameMode === 'exploration',
+        );
+
         if (this.player) {
             this.player.setDepth(this.player.y);
         }
