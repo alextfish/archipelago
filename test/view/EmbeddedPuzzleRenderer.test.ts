@@ -39,6 +39,10 @@ describe('EmbeddedPuzzleRenderer - Coordinate Conversion', () => {
         renderer = new EmbeddedPuzzleRenderer(mockScene, puzzleBounds as any);
     });
 
+    it('uses a constraint feedback depth above overworld roof layers', () => {
+        expect((renderer as any).getConstraintFeedbackDepth()).toBe(100_001);
+    });
+
     describe('screenToGrid with zoom', () => {
         it('should correctly convert screen coordinates with camera zoom', () => {
             // Test case: screen position (400, 300) with camera zoom 2.0

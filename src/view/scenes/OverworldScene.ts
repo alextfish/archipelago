@@ -42,7 +42,13 @@ import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
 import { NPCSpriteController } from '@view/NPCSpriteController';
 import { ConversationVariableSubstitutor } from '@model/conversation/ConversationVariableSubstitutor';
 import { PortalManager } from '@view/PortalManager';
-import { buildPuzzleEntryInteractables, createBridgesLayer, isPuzzleEntryTile } from '@view/MapPuzzleSceneHelpers';
+import {
+  buildPuzzleEntryInteractables,
+  createBridgesLayer,
+  hidePuzzleConstraintNPCsAfterEntry,
+  isPuzzleEntryTile,
+  showPuzzleConstraintNPCsBeforeExit,
+} from '@view/MapPuzzleSceneHelpers';
 import { OverworldCameraZones } from '@model/overworld/OverworldCameraZones';
 
 /**
@@ -1102,22 +1108,6 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   /**
-   * Hide constraint NPCs for a specific puzzle.
-   * Delegated to {@link ConstraintNPCManager}.
-   */
-  private hideConstraintNPCsForPuzzle(puzzleId: string): void {
-    this.constraintNPCManager?.hideConstraintNPCsForPuzzle(puzzleId);
-  }
-
-  /**
-   * Show constraint NPCs for a specific puzzle.
-   * Delegated to {@link ConstraintNPCManager}.
-   */
-  private showConstraintNPCsForPuzzle(puzzleId: string): void {
-    this.constraintNPCManager?.showConstraintNPCsForPuzzle(puzzleId);
-  }
-
-  /**
    * Helper: Find all layers matching a suffix pattern.
    */
   private findLayersBySuffix(suffix: string): Phaser.Tilemaps.LayerData[] {
@@ -2154,7 +2144,7 @@ export class OverworldScene extends Phaser.Scene {
       );
 
       // Hide overworld constraint NPCs after camera transition completes
-      this.hideConstraintNPCsForPuzzle(puzzleId);
+      hidePuzzleConstraintNPCsAfterEntry(puzzleId, this.constraintNPCManager);
 
       // Emit test event for automation
       emitTestEvent('puzzle_entered', { puzzleId });
@@ -2202,12 +2192,10 @@ export class OverworldScene extends Phaser.Scene {
 
       // Delegate to controller for puzzle exit
       console.log('[DIAGNOSTIC] About to call puzzleController.exitPuzzle, success:', success);
-      const activePuzzleId = this.puzzleController.getCurrentPuzzleId();
-
-      // Show overworld constraint NPCs before camera transition starts
-      if (activePuzzleId) {
-        this.showConstraintNPCsForPuzzle(activePuzzleId);
-      }
+      const activePuzzleId = showPuzzleConstraintNPCsBeforeExit(
+        this.puzzleController,
+        this.constraintNPCManager,
+      );
 
       const exitResult = await this.puzzleController.exitPuzzle(success, (mode: 'exploration') => {
         console.log('[DIAGNOSTIC] onModeChange callback called, setting mode to:', mode);

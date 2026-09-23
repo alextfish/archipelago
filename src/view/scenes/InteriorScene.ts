@@ -23,7 +23,13 @@ import { ConversationConditionEvaluator } from '@model/conversation/Conversation
 import { ConversationVariableSubstitutor } from '@model/conversation/ConversationVariableSubstitutor';
 import { RoofManager } from '@view/RoofManager';
 import { SceneTransitionCoordinator } from '@view/SceneTransitionCoordinator';
-import { buildPuzzleEntryInteractables, createBridgesLayer, isPuzzleEntryTile } from '@view/MapPuzzleSceneHelpers';
+import {
+    buildPuzzleEntryInteractables,
+    createBridgesLayer,
+    hidePuzzleConstraintNPCsAfterEntry,
+    isPuzzleEntryTile,
+    showPuzzleConstraintNPCsBeforeExit,
+} from '@view/MapPuzzleSceneHelpers';
 import type { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
@@ -994,7 +1000,7 @@ export class InteriorScene extends Phaser.Scene {
                 this.cameras.main.stopFollow();
             });
 
-            this.constraintNPCManager?.hideConstraintNPCsForPuzzle(puzzleId);
+            hidePuzzleConstraintNPCsAfterEntry(puzzleId, this.constraintNPCManager);
 
         } catch (error) {
             console.error(`[InteriorScene] Failed to enter overworld puzzle: ${puzzleId}`, error);
@@ -1025,15 +1031,14 @@ export class InteriorScene extends Phaser.Scene {
             this.events.off('bridge-clicked', this.handleBridgeClicked, this);
             this.input.keyboard?.off('keydown-ESC', this.handleEscapeKey, this);
 
-            const activePuzzleId = this.puzzleController.getCurrentPuzzleId();
+            showPuzzleConstraintNPCsBeforeExit(
+                this.puzzleController,
+                this.constraintNPCManager,
+            );
             const exitResult = await this.puzzleController.exitPuzzle(success, (mode: 'exploration') => {
                 this.gameMode = mode;
                 this.cameras.main.startFollow(this.player);
             });
-
-            if (activePuzzleId) {
-                this.constraintNPCManager?.showConstraintNPCsForPuzzle(activePuzzleId);
-            }
 
             const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
             hud?.setJewelHUDVisible(true);

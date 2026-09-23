@@ -5,6 +5,15 @@ import type { OverworldPuzzleManager } from '@model/overworld/OverworldPuzzleMan
 import type { GridToWorldMapper } from '@view/GridToWorldMapper';
 import type { Interactable } from '@view/InteractionCursor';
 
+type ConstraintNPCVisibilityLike = {
+    hideConstraintNPCsForPuzzle: (puzzleId: string) => void;
+    showConstraintNPCsForPuzzle: (puzzleId: string) => void;
+};
+
+type ActivePuzzleTrackerLike = {
+    getCurrentPuzzleId: () => string | undefined;
+};
+
 type PuzzleEntryTileLike = {
     properties?: Record<string, unknown>;
 };
@@ -103,4 +112,23 @@ export function createBridgesLayer(
         map.tileWidth,
         map.tileHeight,
     ) ?? null;
+}
+
+export function hidePuzzleConstraintNPCsAfterEntry(
+    puzzleId: string,
+    constraintNPCManager?: ConstraintNPCVisibilityLike,
+): void {
+    constraintNPCManager?.hideConstraintNPCsForPuzzle(puzzleId);
+}
+
+export function showPuzzleConstraintNPCsBeforeExit(
+    puzzleController: ActivePuzzleTrackerLike,
+    constraintNPCManager?: ConstraintNPCVisibilityLike,
+): string | undefined {
+    const activePuzzleId = puzzleController.getCurrentPuzzleId();
+    if (activePuzzleId) {
+        constraintNPCManager?.showConstraintNPCsForPuzzle(activePuzzleId);
+    }
+
+    return activePuzzleId;
 }

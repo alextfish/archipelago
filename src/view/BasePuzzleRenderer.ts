@@ -101,6 +101,11 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
         // no-op: PhaserPuzzleRenderer leaves objects directly in scene
     }
 
+    /** Depth used for constraint feedback speech bubbles. */
+    protected getConstraintFeedbackDepth(): number {
+        return 200;
+    }
+
     // -------------------------------------------------------------------------
     // Shared protected helpers
     // -------------------------------------------------------------------------
@@ -341,6 +346,8 @@ export abstract class BasePuzzleRenderer implements PuzzleRenderer, IPuzzleView 
                 this.languageTilesetKey,
                 this.npcSpriteKey,
                 this.constraintNPCs,
+                'grass',
+                this.getConstraintFeedbackDepth(),
             );
             if (this.glyphTracker) {
                 this.feedbackDisplay.setGlyphTracker(this.glyphTracker);

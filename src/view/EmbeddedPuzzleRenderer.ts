@@ -8,6 +8,8 @@ import { GridToWorldMapper } from './GridToWorldMapper';
 import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
 import { BasePuzzleRenderer } from './BasePuzzleRenderer';
 
+const OVERWORLD_CONSTRAINT_FEEDBACK_DEPTH = 100_001;
+
 /**
  * Puzzle renderer that works embedded within the overworld scene.
  * Draws puzzle elements on top of the existing overworld map using a
@@ -50,6 +52,10 @@ export class EmbeddedPuzzleRenderer extends BasePuzzleRenderer implements IPuzzl
 
     protected override onGameObjectCreated(go: Phaser.GameObjects.GameObject): void {
         this.puzzleContainer.add(go);
+    }
+
+    protected override getConstraintFeedbackDepth(): number {
+        return OVERWORLD_CONSTRAINT_FEEDBACK_DEPTH;
     }
 
     // -------------------------------------------------------------------------
