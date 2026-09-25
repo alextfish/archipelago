@@ -235,14 +235,16 @@ export class DoorManager {
             return;
         }
 
-        const animKey = `${mapping.animationKey}-play`;
+        const startFrame = mapping.animationStartFrame ?? 0;
+        const endFrame = startFrame + mapping.frameCount - 1;
+        const animKey = `${mapping.animationKey}-${startFrame}-${endFrame}-play`;
 
         if (!this.scene.anims.exists(animKey)) {
             this.scene.anims.create({
                 key: animKey,
                 frames: this.scene.anims.generateFrameNumbers(mapping.animationKey, {
-                    start: 0,
-                    end: mapping.frameCount - 1
+                    start: startFrame,
+                    end: endFrame
                 }),
                 frameRate: 8,
                 repeat: 0
@@ -251,7 +253,7 @@ export class DoorManager {
 
         await new Promise<void>((resolve) => {
             const doorSprite = this.doorSprites.get(door.id);
-            const targetSprite = doorSprite ?? this.scene.add.sprite(doorWorldX, doorWorldY, mapping.textureKey, 0).setOrigin(0.5, 0.5);
+            const targetSprite = doorSprite ?? this.scene.add.sprite(doorWorldX, doorWorldY, mapping.textureKey, mapping.closedFrame).setOrigin(0.5, 0.5);
             const isTemporary = !doorSprite;
             targetSprite.once('animationcomplete', () => {
                 if (isTemporary) targetSprite.destroy();

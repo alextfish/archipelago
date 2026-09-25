@@ -8,6 +8,7 @@ export class PuzzleHUDScene extends Phaser.Scene {
     private static readonly SOLVED_OVERLAY_TEXTURE_KEY = 'puzzle-solved-tick';
     private static readonly SOLVED_OVERLAY_ALPHA = 0.8;
     private static readonly SOLVED_OVERLAY_END_SCALE = 1.35;
+    private static readonly SIDEBAR_WIDTH = 150;
     private sidebar: PuzzleSidebar | null = null;
     private counts: Record<string, number> = {};
     private types: BridgeType[] = [];
@@ -27,11 +28,12 @@ export class PuzzleHUDScene extends Phaser.Scene {
 
     create() {
         // Create solid background that sits between the overworld and HUD elements
-        // This prevents the overworld from showing through the HUD
+        // Scope the dimmer to the sidebar column rather than the full puzzle,
+        // so series/bridge puzzles remain fully visible while the UI stays legible.
         this.backgroundRect = this.add.rectangle(
+            this.scale.width - PuzzleHUDScene.SIDEBAR_WIDTH,
             0,
-            0,
-            this.scale.width,
+            PuzzleHUDScene.SIDEBAR_WIDTH,
             this.scale.height,
             0x1a1a1a,
             0.85

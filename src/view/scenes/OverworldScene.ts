@@ -228,6 +228,10 @@ export class OverworldScene extends Phaser.Scene {
       frameWidth: 32,
       frameHeight: 64
     });
+    this.load.spritesheet('terrains-door-tiles', 'resources/tilesets/terrains.png', {
+      frameWidth: 32,
+      frameHeight: 32
+    });
 
     // Load TMX file asynchronously, then load embedded tilesets
     this.loadTmxFile();
@@ -1917,21 +1921,7 @@ export class OverworldScene extends Phaser.Scene {
       }
     }
 
-    // Find the first unsolved puzzle
-    let firstUnsolvedId: string | null = null;
-    const entries = series.getAllPuzzleEntries();
-    for (const entry of entries) {
-      if (entry.unlocked && !entry.completed) {
-        firstUnsolvedId = entry.id;
-        break;
-      }
-    }
-
-    // If no unlocked incomplete puzzle, try first unlocked puzzle
-    if (!firstUnsolvedId) {
-      const firstUnlocked = entries.find(e => e.unlocked);
-      firstUnsolvedId = firstUnlocked?.id ?? null;
-    }
+    const firstUnsolvedId = this.getSeriesEntryIdToLaunch(series, true);
 
     if (!firstUnsolvedId) {
       console.warn(`No unlocked puzzles found in series ${seriesId}`);
@@ -1942,17 +1932,7 @@ export class OverworldScene extends Phaser.Scene {
 
     // Store the current series for navigation
     this.currentSeries = series;
-
-    // Get the puzzle data
-    const puzzleData = this.currentSeriesPuzzleData.get(firstUnsolvedId);
-    if (!puzzleData) {
-      console.error(`No puzzle data found for ${firstUnsolvedId}`);
-      return;
-    }
-
-    // Launch BridgePuzzleScene with the puzzle data
-    this.overworldHUD?.setJewelHUDVisible(false);
-    this.scene.launch('BridgePuzzleScene', { puzzleData, seriesMode: true });
+    this.launchSeriesPuzzleEntry(firstUnsolvedId);
   }
 
   private async animateDoorChange(door: Door, unlock: boolean): Promise<void> {
@@ -1970,16 +1950,15 @@ export class OverworldScene extends Phaser.Scene {
   private async handleSeriesPuzzleCompleted(data: { puzzleId: string; success: boolean }): Promise<void> {
     console.log(`[OverworldScene] Series puzzle completed: ${data.puzzleId}, success: ${data.success}`);
 
-    // BridgePuzzleScene has closed — restore the jewel HUD regardless of outcome
-    this.overworldHUD?.setJewelHUDVisible(true);
-
     if (!this.currentSeries) {
       console.warn('No current series - ignoring puzzle completion');
+      this.overworldHUD?.setJewelHUDVisible(true);
       return;
     }
 
     if (!data.success) {
       console.log('Puzzle was not successfully solved - not marking as complete');
+      this.overworldHUD?.setJewelHUDVisible(true);
       return;
     }
 
@@ -2035,9 +2014,52 @@ export class OverworldScene extends Phaser.Scene {
       }
     } else {
       console.log(`Series ${this.currentSeries.id} not yet complete`);
+      const nextPuzzleId = this.getSeriesEntryIdToLaunch(this.currentSeries, false);
+      if (nextPuzzleId) {
+        this.time.delayedCall(0, () => {
+          this.launchSeriesPuzzleEntry(nextPuzzleId);
+        });
+      } else {
+        this.overworldHUD?.setJewelHUDVisible(true);
+      }
+      this.saveGameState();
+      return;
     }
 
+    this.overworldHUD?.setJewelHUDVisible(true);
     this.saveGameState();
+  }
+
+  private getSeriesEntryIdToLaunch(series: any, allowCompletedFallback: boolean): string | null {
+    const entries = series.getAllPuzzleEntries();
+    for (const entry of entries) {
+      if (entry.unlocked && !entry.completed) {
+        return entry.id;
+      }
+    }
+
+    if (!allowCompletedFallback) {
+      return null;
+    }
+
+    const firstUnlocked = entries.find((entry: any) => entry.unlocked);
+    return firstUnlocked?.id ?? null;
+  }
+
+  private launchSeriesPuzzleEntry(entryId: string): void {
+    const puzzleData = this.currentSeriesPuzzleData.get(entryId);
+    if (!puzzleData) {
+      console.error(`No puzzle data found for ${entryId}`);
+      this.overworldHUD?.setJewelHUDVisible(true);
+      return;
+    }
+
+    this.overworldHUD?.setJewelHUDVisible(false);
+    this.scene.launch('BridgePuzzleScene', {
+      puzzleData,
+      seriesMode: true,
+      callerSceneKey: 'OverworldScene',
+    });
   }
 
   /**

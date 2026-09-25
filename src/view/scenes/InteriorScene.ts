@@ -1192,18 +1192,7 @@ export class InteriorScene extends Phaser.Scene {
             }
         }
 
-        const entries = series.getAllPuzzleEntries();
-        let firstUnsolvedId: string | null = null;
-        for (const entry of entries) {
-            if (entry.unlocked && !entry.completed) {
-                firstUnsolvedId = entry.id;
-                break;
-            }
-        }
-        if (!firstUnsolvedId) {
-            const firstUnlocked = entries.find((e: any) => e.unlocked);
-            firstUnsolvedId = firstUnlocked?.id ?? null;
-        }
+        const firstUnsolvedId = this.getSeriesEntryIdToLaunch(series, true);
 
         if (!firstUnsolvedId) {
             console.warn(`[InteriorScene] No unlocked puzzles found in series ${seriesId}`);
@@ -1211,33 +1200,21 @@ export class InteriorScene extends Phaser.Scene {
         }
 
         this.currentSeries = series;
-        const puzzleData = this.currentSeriesPuzzleData.get(firstUnsolvedId);
-        if (!puzzleData) {
-            console.error(`[InteriorScene] No puzzle data for ${firstUnsolvedId}`);
-            return;
-        }
-
-        // Hide jewel HUD while solving, listen for completion
-        const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
-        hud?.setJewelHUDVisible(false);
-
-        // Listen for series completion (BridgePuzzleScene emits to 'InteriorScene')
-        this.events.once('seriesPuzzleCompleted', (data: { puzzleId: string; success: boolean }) => {
-            void this.handleSeriesPuzzleCompleted(data);
-        });
-
-        this.scene.launch('BridgePuzzleScene', {
-            puzzleData,
-            seriesMode: true,
-            callerSceneKey: 'InteriorScene',
-        });
+        this.launchSeriesPuzzleEntry(firstUnsolvedId);
     }
 
     private async handleSeriesPuzzleCompleted(data: { puzzleId: string; success: boolean }): Promise<void> {
-        const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
-        hud?.setJewelHUDVisible(true);
+        if (!this.currentSeries) {
+            const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
+            hud?.setJewelHUDVisible(true);
+            return;
+        }
 
-        if (!this.currentSeries || !data.success) return;
+        if (!data.success) {
+            const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
+            hud?.setJewelHUDVisible(true);
+            return;
+        }
 
         const allEntries = this.currentSeries.getAllPuzzleEntries();
         const matching = allEntries.find((entry: any) => {
@@ -1254,5 +1231,61 @@ export class InteriorScene extends Phaser.Scene {
             }
             this.saveStateCallback();
         }
+
+        if (this.currentSeries.isSeriesCompleted()) {
+            const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
+            hud?.setJewelHUDVisible(true);
+            return;
+        }
+
+        const nextPuzzleId = this.getSeriesEntryIdToLaunch(this.currentSeries, false);
+        if (!nextPuzzleId) {
+            const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
+            hud?.setJewelHUDVisible(true);
+            return;
+        }
+
+        this.time.delayedCall(0, () => {
+            this.launchSeriesPuzzleEntry(nextPuzzleId);
+        });
+    }
+
+    private getSeriesEntryIdToLaunch(series: any, allowCompletedFallback: boolean): string | null {
+        const entries = series.getAllPuzzleEntries();
+        for (const entry of entries) {
+            if (entry.unlocked && !entry.completed) {
+                return entry.id;
+            }
+        }
+
+        if (!allowCompletedFallback) {
+            return null;
+        }
+
+        const firstUnlocked = entries.find((entry: any) => entry.unlocked);
+        return firstUnlocked?.id ?? null;
+    }
+
+    private launchSeriesPuzzleEntry(entryId: string): void {
+        const puzzleData = this.currentSeriesPuzzleData.get(entryId);
+        if (!puzzleData) {
+            console.error(`[InteriorScene] No puzzle data for ${entryId}`);
+            const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
+            hud?.setJewelHUDVisible(true);
+            return;
+        }
+
+        const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
+        hud?.setJewelHUDVisible(false);
+
+        this.events.once('seriesPuzzleCompleted', (data: { puzzleId: string; success: boolean }) => {
+            void this.handleSeriesPuzzleCompleted(data);
+        });
+
+        this.scene.launch('BridgePuzzleScene', {
+            puzzleData,
+            seriesMode: true,
+            callerSceneKey: 'InteriorScene',
+        });
     }
 }

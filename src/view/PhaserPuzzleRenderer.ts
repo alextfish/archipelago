@@ -12,6 +12,10 @@ export class PhaserPuzzleRenderer extends BasePuzzleRenderer {
   }
 
   init(puzzle: BridgePuzzle): void {
+    // Series puzzles can reuse the same scene instance; always clear any prior
+    // island, bridge, and constraint visuals before drawing the next puzzle.
+    this.destroy();
+
     // Create island sprites and constraint NPC indicators for each island
     for (const island of puzzle.islands) {
       const worldPos = this.gridMapper.gridToWorld(island.x, island.y);

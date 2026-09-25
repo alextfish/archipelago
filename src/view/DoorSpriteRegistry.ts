@@ -18,6 +18,8 @@ export interface DoorSpriteMapping {
     frameHeight: number;
     /** Number of frames in the opening animation */
     frameCount: number;
+    /** First frame index in the spritesheet used for the opening animation. */
+    animationStartFrame?: number;
 }
 
 /**
@@ -26,6 +28,28 @@ export interface DoorSpriteMapping {
  * Frame 0 = closed state, final frame = open state.
  */
 export const DoorSpriteRegistry: Record<string, DoorSpriteMapping> = {
+    // General horizontal door tiles from terrains.png
+    'doorHClosed': {
+        textureKey: 'terrains-door-tiles',
+        closedFrame: 30,
+        openFrame: 31,
+        animationKey: 'terrains-door-tiles',
+        frameWidth: 32,
+        frameHeight: 32,
+        frameCount: 2,
+        animationStartFrame: 30
+    },
+    'doorHOpen': {
+        textureKey: 'terrains-door-tiles',
+        closedFrame: 30,
+        openFrame: 31,
+        animationKey: 'terrains-door-tiles',
+        frameWidth: 32,
+        frameHeight: 32,
+        frameCount: 2,
+        animationStartFrame: 30
+    },
+
     // Horizontal doors
     'forestDoorHClosed': {
         textureKey: 'forestDoorHOpening',
@@ -34,7 +58,8 @@ export const DoorSpriteRegistry: Record<string, DoorSpriteMapping> = {
         animationKey: 'forestDoorHOpening',
         frameWidth: 32,
         frameHeight: 32,
-        frameCount: 6
+        frameCount: 6,
+        animationStartFrame: 0
     },
     'forestDoorHOpen': {
         textureKey: 'forestDoorHOpening',
@@ -43,7 +68,8 @@ export const DoorSpriteRegistry: Record<string, DoorSpriteMapping> = {
         animationKey: 'forestDoorHOpening',
         frameWidth: 32,
         frameHeight: 32,
-        frameCount: 6
+        frameCount: 6,
+        animationStartFrame: 0
     },
 
     // Vertical doors
@@ -54,7 +80,8 @@ export const DoorSpriteRegistry: Record<string, DoorSpriteMapping> = {
         animationKey: 'forestDoorVOpening',
         frameWidth: 32,
         frameHeight: 64,
-        frameCount: 6
+        frameCount: 6,
+        animationStartFrame: 0
     },
     'forestDoorVOpen': {
         textureKey: 'forestDoorVOpening',
@@ -63,7 +90,8 @@ export const DoorSpriteRegistry: Record<string, DoorSpriteMapping> = {
         animationKey: 'forestDoorVOpening',
         frameWidth: 32,
         frameHeight: 64,
-        frameCount: 6
+        frameCount: 6,
+        animationStartFrame: 0
     }
 };
 

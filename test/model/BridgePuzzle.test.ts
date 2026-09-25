@@ -108,6 +108,21 @@ describe("BridgePuzzle", () => {
       expect(bridgesAt1).toHaveLength(1);
       expect(bridgesAt1[0].id).toBe(bridgeId);
     });
+
+    it("scopes bridge ids to the owning puzzle", () => {
+      const firstPuzzle = new BridgePuzzle({
+        ...puzzleSpec,
+        id: "series-puzzle-1",
+      });
+      const secondPuzzle = new BridgePuzzle({
+        ...puzzleSpec,
+        id: "series-puzzle-2",
+      });
+
+      expect(firstPuzzle.bridges[0].id).toBe("series-puzzle-1-b1");
+      expect(secondPuzzle.bridges[0].id).toBe("series-puzzle-2-b1");
+      expect(firstPuzzle.bridges[0].id).not.toBe(secondPuzzle.bridges[0].id);
+    });
   });
 
   describe("island operations", () => {

@@ -6,6 +6,10 @@ import { isTestMode, attachTestMarker } from '@helpers/TestMarkers';
 import { loadNPCSprites } from '../NPCSpriteHelper';
 
 export class IslandMapScene extends Phaser.Scene {
+    private static readonly CONSTRAINT_PADDING_X_TILES = 5;
+    private static readonly CONSTRAINT_PADDING_Y_TILES = 2;
+    private static readonly HUD_SIDEBAR_WIDTH_PX = 150;
+
     private puzzle: BridgePuzzle | null = null;
     private gridMapper: GridToWorldMapper | null = null;
     private puzzleRenderer: PhaserPuzzleRenderer | null = null;
@@ -178,6 +182,11 @@ export class IslandMapScene extends Phaser.Scene {
     private initializeRenderer() {
         if (!this.puzzle) return;
 
+        if (this.puzzleRenderer) {
+            this.puzzleRenderer.destroy();
+            this.puzzleRenderer = null;
+        }
+
         // Create coordinate mapper with 32px cell size (sprites are 32x32)
         this.gridMapper = new GridToWorldMapper(32);
 
@@ -255,28 +264,29 @@ export class IslandMapScene extends Phaser.Scene {
     private adjustCameraForIslands() {
         if (!this.gridMapper || !this.puzzle) return;
 
-        // Temporarily use full screen to test if islands appear
-        const availWidth = this.scale.width;
+        // Reserve the puzzle HUD sidebar width so puzzle content and speech bubbles
+        // fit inside the usable puzzle viewport rather than underneath the UI.
+        const availWidth = this.scale.width - IslandMapScene.HUD_SIDEBAR_WIDTH_PX;
         const availHeight = this.scale.height;
-        console.log(`Using full screen: ${availWidth} x ${availHeight}`);
+        console.log(`Using puzzle viewport: ${availWidth} x ${availHeight}`);
 
         const xs = this.puzzle.islands.map(i => i.x);
         const ys = this.puzzle.islands.map(i => i.y);
-        const minGX = Math.min(...xs);
-        const maxGX = Math.max(...xs);
-        const minGY = Math.min(...ys);
-        const maxGY = Math.max(...ys);
+        const minGX = Math.min(...xs) - IslandMapScene.CONSTRAINT_PADDING_X_TILES;
+        const maxGX = Math.max(...xs) + IslandMapScene.CONSTRAINT_PADDING_X_TILES;
+        const minGY = Math.min(...ys) - IslandMapScene.CONSTRAINT_PADDING_Y_TILES;
+        const maxGY = Math.max(...ys) + IslandMapScene.CONSTRAINT_PADDING_Y_TILES;
 
         const cell = this.gridMapper.getCellSize();
         const worldWidth = (maxGX - minGX + 1) * cell;
         const worldHeight = (maxGY - minGY + 1) * cell;
-        console.log(`Island grid bounds: (${minGX},${minGY}) to (${maxGX},${maxGY})`);
+        console.log(`Padded island grid bounds: (${minGX},${minGY}) to (${maxGX},${maxGY})`);
         console.log(`Island world size: ${worldWidth} x ${worldHeight}px`);
 
         // Zoom to fit islands inside available area. Use the smaller zoom so both axes fit.
         const zoomX = availWidth / worldWidth;
         const zoomY = availHeight / worldHeight;
-        const padFactor = 0.66;
+        const padFactor = 1;
         const zoom = Math.min(zoomX, zoomY) * padFactor;
         console.log(`Setting camera zoom to ${zoom.toFixed(2)}`);
 

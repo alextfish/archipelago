@@ -136,6 +136,9 @@ export class NPCAppearanceRegistry {
                 happy: 2,
                 sad: 1,
             },
+            faceTextureOverrides: {
+                happy: 'faces/Pirate-F happy',
+            },
             idleAnimation: [
                 { frame: 11, duration: 200 },
                 { frame: 9, duration: 200 },

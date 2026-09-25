@@ -66,7 +66,7 @@ export class BridgePuzzle {
         }),
         count: spec.count ?? 1
       }));
-    this.inventory = new BridgeInventory(bridgeTypes);
+    this.inventory = new BridgeInventory(bridgeTypes, this.id);
     if (spec.maxNumBridges !== undefined) {
       this.maxNumBridges = spec.maxNumBridges;
     } else {

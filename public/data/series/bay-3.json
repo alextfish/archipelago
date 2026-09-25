@@ -1,0 +1,626 @@
+{
+    "id":  "bay-3",
+    "title":  "BAY 3",
+    "description":  "Generated from CSV NPC section \u0027BAY 3\u0027",
+    "puzzles":  [
+                    {
+                        "id":  "bay-see-adj-1",
+                        "title":  "bay see+adj 1",
+                        "description":  "Generated from CSV puzzle \u0027bay see+adj 1\u0027",
+                        "puzzleData":  {
+                                           "id":  "bay-see-adj-1",
+                                           "type":  "standard",
+                                           "size":  {
+                                                        "width":  11,
+                                                        "height":  11
+                                                    },
+                                           "islands":  [
+                                                           {
+                                                               "id":  "I1",
+                                                               "x":  3,
+                                                               "y":  2,
+                                                               "constraints":  [
+                                                                                   "num_visible=2"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I2",
+                                                               "x":  6,
+                                                               "y":  2
+                                                           },
+                                                           {
+                                                               "id":  "I3",
+                                                               "x":  9,
+                                                               "y":  2,
+                                                               "constraints":  [
+                                                                                   "num_visible=3"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I4",
+                                                               "x":  4,
+                                                               "y":  3,
+                                                               "constraints":  [
+                                                                                   "num_visible=1"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I5",
+                                                               "x":  7,
+                                                               "y":  3,
+                                                               "constraints":  [
+                                                                                   "num_passing=2",
+                                                                                   "direction=adjacent"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I6",
+                                                               "x":  10,
+                                                               "y":  3
+                                                           },
+                                                           {
+                                                               "id":  "I7",
+                                                               "x":  3,
+                                                               "y":  4
+                                                           },
+                                                           {
+                                                               "id":  "I8",
+                                                               "x":  6,
+                                                               "y":  4,
+                                                               "constraints":  [
+                                                                                   "num_visible=2"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I9",
+                                                               "x":  9,
+                                                               "y":  4
+                                                           },
+                                                           {
+                                                               "id":  "I10",
+                                                               "x":  4,
+                                                               "y":  5
+                                                           },
+                                                           {
+                                                               "id":  "I11",
+                                                               "x":  7,
+                                                               "y":  5
+                                                           },
+                                                           {
+                                                               "id":  "I12",
+                                                               "x":  8,
+                                                               "y":  5,
+                                                               "constraints":  [
+                                                                                   "num_passing=1",
+                                                                                   "direction=adjacent"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I13",
+                                                               "x":  10,
+                                                               "y":  5
+                                                           },
+                                                           {
+                                                               "id":  "I14",
+                                                               "x":  3,
+                                                               "y":  6,
+                                                               "constraints":  [
+                                                                                   "num_visible=2"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I15",
+                                                               "x":  6,
+                                                               "y":  6,
+                                                               "constraints":  [
+                                                                                   "num_passing=2",
+                                                                                   "direction=adjacent"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I16",
+                                                               "x":  8,
+                                                               "y":  6,
+                                                               "constraints":  [
+                                                                                   "num_visible=1"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I17",
+                                                               "x":  4,
+                                                               "y":  7
+                                                           },
+                                                           {
+                                                               "id":  "I18",
+                                                               "x":  7,
+                                                               "y":  7
+                                                           },
+                                                           {
+                                                               "id":  "I19",
+                                                               "x":  9,
+                                                               "y":  7
+                                                           }
+                                                       ],
+                                           "bridgeTypes":  [
+                                                               {
+                                                                   "id":  "bridge-length-2",
+                                                                   "colour":  "#8B4513",
+                                                                   "length":  2,
+                                                                   "count":  3,
+                                                                   "width":  1
+                                                               },
+                                                               {
+                                                                   "id":  "bridge-length-3",
+                                                                   "colour":  "#8B4513",
+                                                                   "length":  3,
+                                                                   "count":  8,
+                                                                   "width":  1
+                                                               }
+                                                           ],
+                                           "constraints":  [
+                                                               {
+                                                                   "type":  "AllBridgesPlacedConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  2,
+                                                                                  "islandId":  "I1"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  3,
+                                                                                  "islandId":  "I3"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  1,
+                                                                                  "islandId":  "I4"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "direction":  "adjacent",
+                                                                                  "islandId":  "I5",
+                                                                                  "count":  2
+                                                                              },
+                                                                   "type":  "IslandPassingBridgeCountConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  2,
+                                                                                  "islandId":  "I8"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "direction":  "adjacent",
+                                                                                  "islandId":  "I12",
+                                                                                  "count":  1
+                                                                              },
+                                                                   "type":  "IslandPassingBridgeCountConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  2,
+                                                                                  "islandId":  "I14"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "direction":  "adjacent",
+                                                                                  "islandId":  "I15",
+                                                                                  "count":  2
+                                                                              },
+                                                                   "type":  "IslandPassingBridgeCountConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  1,
+                                                                                  "islandId":  "I16"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               }
+                                                           ],
+                                           "maxNumBridges":  2
+                                       },
+                        "requiredPuzzles":  [
+
+                                            ]
+                    },
+                    {
+                        "id":  "bay-see-adj-2",
+                        "title":  "bay see+adj 2",
+                        "description":  "Generated from CSV puzzle \u0027bay see+adj 2\u0027",
+                        "puzzleData":  {
+                                           "id":  "bay-see-adj-2",
+                                           "type":  "standard",
+                                           "size":  {
+                                                        "width":  11,
+                                                        "height":  11
+                                                    },
+                                           "islands":  [
+                                                           {
+                                                               "id":  "I1",
+                                                               "x":  3,
+                                                               "y":  3
+                                                           },
+                                                           {
+                                                               "id":  "I2",
+                                                               "x":  6,
+                                                               "y":  3,
+                                                               "constraints":  [
+                                                                                   "num_visible=2"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I3",
+                                                               "x":  9,
+                                                               "y":  3,
+                                                               "constraints":  [
+                                                                                   "num_visible=3"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I4",
+                                                               "x":  4,
+                                                               "y":  4,
+                                                               "constraints":  [
+                                                                                   "num_passing=1",
+                                                                                   "direction=adjacent"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I5",
+                                                               "x":  7,
+                                                               "y":  4
+                                                           },
+                                                           {
+                                                               "id":  "I6",
+                                                               "x":  5,
+                                                               "y":  5
+                                                           },
+                                                           {
+                                                               "id":  "I7",
+                                                               "x":  8,
+                                                               "y":  5
+                                                           },
+                                                           {
+                                                               "id":  "I8",
+                                                               "x":  3,
+                                                               "y":  6
+                                                           },
+                                                           {
+                                                               "id":  "I9",
+                                                               "x":  6,
+                                                               "y":  6,
+                                                               "constraints":  [
+                                                                                   "num_visible=2"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I10",
+                                                               "x":  9,
+                                                               "y":  6
+                                                           },
+                                                           {
+                                                               "id":  "I11",
+                                                               "x":  4,
+                                                               "y":  7,
+                                                               "constraints":  [
+                                                                                   "num_passing=1",
+                                                                                   "direction=adjacent"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I12",
+                                                               "x":  7,
+                                                               "y":  7
+                                                           },
+                                                           {
+                                                               "id":  "I13",
+                                                               "x":  5,
+                                                               "y":  8,
+                                                               "constraints":  [
+                                                                                   "num_visible=1"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I14",
+                                                               "x":  8,
+                                                               "y":  8
+                                                           },
+                                                           {
+                                                               "id":  "I15",
+                                                               "x":  3,
+                                                               "y":  9,
+                                                               "constraints":  [
+                                                                                   "num_visible=3"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I16",
+                                                               "x":  6,
+                                                               "y":  9
+                                                           },
+                                                           {
+                                                               "id":  "I17",
+                                                               "x":  9,
+                                                               "y":  9
+                                                           }
+                                                       ],
+                                           "bridgeTypes":  [
+                                                               {
+                                                                   "id":  "bridge-length-3",
+                                                                   "colour":  "#8B4513",
+                                                                   "length":  3,
+                                                                   "count":  8,
+                                                                   "width":  1
+                                                               }
+                                                           ],
+                                           "constraints":  [
+                                                               {
+                                                                   "type":  "AllBridgesPlacedConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  2,
+                                                                                  "islandId":  "I2"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  3,
+                                                                                  "islandId":  "I3"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "direction":  "adjacent",
+                                                                                  "islandId":  "I4",
+                                                                                  "count":  1
+                                                                              },
+                                                                   "type":  "IslandPassingBridgeCountConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  2,
+                                                                                  "islandId":  "I9"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "direction":  "adjacent",
+                                                                                  "islandId":  "I11",
+                                                                                  "count":  1
+                                                                              },
+                                                                   "type":  "IslandPassingBridgeCountConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  1,
+                                                                                  "islandId":  "I13"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  3,
+                                                                                  "islandId":  "I15"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               }
+                                                           ],
+                                           "maxNumBridges":  2
+                                       },
+                        "requiredPuzzles":  [
+                                                "bay-see-adj-1"
+                                            ]
+                    },
+                    {
+                        "id":  "bay-see-adj-3",
+                        "title":  "bay see+adj 3",
+                        "description":  "Generated from CSV puzzle \u0027bay see+adj 3\u0027",
+                        "puzzleData":  {
+                                           "id":  "bay-see-adj-3",
+                                           "type":  "standard",
+                                           "size":  {
+                                                        "width":  11,
+                                                        "height":  11
+                                                    },
+                                           "islands":  [
+                                                           {
+                                                               "id":  "I1",
+                                                               "x":  3,
+                                                               "y":  3
+                                                           },
+                                                           {
+                                                               "id":  "I2",
+                                                               "x":  6,
+                                                               "y":  3,
+                                                               "constraints":  [
+                                                                                   "num_visible=2"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I3",
+                                                               "x":  9,
+                                                               "y":  3,
+                                                               "constraints":  [
+                                                                                   "num_visible=3"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I4",
+                                                               "x":  4,
+                                                               "y":  4,
+                                                               "constraints":  [
+                                                                                   "num_visible=2"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I5",
+                                                               "x":  7,
+                                                               "y":  4
+                                                           },
+                                                           {
+                                                               "id":  "I6",
+                                                               "x":  5,
+                                                               "y":  5
+                                                           },
+                                                           {
+                                                               "id":  "I7",
+                                                               "x":  8,
+                                                               "y":  5
+                                                           },
+                                                           {
+                                                               "id":  "I8",
+                                                               "x":  3,
+                                                               "y":  6
+                                                           },
+                                                           {
+                                                               "id":  "I9",
+                                                               "x":  6,
+                                                               "y":  6,
+                                                               "constraints":  [
+                                                                                   "num_visible=2"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I10",
+                                                               "x":  9,
+                                                               "y":  6
+                                                           },
+                                                           {
+                                                               "id":  "I11",
+                                                               "x":  4,
+                                                               "y":  7,
+                                                               "constraints":  [
+                                                                                   "num_passing=1",
+                                                                                   "direction=adjacent"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I12",
+                                                               "x":  7,
+                                                               "y":  7
+                                                           },
+                                                           {
+                                                               "id":  "I13",
+                                                               "x":  5,
+                                                               "y":  8
+                                                           },
+                                                           {
+                                                               "id":  "I14",
+                                                               "x":  8,
+                                                               "y":  8
+                                                           },
+                                                           {
+                                                               "id":  "I15",
+                                                               "x":  3,
+                                                               "y":  9,
+                                                               "constraints":  [
+                                                                                   "num_visible=2"
+                                                                               ]
+                                                           },
+                                                           {
+                                                               "id":  "I16",
+                                                               "x":  6,
+                                                               "y":  9
+                                                           },
+                                                           {
+                                                               "id":  "I17",
+                                                               "x":  9,
+                                                               "y":  9,
+                                                               "constraints":  [
+                                                                                   "num_visible=2"
+                                                                               ]
+                                                           }
+                                                       ],
+                                           "bridgeTypes":  [
+                                                               {
+                                                                   "id":  "bridge-length-3",
+                                                                   "colour":  "#8B4513",
+                                                                   "length":  3,
+                                                                   "count":  10,
+                                                                   "width":  1
+                                                               }
+                                                           ],
+                                           "constraints":  [
+                                                               {
+                                                                   "type":  "AllBridgesPlacedConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  2,
+                                                                                  "islandId":  "I2"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  3,
+                                                                                  "islandId":  "I3"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  2,
+                                                                                  "islandId":  "I4"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  2,
+                                                                                  "islandId":  "I9"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "direction":  "adjacent",
+                                                                                  "islandId":  "I11",
+                                                                                  "count":  1
+                                                                              },
+                                                                   "type":  "IslandPassingBridgeCountConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  2,
+                                                                                  "islandId":  "I15"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               },
+                                                               {
+                                                                   "params":  {
+                                                                                  "count":  2,
+                                                                                  "islandId":  "I17"
+                                                                              },
+                                                                   "type":  "IslandVisibilityConstraint"
+                                                               }
+                                                           ],
+                                           "maxNumBridges":  2
+                                       },
+                        "requiredPuzzles":  [
+                                                "bay-see-adj-2"
+                                            ]
+                    }
+                ],
+    "metadata":  {
+                     "tags":  [
+                                  "generated",
+                                  "csv-import"
+                              ]
+                 }
+}

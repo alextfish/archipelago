@@ -1,0 +1,23 @@
+{
+  "id": "bay1Solved",
+  "npcId": "npcBaySeries1",
+  "start": "completed",
+  "nodes": {
+    "completed": {
+      "npc": {
+        "expression": "happy",
+        "glyphs": "you bridge good"
+      },
+      "choices": [
+        {
+          "text": "Thanks!",
+          "end": true
+        },
+        {
+          "text": "Leave",
+          "end": true
+        }
+      ]
+    }
+  }
+}

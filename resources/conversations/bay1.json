@@ -1,0 +1,26 @@
+{
+  "id": "bay1",
+  "npcId": "npcBaySeries1",
+  "start": "intro",
+  "nodes": {
+    "intro": {
+      "npc": {
+        "expression": "neutral",
+        "glyphs": "you build bridge question"
+      },
+      "choices": [
+        {
+          "text": "Build",
+          "effects": [
+            { "type": "startSeries", "seriesId": "bay-1-see" }
+          ],
+          "end": true
+        },
+        {
+          "text": "Leave",
+          "end": true
+        }
+      ]
+    }
+  }
+}

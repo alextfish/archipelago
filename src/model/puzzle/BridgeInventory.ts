@@ -6,8 +6,9 @@ import { StrutBridge } from "./StrutBridge";
 export class BridgeInventory {
   private allBridges: Bridge[] = [];
 
-  constructor(types: (BridgeType & { count: number })[]) {
+  constructor(types: (BridgeType & { count: number })[], bridgeIdScope?: string) {
     let counter = 0;
+    const idPrefix = bridgeIdScope ? `${bridgeIdScope}-` : '';
     for (const t of types) {
       for (let i = 0; i < t.count; i++) {
         const bridgeType: BridgeType = {
@@ -20,9 +21,9 @@ export class BridgeInventory {
           canCoverIsland: t.canCoverIsland,
         };
         if (t.mustCoverIsland) {
-          this.allBridges.push(new StrutBridge(`b${++counter}`, bridgeType));
+          this.allBridges.push(new StrutBridge(`${idPrefix}b${++counter}`, bridgeType));
         } else {
-          this.allBridges.push({ id: `b${++counter}`, type: bridgeType });
+          this.allBridges.push({ id: `${idPrefix}b${++counter}`, type: bridgeType });
         }
       }
     }
@@ -30,7 +31,7 @@ export class BridgeInventory {
 
   /** Returns all bridges, whether placed or not */
   get bridges(): Bridge[] { return this.allBridges; }
-  get bridgeTypes(): BridgeType[] { 
+  get bridgeTypes(): BridgeType[] {
     // uniquify the types by id, but then return the original objects
     const unique = [
       ...new Map(
