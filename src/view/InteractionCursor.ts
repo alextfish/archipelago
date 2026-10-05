@@ -23,6 +23,7 @@ export class InteractionCursor {
     private scene: Phaser.Scene;
     private cursorSprites: Phaser.GameObjects.Sprite[] = [];
     private currentTarget?: Interactable;
+    private preferredTargetTile?: { tileX: number; tileY: number };
     private tileWidth: number;
     private tileHeight: number;
     private lastFacing: 'up' | 'down' | 'left' | 'right' = 'down';
@@ -113,12 +114,40 @@ export class InteractionCursor {
             return;
         }
 
-        // If multiple in range, choose the one closest in the facing direction
-        const target = this.selectBestTarget(playerTileX, playerTileY, inRange);
+        // Prefer a pointer-selected target tile while it remains in range.
+        let target: Interactable | undefined;
+        if (this.preferredTargetTile) {
+            target = inRange.find((candidate) =>
+                candidate.tileX === this.preferredTargetTile!.tileX
+                && candidate.tileY === this.preferredTargetTile!.tileY
+            );
+            if (!target) {
+                this.preferredTargetTile = undefined;
+            }
+        }
+
+        // Fallback to facing-based selection when no preferred tile is active.
+        if (!target) {
+            target = this.selectBestTarget(playerTileX, playerTileY, inRange);
+        }
 
         if (target !== this.currentTarget) {
             this.setTarget(target);
         }
+    }
+
+    /**
+     * Prefer a specific interactable tile for cursor targeting while it remains in range.
+     */
+    setPreferredTargetTile(tileX: number, tileY: number): void {
+        this.preferredTargetTile = { tileX, tileY };
+    }
+
+    /**
+     * Clear any pointer-selected target preference and return to facing-based selection.
+     */
+    clearPreferredTargetTile(): void {
+        this.preferredTargetTile = undefined;
     }
 
     /**
@@ -192,6 +221,7 @@ export class InteractionCursor {
      */
     hide(): void {
         this.currentTarget = undefined;
+        this.preferredTargetTile = undefined;
         for (const sprite of this.cursorSprites) {
             sprite.setVisible(false);
         }
@@ -222,5 +252,6 @@ export class InteractionCursor {
         }
         this.cursorSprites = [];
         this.currentTarget = undefined;
+        this.preferredTargetTile = undefined;
     }
 }

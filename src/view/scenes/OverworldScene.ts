@@ -30,6 +30,7 @@ import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { GridToWorldMapper } from '@view/GridToWorldMapper';
 import { TileAnimationManager } from '@view/TileAnimationManager';
 import { loadNPCSprites } from '@view/NPCSpriteHelper';
+import { findInteractableInRangeAtTile, isWithinInteractionRange } from '@view/PointerInteractionHelpers';
 import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
 import type { PlayerStartPosition } from '@model/overworld/PlayerStartManager';
 import { SceneTransitionCoordinator } from '@view/SceneTransitionCoordinator';
@@ -1632,35 +1633,27 @@ export class OverworldScene extends Phaser.Scene {
       const { x: clickTileX, y: clickTileY } = this.gridMapper.worldToGrid(worldX, worldY);
       const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(playerX, playerY);
 
-      // Check if there's a focused target
-      const focusedTarget = this.interactionCursor.getCurrentTarget();
+      const clickedTarget = findInteractableInRangeAtTile(
+        this.interactables,
+        playerTileX,
+        playerTileY,
+        clickTileX,
+        clickTileY,
+      );
 
-      // If clicking on the focused target, interact with it
-      if (focusedTarget && this.interactionCursor.isTargeting(clickTileX, clickTileY)) {
-        console.log(`Interacting with focused target at (${clickTileX}, ${clickTileY})`);
-        this.interactWithTarget(focusedTarget);
+      // Click directly interacts with the clicked target when one is in range.
+      if (clickedTarget) {
+        this.interactionCursor.setPreferredTargetTile(clickTileX, clickTileY);
+        console.log(`Interacting with clicked target at (${clickTileX}, ${clickTileY})`);
+        this.interactWithTarget(clickedTarget);
         this.isPointerHeld = false; // Don't continue moving after interaction
         return;
       }
 
-      // Check if clicking within interaction range (1 tile)
-      const tileDx = Math.abs(clickTileX - playerTileX);
-      const tileDy = Math.abs(clickTileY - playerTileY);
-      const withinRange = tileDx <= 1 && tileDy <= 1;
+      const withinRange = isWithinInteractionRange(playerTileX, playerTileY, clickTileX, clickTileY);
 
       if (withinRange) {
-        // Check if clicking on an interactable
-        const clickedInteractable = this.interactables.find(
-          i => i.tileX === clickTileX && i.tileY === clickTileY
-        );
-
-        if (clickedInteractable) {
-          // If it's not focused, focus it (player may need to turn)
-          // If it becomes focused, it will be interactable next tap
-          console.log(`Focusing interactable at (${clickTileX}, ${clickTileY})`);
-          this.isPointerHeld = false; // Don't continue moving when focusing
-          return;
-        }
+        this.interactionCursor.clearPreferredTargetTile();
 
         // Clicking on player's own tile - try to enter puzzle at player position
         if (clickTileX === playerTileX && clickTileY === playerTileY) {
@@ -1678,14 +1671,34 @@ export class OverworldScene extends Phaser.Scene {
 
     this.input.on('pointerdown', this.puzzleEntryPointerHandler);
 
-    // Add pointer move handler for continuous movement while held
+    // Mouseover handler to update interaction cursor, and player destination while dragging
     this.pointerMoveHandler = (pointer: Phaser.Input.Pointer) => {
-      // Only update destination if pointer is held and in exploration mode
-      if (!this.isPointerHeld || !this.canPlayerMoveAroundAndInteract()) {
+      if (!this.canPlayerMoveAroundAndInteract()) {
         return;
       }
 
-      if (!this.player || !this.playerController || !pointer.isDown) {
+      if (!this.player || !this.playerController || !this.interactionCursor) {
+        return;
+      }
+
+      const { x: hoverTileX, y: hoverTileY } = this.gridMapper.worldToGrid(pointer.worldX, pointer.worldY);
+      const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
+      const hoveredTarget = findInteractableInRangeAtTile(
+        this.interactables,
+        playerTileX,
+        playerTileY,
+        hoverTileX,
+        hoverTileY,
+      );
+
+      if (hoveredTarget) {
+        this.interactionCursor.setPreferredTargetTile(hoverTileX, hoverTileY);
+      } else {
+        this.interactionCursor.clearPreferredTargetTile();
+      }
+
+      // Only update destination while the pointer is being dragged.
+      if (!this.isPointerHeld || !pointer.isDown) {
         return;
       }
 

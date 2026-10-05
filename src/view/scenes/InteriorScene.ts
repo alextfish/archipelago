@@ -13,6 +13,7 @@ import { PlayerController } from '@view/PlayerController';
 import { CameraManager } from '@view/CameraManager';
 import { GridToWorldMapper } from '@view/GridToWorldMapper';
 import { InteractionCursor, type Interactable } from '@view/InteractionCursor';
+import { findInteractableInRangeAtTile, isWithinInteractionRange } from '@view/PointerInteractionHelpers';
 import { NPCSpriteController } from '@view/NPCSpriteController';
 import { CollectibleManager } from '@view/CollectibleManager';
 import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
@@ -278,9 +279,7 @@ export class InteriorScene extends Phaser.Scene {
             this.canPlayerMoveAroundAndInteract(),
         );
 
-        if (this.player) {
-            this.player.setDepth(this.player.y);
-        }
+        this.player?.setDepth(this.player.y);
 
         if (!this.canPlayerMoveAroundAndInteract()) {
             return;
@@ -785,37 +784,58 @@ export class InteriorScene extends Phaser.Scene {
 
             const { x: worldX, y: worldY } = { x: pointer.worldX, y: pointer.worldY };
 
-            if (!this.player) return;
+            if (!this.player || !this.interactionCursor) return;
             this.isPointerHeld = true;
             const { x: clickTileX, y: clickTileY } = this.gridMapper.worldToGrid(worldX, worldY);
             const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(
                 this.player.x, this.player.y
             );
 
-            const focusedTarget = this.interactionCursor?.getCurrentTarget();
-            if (focusedTarget && this.interactionCursor?.isTargeting(clickTileX, clickTileY)) {
-                this.interactWithTarget(focusedTarget);
+            // Is there something specific in the clicked tile?
+            // If so that's the only target we want to interact with, even if there are other interactables in range.
+            const clickedTarget = findInteractableInRangeAtTile(
+                this.interactables,
+                playerTileX,
+                playerTileY,
+                clickTileX,
+                clickTileY,
+            );
+            if (clickedTarget) {
+                this.interactionCursor.setPreferredTargetTile(clickTileX, clickTileY);
+                this.interactWithTarget(clickedTarget);
                 this.isPointerHeld = false;
                 return;
             }
 
-            const tileDx = Math.abs(clickTileX - playerTileX);
-            const tileDy = Math.abs(clickTileY - playerTileY);
-            if (tileDx <= 1 && tileDy <= 1) {
-                const clicked = this.interactables.find(
-                    (i) => i.tileX === clickTileX && i.tileY === clickTileY
-                );
-                if (clicked) {
-                    this.isPointerHeld = false;
-                    return;
-                }
+            // Otherwise revert to normal target selection
+            if (isWithinInteractionRange(playerTileX, playerTileY, clickTileX, clickTileY)) {
+                this.interactionCursor.clearPreferredTargetTile();
             }
 
             this.playerController.setTargetPosition(worldX, worldY);
         };
 
         this.pointerMoveHandler = (pointer: Phaser.Input.Pointer) => {
-            if (!this.isPointerHeld || !this.playerController || !pointer.isDown || !this.canPlayerMoveAroundAndInteract()) return;
+            if (!this.canPlayerMoveAroundAndInteract()) return;
+            if (!this.player || !this.interactionCursor) return;
+
+            const { x: hoverTileX, y: hoverTileY } = this.gridMapper.worldToGrid(pointer.worldX, pointer.worldY);
+            const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
+            const hoveredTarget = findInteractableInRangeAtTile(
+                this.interactables,
+                playerTileX,
+                playerTileY,
+                hoverTileX,
+                hoverTileY,
+            );
+
+            if (hoveredTarget) {
+                this.interactionCursor.setPreferredTargetTile(hoverTileX, hoverTileY);
+            } else {
+                this.interactionCursor.clearPreferredTargetTile();
+            }
+
+            if (!this.isPointerHeld || !this.playerController || !pointer.isDown) return;
             this.playerController.setTargetPosition(pointer.worldX, pointer.worldY);
         };
 
