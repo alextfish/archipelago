@@ -117,9 +117,10 @@ export class InteractionCursor {
         // Prefer a pointer-selected target tile while it remains in range.
         let target: Interactable | undefined;
         if (this.preferredTargetTile) {
+            const preferredTile = this.preferredTargetTile;
             target = inRange.find((candidate) =>
-                candidate.tileX === this.preferredTargetTile!.tileX
-                && candidate.tileY === this.preferredTargetTile!.tileY
+                candidate.tileX === preferredTile.tileX
+                && candidate.tileY === preferredTile.tileY
             );
             if (!target) {
                 this.preferredTargetTile = undefined;
@@ -133,7 +134,10 @@ export class InteractionCursor {
 
         if (target !== this.currentTarget) {
             this.setTarget(target);
+            return;
         }
+
+        this.positionCursorAtTarget(target);
     }
 
     /**
@@ -203,6 +207,18 @@ export class InteractionCursor {
     private setTarget(target: Interactable): void {
         this.currentTarget = target;
 
+        this.positionCursorAtTarget(target);
+
+        // Show first frame
+        this.cursorSprites[0].setVisible(true);
+        this.cursorSprites[1].setVisible(false);
+    }
+
+    /**
+     * Position cursor sprites at an interactable's tile centre.
+     */
+    private positionCursorAtTarget(target: Interactable): void {
+
         // Position cursor at target tile (centered)
         const worldX = target.tileX * this.tileWidth + this.tileWidth / 2;
         const worldY = target.tileY * this.tileHeight + this.tileHeight / 2;
@@ -210,10 +226,6 @@ export class InteractionCursor {
         for (const sprite of this.cursorSprites) {
             sprite.setPosition(worldX, worldY);
         }
-
-        // Show first frame
-        this.cursorSprites[0].setVisible(true);
-        this.cursorSprites[1].setVisible(false);
     }
 
     /**
