@@ -139,6 +139,7 @@ export class OverworldScene extends Phaser.Scene {
   // Active series tracking (for navigation)
   private currentSeries: any = null;
   private currentSeriesPuzzleData: Map<string, any> = new Map();
+  private shouldShowNewGameIntro: boolean = false;
 
   constructor() {
     super({ key: 'OverworldScene' });
@@ -640,6 +641,10 @@ export class OverworldScene extends Phaser.Scene {
         () => this.saveGameState(),
       );
       this.portalManager.loadPortals();
+
+      if (this.shouldShowNewGameIntro) {
+        this.showNewGameIntroDialogue();
+      }
 
     } catch (error) {
       console.error('Failed to initialize overworld puzzles:', error);
@@ -1528,13 +1533,74 @@ export class OverworldScene extends Phaser.Scene {
   private loadGameState(): void {
     try {
       const saved = localStorage.getItem('archipelago_game_state');
+      this.shouldShowNewGameIntro = !saved;
       if (saved) {
         this.gameState.importState(JSON.parse(saved));
         console.log('[OverworldScene] Game state loaded from localStorage');
+      } else {
+        console.log('[OverworldScene] No saved game state found; intro dialogue will be shown');
       }
     } catch (e) {
+      this.shouldShowNewGameIntro = true;
       console.warn('[OverworldScene] Failed to load game state:', e);
     }
+  }
+
+  /**
+   * Show an onboarding dialogue on a fresh game before allowing exploration.
+   * Uses ConversationScene with plain English text rather than glyph language.
+   */
+  private showNewGameIntroDialogue(): void {
+    this.shouldShowNewGameIntro = false;
+
+    this.gameMode = 'conversation';
+    this.playerController?.stopAndIdle();
+    this.playerController?.setEnabled(false);
+    this.interactionCursor?.hide();
+
+    const introText =
+      'Thank you for playtesting! Pretend you\'ve just seen a beautifully animated cutscene of you, a builder character, getting shipwrecked on an island. Build bridges to find your way around. Click or tap anywhere to move. Or use arrow keys/WASD and Space/E/Enter.';
+
+    const startIntroConversation = (): void => {
+      const conversationScene = this.scene.get('ConversationScene') as ConversationScene | null;
+      if (!conversationScene) {
+        console.error('[OverworldScene] ConversationScene not found for new-game intro');
+        this.gameMode = 'exploration';
+        SceneTransitionCoordinator.enableInteraction({
+          scene: this,
+          playerController: this.playerController,
+          onEnable: () => {
+            this.isPointerHeld = false;
+          },
+        });
+        return;
+      }
+
+      conversationScene.showEnglishMessage(
+        introText,
+        'Start exploring',
+        () => {
+          this.gameMode = 'exploration';
+          this.scene.stop('ConversationScene');
+          SceneTransitionCoordinator.enableInteraction({
+            scene: this,
+            playerController: this.playerController,
+            onEnable: () => {
+              this.isPointerHeld = false;
+            },
+          });
+        }
+      );
+    };
+
+    if (!this.scene.isActive('ConversationScene')) {
+      this.scene.launch('ConversationScene');
+      const conversationScene = this.scene.get('ConversationScene') as ConversationScene | null;
+      conversationScene?.events.once('create', startIntroConversation);
+      return;
+    }
+
+    startIntroConversation();
   }
 
   /**

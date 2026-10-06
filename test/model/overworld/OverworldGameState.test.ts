@@ -262,7 +262,8 @@ describe('OverworldGameState', () => {
         });
 
         it('should restore saved bridge progress onto freshly loaded puzzles', () => {
-            mockPuzzle.placeBridge('b1', { x: 1, y: 1 }, { x: 3, y: 1 });
+            const bridgeID = mockPuzzle.bridges[0].id;
+            mockPuzzle.placeBridge(bridgeID, { x: 1, y: 1 }, { x: 3, y: 1 });
             gameState.saveOverworldPuzzleProgress('test-puzzle', mockPuzzle);
 
             const exported = gameState.exportState();

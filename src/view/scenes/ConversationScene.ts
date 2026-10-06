@@ -31,6 +31,10 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     private overlay: Phaser.GameObjects.Rectangle | null = null;
     private speechBubble: SpeechBubble | null = null;
     private choiceButtons: ChoiceButton[] = [];
+    private englishMessagePanel: Phaser.GameObjects.Rectangle | null = null;
+    private englishMessageText: Phaser.GameObjects.Text | null = null;
+    private isShowingEnglishMessage = false;
+    private onEnglishMessageDismiss: (() => void) | null = null;
     private npcPortrait: Phaser.GameObjects.Container | null = null;
     private playerPortrait: Phaser.GameObjects.Container | null = null;
     private currentNPC: NPC | null = null;
@@ -43,6 +47,10 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     private readonly CHOICE_HEIGHT = 60;
     private readonly CHOICE_SPACING = 20;
     private readonly CHOICE_WIDTH = 280; // Narrower for horizontal layout
+    private readonly ENGLISH_MESSAGE_WIDTH = 900;
+    private readonly ENGLISH_MESSAGE_HEIGHT = 260;
+    private readonly ENGLISH_MESSAGE_Y = 110;
+    private readonly ENGLISH_MESSAGE_PADDING = 24;
     private readonly PORTRAIT_SIZE = 96;
     private readonly PORTRAIT_SCALE = 2;
     private readonly PORTRAIT_PADDING = 20;
@@ -158,7 +166,87 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         this.controller.startConversation(spec, npc, startNodeId);
 
         console.log('ConversationScene: startConversation complete');
-    }    /**
+    }
+
+    /**
+     * Display a plain-English message inside the conversation scene.
+     * Used for onboarding/tutorial prompts that should reuse this UI shell.
+     */
+    showEnglishMessage(message: string, buttonText: string = 'Continue', onDismiss?: () => void): void {
+        this.isShowingEnglishMessage = true;
+        this.onEnglishMessageDismiss = onDismiss ?? null;
+
+        // Make sure the scene itself is visible and on top.
+        this.scene.setVisible(true, 'ConversationScene');
+        this.scene.bringToTop('ConversationScene');
+        if (this.scene.isActive('OverworldHUDScene')) {
+            this.scene.bringToTop('OverworldHUDScene');
+        }
+
+        this.clearChoices();
+        this.speechBubble?.clear();
+        this.speechBubble?.setVisible(false);
+        if (this.npcPortrait) this.npcPortrait.setVisible(false);
+        if (this.playerPortrait) this.playerPortrait.setVisible(false);
+
+        if (!this.englishMessagePanel) {
+            this.englishMessagePanel = this.add.rectangle(
+                (this.scale.width - this.ENGLISH_MESSAGE_WIDTH) / 2,
+                this.ENGLISH_MESSAGE_Y,
+                this.ENGLISH_MESSAGE_WIDTH,
+                this.ENGLISH_MESSAGE_HEIGHT,
+                0x101010,
+                0.92
+            );
+            this.englishMessagePanel.setOrigin(0, 0);
+            this.englishMessagePanel.setStrokeStyle(3, 0xffffff, 0.9);
+            this.englishMessagePanel.setDepth(10);
+        }
+
+        if (!this.englishMessageText) {
+            this.englishMessageText = this.add.text(
+                this.englishMessagePanel.x + this.ENGLISH_MESSAGE_PADDING,
+                this.englishMessagePanel.y + this.ENGLISH_MESSAGE_PADDING,
+                message,
+                {
+                    fontSize: '28px',
+                    color: '#ffffff',
+                    fontFamily: 'Arial',
+                    align: 'left',
+                    wordWrap: {
+                        width: this.ENGLISH_MESSAGE_WIDTH - this.ENGLISH_MESSAGE_PADDING * 2,
+                        useAdvancedWrap: true,
+                    },
+                    lineSpacing: 8,
+                }
+            );
+            this.englishMessageText.setDepth(11);
+        } else {
+            this.englishMessageText.setText(message);
+        }
+
+        this.englishMessagePanel.setVisible(true);
+        this.englishMessageText.setVisible(true);
+
+        const centerX = this.scale.width / 2;
+        const buttonY = this.ENGLISH_MESSAGE_Y + this.ENGLISH_MESSAGE_HEIGHT + 32;
+        const button = new ChoiceButton(
+            this,
+            centerX - this.CHOICE_WIDTH / 2,
+            buttonY,
+            this.CHOICE_WIDTH,
+            this.CHOICE_HEIGHT,
+            buttonText,
+            -1,
+            () => this.onContinueClicked()
+        );
+        button.setDepth(12);
+        this.choiceButtons.push(button);
+
+        this.setVisible(true);
+    }
+
+    /**
      * ConversationHost interface: Display NPC line
      */
     displayNPCLine(expression: string, glyphFramesByRow: number[][], language: string, customFrame?: string): void {
@@ -313,6 +401,13 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
      */
     private onContinueClicked(): void {
         console.log('ConversationScene: Continue button clicked, ending conversation');
+        if (this.isShowingEnglishMessage) {
+            const dismissCallback = this.onEnglishMessageDismiss;
+            this.hideConversation();
+            dismissCallback?.();
+            return;
+        }
+
         if (this.controller) {
             this.controller.endConversation(); // Emit test event and clear state
         }
@@ -327,6 +422,7 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         console.log('ConversationScene: hideConversation called');
         this.setVisible(false);
         this.clearChoices();
+        this.clearEnglishMessage();
 
         if (this.speechBubble) {
             this.speechBubble.clear();
@@ -377,6 +473,8 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     private setVisible(visible: boolean): void {
         if (this.overlay) this.overlay.setVisible(visible);
         if (this.speechBubble) this.speechBubble.setVisible(visible);
+        if (this.englishMessagePanel) this.englishMessagePanel.setVisible(visible && this.isShowingEnglishMessage);
+        if (this.englishMessageText) this.englishMessageText.setVisible(visible && this.isShowingEnglishMessage);
 
         for (const button of this.choiceButtons) {
             button.setVisible(visible);
@@ -534,6 +632,21 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         const sprite = portrait.getAt(1) as Phaser.GameObjects.Sprite;
         if (sprite) {
             sprite.setTexture(spriteKey, frame);
+        }
+    }
+
+    /**
+     * Reset state for the plain-English message mode.
+     */
+    private clearEnglishMessage(): void {
+        this.isShowingEnglishMessage = false;
+        this.onEnglishMessageDismiss = null;
+        if (this.englishMessagePanel) {
+            this.englishMessagePanel.setVisible(false);
+        }
+        if (this.englishMessageText) {
+            this.englishMessageText.setVisible(false);
+            this.englishMessageText.setText('');
         }
     }
 }
