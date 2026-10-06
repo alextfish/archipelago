@@ -487,7 +487,24 @@ export class OverworldScene extends Phaser.Scene {
 
     // Set up input and player controller
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.playerController = new PlayerController(this, this.player, this.cursors, (x, y) => this.getCollisionAt(x, y));
+    const wasdKeys = this.input.keyboard!.addKeys({
+      up: Phaser.Input.Keyboard.KeyCodes.W,
+      down: Phaser.Input.Keyboard.KeyCodes.S,
+      left: Phaser.Input.Keyboard.KeyCodes.A,
+      right: Phaser.Input.Keyboard.KeyCodes.D,
+    }) as {
+      up: Phaser.Input.Keyboard.Key;
+      down: Phaser.Input.Keyboard.Key;
+      left: Phaser.Input.Keyboard.Key;
+      right: Phaser.Input.Keyboard.Key;
+    };
+    this.playerController = new PlayerController(
+      this,
+      this.player,
+      this.cursors,
+      (x, y) => this.getCollisionAt(x, y),
+      wasdKeys,
+    );
 
     console.log('Overworld scene created successfully');
     console.log(`Map size: ${mapWidth}x${mapHeight}`);

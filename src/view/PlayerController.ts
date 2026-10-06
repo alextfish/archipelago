@@ -55,6 +55,12 @@ const COLLISION_TYPE_NAMES: Record<number, string> = {
 export class PlayerController {
     private player: Phaser.GameObjects.Sprite;
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
+    private wasdKeys?: {
+        up: Phaser.Input.Keyboard.Key;
+        down: Phaser.Input.Keyboard.Key;
+        left: Phaser.Input.Keyboard.Key;
+        right: Phaser.Input.Keyboard.Key;
+    };
     private scene: Phaser.Scene;
     private enabled: boolean = true;
     private getCollisionAt?: (tileX: number, tileY: number) => CollisionType;
@@ -81,13 +87,24 @@ export class PlayerController {
         scene: Phaser.Scene,
         player: Phaser.GameObjects.Sprite,
         cursors: Phaser.Types.Input.Keyboard.CursorKeys,
-        getCollisionAt?: (tileX: number, tileY: number) => CollisionType
+        getCollisionAt?: (tileX: number, tileY: number) => CollisionType,
+        wasdKeys?: {
+            up: Phaser.Input.Keyboard.Key;
+            down: Phaser.Input.Keyboard.Key;
+            left: Phaser.Input.Keyboard.Key;
+            right: Phaser.Input.Keyboard.Key;
+        }
     ) {
         this.scene = scene;
         this.player = player;
         this.cursors = cursors;
         this.getCollisionAt = getCollisionAt;
+        this.wasdKeys = wasdKeys;
         this.createPlayerAnimations();
+    }
+
+    private isDirectionDown(direction: 'up' | 'down' | 'left' | 'right'): boolean {
+        return Boolean(this.cursors[direction]?.isDown || this.wasdKeys?.[direction]?.isDown);
     }
 
     /**
@@ -174,10 +191,10 @@ export class PlayerController {
 
         // Check if any keyboard input is being used
         const hasKeyboardInput =
-            this.cursors.left!.isDown ||
-            this.cursors.right!.isDown ||
-            this.cursors.up!.isDown ||
-            this.cursors.down!.isDown;
+            this.isDirectionDown('left') ||
+            this.isDirectionDown('right') ||
+            this.isDirectionDown('up') ||
+            this.isDirectionDown('down');
 
         // Keyboard input takes priority and cancels tap movement
         if (hasKeyboardInput) {
@@ -257,15 +274,15 @@ export class PlayerController {
         let dirX = 0;
         let dirY = 0;
 
-        if (this.cursors.left!.isDown) {
+        if (this.isDirectionDown('left')) {
             dirX = -1;
-        } else if (this.cursors.right!.isDown) {
+        } else if (this.isDirectionDown('right')) {
             dirX = 1;
         }
 
-        if (this.cursors.up!.isDown) {
+        if (this.isDirectionDown('up')) {
             dirY = -1;
-        } else if (this.cursors.down!.isDown) {
+        } else if (this.isDirectionDown('down')) {
             dirY = 1;
         }
 

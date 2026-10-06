@@ -23,6 +23,13 @@ type MockCursors = {
     right?: { isDown: boolean };
 };
 
+type MockWASDKeys = {
+    up: { isDown: boolean };
+    down: { isDown: boolean };
+    left: { isDown: boolean };
+    right: { isDown: boolean };
+};
+
 type MockScene = {
     anims: {
         create: ReturnType<typeof vi.fn>;
@@ -38,6 +45,7 @@ describe('PlayerController', () => {
     let controller: PlayerController;
     let mockPlayer: MockSprite;
     let mockCursors: MockCursors;
+    let mockWASDKeys: MockWASDKeys;
     let mockScene: MockScene;
 
     beforeEach(() => {
@@ -65,6 +73,13 @@ describe('PlayerController', () => {
             right: { isDown: false }
         };
 
+        mockWASDKeys = {
+            up: { isDown: false },
+            down: { isDown: false },
+            left: { isDown: false },
+            right: { isDown: false }
+        };
+
         // Create mock scene with game loop delta (16ms ≈ 60 fps)
         mockScene = {
             anims: {
@@ -80,7 +95,14 @@ describe('PlayerController', () => {
         controller = new PlayerController(
             mockScene as unknown as Phaser.Scene,
             mockPlayer as unknown as Phaser.GameObjects.Sprite,
-            mockCursors as unknown as Phaser.Types.Input.Keyboard.CursorKeys
+            mockCursors as unknown as Phaser.Types.Input.Keyboard.CursorKeys,
+            undefined,
+            mockWASDKeys as unknown as {
+                up: Phaser.Input.Keyboard.Key;
+                down: Phaser.Input.Keyboard.Key;
+                left: Phaser.Input.Keyboard.Key;
+                right: Phaser.Input.Keyboard.Key;
+            }
         );
     });
 
@@ -141,6 +163,22 @@ describe('PlayerController', () => {
             expect(mockPlayer.y).toBeGreaterThan(100);
             // An animation should play (walk-down when no horizontal movement)
             expect(mockPlayer.anims.play).toHaveBeenCalled();
+        });
+
+        it('should move player left when A key is pressed', () => {
+            mockWASDKeys.left.isDown = true;
+            controller.update();
+            expect(mockPlayer.x).toBeLessThan(100);
+            expect(mockPlayer.anims.play).toHaveBeenCalledWith('walk-left', true);
+        });
+
+        it('should allow mixing arrow and WASD keys interchangeably', () => {
+            mockCursors.left!.isDown = true;
+            mockWASDKeys.up.isDown = true;
+            controller.update();
+            expect(mockPlayer.x).toBeLessThan(100);
+            expect(mockPlayer.y).toBeLessThan(100);
+            expect(mockPlayer.anims.play).toHaveBeenCalledWith('walk-left', true);
         });
 
         it('should play idle animation when player stops moving', () => {
