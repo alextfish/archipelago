@@ -1,4 +1,5 @@
 import type { TileLayerConfig } from './MapPuzzleExtractor';
+import { OverworldWaterPaddingGenerator } from './OverworldWaterPaddingGenerator';
 
 /**
  * Example tile layer configuration for overworld puzzle extraction
@@ -100,6 +101,19 @@ export class MapUtils {
             // Validate basic structure
             if (!mapData.width || !mapData.height || !mapData.layers) {
                 throw new Error(`Invalid Tiled map format: ${mapPath}`);
+            }
+
+            // One-time runtime augmentation for the overworld map: add ocean padding
+            // around the authored map if it has not already been generated.
+            const normalisedMapPath = mapPath.replace(/\\/g, '/').toLowerCase();
+            const isOverworldMap =
+                normalisedMapPath.endsWith('/overworld.json') ||
+                normalisedMapPath.endsWith('/overworld.tmx');
+            if (isOverworldMap) {
+                const changed = OverworldWaterPaddingGenerator.apply(mapData);
+                if (changed) {
+                    console.log('[MapUtils] Added generated overworld water padding (20 tiles)');
+                }
             }
 
             console.log(`Loaded Tiled map: ${mapData.width}x${mapData.height} with ${mapData.layers.length} layers`);

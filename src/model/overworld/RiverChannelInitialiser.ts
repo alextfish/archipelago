@@ -13,6 +13,12 @@ import type { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
  * Works entirely in tile coordinates (not pixels).
  */
 export class RiverChannelInitialiser {
+  private static shouldUseForFlow(layer: any): boolean {
+    if (!Array.isArray(layer?.properties)) return true;
+    const excluded = layer.properties.find((p: any) => p?.name === 'excludeFromFlow');
+    return excluded?.value !== true;
+  }
+
   /**
    * Extract river channels from Tiled map data.
    * Uses flood-fill algorithm to trace connected water tiles.
@@ -31,24 +37,24 @@ export class RiverChannelInitialiser {
     }>
   ): RiverChannel[] {
     const channels: RiverChannel[] = [];
-    
+
     // 1. Find the flow layer in Tiled data
     const flowLayer = tiledMapData.layers?.find((l: any) => l.name === flowLayerName);
     if (!flowLayer) {
       console.warn(`Flow layer "${flowLayerName}" not found in Tiled map`);
       return channels;
     }
-    
+
     // 2. Build a grid of water tiles from layer data (in tile coordinates)
     const waterGrid = this.buildWaterGrid(flowLayer, tiledMapData.width, tiledMapData.height);
-    
+
     // 3. For each puzzle edge tile, trace downstream to find channels
     for (const [puzzleID, region] of puzzleRegions) {
       for (const edgeTile of region.edgeTiles) {
         // Convert local edge tile to world tile coordinates
         const worldTileX = region.bounds.tileX + edgeTile.x;
         const worldTileY = region.bounds.tileY + edgeTile.y;
-        
+
         const channel = this.traceChannel(
           puzzleID,
           { localX: edgeTile.x, localY: edgeTile.y, edge: edgeTile.edge },
@@ -62,39 +68,39 @@ export class RiverChannelInitialiser {
         }
       }
     }
-    
+
     return channels;
   }
-  
+
   /**
    * Build a grid of water tiles from Tiled layer data.
    * Returns a set of GridKeys for tiles with water.
    */
   private static buildWaterGrid(flowLayer: any, mapWidth: number, mapHeight: number): Set<GridKey> {
     const waterGrid = new Set<GridKey>();
-    
+
     // Handle both data array and data property
     const data = flowLayer.data;
     if (!data) {
       return waterGrid;
     }
-    
+
     // Tiled stores tile data in a flat array, row by row
     for (let y = 0; y < mapHeight; y++) {
       for (let x = 0; x < mapWidth; x++) {
         const index = y * mapWidth + x;
         const tileGID = data[index];
-        
+
         // Non-zero GID means a tile is present
         if (tileGID && tileGID > 0) {
           waterGrid.add(gridKey(x, y));
         }
       }
     }
-    
+
     return waterGrid;
   }
-  
+
   /**
    * Trace a channel from a source puzzle edge to a target puzzle edge.
    * Uses flood-fill algorithm starting from the source edge tile.
@@ -113,32 +119,32 @@ export class RiverChannelInitialiser {
       // No water adjacent to this edge
       return null;
     }
-    
+
     // Flood-fill to trace the channel
     const visited = new Set<GridKey>();
     const channelTiles: GridKey[] = [];
     const queue: GridKey[] = [startKey];
-    
+
     let targetPuzzleID: string | null = null;
     let targetEdgeTile: { localX: number; localY: number } | null = null;
     let targetWorldTileX: number | null = null;
     let targetWorldTileY: number | null = null;
-    
+
     while (queue.length > 0) {
       const currentKey = queue.shift()!;
-      
+
       if (visited.has(currentKey)) {
         continue;
       }
       visited.add(currentKey);
-      
+
       // Skip if not a water tile
       if (!waterGrid.has(currentKey)) {
         continue;
       }
-      
+
       channelTiles.push(currentKey);
-      
+
       // Check if we've reached another puzzle edge
       const targetInfo = this.checkPuzzleEdge(currentKey, puzzleRegions, sourcePuzzleID);
       if (targetInfo) {
@@ -148,7 +154,7 @@ export class RiverChannelInitialiser {
         targetWorldTileY = targetInfo.worldTileY;
         break; // Found target, stop tracing
       }
-      
+
       // Add adjacent water tiles to queue
       const neighbors = this.getNeighbors(currentKey);
       for (const neighbor of neighbors) {
@@ -157,7 +163,7 @@ export class RiverChannelInitialiser {
         }
       }
     }
-    
+
     // Only create channel if we found a target
     if (targetPuzzleID && targetEdgeTile && targetWorldTileX !== null && targetWorldTileY !== null && channelTiles.length > 0) {
       return {
@@ -173,10 +179,10 @@ export class RiverChannelInitialiser {
         targetWorldTileY
       };
     }
-    
+
     return null;
   }
-  
+
   /**
    * Get the tile adjacent to the given tile in the specified direction.
    */
@@ -189,7 +195,7 @@ export class RiverChannelInitialiser {
       default: return null;
     }
   }
-  
+
   /**
    * Get all 4-connected neighbors of a tile.
    */
@@ -197,7 +203,7 @@ export class RiverChannelInitialiser {
     const [xStr, yStr] = (key as string).split(',');
     const x = Number.parseInt(xStr);
     const y = Number.parseInt(yStr);
-    
+
     return [
       gridKey(x, y - 1), // North
       gridKey(x, y + 1), // South
@@ -205,7 +211,7 @@ export class RiverChannelInitialiser {
       gridKey(x - 1, y)  // West
     ];
   }
-  
+
   /**
    * Check if a tile is adjacent to an edge of a puzzle (not the source puzzle).
    * Returns puzzle info if found, null otherwise.
@@ -218,24 +224,24 @@ export class RiverChannelInitialiser {
     const [xStr, yStr] = (tileKey as string).split(',');
     const worldX = Number.parseInt(xStr);
     const worldY = Number.parseInt(yStr);
-    
+
     for (const [puzzleID, region] of puzzleRegions) {
       if (puzzleID === excludePuzzleID) {
         continue; // Skip source puzzle
       }
-      
+
       const { bounds, edgeTiles } = region;
-      
+
       // Check each edge tile to see if the water tile is adjacent to it
       for (const edgeTile of edgeTiles) {
         const edgeWorldX = bounds.tileX + edgeTile.x;
         const edgeWorldY = bounds.tileY + edgeTile.y;
-        
+
         // Check if water tile is adjacent to this edge tile
-        const isAdjacent = 
+        const isAdjacent =
           (worldX === edgeWorldX && Math.abs(worldY - edgeWorldY) === 1) ||
           (worldY === edgeWorldY && Math.abs(worldX - edgeWorldX) === 1);
-        
+
         if (isAdjacent) {
           return {
             puzzleID,
@@ -246,7 +252,7 @@ export class RiverChannelInitialiser {
         }
       }
     }
-    
+
     return null;
   }
 
@@ -314,7 +320,9 @@ export class RiverChannelInitialiser {
     const mapHeight: number = tiledMapData.height ?? 0;
     const merged = new Array<number>(mapWidth * mapHeight).fill(0);
 
-    const waterLayers = TiledLayerUtils.findTileLayersByName(tiledMapData.layers ?? [], 'water');
+    const waterLayers = TiledLayerUtils
+      .findTileLayersByName(tiledMapData.layers ?? [], 'water')
+      .filter(layer => this.shouldUseForFlow(layer.data));
     console.log(`[MergedWater] Merging ${waterLayers.length} water layer(s) into master grid`);
 
     for (const layer of waterLayers) {

@@ -103,6 +103,12 @@ export interface TiledMapData {
 export class MapPuzzleExtractor {
     private cachedIslandTileIDs: number[] | null = null;
 
+    private static shouldUseAsPuzzleWaterLayer(layer: any): boolean {
+        if (!Array.isArray(layer?.properties)) return true;
+        const excluded = layer.properties.find((p: any) => p?.name === 'excludeFromPuzzleWater');
+        return excluded?.value !== true;
+    }
+
     constructor(private readonly tileConfig: TileLayerConfig) { }
 
     /**
@@ -305,7 +311,7 @@ export class MapPuzzleExtractor {
         const waterLayers = TiledLayerUtils.findTileLayersByName(
             tiledMap.layers as any[],
             'water'
-        );
+        ).filter(layer => MapPuzzleExtractor.shouldUseAsPuzzleWaterLayer(layer.data));
         if (waterLayers.length === 0) {
             console.warn(`No water layer found for FlowPuzzle ${definition.id}`);
             return [];
