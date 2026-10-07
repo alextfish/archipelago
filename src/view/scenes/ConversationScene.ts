@@ -51,9 +51,10 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
     private readonly ENGLISH_MESSAGE_HEIGHT = 260;
     private readonly ENGLISH_MESSAGE_Y = 110;
     private readonly ENGLISH_MESSAGE_PADDING = 24;
-    private readonly PORTRAIT_SIZE = 96;
+    private readonly PORTRAIT_SIZE = 64;
     private readonly PORTRAIT_SCALE = 2;
-    private readonly PORTRAIT_PADDING = 20;
+    private readonly PORTRAIT_PADDING_X = 20;
+    private readonly PORTRAIT_PADDING_Y = 60;
 
     constructor() {
         super({ key: 'ConversationScene' });
@@ -577,8 +578,8 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         this.npcPortrait = this.createPortrait(
             appearance.spriteKey,
             this.appearanceRegistry.getExpressionFrame(npc.appearanceId, 'neutral'),
-            this.PORTRAIT_PADDING,
-            this.PORTRAIT_PADDING
+            this.PORTRAIT_PADDING_X,
+            this.PORTRAIT_PADDING_Y
         );
 
         // Create player portrait (top right)
@@ -586,8 +587,8 @@ export class ConversationScene extends Phaser.Scene implements ConversationHost 
         this.playerPortrait = this.createPortrait(
             'player_face', // Player sprite key
             0, // neutral frame
-            this.scale.width - this.PORTRAIT_PADDING - (this.PORTRAIT_SIZE * this.PORTRAIT_SCALE),
-            this.PORTRAIT_PADDING
+            this.scale.width - this.PORTRAIT_PADDING_X - (this.PORTRAIT_SIZE * this.PORTRAIT_SCALE),
+            this.PORTRAIT_PADDING_Y
         );
     }
 
