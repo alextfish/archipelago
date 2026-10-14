@@ -841,7 +841,7 @@
  <objectgroup id="13" name="doors">
   <object id="17" name="jcave" x="384" y="192" width="160" height="32">
    <properties>
-    <property name="puzzleId" value="JournalCavePuzzle"/>
+    <property name="overworldPuzzleId" value="JournalCavePuzzle"/>
     <property name="spriteId" value="caveDoorClosed"/>
    </properties>
   </object>

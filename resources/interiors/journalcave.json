@@ -746,7 +746,7 @@
                  "name":"jcave",
                  "properties":[
                         {
-                         "name":"puzzleId",
+                         "name":"overworldPuzzleId",
                          "type":"string",
                          "value":"JournalCavePuzzle"
                         }, 

@@ -30,7 +30,7 @@ export class Door {
         if (positions.length === 0) {
             throw new Error('Door must have at least one position');
         }
-        
+
         this.id = id;
         this.positions = positions;
         this.locked = locked;
@@ -80,18 +80,18 @@ export class Door {
     static fromTiledObject(obj: any, tileWidth: number, tileHeight: number): Door {
         // Extract door ID from object
         const id = obj.name || obj.id?.toString() || 'unknown';
-        
+
         // Extract custom properties
         let seriesId: string | undefined;
         let spriteId: string | undefined;
         let overworldPuzzleId: string | undefined;
-        
+
         if (obj.properties && Array.isArray(obj.properties)) {
             const seriesProp = obj.properties.find((p: any) => p.name === 'seriesId');
             if (seriesProp && seriesProp.value) {
                 seriesId = seriesProp.value;
             }
-            
+
             const spriteProp = obj.properties.find((p: any) => p.name === 'spriteId');
             if (spriteProp && spriteProp.value) {
                 spriteId = spriteProp.value;
@@ -110,14 +110,14 @@ export class Door {
                 }
             }
         }
-        
+
         // Calculate tile positions from object bounds
         // Tiled objects use pixel coordinates
         const startTileX = Math.floor(obj.x / tileWidth);
         const startTileY = Math.floor(obj.y / tileHeight);
         const widthInTiles = Math.ceil((obj.width || tileWidth) / tileWidth);
         const heightInTiles = Math.ceil((obj.height || tileHeight) / tileHeight);
-        
+
         const positions: DoorPosition[] = [];
         for (let dy = 0; dy < heightInTiles; dy++) {
             for (let dx = 0; dx < widthInTiles; dx++) {
@@ -127,7 +127,7 @@ export class Door {
                 });
             }
         }
-        
+
         return new Door(id, positions, true, seriesId, spriteId, overworldPuzzleId);
     }
 }

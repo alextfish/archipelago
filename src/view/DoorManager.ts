@@ -161,7 +161,18 @@ export class DoorManager {
             return;
         }
 
-        const linkedDoors = this.doors.filter(d => d.overworldPuzzleId === puzzleId);
+        const linkedDoors = this.doors.filter((door) => this.isDoorLinkedToPuzzle(door, puzzleId));
+        if (linkedDoors.length === 0) {
+            const linkedDoorInfo = this.doors
+                .filter((door) => !!door.overworldPuzzleId)
+                .map((door) => `${door.id}:${door.overworldPuzzleId}`)
+                .join(', ');
+            console.log(
+                `No doors linked to puzzle ${puzzleId}. ` +
+                `Known linked doors: ${linkedDoorInfo || 'none'}`
+            );
+        }
+
         for (const door of linkedDoors) {
             if (wasSolved && door.isLocked()) {
                 console.log(`Animating unlock of door ${door.id} linked to puzzle ${puzzleId}`);
@@ -336,6 +347,30 @@ export class DoorManager {
             }
             return a.tileX - b.tileX;
         });
+    }
+
+    private isDoorLinkedToPuzzle(door: Door, puzzleId: string): boolean {
+        const linkedId = door.overworldPuzzleId;
+        if (!linkedId) {
+            return false;
+        }
+
+        if (linkedId === puzzleId) {
+            return true;
+        }
+
+        // Interior puzzle IDs are namespaced like "interior:<mapKey>:<puzzleId>".
+        // Allow maps to specify either the full ID or the short trailing puzzle ID.
+        return this.getPuzzleIdTail(linkedId) === this.getPuzzleIdTail(puzzleId);
+    }
+
+    private getPuzzleIdTail(puzzleId: string): string {
+        const lastColonIndex = puzzleId.lastIndexOf(':');
+        if (lastColonIndex < 0) {
+            return puzzleId;
+        }
+
+        return puzzleId.substring(lastColonIndex + 1);
     }
 
     private getWidthVariant(
