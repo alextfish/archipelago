@@ -45,6 +45,16 @@ export class FlowPuzzle extends BridgePuzzle {
     }
     // Initial computation
     this.recomputeWater();
+
+    // Log initial water state for diagnostics
+    const waterCount = this.hasWater.size;
+    const sourceCount = Array.from(this.flowSquares.values()).filter(fs => fs.isSource).length;
+    const edgeInputCount = this.edgeInputs.size;
+    if (waterCount === 0 && sourceCount === 0 && edgeInputCount === 0) {
+      console.warn(`[FlowPuzzle] "${spec.id}" created with NO initial water, NO source tiles, NO edge inputs`);
+    } else {
+      console.log(`[FlowPuzzle] "${spec.id}" created: ${sourceCount} source(s), ${edgeInputCount} edge input(s), ${waterCount} wet tile(s)`);
+    }
   }
 
   getFlowSquare(x: number, y: number): FlowSquareSpec | undefined {
