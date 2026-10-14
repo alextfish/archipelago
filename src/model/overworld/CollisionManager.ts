@@ -213,10 +213,11 @@ export class CollisionManager {
      */
     updateDoorCollision(door: Door): void {
         const locked = door.isLocked();
-        // Locked doors are blocked, unlocked doors are walkable
-        const collisionType = locked ? CollisionType.BLOCKED : CollisionType.WALKABLE;
-        console.log(`CollisionManager: Updating door ${door.id} collision: locked=${locked}, type=${collisionType}`);
+        console.log(`CollisionManager: Updating door ${door.id} collision: locked=${locked}`);
         for (const pos of door.getPositions()) {
+            const collisionType = locked
+                ? CollisionType.BLOCKED
+                : (door.isPositionPassableWhenOpen(pos) ? CollisionType.WALKABLE : CollisionType.BLOCKED);
             this.sceneHost.setCollisionAt(pos.tileX, pos.tileY, collisionType);
             console.log(`  Set collision at (${pos.tileX}, ${pos.tileY}) to ${collisionType}`);
         }

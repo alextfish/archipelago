@@ -280,13 +280,11 @@ export class ConstraintNPCManager {
         for (const [npcId, sprite] of this.constraintNPCSprites) {
             if (!npcId.startsWith(prefix)) continue;
             sprite.setVisible(visible);
-            if (applyDisguise) {
+            if (visible) {
                 const disguise = this.constraintDisguiseKeys.get(npcId);
                 if (disguise) {
-                    sprite.setTexture(disguise.solvedKey);
+                    sprite.setTexture(applyDisguise ? disguise.solvedKey : disguise.normalKey);
                 }
-            } else if (!visible) {
-                // no texture change needed when hiding
             }
         }
 

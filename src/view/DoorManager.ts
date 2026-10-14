@@ -222,6 +222,7 @@ export class DoorManager {
 
         if (variant) {
             const orderedPositions = this.getOrderedDoorPositions(door);
+            door.setOpenPassableMask(variant.passableWhenOpen ?? null, orderedPositions);
             const sprites = orderedPositions.map((pos, index) => {
                 const worldX = (pos.tileX + 0.5) * tileW;
                 const worldY = (pos.tileY + 0.5) * tileH;
@@ -236,6 +237,8 @@ export class DoorManager {
             console.log(`Door ${door.id}: created ${sprites.length} width-variant sprites`);
             return;
         }
+
+        door.setOpenPassableMask(null);
 
         const positions = door.getPositions();
         const sumX = positions.reduce((acc, p) => acc + p.tileX, 0);

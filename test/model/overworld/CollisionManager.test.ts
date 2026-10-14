@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CollisionManager, CollisionType } from '@model/overworld/CollisionManager';
 import { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import type { Bridge } from '@model/puzzle/Bridge';
+import { Door } from '@model/overworld/Door';
 
 describe('CollisionManager', () => {
     let mockOverworldScene: any;
@@ -259,6 +260,42 @@ describe('CollisionManager', () => {
 
             expect(hostWithPermanentBlockCheck.isPermanentlyBlocked).toHaveBeenCalledWith(2, 3);
             expect(hostWithPermanentBlockCheck.setCollisionAt).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('door collision passability', () => {
+        it('should keep masked door edge tiles blocked when unlocked', () => {
+            const door = new Door('door1', [
+                { tileX: 10, tileY: 8 },
+                { tileX: 11, tileY: 8 },
+                { tileX: 12, tileY: 8 },
+                { tileX: 13, tileY: 8 },
+                { tileX: 14, tileY: 8 },
+            ], false);
+
+            door.setOpenPassableMask([false, true, true, true, false]);
+            collisionManager.updateDoorCollision(door);
+
+            expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(10, 8, CollisionType.BLOCKED);
+            expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(11, 8, CollisionType.WALKABLE);
+            expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(12, 8, CollisionType.WALKABLE);
+            expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(13, 8, CollisionType.WALKABLE);
+            expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(14, 8, CollisionType.BLOCKED);
+        });
+
+        it('should keep all door tiles blocked when locked regardless of mask', () => {
+            const door = new Door('door1', [
+                { tileX: 10, tileY: 8 },
+                { tileX: 11, tileY: 8 },
+                { tileX: 12, tileY: 8 },
+            ]);
+
+            door.setOpenPassableMask([false, true, false]);
+            collisionManager.updateDoorCollision(door);
+
+            expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(10, 8, CollisionType.BLOCKED);
+            expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(11, 8, CollisionType.BLOCKED);
+            expect(mockOverworldScene.setCollisionAt).toHaveBeenCalledWith(12, 8, CollisionType.BLOCKED);
         });
     });
 });

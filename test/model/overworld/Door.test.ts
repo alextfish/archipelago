@@ -124,6 +124,56 @@ describe('Door', () => {
         });
     });
 
+    describe('open passability masks', () => {
+        it('should default to passable for all tiles when unlocked', () => {
+            const door = new Door('door1', [
+                { tileX: 5, tileY: 10 },
+                { tileX: 6, tileY: 10 },
+                { tileX: 7, tileY: 10 },
+            ]);
+
+            expect(door.isPositionPassableWhenOpen({ tileX: 5, tileY: 10 })).toBe(true);
+            expect(door.isPositionPassableWhenOpen({ tileX: 6, tileY: 10 })).toBe(true);
+            expect(door.isPositionPassableWhenOpen({ tileX: 7, tileY: 10 })).toBe(true);
+        });
+
+        it('should apply a custom open-passability mask by tile position', () => {
+            const door = new Door('door1', [
+                { tileX: 5, tileY: 10 },
+                { tileX: 6, tileY: 10 },
+                { tileX: 7, tileY: 10 },
+            ]);
+
+            door.setOpenPassableMask([false, true, false]);
+
+            expect(door.isPositionPassableWhenOpen({ tileX: 5, tileY: 10 })).toBe(false);
+            expect(door.isPositionPassableWhenOpen({ tileX: 6, tileY: 10 })).toBe(true);
+            expect(door.isPositionPassableWhenOpen({ tileX: 7, tileY: 10 })).toBe(false);
+        });
+
+        it('should clear a custom passability mask when reset to null', () => {
+            const door = new Door('door1', [
+                { tileX: 5, tileY: 10 },
+                { tileX: 6, tileY: 10 },
+            ]);
+
+            door.setOpenPassableMask([false, true]);
+            door.setOpenPassableMask(null);
+
+            expect(door.isPositionPassableWhenOpen({ tileX: 5, tileY: 10 })).toBe(true);
+            expect(door.isPositionPassableWhenOpen({ tileX: 6, tileY: 10 })).toBe(true);
+        });
+
+        it('should throw when passability mask length does not match position count', () => {
+            const door = new Door('door1', [
+                { tileX: 5, tileY: 10 },
+                { tileX: 6, tileY: 10 },
+            ]);
+
+            expect(() => door.setOpenPassableMask([true])).toThrow('mask length');
+        });
+    });
+
     describe('fromTiledObject', () => {
         it('should create door from simple Tiled object', () => {
             const tiledObj = {

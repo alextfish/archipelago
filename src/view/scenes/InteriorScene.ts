@@ -1096,6 +1096,8 @@ export class InteriorScene extends Phaser.Scene {
                 this.cameras.main.startFollow(this.player);
             });
 
+            this.constraintNPCManager?.showConstraintNPCsForPuzzle(exitResult.puzzleId);
+
             const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
             hud?.setJewelHUDVisible(true);
             this.isPointerHeld = false;

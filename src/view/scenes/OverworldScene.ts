@@ -2323,6 +2323,8 @@ export class OverworldScene extends Phaser.Scene {
       });
       console.log('[DIAGNOSTIC] puzzleController.exitPuzzle completed');
 
+      this.constraintNPCManager?.showConstraintNPCsForPuzzle(exitResult.puzzleId);
+
       // (water visuals already updated in the onBeforeTransition callback above)
 
       // Before re-enabling player movement, animate any doors linked to this puzzle.

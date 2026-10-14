@@ -31,6 +31,8 @@ export interface DoorSpriteVariant {
     openFrames: number[];
     /** Optional per-tile animation frame sequences, ordered left-to-right. */
     animationFrameSequences?: number[][];
+    /** Optional per-tile passability flags while the door is unlocked. */
+    passableWhenOpen?: boolean[];
 }
 
 /**
@@ -119,6 +121,7 @@ export const DoorSpriteRegistry: Record<string, DoorSpriteMapping> = {
             3: {
                 closedFrames: [81, 82, 84],
                 openFrames: [107, 108, 110],
+                passableWhenOpen: [false, true, false],
                 animationFrameSequences: [
                     [81, 94, 85, 98, 107],
                     [82, 95, 86, 99, 108],
@@ -128,6 +131,7 @@ export const DoorSpriteRegistry: Record<string, DoorSpriteMapping> = {
             4: {
                 closedFrames: [81, 82, 83, 84],
                 openFrames: [107, 108, 109, 110],
+                passableWhenOpen: [false, true, true, false],
                 animationFrameSequences: [
                     [81, 94, 85, 98, 107],
                     [82, 95, 86, 99, 108],
@@ -138,6 +142,7 @@ export const DoorSpriteRegistry: Record<string, DoorSpriteMapping> = {
             5: {
                 closedFrames: [81, 82, 83, 82, 84],
                 openFrames: [107, 108, 109, 108, 110],
+                passableWhenOpen: [false, true, true, true, false],
                 animationFrameSequences: [
                     [81, 94, 85, 98, 107],
                     [82, 95, 86, 99, 108],
@@ -160,6 +165,7 @@ export const DoorSpriteRegistry: Record<string, DoorSpriteMapping> = {
             3: {
                 closedFrames: [81, 82, 84],
                 openFrames: [107, 108, 110],
+                passableWhenOpen: [false, true, false],
                 animationFrameSequences: [
                     [81, 94, 85, 98, 107],
                     [82, 95, 86, 99, 108],
@@ -169,6 +175,7 @@ export const DoorSpriteRegistry: Record<string, DoorSpriteMapping> = {
             4: {
                 closedFrames: [81, 82, 83, 84],
                 openFrames: [107, 108, 109, 110],
+                passableWhenOpen: [false, true, true, false],
                 animationFrameSequences: [
                     [81, 94, 85, 98, 107],
                     [82, 95, 86, 99, 108],
@@ -179,6 +186,7 @@ export const DoorSpriteRegistry: Record<string, DoorSpriteMapping> = {
             5: {
                 closedFrames: [81, 82, 83, 82, 84],
                 openFrames: [107, 108, 109, 108, 110],
+                passableWhenOpen: [false, true, true, true, false],
                 animationFrameSequences: [
                     [81, 94, 85, 98, 107],
                     [82, 95, 86, 99, 108],

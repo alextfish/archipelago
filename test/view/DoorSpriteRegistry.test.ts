@@ -22,4 +22,13 @@ describe('DoorSpriteRegistry', () => {
         expect(getDoorSpriteFrame('doorHClosed', true)).toBe(30);
         expect(getDoorSpriteFrame('doorHClosed', false)).toBe(31);
     });
+
+    it('defines cave multi-tile passability masks with blocked wall edges', () => {
+        const mapping = getDoorSpriteMapping('caveDoorClosed');
+        expect(mapping).not.toBeNull();
+
+        expect(mapping!.variantsByWidth?.[3].passableWhenOpen).toEqual([false, true, false]);
+        expect(mapping!.variantsByWidth?.[4].passableWhenOpen).toEqual([false, true, true, false]);
+        expect(mapping!.variantsByWidth?.[5].passableWhenOpen).toEqual([false, true, true, true, false]);
+    });
 });

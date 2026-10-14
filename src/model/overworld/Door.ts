@@ -18,6 +18,7 @@ export class Door {
     readonly overworldPuzzleId?: string;     // Overworld puzzle that unlocks/locks this door
     readonly spriteId?: string;              // Sprite identifier for rendering
     private locked: boolean;
+    private openPassableTileKeys: Set<string> | null = null;
 
     constructor(
         id: string,
@@ -72,6 +73,45 @@ export class Door {
      */
     occupiesTile(tileX: number, tileY: number): boolean {
         return this.positions.some(pos => pos.tileX === tileX && pos.tileY === tileY);
+    }
+
+    /**
+     * Configure which occupied tiles are passable when the door is unlocked.
+     * If unset, all occupied tiles are passable when unlocked.
+     */
+    setOpenPassableMask(mask: readonly boolean[] | null, positionOrder?: readonly DoorPosition[]): void {
+        if (!mask) {
+            this.openPassableTileKeys = null;
+            return;
+        }
+
+        const positions = positionOrder ?? this.positions;
+        if (mask.length !== positions.length) {
+            throw new Error(`Door ${this.id} passability mask length ${mask.length} does not match positions length ${positions.length}`);
+        }
+
+        const passableTileKeys = new Set<string>();
+        for (let index = 0; index < positions.length; index++) {
+            if (!mask[index]) {
+                continue;
+            }
+
+            const pos = positions[index];
+            passableTileKeys.add(`${pos.tileX},${pos.tileY}`);
+        }
+
+        this.openPassableTileKeys = passableTileKeys;
+    }
+
+    /**
+     * Check if a given occupied tile should be passable while unlocked.
+     */
+    isPositionPassableWhenOpen(position: DoorPosition): boolean {
+        if (!this.openPassableTileKeys) {
+            return true;
+        }
+
+        return this.openPassableTileKeys.has(`${position.tileX},${position.tileY}`);
     }
 
     /**
