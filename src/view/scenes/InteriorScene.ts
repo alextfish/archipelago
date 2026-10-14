@@ -25,6 +25,7 @@ import { ConversationConditionEvaluator } from '@model/conversation/Conversation
 import { ConversationVariableSubstitutor } from '@model/conversation/ConversationVariableSubstitutor';
 import { RoofManager } from '@view/RoofManager';
 import { SceneTransitionCoordinator } from '@view/SceneTransitionCoordinator';
+import { getConstraintPuzzleID } from '@view/ConstraintNPCUtils';
 import {
     buildPuzzleEntryInteractables,
     createBridgesLayer,
@@ -36,6 +37,7 @@ import type { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 import { queueDoorSpriteAssets } from '@view/DoorAssetLoader';
+import { Door } from '@model/overworld/Door';
 
 /**
  * Depth value for overhead layers (roofs, canopies, etc.) that should always
@@ -846,6 +848,12 @@ export class InteriorScene extends Phaser.Scene {
             // Otherwise revert to normal target selection
             if (isWithinInteractionRange(playerTileX, playerTileY, clickTileX, clickTileY)) {
                 this.interactionCursor.clearPreferredTargetTile();
+
+                if (clickTileX === playerTileX && clickTileY === playerTileY) {
+                    this.checkForPuzzleEntry();
+                    this.isPointerHeld = false;
+                    return;
+                }
             }
 
             this.playerController.setTargetPosition(worldX, worldY);
@@ -936,7 +944,7 @@ export class InteriorScene extends Phaser.Scene {
             let useSolvedConversation = false;
 
             if (npc.id.startsWith('constraint-')) {
-                const puzzleId = this.getConstraintPuzzleId(npc.id);
+                const puzzleId = getConstraintPuzzleID(npc.id);
                 useSolvedConversation = puzzleId
                     ? this.gameState.isPuzzleCompleted(puzzleId)
                     : false;
@@ -1132,25 +1140,6 @@ export class InteriorScene extends Phaser.Scene {
         }
     }
 
-    private getConstraintPuzzleId(npcId: string): string | null {
-        if (!npcId.startsWith('constraint-')) {
-            return null;
-        }
-
-        const lastSeparator = npcId.lastIndexOf('-');
-        if (lastSeparator <= 'constraint-'.length) {
-            return null;
-        }
-
-        const withoutIslandId = npcId.substring(0, lastSeparator);
-        const typeSeparator = withoutIslandId.lastIndexOf('-');
-        if (typeSeparator <= 'constraint-'.length) {
-            return null;
-        }
-
-        return withoutIslandId.substring('constraint-'.length, typeSeparator);
-    }
-
     private handleHUDExit(): void {
         this.currentSeries = null;
         if (this.puzzleController) {
@@ -1205,6 +1194,18 @@ export class InteriorScene extends Phaser.Scene {
         this.puzzleController?.handleBridgeClicked(bridgeId);
     }
 
+    private async animateDoorChange(door: Door, unlock: boolean): Promise<void> {
+        await this.doorManager?.animateDoorChange(door, unlock);
+    }
+
+    private unlockDoor(doorId: string): void {
+        this.doorManager?.unlockDoor(doorId);
+    }
+
+    private updateNPCIcon(npc: NPC): void {
+        this.npcSpriteController?.updateNPCIcon(npc);
+    }
+
     private async handleConversationEffects(effects: any[], npc?: NPC): Promise<void> {
         for (const effect of effects) {
             switch (effect.type) {
@@ -1212,10 +1213,10 @@ export class InteriorScene extends Phaser.Scene {
                     if (effect.seriesId) {
                         await this.startPuzzleSeries(effect.seriesId, npc);
                     }
-                    break;
+                break;
                 case 'unlockDoor':
                     if (effect.doorId) {
-                        this.doorManager?.unlockDoor(effect.doorId);
+                        this.unlockDoor(effect.doorId);
                     }
                     break;
                 default:
@@ -1268,14 +1269,14 @@ export class InteriorScene extends Phaser.Scene {
     }
 
     private async handleSeriesPuzzleCompleted(data: { puzzleId: string; success: boolean }): Promise<void> {
+        const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
+
         if (!this.currentSeries) {
-            const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
             hud?.setJewelHUDVisible(true);
             return;
         }
 
         if (!data.success) {
-            const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
             hud?.setJewelHUDVisible(true);
             return;
         }
@@ -1293,25 +1294,41 @@ export class InteriorScene extends Phaser.Scene {
             if (this.seriesManager) {
                 await this.seriesManager.saveSeriesProgress(this.currentSeries);
             }
-            this.saveStateCallback();
         }
 
         if (this.currentSeries.isSeriesCompleted()) {
-            const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
-            hud?.setJewelHUDVisible(true);
+            const seriesDoor = this.doorManager?.doors.find((door) => door.id === this.currentSeries!.id);
+            if (seriesDoor && seriesDoor.isLocked()) {
+                await this.animateDoorChange(seriesDoor, true);
+            } else if (!seriesDoor) {
+                this.unlockDoor(this.currentSeries.id);
+            }
+
+            for (const [npcId, state] of (this.npcSpriteController?.npcSeriesStates.entries() ?? [])) {
+                if (state.getSeries()?.id === this.currentSeries.id) {
+                    const npc = this.npcs.find((candidate) => candidate.id === npcId);
+                    if (npc) {
+                        this.updateNPCIcon(npc);
+                    }
+                }
+            }
+        } else {
+            const nextPuzzleId = this.getSeriesEntryIdToLaunch(this.currentSeries, false);
+            if (!nextPuzzleId) {
+                hud?.setJewelHUDVisible(true);
+                this.saveStateCallback();
+                return;
+            }
+
+            this.time.delayedCall(0, () => {
+                this.launchSeriesPuzzleEntry(nextPuzzleId);
+            });
+            this.saveStateCallback();
             return;
         }
 
-        const nextPuzzleId = this.getSeriesEntryIdToLaunch(this.currentSeries, false);
-        if (!nextPuzzleId) {
-            const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
-            hud?.setJewelHUDVisible(true);
-            return;
-        }
-
-        this.time.delayedCall(0, () => {
-            this.launchSeriesPuzzleEntry(nextPuzzleId);
-        });
+        hud?.setJewelHUDVisible(true);
+        this.saveStateCallback();
     }
 
     private getSeriesEntryIdToLaunch(series: any, allowCompletedFallback: boolean): string | null {

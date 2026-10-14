@@ -44,6 +44,7 @@ import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
 import { NPCSpriteController } from '@view/NPCSpriteController';
 import { ConversationVariableSubstitutor } from '@model/conversation/ConversationVariableSubstitutor';
 import { PortalManager } from '@view/PortalManager';
+import { getConstraintPuzzleID } from '@view/ConstraintNPCUtils';
 import {
   buildPuzzleEntryInteractables,
   createBridgesLayer,
@@ -1834,10 +1835,8 @@ export class OverworldScene extends Phaser.Scene {
 
       // For constraint NPCs, check puzzle completion status
       if (npc.id.startsWith('constraint-')) {
-        // Extract puzzle ID from npc.id format: constraint-{puzzleId}-{type}-{islandId}
-        const match = npc.id.match(/^constraint-([^-]+)/);
-        if (match) {
-          const puzzleId = match[1];
+        const puzzleId = getConstraintPuzzleID(npc.id);
+        if (puzzleId) {
           useSolvedConversation = this.gameState.isPuzzleCompleted(puzzleId);
           console.log(`Constraint NPC conversation: puzzle ${puzzleId} completed = ${useSolvedConversation}`);
         }
@@ -1874,13 +1873,13 @@ export class OverworldScene extends Phaser.Scene {
       this.gameMode = 'conversation';
       this.interactionCursor?.hide();
       this.playerController?.stopAndIdle();
+      this.playerController?.setEnabled(false);
       console.log(`Switching to conversation mode with NPC: ${npc.name} (solved: ${useSolvedConversation}, startNode: ${startNodeId})`);
 
       // Get conversation scene
       const conversationScene = this.scene.get('ConversationScene') as (ConversationScene & { startConversation: Function; events: Phaser.Events.EventEmitter }) | null;
       if (!conversationScene) {
-        console.error('ConversationScene not found');
-        return;
+        throw new Error('ConversationScene not found');
       }
 
       // Inject glyph tracker so speech bubbles register for Translation Mode
@@ -1910,6 +1909,7 @@ export class OverworldScene extends Phaser.Scene {
 
     } catch (error) {
       console.error('Error starting conversation:', error);
+      this.playerController?.setEnabled(true);
       this.gameMode = 'exploration';
     }
   }
@@ -1919,6 +1919,7 @@ export class OverworldScene extends Phaser.Scene {
    */
   private onConversationEnded(): void {
     console.log('Conversation ended, returning to exploration');
+    this.playerController?.setEnabled(true);
     this.gameMode = 'exploration';
 
     // Clean up event listeners
