@@ -20,6 +20,17 @@ export interface DoorSpriteMapping {
     frameCount: number;
     /** First frame index in the spritesheet used for the opening animation. */
     animationStartFrame?: number;
+    /** Width-specific sprite frame variants for multi-tile doors. */
+    variantsByWidth?: Record<number, DoorSpriteVariant>;
+}
+
+export interface DoorSpriteVariant {
+    /** Per-tile frame indices for the closed state, ordered left-to-right. */
+    closedFrames: number[];
+    /** Per-tile frame indices for the open state, ordered left-to-right. */
+    openFrames: number[];
+    /** Optional per-tile animation frame sequences, ordered left-to-right. */
+    animationFrameSequences?: number[][];
 }
 
 /**
@@ -92,6 +103,91 @@ export const DoorSpriteRegistry: Record<string, DoorSpriteMapping> = {
         frameHeight: 64,
         frameCount: 6,
         animationStartFrame: 0
+    },
+
+    // Cave wall door variants that can span 3, 4, or 5 tiles.
+    // Width-specific frames use CaveWalls tileset indices.
+    'caveDoorClosed': {
+        textureKey: 'cavewalls-door-tiles',
+        closedFrame: 81,
+        openFrame: 107,
+        animationKey: 'cavewalls-door-tiles',
+        frameWidth: 32,
+        frameHeight: 32,
+        frameCount: 5,
+        variantsByWidth: {
+            3: {
+                closedFrames: [81, 82, 84],
+                openFrames: [107, 108, 110],
+                animationFrameSequences: [
+                    [81, 94, 85, 98, 107],
+                    [82, 95, 86, 99, 108],
+                    [84, 97, 88, 101, 110],
+                ]
+            },
+            4: {
+                closedFrames: [81, 82, 83, 84],
+                openFrames: [107, 108, 109, 110],
+                animationFrameSequences: [
+                    [81, 94, 85, 98, 107],
+                    [82, 95, 86, 99, 108],
+                    [83, 96, 87, 100, 109],
+                    [84, 97, 88, 101, 110],
+                ]
+            },
+            5: {
+                closedFrames: [81, 82, 83, 82, 84],
+                openFrames: [107, 108, 109, 108, 110],
+                animationFrameSequences: [
+                    [81, 94, 85, 98, 107],
+                    [82, 95, 86, 99, 108],
+                    [83, 96, 87, 100, 109],
+                    [82, 95, 86, 99, 108],
+                    [84, 97, 88, 101, 110],
+                ]
+            }
+        }
+    },
+    'caveDoorOpen': {
+        textureKey: 'cavewalls-door-tiles',
+        closedFrame: 81,
+        openFrame: 107,
+        animationKey: 'cavewalls-door-tiles',
+        frameWidth: 32,
+        frameHeight: 32,
+        frameCount: 5,
+        variantsByWidth: {
+            3: {
+                closedFrames: [81, 82, 84],
+                openFrames: [107, 108, 110],
+                animationFrameSequences: [
+                    [81, 94, 85, 98, 107],
+                    [82, 95, 86, 99, 108],
+                    [84, 97, 88, 101, 110],
+                ]
+            },
+            4: {
+                closedFrames: [81, 82, 83, 84],
+                openFrames: [107, 108, 109, 110],
+                animationFrameSequences: [
+                    [81, 94, 85, 98, 107],
+                    [82, 95, 86, 99, 108],
+                    [83, 96, 87, 100, 109],
+                    [84, 97, 88, 101, 110],
+                ]
+            },
+            5: {
+                closedFrames: [81, 82, 83, 82, 84],
+                openFrames: [107, 108, 109, 108, 110],
+                animationFrameSequences: [
+                    [81, 94, 85, 98, 107],
+                    [82, 95, 86, 99, 108],
+                    [83, 96, 87, 100, 109],
+                    [82, 95, 86, 99, 108],
+                    [84, 97, 88, 101, 110],
+                ]
+            }
+        }
     }
 };
 

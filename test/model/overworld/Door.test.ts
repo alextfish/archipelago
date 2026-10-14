@@ -228,6 +228,23 @@ describe('Door', () => {
             expect(door.overworldPuzzleId).toBe('forest-puzzle-1');
         });
 
+        it('should treat puzzleId as an alias for overworldPuzzleId', () => {
+            const tiledObj = {
+                name: 'door1',
+                x: 160,
+                y: 320,
+                width: 32,
+                height: 32,
+                properties: [
+                    { name: 'puzzleId', value: 'journal-cave-puzzle' }
+                ]
+            };
+
+            const door = Door.fromTiledObject(tiledObj, 32, 32);
+
+            expect(door.overworldPuzzleId).toBe('journal-cave-puzzle');
+        });
+
         it('should extract all three link properties together', () => {
             const tiledObj = {
                 name: 'door1',

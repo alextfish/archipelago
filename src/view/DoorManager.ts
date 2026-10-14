@@ -5,7 +5,7 @@ import type { OverworldGameState } from '@model/overworld/OverworldGameState';
 import type { PlayerController } from '@view/PlayerController';
 import type { CameraManager } from '@view/CameraManager';
 import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
-import { getDoorSpriteMapping } from '@view/DoorSpriteRegistry';
+import { getDoorSpriteMapping, type DoorSpriteVariant } from '@view/DoorSpriteRegistry';
 
 /**
  * Manages all door objects in the overworld:
@@ -28,7 +28,7 @@ export class DoorManager {
     private getPlayerController: () => PlayerController | undefined;
 
     readonly doors: Door[] = [];
-    private readonly doorSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
+    private readonly doorSprites: Map<string, Phaser.GameObjects.Sprite[]> = new Map();
 
     constructor(
         scene: Phaser.Scene,
@@ -150,6 +150,30 @@ export class DoorManager {
     }
 
     /**
+     * Animate all doors linked to a puzzle transition in the same way across scenes.
+     */
+    async animatePuzzleLinkedDoors(
+        puzzleId: string,
+        wasSolved: boolean,
+        wasUnsolved: boolean
+    ): Promise<void> {
+        if (!wasSolved && !wasUnsolved) {
+            return;
+        }
+
+        const linkedDoors = this.doors.filter(d => d.overworldPuzzleId === puzzleId);
+        for (const door of linkedDoors) {
+            if (wasSolved && door.isLocked()) {
+                console.log(`Animating unlock of door ${door.id} linked to puzzle ${puzzleId}`);
+                await this.animateDoorChange(door, true);
+            } else if (wasUnsolved && !door.isLocked()) {
+                console.log(`Animating lock of door ${door.id} linked to puzzle ${puzzleId}`);
+                await this.animateDoorChange(door, false);
+            }
+        }
+    }
+
+    /**
      * Unlock a door by ID immediately, without animation.
      * Used for conversation-triggered unlocks.
      */
@@ -183,6 +207,24 @@ export class DoorManager {
 
         const tileW: number = this.tiledMapData?.tilewidth ?? 32;
         const tileH: number = this.tiledMapData?.tileheight ?? 32;
+        const variant = this.getWidthVariant(door, mapping.variantsByWidth);
+
+        if (variant) {
+            const orderedPositions = this.getOrderedDoorPositions(door);
+            const sprites = orderedPositions.map((pos, index) => {
+                const worldX = (pos.tileX + 0.5) * tileW;
+                const worldY = (pos.tileY + 0.5) * tileH;
+                const frame = door.isLocked() ? variant.closedFrames[index] : variant.openFrames[index];
+                const sprite = this.scene.add.sprite(worldX, worldY, mapping.textureKey, frame);
+                sprite.setOrigin(0.5, 0.5);
+                sprite.setDepth((pos.tileY + 1) * tileH);
+                return sprite;
+            });
+
+            this.doorSprites.set(door.id, sprites);
+            console.log(`Door ${door.id}: created ${sprites.length} width-variant sprites`);
+            return;
+        }
 
         const positions = door.getPositions();
         const sumX = positions.reduce((acc, p) => acc + p.tileX, 0);
@@ -195,7 +237,7 @@ export class DoorManager {
         sprite.setOrigin(0.5, 0.5);
         const maxTileY = Math.max(...positions.map(p => p.tileY));
         sprite.setDepth((maxTileY + 1) * tileH);
-        this.doorSprites.set(door.id, sprite);
+        this.doorSprites.set(door.id, [sprite]);
         console.log(`Door ${door.id}: spriteId=${door.spriteId}, locked=${door.isLocked()}, frame=${frame}, world=(${worldX}, ${worldY})`);
     }
 
@@ -205,11 +247,23 @@ export class DoorManager {
         const mapping = getDoorSpriteMapping(door.spriteId);
         if (!mapping) return;
 
-        const frame = door.isLocked() ? mapping.closedFrame : mapping.openFrame;
-        const sprite = this.doorSprites.get(door.id);
-        if (sprite) {
-            sprite.setFrame(frame);
+        const sprites = this.doorSprites.get(door.id);
+        if (!sprites || sprites.length === 0) {
+            return;
         }
+
+        const variant = this.getWidthVariant(door, mapping.variantsByWidth);
+        if (variant && sprites.length === variant.closedFrames.length) {
+            sprites.forEach((sprite, index) => {
+                const frame = door.isLocked() ? variant.closedFrames[index] : variant.openFrames[index];
+                sprite.setFrame(frame);
+            });
+            console.log(`Updated door ${door.id} width-variant sprites to ${door.isLocked() ? 'closed' : 'open'} state`);
+            return;
+        }
+
+        const frame = door.isLocked() ? mapping.closedFrame : mapping.openFrame;
+        sprites[0].setFrame(frame);
         console.log(`Updated door ${door.id} sprite to ${door.isLocked() ? 'closed' : 'open'} state (frame=${frame})`);
     }
 
@@ -235,6 +289,18 @@ export class DoorManager {
             return;
         }
 
+        const existingSprites = this.doorSprites.get(door.id) ?? [];
+        const variant = this.getWidthVariant(door, mapping.variantsByWidth);
+        if (
+            variant?.animationFrameSequences &&
+            existingSprites.length === variant.animationFrameSequences.length
+        ) {
+            await Promise.all(existingSprites.map((sprite, index) =>
+                this.playFrameSequenceAnimation(mapping.animationKey, variant.animationFrameSequences![index], sprite)
+            ));
+            return;
+        }
+
         const startFrame = mapping.animationStartFrame ?? 0;
         const endFrame = startFrame + mapping.frameCount - 1;
         const animKey = `${mapping.animationKey}-${startFrame}-${endFrame}-play`;
@@ -252,7 +318,7 @@ export class DoorManager {
         }
 
         await new Promise<void>((resolve) => {
-            const doorSprite = this.doorSprites.get(door.id);
+            const doorSprite = existingSprites[0];
             const targetSprite = doorSprite ?? this.scene.add.sprite(doorWorldX, doorWorldY, mapping.textureKey, mapping.closedFrame).setOrigin(0.5, 0.5);
             const isTemporary = !doorSprite;
             targetSprite.once('animationcomplete', () => {
@@ -260,6 +326,78 @@ export class DoorManager {
                 resolve();
             });
             targetSprite.play(animKey);
+        });
+    }
+
+    private getOrderedDoorPositions(door: Door): { tileX: number; tileY: number }[] {
+        return [...door.getPositions()].sort((a, b) => {
+            if (a.tileY !== b.tileY) {
+                return a.tileY - b.tileY;
+            }
+            return a.tileX - b.tileX;
+        });
+    }
+
+    private getWidthVariant(
+        door: Door,
+        variantsByWidth: Record<number, DoorSpriteVariant> | undefined
+    ): DoorSpriteVariant | null {
+        if (!variantsByWidth) {
+            return null;
+        }
+
+        const positions = door.getPositions();
+        const tileRows = new Set(positions.map(pos => pos.tileY));
+        if (tileRows.size !== 1) {
+            return null;
+        }
+
+        const variant = variantsByWidth[positions.length];
+        if (!variant) {
+            return null;
+        }
+
+        if (
+            variant.closedFrames.length !== positions.length ||
+            variant.openFrames.length !== positions.length
+        ) {
+            console.warn(`Door variant width mismatch for door ${door.id}`);
+            return null;
+        }
+
+        if (
+            variant.animationFrameSequences &&
+            variant.animationFrameSequences.length !== positions.length
+        ) {
+            console.warn(`Door animation sequence width mismatch for door ${door.id}`);
+            return null;
+        }
+
+        return variant;
+    }
+
+    private async playFrameSequenceAnimation(
+        textureKey: string,
+        frameSequence: number[],
+        sprite: Phaser.GameObjects.Sprite
+    ): Promise<void> {
+        if (frameSequence.length === 0) {
+            return;
+        }
+
+        const animKey = `${textureKey}-seq-${frameSequence.join('-')}`;
+        if (!this.scene.anims.exists(animKey)) {
+            this.scene.anims.create({
+                key: animKey,
+                frames: frameSequence.map(frame => ({ key: textureKey, frame })),
+                frameRate: 8,
+                repeat: 0
+            });
+        }
+
+        await new Promise<void>((resolve) => {
+            sprite.once('animationcomplete', () => resolve());
+            sprite.play(animKey);
         });
     }
 }

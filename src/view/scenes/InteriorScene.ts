@@ -17,6 +17,7 @@ import { findInteractableInRangeAtTile, isWithinInteractionRange } from '@view/P
 import { NPCSpriteController } from '@view/NPCSpriteController';
 import { CollectibleManager } from '@view/CollectibleManager';
 import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
+import { DoorManager } from '@view/DoorManager';
 import { Portal } from '@model/overworld/Portal';
 import { NPC } from '@model/conversation/NPC';
 import type { ConversationSpec } from '@model/conversation/ConversationData';
@@ -34,6 +35,7 @@ import {
 import type { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
+import { queueDoorSpriteAssets } from '@view/DoorAssetLoader';
 
 /**
  * Depth value for overhead layers (roofs, canopies, etc.) that should always
@@ -96,6 +98,7 @@ export class InteriorScene extends Phaser.Scene {
     private npcSpriteController?: NPCSpriteController;
     private collectibleManager?: CollectibleManager;
     private constraintNPCManager?: ConstraintNPCManager;
+    private doorManager?: DoorManager;
     private puzzleManager!: OverworldPuzzleManager;
     private collisionManager!: CollisionManager;
     private bridgeManager?: OverworldBridgeManager;
@@ -162,11 +165,13 @@ export class InteriorScene extends Phaser.Scene {
         this.bridgeManager = undefined;
         this.puzzleController = undefined;
         this.constraintNPCManager = undefined;
+        this.doorManager = undefined;
         this.gameMode = 'exploration';
         this.isExitingPuzzle = false;
     }
 
     preload(): void {
+        queueDoorSpriteAssets(this);
         // Kick off async map load (same polling pattern as OverworldScene)
         this.loadMapFile();
     }
@@ -247,6 +252,7 @@ export class InteriorScene extends Phaser.Scene {
         this.setupNPCs();
         this.setupCollectibles();
         this.initializeInteriorPuzzles(tilesets);
+        this.setupDoors();
         this.loadPortals();
 
         // Interaction cursor
@@ -725,6 +731,24 @@ export class InteriorScene extends Phaser.Scene {
         }
     }
 
+    private setupDoors(): void {
+        if (!this.map || !this.tiledMapData) {
+            return;
+        }
+
+        this.doorManager = new DoorManager(
+            this,
+            this.tiledMapData,
+            this.map,
+            this.collisionManager,
+            this.gameState,
+            this.cameraManager,
+            () => this.player ?? null,
+            () => this.playerController,
+        );
+        this.doorManager.loadDoors();
+    }
+
     private getPuzzleIDPrefix(): string {
         return `interior:${this.mapKey}`;
     }
@@ -1078,6 +1102,11 @@ export class InteriorScene extends Phaser.Scene {
             this.playerController?.setEnabled(!this.isSceneTransitioning && this.gameMode === 'exploration');
 
             if (exitResult.wasSolved || exitResult.wasUnsolved) {
+                await this.doorManager?.animatePuzzleLinkedDoors(
+                    exitResult.puzzleId,
+                    exitResult.wasSolved,
+                    exitResult.wasUnsolved,
+                );
                 this.saveStateCallback();
             }
 
@@ -1183,8 +1212,9 @@ export class InteriorScene extends Phaser.Scene {
                     }
                     break;
                 case 'unlockDoor':
-                    // Doors inside interiors are not yet managed — ignore for now
-                    console.log(`[InteriorScene] Door unlock "${effect.doorId}" not yet handled in interiors`);
+                    if (effect.doorId) {
+                        this.doorManager?.unlockDoor(effect.doorId);
+                    }
                     break;
                 default:
                     console.log(`[InteriorScene] Unhandled conversation effect: ${effect.type}`);

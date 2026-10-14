@@ -38,6 +38,7 @@ import { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 import { CollisionInitialiser } from '@model/overworld/CollisionInitialiser';
 import { FlowWaterVisualManager } from '@view/FlowWaterVisualManager';
 import { DoorManager } from '@view/DoorManager';
+import { queueDoorSpriteAssets } from '@view/DoorAssetLoader';
 import { CollectibleManager } from '@view/CollectibleManager';
 import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
 import { NPCSpriteController } from '@view/NPCSpriteController';
@@ -219,21 +220,7 @@ export class OverworldScene extends Phaser.Scene {
     this.load.spritesheet('jewel-blue', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 8, endFrame: 11 });
     this.load.spritesheet('jewel-yellow', 'resources/sprites/jewels.png', { ...JEWEL_FRAME_CONFIG, startFrame: 12, endFrame: 15 });
 
-    // Load door opening animation spritesheets (horizontal and vertical variants).
-    // Each sheet is a horizontal strip of frames showing the door swinging open.
-    // Frame dimensions match those specified in DoorSpriteRegistry.
-    this.load.spritesheet('forestDoorHOpening', 'resources/sprites/forestDoorHOpening.png', {
-      frameWidth: 32,
-      frameHeight: 32
-    });
-    this.load.spritesheet('forestDoorVOpening', 'resources/sprites/forestDoorVOpening.png', {
-      frameWidth: 32,
-      frameHeight: 64
-    });
-    this.load.spritesheet('terrains-door-tiles', 'resources/tilesets/terrains.png', {
-      frameWidth: 32,
-      frameHeight: 32
-    });
+    queueDoorSpriteAssets(this);
 
     // Load TMX file asynchronously, then load embedded tilesets
     this.loadTmxFile();
@@ -602,17 +589,21 @@ export class OverworldScene extends Phaser.Scene {
         );
       }
 
+      // Merge all `water` Tiled layers into a single master grid, then wire up
+      // RiverChannelExtractor / WaterPropagationEngine so that downstream puzzles
+      // (e.g. flowPuzzle2) receive edge inputs from upstream sources (e.g. flowPuzzle1).
+      // This MUST run before applyInitialFlowPuzzleCollision so that edge inputs are
+      // computed and set on all puzzles before collision blocking and visuals are applied.
+      this.mergedWaterLayerData = this.buildMergedWaterLayer();
+      this.wireRiverChannels(puzzles);
+
       // Apply initial water blocking for FlowPuzzles.
       // Each FlowPuzzle computes its water state on construction; those tiles must
       // be blocked (both high and low ground) so the player cannot walk through
       // flowing water before solving the puzzle.
+      // This runs AFTER wireRiverChannels so that edge inputs from upstream puzzles
+      // have been propagated to downstream puzzles.
       this.applyInitialFlowPuzzleCollision(puzzles);
-
-      // Merge all `water` Tiled layers into a single master grid, then wire up
-      // RiverChannelExtractor / WaterPropagationEngine so that downstream puzzles
-      // (e.g. flowPuzzle2) receive edge inputs from upstream sources (e.g. flowPuzzle1).
-      this.mergedWaterLayerData = this.buildMergedWaterLayer();
-      this.wireRiverChannels(puzzles);
 
       // Create puzzle controller now that we have all dependencies
       this.puzzleController = new OverworldPuzzleController(
@@ -2339,19 +2330,11 @@ export class OverworldScene extends Phaser.Scene {
       // movement is still disabled (set during enterOverworldPuzzle), so animateDoorChange
       // can immediately pan away without needing extra setup.
 
-      // Animate overworld-puzzle-linked doors
-      if (exitResult.wasSolved || exitResult.wasUnsolved) {
-        const linkedDoors = this.doorManager?.doors.filter(d => d.overworldPuzzleId === exitResult.puzzleId) ?? [];
-        for (const door of linkedDoors) {
-          if (exitResult.wasSolved && door.isLocked()) {
-            console.log(`Animating unlock of door ${door.id} linked to overworld puzzle ${exitResult.puzzleId}`);
-            await this.animateDoorChange(door, true);
-          } else if (exitResult.wasUnsolved && !door.isLocked()) {
-            console.log(`Animating lock of door ${door.id} linked to overworld puzzle ${exitResult.puzzleId}`);
-            await this.animateDoorChange(door, false);
-          }
-        }
-      }
+      await this.doorManager?.animatePuzzleLinkedDoors(
+        exitResult.puzzleId,
+        exitResult.wasSolved,
+        exitResult.wasUnsolved,
+      );
 
       // Animate series-puzzle-linked door if series is now complete
       if (success && this.currentSeries && this.currentSeries.isSeriesCompleted()) {

@@ -101,6 +101,14 @@ export class Door {
             if (overworldPuzzleProp && overworldPuzzleProp.value) {
                 overworldPuzzleId = overworldPuzzleProp.value;
             }
+
+            // Support the older/simple `puzzleId` property name used in some maps.
+            if (!overworldPuzzleId) {
+                const puzzleProp = obj.properties.find((p: any) => p.name === 'puzzleId');
+                if (puzzleProp && puzzleProp.value) {
+                    overworldPuzzleId = puzzleProp.value;
+                }
+            }
         }
         
         // Calculate tile positions from object bounds
