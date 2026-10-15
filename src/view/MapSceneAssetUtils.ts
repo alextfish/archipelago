@@ -10,6 +10,16 @@ interface LayerLike {
     properties?: unknown[];
 }
 
+interface TilesetLike {
+    name: string;
+    image?: string;
+}
+
+interface TilesetImageLoadRequest {
+    textureKey: string;
+    imagePath: string;
+}
+
 const EXTERNAL_TILESET_TEXTURE_KEYS: Record<string, string> = {
     beach: 'beachTileset',
     SproutLandsGrassIslands: 'grassTileset',
@@ -41,6 +51,53 @@ export function resolveTilesetImagePath(imagePath: string): string {
 
 export function findMapLayersBySuffix<T extends { name: string }>(layers: T[], suffix: string): T[] {
     return layers.filter((layer) => TiledLayerUtils.getLayerSuffix(layer.name) === suffix);
+}
+
+export function getTilesetImageLoadRequests(
+    tilesets: TilesetLike[] | undefined,
+    textureExists: (textureKey: string) => boolean,
+    options: { skipResourcePrefixedImages?: boolean } = {},
+): TilesetImageLoadRequest[] {
+    if (!tilesets) {
+        return [];
+    }
+
+    return tilesets.flatMap((tileset) => {
+        if (!tileset.image) {
+            return [];
+        }
+
+        if (options.skipResourcePrefixedImages && tileset.image.startsWith('resources/')) {
+            return [];
+        }
+
+        const textureKey = getTilesetTextureKey(tileset.name);
+        if (textureExists(textureKey)) {
+            return [];
+        }
+
+        return [{
+            textureKey,
+            imagePath: resolveTilesetImagePath(tileset.image),
+        }];
+    });
+}
+
+export function areTilesetTexturesReady(
+    tilesets: TilesetLike[] | undefined,
+    textureExists: (textureKey: string) => boolean,
+): boolean {
+    if (!tilesets) {
+        return false;
+    }
+
+    return tilesets.every((tileset) => {
+        if (!tileset.image) {
+            return true;
+        }
+
+        return textureExists(getTilesetTextureKey(tileset.name));
+    });
 }
 
 export function shouldAutoRenderLayer(

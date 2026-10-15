@@ -38,10 +38,12 @@ import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 import { queueDoorSpriteAssets } from '@view/DoorAssetLoader';
 import { Door } from '@model/overworld/Door';
+import { TileAnimationManager } from '@view/TileAnimationManager';
 import {
+    areTilesetTexturesReady,
     findMapLayersBySuffix,
     getTilesetTextureKey,
-    resolveTilesetImagePath,
+    getTilesetImageLoadRequests,
     shouldAutoRenderLayer,
     shouldRenderLayerAbovePlayer,
 } from '@view/MapSceneAssetUtils';
@@ -108,6 +110,7 @@ export class InteriorScene extends Phaser.Scene {
     private collectibleManager?: CollectibleManager;
     private constraintNPCManager?: ConstraintNPCManager;
     private doorManager?: DoorManager;
+    private tileAnimationManager?: TileAnimationManager;
     private puzzleManager!: OverworldPuzzleManager;
     private collisionManager!: CollisionManager;
     private bridgeManager?: OverworldBridgeManager;
@@ -175,6 +178,7 @@ export class InteriorScene extends Phaser.Scene {
         this.puzzleController = undefined;
         this.constraintNPCManager = undefined;
         this.doorManager = undefined;
+        this.tileAnimationManager = undefined;
         this.gameMode = 'exploration';
         this.isExitingPuzzle = false;
     }
@@ -209,6 +213,7 @@ export class InteriorScene extends Phaser.Scene {
         this.setupVisualLayers(tilesets);
         this.setupCollisionLayer(tilesets);
         this.setupRoofsLayer(tilesets);
+        this.tileAnimationManager = new TileAnimationManager(this.map, tilesets);
 
         // Player position: prefer persisted coords, then named spawn, then map centre
         const startPos = this.findSpawnPosition();
@@ -301,6 +306,7 @@ export class InteriorScene extends Phaser.Scene {
     }
 
     update(_time: number, delta: number): void {
+        this.tileAnimationManager?.update(delta);
         this.npcSpriteController?.update(
             delta,
             this.canPlayerMoveAroundAndInteract(),
@@ -446,17 +452,16 @@ export class InteriorScene extends Phaser.Scene {
     private loadEmbeddedTilesets(data: any): void {
         if (!data?.tilesets) return;
 
-        let queuedTextures = false;
-        for (const tileset of data.tilesets) {
-            if (!tileset.image) continue;
-            const key = getTilesetTextureKey(tileset.name);
-            if (this.textures.exists(key)) continue;
-            const imagePath = resolveTilesetImagePath(tileset.image);
-            this.load.image(key, imagePath);
-            queuedTextures = true;
+        const requests = getTilesetImageLoadRequests(
+            data.tilesets,
+            (textureKey) => this.textures.exists(textureKey),
+        );
+
+        for (const request of requests) {
+            this.load.image(request.textureKey, request.imagePath);
         }
 
-        if (queuedTextures && !this.load.isLoading()) {
+        if (requests.length > 0 && !this.load.isLoading()) {
             this.load.start();
         }
     }
@@ -483,17 +488,10 @@ export class InteriorScene extends Phaser.Scene {
 
     private areTilesetTexturesReady(): boolean {
         const mapData = this.cache.tilemap.get(this.mapCacheKey);
-        if (!mapData?.data?.tilesets) {
-            return false;
-        }
-
-        return mapData.data.tilesets.every((tileset: { name: string; image?: string }) => {
-            if (!tileset.image) {
-                return true;
-            }
-
-            return this.textures.exists(getTilesetTextureKey(tileset.name));
-        });
+        return areTilesetTexturesReady(
+            mapData?.data?.tilesets,
+            (textureKey) => this.textures.exists(textureKey),
+        );
     }
 
     private setupVisualLayers(tilesets: Phaser.Tilemaps.Tileset[]): void {

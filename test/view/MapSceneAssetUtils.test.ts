@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+    areTilesetTexturesReady,
     findMapLayersBySuffix,
     getTilesetTextureKey,
+    getTilesetImageLoadRequests,
     resolveTilesetImagePath,
     shouldAutoRenderLayer,
     shouldRenderLayerAbovePlayer,
@@ -44,6 +46,63 @@ describe('MapSceneAssetUtils', () => {
 
             expect(findMapLayersBySuffix(layers, 'collision')).toEqual([{ name: 'Beach/collision' }]);
             expect(findMapLayersBySuffix(layers, 'roofs')).toEqual([{ name: 'Forest/roofs' }]);
+        });
+    });
+
+    describe('getTilesetImageLoadRequests', () => {
+        it('returns unresolved image loads for missing textures', () => {
+            const requests = getTilesetImageLoadRequests(
+                [
+                    { name: 'beach', image: 'resources/tilesets/beach.png' },
+                    { name: 'cavewalls', image: '../tilesets/cave.png' },
+                ],
+                (textureKey) => textureKey === 'beachTileset',
+            );
+
+            expect(requests).toEqual([
+                {
+                    textureKey: 'tileset_cavewalls',
+                    imagePath: 'resources/tilesets/cave.png',
+                },
+            ]);
+        });
+
+        it('supports skipping already-preloaded resource-prefixed tilesets', () => {
+            const requests = getTilesetImageLoadRequests(
+                [
+                    { name: 'beach', image: 'resources/tilesets/beach.png' },
+                    { name: 'embedded', image: 'tilesets/cave.png' },
+                ],
+                () => false,
+                { skipResourcePrefixedImages: true },
+            );
+
+            expect(requests).toEqual([
+                {
+                    textureKey: 'tileset_embedded',
+                    imagePath: 'resources/tilesets/cave.png',
+                },
+            ]);
+        });
+    });
+
+    describe('areTilesetTexturesReady', () => {
+        it('returns true only when every image-backed tileset texture exists', () => {
+            expect(areTilesetTexturesReady(
+                [
+                    { name: 'beach', image: 'resources/tilesets/beach.png' },
+                    { name: 'collection' },
+                ],
+                (textureKey) => textureKey === 'beachTileset',
+            )).toBe(true);
+
+            expect(areTilesetTexturesReady(
+                [
+                    { name: 'beach', image: 'resources/tilesets/beach.png' },
+                    { name: 'embedded', image: 'tilesets/cave.png' },
+                ],
+                (textureKey) => textureKey === 'beachTileset',
+            )).toBe(false);
         });
     });
 

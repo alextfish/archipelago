@@ -48,7 +48,7 @@ import { getConstraintPuzzleID } from '@view/ConstraintNPCUtils';
 import {
   findMapLayersBySuffix,
   getTilesetTextureKey,
-  resolveTilesetImagePath,
+  getTilesetImageLoadRequests,
   shouldAutoRenderLayer,
   shouldRenderLayerAbovePlayer,
 } from '@view/MapSceneAssetUtils';
@@ -269,23 +269,15 @@ export class OverworldScene extends Phaser.Scene {
 
     console.log(`Checking ${tiledMapData.tilesets.length} tilesets for embedded images...`);
 
+    const requests = getTilesetImageLoadRequests(
+      tiledMapData.tilesets,
+      (textureKey) => this.textures.exists(textureKey),
+      { skipResourcePrefixedImages: true },
+    );
+
     for (const tileset of tiledMapData.tilesets) {
-      // Embedded tilesets have the 'image' property as a data URL or a relative path
-      // They might also have 'tiles' array with individual tile images
       if (tileset.image && !tileset.image.startsWith('resources/')) {
-        // This is likely an embedded tileset or uses a different path convention
-        const tilesetKey = getTilesetTextureKey(tileset.name);
-
-        console.log(`Loading embedded tileset: ${tileset.name} (key: ${tilesetKey})`);
-
-        // If the image is a data URL, load it directly
-        if (tileset.image.startsWith('data:')) {
-          this.load.image(tilesetKey, tileset.image);
-        } else {
-          const imagePath = resolveTilesetImagePath(tileset.image);
-          console.log(`  Loading from path: ${imagePath}`);
-          this.load.image(tilesetKey, imagePath);
-        }
+        console.log(`Loading embedded tileset: ${tileset.name} (key: ${getTilesetTextureKey(tileset.name)})`);
       } else if (tileset.image) {
         console.log(`Tileset ${tileset.name} uses external image: ${tileset.image}`);
       } else {
@@ -293,8 +285,15 @@ export class OverworldScene extends Phaser.Scene {
       }
     }
 
+    for (const request of requests) {
+      if (!request.imagePath.startsWith('data:')) {
+        console.log(`  Loading from path: ${request.imagePath}`);
+      }
+      this.load.image(request.textureKey, request.imagePath);
+    }
+
     // Start the loader if we added any new assets
-    if (!this.load.isLoading() && this.load.totalToLoad > 0) {
+    if (requests.length > 0 && !this.load.isLoading()) {
       this.load.start();
     }
   }
