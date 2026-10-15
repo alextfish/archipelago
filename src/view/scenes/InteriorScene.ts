@@ -38,6 +38,13 @@ import type { ConversationScene } from '@view/scenes/ConversationScene';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 import { queueDoorSpriteAssets } from '@view/DoorAssetLoader';
 import { Door } from '@model/overworld/Door';
+import {
+    findMapLayersBySuffix,
+    getTilesetTextureKey,
+    resolveTilesetImagePath,
+    shouldAutoRenderLayer,
+    shouldRenderLayerAbovePlayer,
+} from '@view/MapSceneAssetUtils';
 
 /**
  * Depth value for overhead layers (roofs, canopies, etc.) that should always
@@ -442,9 +449,9 @@ export class InteriorScene extends Phaser.Scene {
         let queuedTextures = false;
         for (const tileset of data.tilesets) {
             if (!tileset.image) continue;
-            const key = this.getTilesetTextureKey(tileset.name);
+            const key = getTilesetTextureKey(tileset.name);
             if (this.textures.exists(key)) continue;
-            const imagePath = this.resolveTilesetImagePath(tileset.image);
+            const imagePath = resolveTilesetImagePath(tileset.image);
             this.load.image(key, imagePath);
             queuedTextures = true;
         }
@@ -463,7 +470,7 @@ export class InteriorScene extends Phaser.Scene {
 
         const tilesets: Phaser.Tilemaps.Tileset[] = [];
         for (const ts of mapData.data.tilesets) {
-            const key = this.getTilesetTextureKey(ts.name);
+            const key = getTilesetTextureKey(ts.name);
             const tileset = this.map.addTilesetImage(ts.name, key);
             if (tileset) {
                 tilesets.push(tileset);
@@ -485,65 +492,25 @@ export class InteriorScene extends Phaser.Scene {
                 return true;
             }
 
-            return this.textures.exists(this.getTilesetTextureKey(tileset.name));
+            return this.textures.exists(getTilesetTextureKey(tileset.name));
         });
-    }
-
-    private getTilesetTextureKey(tilesetName: string): string {
-        const externalMapping: Record<string, string> = {
-            beach: 'beachTileset',
-            SproutLandsGrassIslands: 'grassTileset',
-        };
-
-        return externalMapping[tilesetName] ?? `tileset_${tilesetName}`;
-    }
-
-    private resolveTilesetImagePath(imagePath: string): string {
-        if (imagePath.startsWith('data:') || imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-            return imagePath;
-        }
-
-        if (imagePath.startsWith('resources/')) {
-            return imagePath;
-        }
-
-        if (imagePath.startsWith('../')) {
-            return `resources/${imagePath.substring(3)}`;
-        }
-
-        if (imagePath.startsWith('tilesets/') || imagePath.startsWith('sprites/')) {
-            return `resources/${imagePath}`;
-        }
-
-        return `resources/tilesets/${imagePath}`;
     }
 
     private setupVisualLayers(tilesets: Phaser.Tilemaps.Tileset[]): void {
         for (const layerData of this.map.layers) {
-            const suffix = TiledLayerUtils.getLayerSuffix(layerData.name);
-            if (suffix === 'collision' || suffix === 'roofs') continue;
-
-            const autoRenderProp: any = Array.isArray(layerData.properties)
-                ? layerData.properties.find((p: any) => p.name === 'autoRender')
-                : undefined;
-            if (!autoRenderProp || autoRenderProp.value !== true) continue;
+            if (!shouldAutoRenderLayer(layerData)) continue;
 
             const layer = this.map.createLayer(layerData.name, tilesets);
             if (!layer) continue;
 
-            const aboveProp: any = Array.isArray(layerData.properties)
-                ? layerData.properties.find((p: any) => p.name === 'renderAbovePlayer')
-                : undefined;
-            if (aboveProp?.value === true) {
+            if (shouldRenderLayerAbovePlayer(layerData)) {
                 layer.setDepth(OVERHEAD_LAYER_DEPTH);
             }
         }
     }
 
     private setupCollisionLayer(tilesets: Phaser.Tilemaps.Tileset[]): void {
-        const collisionLayers = this.map.layers.filter(
-            (l) => TiledLayerUtils.getLayerSuffix(l.name) === 'collision'
-        );
+        const collisionLayers = findMapLayersBySuffix(this.map.layers, 'collision');
 
         for (const layerData of collisionLayers) {
             const layer = this.map.createLayer(layerData.name, tilesets);
@@ -572,9 +539,7 @@ export class InteriorScene extends Phaser.Scene {
     }
 
     private setupRoofsLayer(tilesets: Phaser.Tilemaps.Tileset[]): void {
-        const roofsLayers = this.map.layers.filter(
-            (l) => TiledLayerUtils.getLayerSuffix(l.name) === 'roofs'
-        );
+        const roofsLayers = findMapLayersBySuffix(this.map.layers, 'roofs');
         for (const layerData of roofsLayers) {
             const layer = this.map.createLayer(layerData.name, tilesets);
             if (layer) {

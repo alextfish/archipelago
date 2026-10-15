@@ -46,6 +46,13 @@ import { ConversationVariableSubstitutor } from '@model/conversation/Conversatio
 import { PortalManager } from '@view/PortalManager';
 import { getConstraintPuzzleID } from '@view/ConstraintNPCUtils';
 import {
+  findMapLayersBySuffix,
+  getTilesetTextureKey,
+  resolveTilesetImagePath,
+  shouldAutoRenderLayer,
+  shouldRenderLayerAbovePlayer,
+} from '@view/MapSceneAssetUtils';
+import {
   buildPuzzleEntryInteractables,
   createBridgesLayer,
   hidePuzzleConstraintNPCsAfterEntry,
@@ -267,7 +274,7 @@ export class OverworldScene extends Phaser.Scene {
       // They might also have 'tiles' array with individual tile images
       if (tileset.image && !tileset.image.startsWith('resources/')) {
         // This is likely an embedded tileset or uses a different path convention
-        const tilesetKey = `tileset_${tileset.name}`;
+        const tilesetKey = getTilesetTextureKey(tileset.name);
 
         console.log(`Loading embedded tileset: ${tileset.name} (key: ${tilesetKey})`);
 
@@ -275,20 +282,7 @@ export class OverworldScene extends Phaser.Scene {
         if (tileset.image.startsWith('data:')) {
           this.load.image(tilesetKey, tileset.image);
         } else {
-          // Otherwise, it's a relative path - construct the full path
-          let imagePath: string;
-          if (tileset.image.startsWith('../')) {
-            // Remove ../ prefix
-            imagePath = tileset.image.substring(3);
-          } else if (tileset.image.startsWith('sprites/')) {
-            imagePath = `resources/${tileset.image}`;
-          } else if (tileset.image.startsWith('tilesets/')) {
-            // Already has tilesets/ prefix, just add resources/
-            imagePath = `resources/${tileset.image}`;
-          } else {
-            // No prefix, add full path
-            imagePath = `resources/tilesets/${tileset.image}`;
-          }
+          const imagePath = resolveTilesetImagePath(tileset.image);
           console.log(`  Loading from path: ${imagePath}`);
           this.load.image(tilesetKey, imagePath);
         }
@@ -1127,13 +1121,6 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   /**
-   * Helper: Find all layers matching a suffix pattern.
-   */
-  private findLayersBySuffix(suffix: string): Phaser.Tilemaps.LayerData[] {
-    return this.map.layers.filter(layer => TiledLayerUtils.getLayerSuffix(layer.name) === suffix);
-  }
-
-  /**
    * Load all tilesets (both external and embedded) from the map
    */
   private loadAllTilesets(): Phaser.Tilemaps.Tileset[] {
@@ -1145,22 +1132,9 @@ export class OverworldScene extends Phaser.Scene {
       return tilesets;
     }
 
-    // Mapping of known external tileset names to their Phaser keys
-    const externalTilesetMapping: Record<string, string> = {
-      'beach': 'beachTileset',
-      'SproutLandsGrassIslands': 'grassTileset'
-    };
-
     for (const tilesetData of mapData.data.tilesets) {
       const tilesetName = tilesetData.name;
-
-      // Try external mapping first
-      let phaserKey = externalTilesetMapping[tilesetName];
-
-      // If not found, assume it's an embedded tileset
-      if (!phaserKey) {
-        phaserKey = `tileset_${tilesetName}`;
-      }
+      const phaserKey = getTilesetTextureKey(tilesetName);
 
       console.log(`Adding tileset: ${tilesetName} with key: ${phaserKey}`);
 
@@ -1187,31 +1161,13 @@ export class OverworldScene extends Phaser.Scene {
     // Check all layers in the map
     for (const layerData of this.map.layers) {
       const layerName = layerData.name;
-
-      // Skip special layers that are handled elsewhere
-      const layerSuffix = TiledLayerUtils.getLayerSuffix(layerName);
-      if (layerSuffix === 'collision' ||
-        layerSuffix === 'roofs' ||
-        layerName === OverworldBridgeManager.getBridgesLayerName()) {
-        continue;
-      }
-
-      // Render only layers that have the autoRender property set to true in Tiled
-      const autoRenderProp = layerData.properties && Array.isArray(layerData.properties)
-        ? layerData.properties.find((prop: any) => prop.name === 'autoRender')
-        : undefined;
-      const shouldRender = autoRenderProp != null && (autoRenderProp as any).value === true;
-
-      if (shouldRender) {
+      if (shouldAutoRenderLayer(layerData, {
+        skippedLayerNames: [OverworldBridgeManager.getBridgesLayerName()],
+      })) {
         // Try to create this layer
         const layer = this.map.createLayer(layerName, tilesets);
         if (layer) {
-          // Layers with the custom property renderAbovePlayer=true render above
-          // the player and NPCs (e.g. tree canopies, overhangs).
-          const abovePlayerProp = layerData.properties && Array.isArray(layerData.properties)
-            ? layerData.properties.find((prop: any) => prop.name === 'renderAbovePlayer')
-            : undefined;
-          if (abovePlayerProp != null && (abovePlayerProp as any).value === true) {
+          if (shouldRenderLayerAbovePlayer(layerData)) {
             layer.setDepth(OVERHEAD_LAYER_DEPTH);
           }
           console.log(`Visual layer "${layerName}" created successfully`);
@@ -1223,8 +1179,7 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   private setupCollisionLayer(tilesets: Phaser.Tilemaps.Tileset[]) {
-    // Find all collision layers (e.g., "Beach/collision", "Forest/collision")
-    const collisionLayerData = this.findLayersBySuffix('collision');
+    const collisionLayerData = findMapLayersBySuffix(this.map.layers, 'collision');
 
     if (collisionLayerData.length > 0) {
       console.log(`Found ${collisionLayerData.length} collision layers`);
@@ -1271,8 +1226,7 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   private setupRoofsLayer(tilesets: Phaser.Tilemaps.Tileset[]) {
-    // Find all roofs layers (e.g., "Beach/roofs", "Forest/roofs")
-    const roofsLayersData = this.findLayersBySuffix('roofs');
+    const roofsLayersData = findMapLayersBySuffix(this.map.layers, 'roofs');
     console.log(`Looking for roofs layers: ${roofsLayersData.length} found`);
 
     if (roofsLayersData.length > 0) {
