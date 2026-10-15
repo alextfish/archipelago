@@ -40,7 +40,6 @@ import { queueDoorSpriteAssets } from '@view/DoorAssetLoader';
 import { Door } from '@model/overworld/Door';
 import { TileAnimationManager } from '@view/TileAnimationManager';
 import {
-    areTilesetTexturesReady,
     getTilesetImageLoadRequests,
 } from '@view/MapSceneAssetUtils';
 import {
@@ -49,6 +48,11 @@ import {
     createVisualLayers,
     loadMapTilesets,
 } from '@view/MapSceneLayerUtils';
+import {
+    areMapSceneTilesetsReady,
+    prepareMapSceneData,
+    queueMapSceneImageRequests,
+} from '@view/MapSceneLoadUtils';
 
 /**
  * Depth value for overhead layers (roofs, canopies, etc.) that should always
@@ -422,8 +426,13 @@ export class InteriorScene extends Phaser.Scene {
         try {
             const mapPath = `resources/interiors/${this.mapKey}.json`;
             console.log(`[InteriorScene] Loading interior map: ${mapPath}`);
-            this.tiledMapData = await MapUtils.loadTiledMap(mapPath);
-            this.loadEmbeddedTilesets(this.tiledMapData);
+            const preparedMap = await prepareMapSceneData(
+                mapPath,
+                MapUtils.loadTiledMap,
+                (textureKey) => this.textures.exists(textureKey),
+            );
+            this.tiledMapData = preparedMap.mapData;
+            this.loadEmbeddedTilesets(preparedMap.tilesetImageRequests);
             this.cache.tilemap.add(this.mapCacheKey, { format: 1, data: this.tiledMapData });
             console.log(`[InteriorScene] Map "${this.mapKey}" loaded`);
         } catch (error) {
@@ -451,21 +460,13 @@ export class InteriorScene extends Phaser.Scene {
         this.scene.stop();
     }
 
-    private loadEmbeddedTilesets(data: any): void {
-        if (!data?.tilesets) return;
-
-        const requests = getTilesetImageLoadRequests(
-            data.tilesets,
-            (textureKey) => this.textures.exists(textureKey),
+    private loadEmbeddedTilesets(requests: ReturnType<typeof getTilesetImageLoadRequests>): void {
+        queueMapSceneImageRequests(
+            requests,
+            (textureKey, imagePath) => this.load.image(textureKey, imagePath),
+            () => this.load.isLoading(),
+            () => this.load.start(),
         );
-
-        for (const request of requests) {
-            this.load.image(request.textureKey, request.imagePath);
-        }
-
-        if (requests.length > 0 && !this.load.isLoading()) {
-            this.load.start();
-        }
     }
 
     private loadAllTilesets(): Phaser.Tilemaps.Tileset[] {
@@ -493,9 +494,8 @@ export class InteriorScene extends Phaser.Scene {
     }
 
     private areTilesetTexturesReady(): boolean {
-        const mapData = this.cache.tilemap.get(this.mapCacheKey);
-        return areTilesetTexturesReady(
-            mapData?.data?.tilesets,
+        return areMapSceneTilesetsReady(
+            this.tiledMapData,
             (textureKey) => this.textures.exists(textureKey),
         );
     }

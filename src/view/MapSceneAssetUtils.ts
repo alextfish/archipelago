@@ -10,12 +10,12 @@ interface LayerLike {
     properties?: unknown[];
 }
 
-interface TilesetLike {
+export interface TilesetLike {
     name: string;
     image?: string;
 }
 
-interface TilesetImageLoadRequest {
+export interface TilesetImageLoadRequest {
     textureKey: string;
     imagePath: string;
 }

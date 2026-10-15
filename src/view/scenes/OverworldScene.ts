@@ -56,6 +56,11 @@ import {
   loadMapTilesets,
 } from '@view/MapSceneLayerUtils';
 import {
+  areMapSceneTilesetsReady,
+  prepareMapSceneData,
+  queueMapSceneImageRequests,
+} from '@view/MapSceneLoadUtils';
+import {
   buildPuzzleEntryInteractables,
   createBridgesLayer,
   hidePuzzleConstraintNPCsAfterEntry,
@@ -240,14 +245,20 @@ export class OverworldScene extends Phaser.Scene {
   private async loadTmxFile() {
     try {
       console.log('Loading map file...');
-      this.tiledMapData = await MapUtils.loadTiledMap('resources/overworld.json');
+      const preparedMap = await prepareMapSceneData(
+        'resources/overworld.json',
+        MapUtils.loadTiledMap,
+        (textureKey) => this.textures.exists(textureKey),
+        { skipResourcePrefixedImages: true },
+      );
+      this.tiledMapData = preparedMap.mapData;
 
       // Initialize player start manager as soon as map data is available
       this.playerStartManager = new PlayerStartManager(this.tiledMapData);
       console.log('Player start manager initialized with', this.playerStartManager.getAllStarts().length, 'start positions');
 
       // Load embedded tilesets from the map data
-      this.loadEmbeddedTilesets(this.tiledMapData);
+      this.loadEmbeddedTilesets(this.tiledMapData, preparedMap.tilesetImageRequests);
 
       // Load any disguise sprites declared on constraint objects in the map
       this.loadDisguiseSprites(this.tiledMapData);
@@ -265,18 +276,15 @@ export class OverworldScene extends Phaser.Scene {
    * Load embedded tilesets from the map data
    * Embedded tilesets have their image data included in the map file
    */
-  private loadEmbeddedTilesets(tiledMapData: any): void {
+  private loadEmbeddedTilesets(
+    tiledMapData: any,
+    requests: ReturnType<typeof getTilesetImageLoadRequests>,
+  ): void {
     if (!tiledMapData || !tiledMapData.tilesets) {
       return;
     }
 
     console.log(`Checking ${tiledMapData.tilesets.length} tilesets for embedded images...`);
-
-    const requests = getTilesetImageLoadRequests(
-      tiledMapData.tilesets,
-      (textureKey) => this.textures.exists(textureKey),
-      { skipResourcePrefixedImages: true },
-    );
 
     for (const tileset of tiledMapData.tilesets) {
       if (tileset.image && !tileset.image.startsWith('resources/')) {
@@ -292,13 +300,14 @@ export class OverworldScene extends Phaser.Scene {
       if (!request.imagePath.startsWith('data:')) {
         console.log(`  Loading from path: ${request.imagePath}`);
       }
-      this.load.image(request.textureKey, request.imagePath);
     }
 
-    // Start the loader if we added any new assets
-    if (requests.length > 0 && !this.load.isLoading()) {
-      this.load.start();
-    }
+    queueMapSceneImageRequests(
+      requests,
+      (textureKey, imagePath) => this.load.image(textureKey, imagePath),
+      () => this.load.isLoading(),
+      () => this.load.start(),
+    );
   }
 
   /**
@@ -405,6 +414,12 @@ export class OverworldScene extends Phaser.Scene {
     // Wait for map loading if needed
     if (!this.cache.tilemap.exists('overworldMap')) {
       console.log('Waiting for map to load...');
+      this.time.delayedCall(100, () => this.create(), [], this);
+      return;
+    }
+
+    if (!areMapSceneTilesetsReady(this.tiledMapData, (textureKey) => this.textures.exists(textureKey))) {
+      console.log('Waiting for tileset textures to load...');
       this.time.delayedCall(100, () => this.create(), [], this);
       return;
     }
