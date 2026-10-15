@@ -12,7 +12,6 @@ import { PlayerController } from '@view/PlayerController';
 import { InteractionCursor, type Interactable } from '@view/InteractionCursor';
 import { RoofManager } from '@view/RoofManager';
 import { NPC } from '@model/conversation/NPC';
-import type { ConversationSpec } from '@model/conversation/ConversationData';
 import { attachTestMarker, isTestMode, getTestConfig } from '@helpers/TestMarkers';
 import { emitTestEvent } from '@helpers/TestEvents';
 import { SeriesFactory, SeriesManager } from '@model/series/SeriesFactory';
@@ -27,42 +26,29 @@ import { RiverChannelInitialiser } from '@model/overworld/RiverChannelInitialise
 import { WaterPropagationEngine } from '@model/overworld/WaterPropagationEngine';
 import type { TranslationModeScene } from '@view/scenes/TranslationModeScene';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
-import { GridToWorldMapper } from '@view/GridToWorldMapper';
-import { TileAnimationManager } from '@view/TileAnimationManager';
 import { loadNPCSprites } from '@view/NPCSpriteHelper';
 import { findInteractableInRangeAtTile, isWithinInteractionRange } from '@view/PointerInteractionHelpers';
-import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
 import type { PlayerStartPosition } from '@model/overworld/PlayerStartManager';
 import { SceneTransitionCoordinator } from '@view/SceneTransitionCoordinator';
 import { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
-import { CollisionInitialiser } from '@model/overworld/CollisionInitialiser';
 import { FlowWaterVisualManager } from '@view/FlowWaterVisualManager';
 import { DoorManager } from '@view/DoorManager';
 import { queueDoorSpriteAssets } from '@view/DoorAssetLoader';
 import { CollectibleManager } from '@view/CollectibleManager';
 import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
 import { NPCSpriteController } from '@view/NPCSpriteController';
-import { ConversationVariableSubstitutor } from '@model/conversation/ConversationVariableSubstitutor';
 import { PortalManager } from '@view/PortalManager';
-import { getConstraintPuzzleID } from '@view/ConstraintNPCUtils';
 import {
   getTilesetTextureKey,
   getTilesetImageLoadRequests,
 } from '@view/MapSceneAssetUtils';
 import {
-  createHiddenLayersBySuffix,
-  createOverheadLayersBySuffix,
-  createVisualLayers,
-  loadMapTilesets,
-} from '@view/MapSceneLayerUtils';
-import {
-  areMapSceneTilesetsReady,
   prepareMapSceneData,
   queueMapSceneImageRequests,
 } from '@view/MapSceneLoadUtils';
+import { ExplorationMapScene } from '@view/scenes/ExplorationMapScene';
 import {
   buildPuzzleEntryInteractables,
-  createBridgesLayer,
   hidePuzzleConstraintNPCsAfterEntry,
   isPuzzleEntryTile,
   showPuzzleConstraintNPCsBeforeExit,
@@ -70,39 +56,26 @@ import {
 import { OverworldCameraZones } from '@model/overworld/OverworldCameraZones';
 
 /**
- * Depth value for overhead layers (roofs, canopies, etc.) that should always
- * render above Y-sorted world sprites. Must exceed any possible worldY value.
- */
-const OVERHEAD_LAYER_DEPTH = 100_000;
-
-/**
  * Overworld scene for exploring the map and finding puzzles
  */
-export class OverworldScene extends Phaser.Scene {
+export class OverworldScene extends ExplorationMapScene {
   private player!: Phaser.GameObjects.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private playerController?: PlayerController;
-  private map!: Phaser.Tilemaps.Tilemap;
-  private collisionLayers: Phaser.Tilemaps.TilemapLayer[] = []; // All source collision layers from Tiled
   private bridgesLayer!: Phaser.Tilemaps.TilemapLayer;
   private collisionArray: number[][] = [];
   /** Tiles that are permanently BLOCKED due to explicit Tiled collision-layer properties
    * (collides=true / walkable=false). Water propagation must never change these. */
   private permanentBlockedTiles: Set<string> = new Set();
-  private gameMode: 'exploration' | 'conversation' | 'puzzle' = 'exploration';
   private isExitingPuzzle: boolean = false; // Guard to prevent re-entrant exit calls
   private isPointerHeld: boolean = false; // Track if pointer is held down for continuous movement
 
   // Overworld puzzle system
   private puzzleManager: OverworldPuzzleManager;
-  private gameState: OverworldGameState;
   private collisionManager: CollisionManager;
   private bridgeManager?: OverworldBridgeManager;
   private cameraManager: CameraManager;
   private overworldCameraZones: OverworldCameraZones = OverworldCameraZones.fromTiledLayers([]);
   private puzzleController?: OverworldPuzzleController; // New: replaces direct puzzle management
-  private tiledMapData?: any;
-  private gridMapper!: GridToWorldMapper;
 
   // Store pointer handlers so we can restore them after puzzle mode
   private puzzleEntryPointerHandler?: (pointer: Phaser.Input.Pointer) => void;
@@ -110,19 +83,10 @@ export class OverworldScene extends Phaser.Scene {
   private pointerUpHandler?: () => void;
 
   // Interaction cursor system
-  private interactionCursor?: InteractionCursor;
   private interactables: Interactable[] = [];
-
-  // NPC and conversation system
-  private npcs: NPC[] = [];
-  private seriesManager?: SeriesManager;
-
-  // Tile animations
-  private tileAnimationManager?: TileAnimationManager;
 
   // Roof hiding system
   private roofManager?: RoofManager;
-  private roofsLayers: Phaser.Tilemaps.TilemapLayer[] = [];
 
   /** Merged tile data from all Tiled `water` layers — built once at load time and used by
    * RiverChannelInitialiser to trace inter-puzzle river channels. */
@@ -131,14 +95,8 @@ export class OverworldScene extends Phaser.Scene {
   // ── Extracted manager classes ─────────────────────────────────────────────
   /** Manages flow-water tile visuals and pontoon tile toggling. */
   private flowWaterManager?: FlowWaterVisualManager;
-  /** Manages door loading, sprite creation, and animated state transitions. */
-  private doorManager?: DoorManager;
   /** Manages jewel collectible loading, animation, and collection. */
   private collectibleManager?: CollectibleManager;
-  /** Manages constraint-NPC sprites and puzzle-mode visibility toggling. */
-  private constraintNPCManager?: ConstraintNPCManager;
-  /** Manages regular NPC sprites, series states, and icon badges. */
-  private npcSpriteController?: NPCSpriteController;
 
   // Portal (scene-transition hotspot) system
   private portalManager?: PortalManager;
@@ -153,9 +111,6 @@ export class OverworldScene extends Phaser.Scene {
   // Overworld HUD scene (book icon, warp button, jewel counts)
   private overworldHUD?: OverworldHUDScene;
 
-  // Active series tracking (for navigation)
-  private currentSeries: any = null;
-  private currentSeriesPuzzleData: Map<string, any> = new Map();
   private shouldShowNewGameIntro: boolean = false;
 
   constructor() {
@@ -411,44 +366,19 @@ export class OverworldScene extends Phaser.Scene {
       this.onWake(data);
     });
 
-    // Wait for map loading if needed
-    if (!this.cache.tilemap.exists('overworldMap')) {
-      console.log('Waiting for map to load...');
-      this.time.delayedCall(100, () => this.create(), [], this);
+    if (!this.waitForMapSceneAssets()) {
       return;
     }
 
-    if (!areMapSceneTilesetsReady(this.tiledMapData, (textureKey) => this.textures.exists(textureKey))) {
-      console.log('Waiting for tileset textures to load...');
-      this.time.delayedCall(100, () => this.create(), [], this);
+    console.log('Setting up visual layers...');
+    const tilesets = this.bootstrapExplorationMap({ requireTilesets: true });
+    if (!tilesets) {
       return;
     }
-
-    // Create the tilemap
-    this.map = this.make.tilemap({ key: 'overworldMap' });
-    this.gridMapper = new GridToWorldMapper(this.tiledMapData?.tilewidth ?? 32);
-
-    // Add all tilesets (both external and embedded)
-    const tilesets = this.loadAllTilesets();
-
-    if (tilesets.length === 0) {
-      console.error('Failed to load any tilesets');
-      return;
-    }
-
     console.log(`Loaded ${tilesets.length} tilesets successfully`);
-
-    // Auto-create all visual layers
-    this.setupVisualLayers(tilesets);
 
     // Create collision layers
     this.setupCollisionLayer(tilesets);
-
-    // Create roofs layers (should be above player)
-    this.setupRoofsLayer(tilesets);
-
-    // Initialise tile animations (scans all created layers once to cache tile instances)
-    this.tileAnimationManager = new TileAnimationManager(this.map, tilesets);
 
     // Set world bounds to match map size
     const mapWidth = this.map.widthInPixels;
@@ -511,9 +441,6 @@ export class OverworldScene extends Phaser.Scene {
 
     // Initialize shared puzzle HUD
     PuzzleHUDManager.getInstance().initializeHUD(this);
-
-    // Listen for series puzzle completion from BridgePuzzleScene
-    this.events.on('seriesPuzzleCompleted', this.handleSeriesPuzzleCompleted, this);
 
     // Create NPCSpriteController (needs map, gridMapper, seriesManager)
     this.npcSpriteController = new NPCSpriteController(
@@ -1137,83 +1064,97 @@ export class OverworldScene extends Phaser.Scene {
     this.npcSpriteController?.updateNPCIcon(npc);
   }
 
-  /**
-   * Load all tilesets (both external and embedded) from the map
-   */
-  private loadAllTilesets(): Phaser.Tilemaps.Tileset[] {
-    const mapData = this.cache.tilemap.get('overworldMap');
-
-    if (!mapData || !mapData.data || !mapData.data.tilesets) {
-      console.warn('No tileset data found in map');
-      return [];
-    }
-
-    const tilesetLoads = loadMapTilesets(
-      mapData.data.tilesets,
-      (tilesetName, textureKey) => this.map.addTilesetImage(tilesetName, textureKey),
-    );
-    const tilesets: Phaser.Tilemaps.Tileset[] = [];
-
-    for (const tilesetLoad of tilesetLoads) {
-      console.log(`Adding tileset: ${tilesetLoad.name} with key: ${tilesetLoad.textureKey}`);
-
-      if (tilesetLoad.tileset) {
-        tilesets.push(tilesetLoad.tileset);
-        console.log(`  ✓ Tileset ${tilesetLoad.name} loaded successfully`);
-      } else {
-        console.warn(`  ✗ Failed to load tileset ${tilesetLoad.name} (key: ${tilesetLoad.textureKey})`);
-      }
-    }
-
-    return tilesets;
+  protected persistMeaningfulProgress(): void {
+    this.saveGameState();
   }
 
-  /**
-   * Setup visual tile layers that should be automatically rendered
-   * Looks for layers with the custom property "autoRender: true" or layers with common visual suffixes
-   */
-  private setupVisualLayers(tilesets: Phaser.Tilemaps.Tileset[]) {
-    console.log('Setting up visual layers...');
+  protected setSeriesHUDVisible(visible: boolean): void {
+    this.overworldHUD?.setJewelHUDVisible(visible);
+  }
 
-    const visualLayers = createVisualLayers(
-      this.map.layers,
-      (layerName, visualTilesets) => this.map.createLayer(layerName, visualTilesets),
-      tilesets,
-      {
-      overheadLayerDepth: OVERHEAD_LAYER_DEPTH,
-      skippedLayerNames: [OverworldBridgeManager.getBridgesLayerName()],
-      },
-    );
+  protected getSeriesPuzzleCallerSceneKey(): string {
+    return 'OverworldScene';
+  }
 
-    for (const layerName of visualLayers.createdLayerNames) {
-      console.log(`Visual layer "${layerName}" created successfully`);
-    }
+  protected getMapCacheKey(): string {
+    return 'overworldMap';
+  }
 
-    for (const layerName of visualLayers.failedLayerNames) {
-      console.warn(`Failed to create visual layer "${layerName}"`);
-    }
+  protected getSkippedVisualLayerNames(): string[] {
+    return [OverworldBridgeManager.getBridgesLayerName()];
+  }
+
+  protected onMapCachePending(): void {
+    console.log('Waiting for map to load...');
+  }
+
+  protected onTilesetTexturesPending(): void {
+    console.log('Waiting for tileset textures to load...');
+  }
+
+  protected onNoTilesetDataInCache(): void {
+    console.warn('No tileset data found in map');
+  }
+
+  protected onTilesetLoaded(tilesetName: string, textureKey: string): void {
+    console.log(`Adding tileset: ${tilesetName} with key: ${textureKey}`);
+    console.log(`  ✓ Tileset ${tilesetName} loaded successfully`);
+  }
+
+  protected onTilesetLoadFailed(tilesetName: string, textureKey: string): void {
+    console.log(`Adding tileset: ${tilesetName} with key: ${textureKey}`);
+    console.warn(`  ✗ Failed to load tileset ${tilesetName} (key: ${textureKey})`);
+  }
+
+  protected onNoTilesetsLoaded(): void {
+    console.error('Failed to load any tilesets');
+  }
+
+  protected onVisualLayerCreated(layerName: string): void {
+    console.log(`Visual layer "${layerName}" created successfully`);
+  }
+
+  protected onVisualLayerCreateFailed(layerName: string): void {
+    console.warn(`Failed to create visual layer "${layerName}"`);
+  }
+
+  protected onRoofLayerCreated(layerName: string, layer: Phaser.Tilemaps.TilemapLayer): void {
+    console.log(`Roofs layer "${layerName}" created successfully: depth=${layer.depth}, visible=${layer.visible}, alpha=${layer.alpha}`);
+  }
+
+  protected onRoofLayerCreateFailed(layerName: string): void {
+    console.error(`Failed to create roofs layer "${layerName}" - createLayer returned null`);
   }
 
   private setupCollisionLayer(tilesets: Phaser.Tilemaps.Tileset[]) {
-    const collisionLayers = createHiddenLayersBySuffix(
-      this.map.layers,
-      (layerName, collisionTilesets) => this.map.createLayer(layerName, collisionTilesets),
-      tilesets,
-      'collision',
-    );
-    this.collisionLayers = collisionLayers.createdLayers;
+    const collisionBootstrap = this.setupCollisionBootstrap(tilesets);
 
     if (this.collisionLayers.length > 0) {
       console.log(`Found ${this.collisionLayers.length} collision layers`);
 
-      for (const layerName of collisionLayers.createdLayerNames) {
+      for (const layerName of collisionBootstrap.createdLayerNames) {
         console.log(`Collision layer "${layerName}" created and configured`);
       }
-      for (const layerName of collisionLayers.failedLayerNames) {
+      for (const layerName of collisionBootstrap.failedLayerNames) {
         console.warn(`Failed to create collision layer "${layerName}"`);
       }
-      // Setup collision detection using all collision layers
-      this.setupCollisionDetection();
+
+      const collisionInitData = collisionBootstrap.collisionInitData;
+      if (!collisionInitData) {
+        return;
+      }
+
+      this.collisionArray = collisionInitData.collisionArray;
+      this.permanentBlockedTiles = collisionInitData.permanentBlockedTiles;
+
+      this.flowWaterManager = new FlowWaterVisualManager(
+        this.map,
+        this.tiledMapData,
+        collisionInitData.pontoonTiles,
+        (x, y) => this.getCollisionAt(x, y),
+        (x, y, t) => this.setCollisionAt(x, y, t),
+        (x, y) => this.isPermanentlyBlocked(x, y),
+      );
     } else {
       console.warn('No collision layers found in map');
     }
@@ -1224,7 +1165,7 @@ export class OverworldScene extends Phaser.Scene {
 
     if (bridgesLayerData) {
       console.log(`Creating bridges layer with tilesets`);
-      const bridgesLayer = createBridgesLayer(this.map, tilesets);
+      const bridgesLayer = this.createBridgesLayerForMap(tilesets, { requireDeclaredLayer: true });
 
       if (bridgesLayer) {
         this.bridgesLayer = bridgesLayer;
@@ -1240,30 +1181,6 @@ export class OverworldScene extends Phaser.Scene {
     }
   }
 
-  private setupRoofsLayer(tilesets: Phaser.Tilemaps.Tileset[]) {
-    const roofLayers = createOverheadLayersBySuffix(
-      this.map.layers,
-      (layerName, roofTilesets) => this.map.createLayer(layerName, roofTilesets),
-      tilesets,
-      'roofs',
-      OVERHEAD_LAYER_DEPTH,
-    );
-    console.log(`Looking for roofs layers: ${roofLayers.createdLayerNames.length + roofLayers.failedLayerNames.length} found`);
-
-    if (roofLayers.createdLayerNames.length > 0 || roofLayers.failedLayerNames.length > 0) {
-      console.log(`Creating ${roofLayers.createdLayerNames.length + roofLayers.failedLayerNames.length} roofs layers with ${tilesets.length} tilesets`);
-      this.roofsLayers = roofLayers.createdLayers;
-
-      for (const roofsLayer of roofLayers.createdLayers) {
-        console.log(`Roofs layer created successfully: depth=${roofsLayer.depth}, visible=${roofsLayer.visible}, alpha=${roofsLayer.alpha}`);
-      }
-      for (const layerName of roofLayers.failedLayerNames) {
-        console.error(`Failed to create roofs layer "${layerName}" - createLayer returned null`);
-      }
-    } else {
-      console.log('No roofs layers found in map (optional)');
-    }
-  }
   private findPlayerStartPosition(): { x: number; y: number } {
     try {
       // Check for test mode override
@@ -1315,39 +1232,8 @@ export class OverworldScene extends Phaser.Scene {
     return { x: centerX, y: centerY };
   }
 
-  private setupCollisionDetection() {
-    if (this.collisionLayers.length === 0) return;
-
-    const mapWidth = this.map.width;
-    const mapHeight = this.map.height;
-
-    const { collisionArray, permanentBlockedTiles, pontoonTiles } = CollisionInitialiser.buildCollisionData(
-      this.tiledMapData ?? {},
-      mapWidth,
-      mapHeight,
-      (x, y) => this.collisionLayers.map(layer => {
-        const tile = layer.getTileAt(x, y);
-        if (!tile || tile.index === -1) return null;
-        return { properties: tile.properties ?? undefined };
-      })
-    );
-
-    this.collisionArray = collisionArray;
-    this.permanentBlockedTiles = permanentBlockedTiles;
-
-    // Create FlowWaterVisualManager now that pontoonTiles are ready
-    this.flowWaterManager = new FlowWaterVisualManager(
-      this.map,
-      this.tiledMapData,
-      pontoonTiles,
-      (x, y) => this.getCollisionAt(x, y),
-      (x, y, t) => this.setCollisionAt(x, y, t),
-      (x, y) => this.isPermanentlyBlocked(x, y),
-    );
-  }
-
   update(_time: number, delta: number) {
-    this.tileAnimationManager?.update(delta);
+    this.updateExplorationMap(_time, delta);
     this.npcSpriteController?.update(delta, this.canPlayerMoveAroundAndInteract());
 
     // Update player depth for Y-sorting so sprites above/below sort correctly
@@ -1789,334 +1675,12 @@ export class OverworldScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * Start a conversation with an NPC
-   */
-  private async startConversationWithNPC(npc: NPC): Promise<void> {
-    if (!npc.hasConversation()) {
-      console.log(`NPC ${npc.name} has no conversation`);
-      return;
-    }
-
-    try {
-      // Determine which conversation to use
-      let useSolvedConversation = false;
-
-      // For constraint NPCs, check puzzle completion status
-      if (npc.id.startsWith('constraint-')) {
-        const puzzleId = getConstraintPuzzleID(npc.id);
-        if (puzzleId) {
-          useSolvedConversation = this.gameState.isPuzzleCompleted(puzzleId);
-          console.log(`Constraint NPC conversation: puzzle ${puzzleId} completed = ${useSolvedConversation}`);
-        }
-      } else {
-        // For series NPCs, check series state
-        const state = this.npcSpriteController?.npcSeriesStates.get(npc.id);
-        useSolvedConversation = state?.isSeriesCompleted() ?? false;
-      }
-
-      // Load conversation JSON
-      const conversationPath = npc.getConversationPath(useSolvedConversation);
-      const response = await fetch(conversationPath);
-      if (!response.ok) {
-        throw new Error(`Failed to load conversation: ${response.statusText}`);
-      }
-
-      const conversationSpec: ConversationSpec = await response.json();
-
-      // Evaluate conditional start branches (e.g. jewel count checks) to pick
-      // the correct starting node for this conversation.
-      const startNodeId = ConversationConditionEvaluator.resolveStartNode(
-        conversationSpec,
-        { getJewelCount: (colour) => this.gameState.getJewelCount(colour) }
-      );
-
-      // Apply conversation variable substitution (e.g. {{count}} → '2')
-      if (npc.conversationVariables) {
-        ConversationVariableSubstitutor.applyTo(conversationSpec, npc.conversationVariables);
-      }
-
-      const conversationNPC = this.constraintNPCManager?.getConversationNPC(npc, useSolvedConversation) ?? npc;
-
-      // Switch to conversation mode
-      this.gameMode = 'conversation';
-      this.interactionCursor?.hide();
-      this.playerController?.stopAndIdle();
-      this.playerController?.setEnabled(false);
-      console.log(`Switching to conversation mode with NPC: ${npc.name} (solved: ${useSolvedConversation}, startNode: ${startNodeId})`);
-
-      // Get conversation scene
-      const conversationScene = this.scene.get('ConversationScene') as (ConversationScene & { startConversation: Function; events: Phaser.Events.EventEmitter }) | null;
-      if (!conversationScene) {
-        throw new Error('ConversationScene not found');
-      }
-
-      // Inject glyph tracker so speech bubbles register for Translation Mode
-      conversationScene.setGlyphTracker(this.gameState.glyphTracker);
-
-      // Listen for conversation end
-      conversationScene.events.once('conversationEnded', () => {
-        this.onConversationEnded();
-      });
-
-      // Listen for conversation effects
-      conversationScene.events.on('conversationEffects', (effects: any[]) => {
-        this.handleConversationEffects(effects, npc);
-      });
-
-      // Launch the conversation scene if not already running
-      if (!this.scene.isActive('ConversationScene')) {
-        // Wait for the scene to be created before starting conversation
-        conversationScene.events.once('create', () => {
-          conversationScene.startConversation(conversationSpec, conversationNPC, startNodeId);
-        });
-        this.scene.launch('ConversationScene');
-      } else {
-        // Scene already running, start conversation immediately
-        conversationScene.startConversation(conversationSpec, conversationNPC, startNodeId);
-      }
-
-    } catch (error) {
-      console.error('Error starting conversation:', error);
-      this.playerController?.setEnabled(true);
-      this.gameMode = 'exploration';
-    }
-  }
-
-  /**
-   * Handle conversation ending
-   */
-  private onConversationEnded(): void {
-    console.log('Conversation ended, returning to exploration');
-    this.playerController?.setEnabled(true);
-    this.gameMode = 'exploration';
-
-    // Clean up event listeners
-    const conversationScene = this.scene.get('ConversationScene');
-    if (conversationScene) {
-      conversationScene.events.off('conversationEffects');
-    }
-
-    // Stop the conversation scene
-    this.scene.stop('ConversationScene');
-  }
-
-  /**
-   * Handle effects from conversation choices
-   */
-  private async handleConversationEffects(effects: any[], npc?: NPC): Promise<void> {
-    console.log('Handling conversation effects:', effects);
-
-    for (const effect of effects) {
-      switch (effect.type) {
-        case 'giveItem':
-          console.log(`TODO: Give item ${effect.itemId} to player`);
-          break;
-        case 'setFlag':
-          console.log(`TODO: Set flag ${effect.flagId} = ${effect.flagValue}`);
-          break;
-        case 'startPuzzle':
-          console.log(`TODO: Start puzzle ${effect.puzzleId}`);
-          break;
-        case 'startSeries':
-          if (effect.seriesId) {
-            await this.startPuzzleSeries(effect.seriesId, npc);
-          }
-          break;
-        case 'unlockDoor':
-          if (effect.doorId) {
-            this.unlockDoor(effect.doorId);
-          }
-          break;
-        case 'setExpression':
-          // Expression changes are handled by the conversation system
-          break;
-      }
-    }
-  }
-
-  /**
-   * Start a puzzle series, launching the first unsolved puzzle
-   */
-  private async startPuzzleSeries(seriesId: string, npc?: NPC): Promise<void> {
-    console.log(`Starting puzzle series: ${seriesId}`);
-
-    // If series is associated with an NPC, use their state
-    let series = null;
-    if (npc) {
-      const state = this.npcSpriteController?.npcSeriesStates.get(npc.id);
-      series = state?.getSeries();
-
-      if (series && series.id !== seriesId) {
-        console.warn(`NPC ${npc.id} series mismatch: expected ${seriesId}, got ${series.id}`);
-        series = null;
-      }
-    }
-
-    // If we don't have the series yet, load it
-    if (!series) {
-      try {
-        const seriesPath = `data/series/${seriesId}.json`;
-        const response = await fetch(seriesPath);
-        if (!response.ok) {
-          throw new Error(`Failed to load series: ${response.statusText}`);
-        }
-        const seriesJson = await response.json();
-        series = await this.seriesManager!.loadSeries(seriesJson);
-
-        // Store puzzle data for launching
-        if (seriesJson.puzzles) {
-          for (const puzzle of seriesJson.puzzles) {
-            if (puzzle.id && puzzle.puzzleData) {
-              this.currentSeriesPuzzleData.set(puzzle.id, puzzle.puzzleData);
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`Error loading series ${seriesId}:`, error);
-        return;
-      }
-    }
-
-    const firstUnsolvedId = this.getSeriesEntryIdToLaunch(series, true);
-
-    if (!firstUnsolvedId) {
-      console.warn(`No unlocked puzzles found in series ${seriesId}`);
-      return;
-    }
-
-    console.log(`Launching first unsolved puzzle: ${firstUnsolvedId}`);
-
-    // Store the current series for navigation
-    this.currentSeries = series;
-    this.launchSeriesPuzzleEntry(firstUnsolvedId);
-  }
-
   private async animateDoorChange(door: Door, unlock: boolean): Promise<void> {
     await this.doorManager?.animateDoorChange(door, unlock);
   }
 
   private unlockDoor(doorId: string): void {
     this.doorManager?.unlockDoor(doorId);
-  }
-
-  /**
-   * Handle completion of a puzzle within a series
-   * Called when BridgePuzzleScene completes a series puzzle
-   */
-  private async handleSeriesPuzzleCompleted(data: { puzzleId: string; success: boolean }): Promise<void> {
-    console.log(`[OverworldScene] Series puzzle completed: ${data.puzzleId}, success: ${data.success}`);
-
-    if (!this.currentSeries) {
-      console.warn('No current series - ignoring puzzle completion');
-      this.overworldHUD?.setJewelHUDVisible(true);
-      return;
-    }
-
-    if (!data.success) {
-      console.log('Puzzle was not successfully solved - not marking as complete');
-      this.overworldHUD?.setJewelHUDVisible(true);
-      return;
-    }
-
-    // Find the series entry that contains this puzzle data ID
-    // The puzzle data has an ID (e.g., "forest-1") but the series entries have their own IDs
-    const allEntries = this.currentSeries.getAllPuzzleEntries();
-    const matchingEntry = allEntries.find((entry: any) => {
-      // Check if this entry's puzzle data is in our series puzzle data map
-      const puzzleData = this.currentSeriesPuzzleData.get(entry.id);
-      return puzzleData && puzzleData.id === data.puzzleId;
-    });
-
-    if (!matchingEntry) {
-      console.warn(`Could not find series entry for puzzle ${data.puzzleId}`);
-      return;
-    }
-
-    // Mark the puzzle as completed in the series using the entry ID
-    console.log(`Marking puzzle entry ${matchingEntry.id} (puzzle data: ${data.puzzleId}) as completed in series ${this.currentSeries.id}`);
-    const result = this.currentSeries.completePuzzle(matchingEntry.id);
-
-    if (result.success) {
-      console.log(`Puzzle ${matchingEntry.id} marked as completed`);
-      if (result.newlyUnlockedPuzzles.length > 0) {
-        console.log(`Newly unlocked puzzles: ${result.newlyUnlockedPuzzles.join(', ')}`);
-      }
-
-      if (this.seriesManager) {
-        await this.seriesManager.saveSeriesProgress(this.currentSeries);
-      }
-    }
-
-    // Check if the series is now complete
-    if (this.currentSeries.isSeriesCompleted()) {
-      console.log(`Series ${this.currentSeries.id} completed! Animating door unlock...`);
-      // Find and animate the door associated with this series
-      const seriesDoor = this.doorManager?.doors.find(d => d.id === this.currentSeries!.id);
-      if (seriesDoor && seriesDoor.isLocked()) {
-        await this.animateDoorChange(seriesDoor, true);
-      } else if (!seriesDoor) {
-        // No animated door found — fall back to instant unlock by ID
-        this.unlockDoor(this.currentSeries.id);
-      }
-
-      // Update NPC icon to show completion
-      for (const [npcId, state] of (this.npcSpriteController?.npcSeriesStates.entries() ?? [])) {
-        if (state.getSeries()?.id === this.currentSeries.id) {
-          const npc = this.npcs.find(n => n.id === npcId);
-          if (npc) {
-            this.updateNPCIcon(npc);
-          }
-        }
-      }
-    } else {
-      console.log(`Series ${this.currentSeries.id} not yet complete`);
-      const nextPuzzleId = this.getSeriesEntryIdToLaunch(this.currentSeries, false);
-      if (nextPuzzleId) {
-        this.time.delayedCall(0, () => {
-          this.launchSeriesPuzzleEntry(nextPuzzleId);
-        });
-      } else {
-        this.overworldHUD?.setJewelHUDVisible(true);
-      }
-      this.saveGameState();
-      return;
-    }
-
-    this.overworldHUD?.setJewelHUDVisible(true);
-    this.saveGameState();
-  }
-
-  private getSeriesEntryIdToLaunch(series: any, allowCompletedFallback: boolean): string | null {
-    const entries = series.getAllPuzzleEntries();
-    for (const entry of entries) {
-      if (entry.unlocked && !entry.completed) {
-        return entry.id;
-      }
-    }
-
-    if (!allowCompletedFallback) {
-      return null;
-    }
-
-    const firstUnlocked = entries.find((entry: any) => entry.unlocked);
-    return firstUnlocked?.id ?? null;
-  }
-
-  private launchSeriesPuzzleEntry(entryId: string): void {
-    const puzzleData = this.currentSeriesPuzzleData.get(entryId);
-    if (!puzzleData) {
-      console.error(`No puzzle data found for ${entryId}`);
-      this.overworldHUD?.setJewelHUDVisible(true);
-      return;
-    }
-
-    this.overworldHUD?.setJewelHUDVisible(false);
-    this.scene.launch('BridgePuzzleScene', {
-      puzzleData,
-      seriesMode: true,
-      callerSceneKey: 'OverworldScene',
-    });
   }
 
   /**
