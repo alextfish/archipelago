@@ -41,12 +41,14 @@ import { Door } from '@model/overworld/Door';
 import { TileAnimationManager } from '@view/TileAnimationManager';
 import {
     areTilesetTexturesReady,
-    findMapLayersBySuffix,
-    getTilesetTextureKey,
     getTilesetImageLoadRequests,
-    shouldAutoRenderLayer,
-    shouldRenderLayerAbovePlayer,
 } from '@view/MapSceneAssetUtils';
+import {
+    createHiddenLayersBySuffix,
+    createOverheadLayersBySuffix,
+    createVisualLayers,
+    loadMapTilesets,
+} from '@view/MapSceneLayerUtils';
 
 /**
  * Depth value for overhead layers (roofs, canopies, etc.) that should always
@@ -473,16 +475,20 @@ export class InteriorScene extends Phaser.Scene {
             return [];
         }
 
+        const tilesetLoads = loadMapTilesets(
+            mapData.data.tilesets,
+            (tilesetName, textureKey) => this.map.addTilesetImage(tilesetName, textureKey),
+        );
         const tilesets: Phaser.Tilemaps.Tileset[] = [];
-        for (const ts of mapData.data.tilesets) {
-            const key = getTilesetTextureKey(ts.name);
-            const tileset = this.map.addTilesetImage(ts.name, key);
-            if (tileset) {
-                tilesets.push(tileset);
+
+        for (const tilesetLoad of tilesetLoads) {
+            if (tilesetLoad.tileset) {
+                tilesets.push(tilesetLoad.tileset);
             } else {
-                console.warn(`[InteriorScene] Failed to load tileset "${ts.name}" (key: ${key})`);
+                console.warn(`[InteriorScene] Failed to load tileset "${tilesetLoad.name}" (key: ${tilesetLoad.textureKey})`);
             }
         }
+
         return tilesets;
     }
 
@@ -495,27 +501,31 @@ export class InteriorScene extends Phaser.Scene {
     }
 
     private setupVisualLayers(tilesets: Phaser.Tilemaps.Tileset[]): void {
-        for (const layerData of this.map.layers) {
-            if (!shouldAutoRenderLayer(layerData)) continue;
+        const visualLayers = createVisualLayers(
+            this.map.layers,
+            (layerName, visualTilesets) => this.map.createLayer(layerName, visualTilesets),
+            tilesets,
+            {
+            overheadLayerDepth: OVERHEAD_LAYER_DEPTH,
+            },
+        );
 
-            const layer = this.map.createLayer(layerData.name, tilesets);
-            if (!layer) continue;
-
-            if (shouldRenderLayerAbovePlayer(layerData)) {
-                layer.setDepth(OVERHEAD_LAYER_DEPTH);
-            }
+        for (const layerName of visualLayers.failedLayerNames) {
+            console.warn(`[InteriorScene] Failed to create visual layer "${layerName}"`);
         }
     }
 
     private setupCollisionLayer(tilesets: Phaser.Tilemaps.Tileset[]): void {
-        const collisionLayers = findMapLayersBySuffix(this.map.layers, 'collision');
+        const collisionLayers = createHiddenLayersBySuffix(
+            this.map.layers,
+            (layerName, collisionTilesets) => this.map.createLayer(layerName, collisionTilesets),
+            tilesets,
+            'collision',
+        );
+        this.collisionLayers = collisionLayers.createdLayers;
 
-        for (const layerData of collisionLayers) {
-            const layer = this.map.createLayer(layerData.name, tilesets);
-            if (layer) {
-                layer.setAlpha(0);
-                this.collisionLayers.push(layer);
-            }
+        for (const layerName of collisionLayers.failedLayerNames) {
+            console.warn(`[InteriorScene] Failed to create collision layer "${layerName}"`);
         }
 
         if (this.collisionLayers.length === 0) {
@@ -537,13 +547,17 @@ export class InteriorScene extends Phaser.Scene {
     }
 
     private setupRoofsLayer(tilesets: Phaser.Tilemaps.Tileset[]): void {
-        const roofsLayers = findMapLayersBySuffix(this.map.layers, 'roofs');
-        for (const layerData of roofsLayers) {
-            const layer = this.map.createLayer(layerData.name, tilesets);
-            if (layer) {
-                layer.setDepth(OVERHEAD_LAYER_DEPTH);
-                this.roofsLayers.push(layer);
-            }
+        const roofLayers = createOverheadLayersBySuffix(
+            this.map.layers,
+            (layerName, roofTilesets) => this.map.createLayer(layerName, roofTilesets),
+            tilesets,
+            'roofs',
+            OVERHEAD_LAYER_DEPTH,
+        );
+        this.roofsLayers = roofLayers.createdLayers;
+
+        for (const layerName of roofLayers.failedLayerNames) {
+            console.warn(`[InteriorScene] Failed to create roofs layer "${layerName}"`);
         }
     }
 

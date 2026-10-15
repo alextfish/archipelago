@@ -46,12 +46,15 @@ import { ConversationVariableSubstitutor } from '@model/conversation/Conversatio
 import { PortalManager } from '@view/PortalManager';
 import { getConstraintPuzzleID } from '@view/ConstraintNPCUtils';
 import {
-  findMapLayersBySuffix,
   getTilesetTextureKey,
   getTilesetImageLoadRequests,
-  shouldAutoRenderLayer,
-  shouldRenderLayerAbovePlayer,
 } from '@view/MapSceneAssetUtils';
+import {
+  createHiddenLayersBySuffix,
+  createOverheadLayersBySuffix,
+  createVisualLayers,
+  loadMapTilesets,
+} from '@view/MapSceneLayerUtils';
 import {
   buildPuzzleEntryInteractables,
   createBridgesLayer,
@@ -1123,27 +1126,27 @@ export class OverworldScene extends Phaser.Scene {
    * Load all tilesets (both external and embedded) from the map
    */
   private loadAllTilesets(): Phaser.Tilemaps.Tileset[] {
-    const tilesets: Phaser.Tilemaps.Tileset[] = [];
     const mapData = this.cache.tilemap.get('overworldMap');
 
     if (!mapData || !mapData.data || !mapData.data.tilesets) {
       console.warn('No tileset data found in map');
-      return tilesets;
+      return [];
     }
 
-    for (const tilesetData of mapData.data.tilesets) {
-      const tilesetName = tilesetData.name;
-      const phaserKey = getTilesetTextureKey(tilesetName);
+    const tilesetLoads = loadMapTilesets(
+      mapData.data.tilesets,
+      (tilesetName, textureKey) => this.map.addTilesetImage(tilesetName, textureKey),
+    );
+    const tilesets: Phaser.Tilemaps.Tileset[] = [];
 
-      console.log(`Adding tileset: ${tilesetName} with key: ${phaserKey}`);
+    for (const tilesetLoad of tilesetLoads) {
+      console.log(`Adding tileset: ${tilesetLoad.name} with key: ${tilesetLoad.textureKey}`);
 
-      const tileset = this.map.addTilesetImage(tilesetName, phaserKey);
-
-      if (tileset) {
-        tilesets.push(tileset);
-        console.log(`  ✓ Tileset ${tilesetName} loaded successfully`);
+      if (tilesetLoad.tileset) {
+        tilesets.push(tilesetLoad.tileset);
+        console.log(`  ✓ Tileset ${tilesetLoad.name} loaded successfully`);
       } else {
-        console.warn(`  ✗ Failed to load tileset ${tilesetName} (key: ${phaserKey})`);
+        console.warn(`  ✗ Failed to load tileset ${tilesetLoad.name} (key: ${tilesetLoad.textureKey})`);
       }
     }
 
@@ -1157,45 +1160,43 @@ export class OverworldScene extends Phaser.Scene {
   private setupVisualLayers(tilesets: Phaser.Tilemaps.Tileset[]) {
     console.log('Setting up visual layers...');
 
-    // Check all layers in the map
-    for (const layerData of this.map.layers) {
-      const layerName = layerData.name;
-      if (shouldAutoRenderLayer(layerData, {
-        skippedLayerNames: [OverworldBridgeManager.getBridgesLayerName()],
-      })) {
-        // Try to create this layer
-        const layer = this.map.createLayer(layerName, tilesets);
-        if (layer) {
-          if (shouldRenderLayerAbovePlayer(layerData)) {
-            layer.setDepth(OVERHEAD_LAYER_DEPTH);
-          }
-          console.log(`Visual layer "${layerName}" created successfully`);
-        } else {
-          console.warn(`Failed to create visual layer "${layerName}"`);
-        }
-      }
+    const visualLayers = createVisualLayers(
+      this.map.layers,
+      (layerName, visualTilesets) => this.map.createLayer(layerName, visualTilesets),
+      tilesets,
+      {
+      overheadLayerDepth: OVERHEAD_LAYER_DEPTH,
+      skippedLayerNames: [OverworldBridgeManager.getBridgesLayerName()],
+      },
+    );
+
+    for (const layerName of visualLayers.createdLayerNames) {
+      console.log(`Visual layer "${layerName}" created successfully`);
+    }
+
+    for (const layerName of visualLayers.failedLayerNames) {
+      console.warn(`Failed to create visual layer "${layerName}"`);
     }
   }
 
   private setupCollisionLayer(tilesets: Phaser.Tilemaps.Tileset[]) {
-    const collisionLayerData = findMapLayersBySuffix(this.map.layers, 'collision');
+    const collisionLayers = createHiddenLayersBySuffix(
+      this.map.layers,
+      (layerName, collisionTilesets) => this.map.createLayer(layerName, collisionTilesets),
+      tilesets,
+      'collision',
+    );
+    this.collisionLayers = collisionLayers.createdLayers;
 
-    if (collisionLayerData.length > 0) {
-      console.log(`Found ${collisionLayerData.length} collision layers`);
+    if (this.collisionLayers.length > 0) {
+      console.log(`Found ${this.collisionLayers.length} collision layers`);
 
-      // Create all collision layers
-      for (const layerData of collisionLayerData) {
-        const collisionLayer = this.map.createLayer(layerData.name, tilesets);
-
-        if (collisionLayer) {
-          // Store all collision layers in array
-          this.collisionLayers.push(collisionLayer);
-          // Make collision layer invisible but functional
-          collisionLayer.setAlpha(0);
-          console.log(`Collision layer "${layerData.name}" created and configured`);
-        }
+      for (const layerName of collisionLayers.createdLayerNames) {
+        console.log(`Collision layer "${layerName}" created and configured`);
       }
-
+      for (const layerName of collisionLayers.failedLayerNames) {
+        console.warn(`Failed to create collision layer "${layerName}"`);
+      }
       // Setup collision detection using all collision layers
       this.setupCollisionDetection();
     } else {
@@ -1225,24 +1226,24 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   private setupRoofsLayer(tilesets: Phaser.Tilemaps.Tileset[]) {
-    const roofsLayersData = findMapLayersBySuffix(this.map.layers, 'roofs');
-    console.log(`Looking for roofs layers: ${roofsLayersData.length} found`);
+    const roofLayers = createOverheadLayersBySuffix(
+      this.map.layers,
+      (layerName, roofTilesets) => this.map.createLayer(layerName, roofTilesets),
+      tilesets,
+      'roofs',
+      OVERHEAD_LAYER_DEPTH,
+    );
+    console.log(`Looking for roofs layers: ${roofLayers.createdLayerNames.length + roofLayers.failedLayerNames.length} found`);
 
-    if (roofsLayersData.length > 0) {
-      console.log(`Creating ${roofsLayersData.length} roofs layers with ${tilesets.length} tilesets`);
+    if (roofLayers.createdLayerNames.length > 0 || roofLayers.failedLayerNames.length > 0) {
+      console.log(`Creating ${roofLayers.createdLayerNames.length + roofLayers.failedLayerNames.length} roofs layers with ${tilesets.length} tilesets`);
+      this.roofsLayers = roofLayers.createdLayers;
 
-      for (const layerData of roofsLayersData) {
-        const roofsLayer = this.map.createLayer(layerData.name, tilesets);
-
-        if (roofsLayer) {
-          // Store all roofs layers
-          this.roofsLayers.push(roofsLayer);
-          // Set roof layer depth to appear above player (player is at default depth 0)
-          roofsLayer.setDepth(OVERHEAD_LAYER_DEPTH);
-          console.log(`Roofs layer "${layerData.name}" created successfully: depth=${roofsLayer.depth}, visible=${roofsLayer.visible}, alpha=${roofsLayer.alpha}`);
-        } else {
-          console.error(`Failed to create roofs layer "${layerData.name}" - createLayer returned null`);
-        }
+      for (const roofsLayer of roofLayers.createdLayers) {
+        console.log(`Roofs layer created successfully: depth=${roofsLayer.depth}, visible=${roofsLayer.visible}, alpha=${roofsLayer.alpha}`);
+      }
+      for (const layerName of roofLayers.failedLayerNames) {
+        console.error(`Failed to create roofs layer "${layerName}" - createLayer returned null`);
       }
     } else {
       console.log('No roofs layers found in map (optional)');
