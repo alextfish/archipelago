@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { OverworldPuzzleController, type PuzzleExitResult } from '@controller/OverworldPuzzleController';
+import { emitTestEvent } from '@helpers/TestEvents';
 import { CollisionInitialiser, type CollisionInitData } from '@model/overworld/CollisionInitialiser';
 import type { ConversationSpec } from '@model/conversation/ConversationData';
 import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
@@ -7,17 +9,24 @@ import { NPC } from '@model/conversation/NPC';
 import type { OverworldGameState } from '@model/overworld/OverworldGameState';
 import { OverworldBridgeManager } from '@model/overworld/OverworldBridgeManager';
 import type { SeriesManager } from '@model/series/SeriesFactory';
+import type { CollectibleManager } from '@view/CollectibleManager';
 import type { ConstraintNPCManager } from '@view/ConstraintNPCManager';
 import type { DoorManager } from '@view/DoorManager';
 import { GridToWorldMapper } from '@view/GridToWorldMapper';
-import type { InteractionCursor } from '@view/InteractionCursor';
+import type { InteractionCursor, Interactable } from '@view/InteractionCursor';
 import type { NPCSpriteController } from '@view/NPCSpriteController';
 import type { PlayerController } from '@view/PlayerController';
+import { findInteractableInRangeAtTile, isWithinInteractionRange } from '@view/PointerInteractionHelpers';
 import { TileAnimationManager } from '@view/TileAnimationManager';
 import { getConstraintPuzzleID } from '@view/ConstraintNPCUtils';
 import { createHiddenLayersBySuffix, createOverheadLayersBySuffix, createVisualLayers, loadMapTilesets } from '@view/MapSceneLayerUtils';
 import { areMapSceneTilesetsReady } from '@view/MapSceneLoadUtils';
-import { createBridgesLayer } from '@view/MapPuzzleSceneHelpers';
+import {
+    createBridgesLayer,
+    hidePuzzleConstraintNPCsAfterEntry,
+    isPuzzleEntryTile,
+    showPuzzleConstraintNPCsBeforeExit,
+} from '@view/MapPuzzleSceneHelpers';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
 
 interface CollisionBootstrapResult {
@@ -38,19 +47,32 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
     protected playerController?: PlayerController;
     protected interactionCursor?: InteractionCursor;
     protected npcSpriteController?: NPCSpriteController;
+    protected collectibleManager?: CollectibleManager;
     protected constraintNPCManager?: ConstraintNPCManager;
     protected doorManager?: DoorManager;
     protected npcs: NPC[] = [];
+    protected interactables: Interactable[] = [];
     protected currentSeries: any = null;
     protected currentSeriesPuzzleData: Map<string, any> = new Map();
     protected gameMode: 'exploration' | 'conversation' | 'puzzle' = 'exploration';
+    protected isExitingPuzzle: boolean = false;
+    protected isPointerHeld: boolean = false;
+    protected pointerDownHandler?: (pointer: Phaser.Input.Pointer) => void;
+    protected pointerMoveHandler?: (pointer: Phaser.Input.Pointer) => void;
+    protected pointerUpHandler?: () => void;
+    protected readonly stepHotspots: Map<string, () => void> = new Map();
+    protected lastCheckedTile: string = '';
 
     public abstract create(): void;
 
     protected abstract getMapCacheKey(): string;
     protected abstract persistMeaningfulProgress(): void;
-    protected abstract setSeriesHUDVisible(visible: boolean): void;
+    protected abstract setJewelHUDVisible(visible: boolean): void;
     protected abstract getSeriesPuzzleCallerSceneKey(): string;
+    protected abstract getEmbeddedPuzzleController(): OverworldPuzzleController | undefined;
+    protected abstract getExplorationPlayerSprite(): Phaser.GameObjects.Sprite | null;
+    protected abstract getExplorationPlayerWorldPosition(): { x: number; y: number } | null;
+    protected abstract getPuzzleIdAtWorldPosition(worldX: number, worldY: number): string | null;
 
     protected getSkippedVisualLayerNames(): string[] {
         return [];
@@ -79,6 +101,40 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
     protected onRoofLayerCreated(_layerName: string, _layer: Phaser.Tilemaps.TilemapLayer): void {}
 
     protected onRoofLayerCreateFailed(_layerName: string): void {}
+
+    protected onEmbeddedPuzzleEnteredMode(): void {
+        this.cameras.main.stopFollow();
+    }
+
+    protected onEmbeddedPuzzleExitedMode(): void {}
+
+    protected canPlayerMoveAroundAndInteract(): boolean {
+        return this.gameMode === 'exploration' && (this.playerController?.isEnabled() ?? false);
+    }
+
+    protected setExplorationPlayerLayerDisplay(_playerLayer: ReturnType<PlayerController['getPlayerLayer']>): void {}
+
+    protected onExplorationFrameWhileActive(): void {}
+
+    protected shouldIgnoreExplorationPointerDown(_pointer: Phaser.Input.Pointer): boolean {
+        return false;
+    }
+
+    protected onLeverInteraction(_target: Interactable): void {
+        console.log(`[${this.sys.settings.key}] Lever interaction not yet implemented`);
+    }
+
+    protected getEmbeddedPuzzleFlowTileChangedCallback(_puzzleId: string):
+        ((lx: number, ly: number, hasWater: boolean) => void) | undefined {
+        return undefined;
+    }
+
+    protected getEmbeddedPuzzleBeforeExitTransitionCallback(_activePuzzleId: string | undefined):
+        (() => void) | undefined {
+        return undefined;
+    }
+
+    protected async onEmbeddedPuzzleExited(_exitResult: PuzzleExitResult, _success: boolean): Promise<void> {}
 
     protected resetExplorationMapState(): void {
         this.collisionLayers = [];
@@ -124,6 +180,24 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
 
     protected updateExplorationMap(_time: number, delta: number): void {
         this.tileAnimationManager?.update(delta);
+    }
+
+    protected updateExplorationScene(_time: number, delta: number): void {
+        this.updateExplorationMap(_time, delta);
+        this.npcSpriteController?.update(delta, this.canPlayerMoveAroundAndInteract());
+
+        const player = this.getExplorationPlayerSprite();
+        player?.setDepth(player.y);
+
+        if (!this.canPlayerMoveAroundAndInteract() || !this.playerController) {
+            return;
+        }
+
+        this.playerController.update();
+        this.setExplorationPlayerLayerDisplay(this.playerController.getPlayerLayer());
+        this.checkStepHotspots();
+        this.updateExplorationInteractionCursor();
+        this.onExplorationFrameWhileActive();
     }
 
     protected async startConversationWithNPC(npc: NPC): Promise<void> {
@@ -285,12 +359,12 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
 
     protected async handleSeriesPuzzleCompleted(data: { puzzleId: string; success: boolean }): Promise<void> {
         if (!this.currentSeries) {
-            this.setSeriesHUDVisible(true);
+            this.setJewelHUDVisible(true);
             return;
         }
 
         if (!data.success) {
-            this.setSeriesHUDVisible(true);
+            this.setJewelHUDVisible(true);
             return;
         }
 
@@ -302,7 +376,7 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
 
         if (!matchingEntry) {
             console.warn(`[${this.sys.settings.key}] Could not find series entry for puzzle ${data.puzzleId}`);
-            this.setSeriesHUDVisible(true);
+            this.setJewelHUDVisible(true);
             return;
         }
 
@@ -330,7 +404,7 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
         } else {
             const nextPuzzleId = this.getSeriesEntryIdToLaunch(this.currentSeries, false);
             if (!nextPuzzleId) {
-                this.setSeriesHUDVisible(true);
+                this.setJewelHUDVisible(true);
                 this.persistMeaningfulProgress();
                 return;
             }
@@ -342,7 +416,7 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
             return;
         }
 
-        this.setSeriesHUDVisible(true);
+        this.setJewelHUDVisible(true);
         this.persistMeaningfulProgress();
     }
 
@@ -366,11 +440,11 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
         const puzzleData = this.currentSeriesPuzzleData.get(entryId);
         if (!puzzleData) {
             console.error(`[${this.sys.settings.key}] No puzzle data for ${entryId}`);
-            this.setSeriesHUDVisible(true);
+            this.setJewelHUDVisible(true);
             return;
         }
 
-        this.setSeriesHUDVisible(false);
+        this.setJewelHUDVisible(false);
         this.events.once('seriesPuzzleCompleted', (data: { puzzleId: string; success: boolean }) => {
             void this.handleSeriesPuzzleCompleted(data);
         });
@@ -380,6 +454,385 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
             seriesMode: true,
             callerSceneKey: this.getSeriesPuzzleCallerSceneKey(),
         });
+    }
+
+    protected setupExplorationInteractionInput(): void {
+        this.pointerDownHandler = (pointer: Phaser.Input.Pointer) => {
+            if (!this.playerController || !this.canPlayerMoveAroundAndInteract()) {
+                return;
+            }
+
+            if (this.shouldIgnoreExplorationPointerDown(pointer)) {
+                return;
+            }
+
+            const player = this.getExplorationPlayerSprite();
+            if (!player || !this.interactionCursor) {
+                return;
+            }
+
+            this.isPointerHeld = true;
+
+            const worldX = pointer.worldX;
+            const worldY = pointer.worldY;
+            const { x: clickTileX, y: clickTileY } = this.gridMapper.worldToGrid(worldX, worldY);
+            const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(player.x, player.y);
+
+            const clickedTarget = findInteractableInRangeAtTile(
+                this.interactables,
+                playerTileX,
+                playerTileY,
+                clickTileX,
+                clickTileY,
+            );
+            if (clickedTarget) {
+                this.interactionCursor.setPreferredTargetTile(clickTileX, clickTileY);
+                this.interactWithTarget(clickedTarget);
+                this.isPointerHeld = false;
+                return;
+            }
+
+            if (isWithinInteractionRange(playerTileX, playerTileY, clickTileX, clickTileY)) {
+                this.interactionCursor.clearPreferredTargetTile();
+
+                if (clickTileX === playerTileX && clickTileY === playerTileY) {
+                    this.checkForPuzzleEntry();
+                    this.isPointerHeld = false;
+                    return;
+                }
+            }
+
+            this.playerController.setTargetPosition(worldX, worldY);
+        };
+
+        this.pointerMoveHandler = (pointer: Phaser.Input.Pointer) => {
+            if (!this.canPlayerMoveAroundAndInteract()) {
+                return;
+            }
+
+            const player = this.getExplorationPlayerSprite();
+            if (!player || !this.playerController || !this.interactionCursor) {
+                return;
+            }
+
+            const { x: hoverTileX, y: hoverTileY } = this.gridMapper.worldToGrid(pointer.worldX, pointer.worldY);
+            const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(player.x, player.y);
+            const hoveredTarget = findInteractableInRangeAtTile(
+                this.interactables,
+                playerTileX,
+                playerTileY,
+                hoverTileX,
+                hoverTileY,
+            );
+
+            if (hoveredTarget) {
+                this.interactionCursor.setPreferredTargetTile(hoverTileX, hoverTileY);
+            } else {
+                this.interactionCursor.clearPreferredTargetTile();
+            }
+
+            if (!this.isPointerHeld || !pointer.isDown) {
+                return;
+            }
+
+            this.playerController.setTargetPosition(pointer.worldX, pointer.worldY);
+        };
+
+        this.pointerUpHandler = () => {
+            this.isPointerHeld = false;
+        };
+
+        this.input.on('pointerdown', this.pointerDownHandler);
+        this.input.on('pointermove', this.pointerMoveHandler);
+        this.input.on('pointerup', this.pointerUpHandler);
+        this.input.keyboard?.on('keydown-E', this.onExplorationInteractKey, this);
+    }
+
+    protected restoreExplorationPointerHandlers(): void {
+        if (this.pointerDownHandler) {
+            this.input.off('pointerdown', this.pointerDownHandler);
+            this.input.on('pointerdown', this.pointerDownHandler);
+        }
+
+        if (this.pointerMoveHandler) {
+            this.input.off('pointermove', this.pointerMoveHandler);
+            this.input.on('pointermove', this.pointerMoveHandler);
+        }
+
+        if (this.pointerUpHandler) {
+            this.input.off('pointerup', this.pointerUpHandler);
+            this.input.on('pointerup', this.pointerUpHandler);
+        }
+    }
+
+    protected registerStepHotspot(tileX: number, tileY: number, callback: () => void): void {
+        this.stepHotspots.set(`${tileX},${tileY}`, callback);
+    }
+
+    protected checkStepHotspots(): void {
+        const player = this.getExplorationPlayerSprite();
+        if (!player || !this.tiledMapData) {
+            return;
+        }
+
+        const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(player.x, player.y);
+        const tileKey = `${tileX},${tileY}`;
+        if (tileKey !== this.lastCheckedTile) {
+            this.lastCheckedTile = tileKey;
+            const callback = this.stepHotspots.get(tileKey);
+            if (callback) {
+                callback();
+            }
+        }
+    }
+
+    protected onExplorationInteractKey(): void {
+        if (!this.canPlayerMoveAroundAndInteract()) {
+            return;
+        }
+
+        const target = this.interactionCursor?.getCurrentTarget();
+        if (target) {
+            this.interactWithTarget(target);
+            return;
+        }
+
+        this.checkForPuzzleEntry();
+    }
+
+    protected interactWithTarget(target: Interactable): void {
+        switch (target.type) {
+            case 'puzzle':
+                if (target.data?.puzzleId) {
+                    void this.enterOverworldPuzzle(target.data.puzzleId);
+                }
+                break;
+            case 'npc':
+                if (target.data?.npc) {
+                    void this.startConversationWithNPC(target.data.npc);
+                }
+                break;
+            case 'lever':
+                this.onLeverInteraction(target);
+                break;
+            case 'collectible':
+                if (target.data?.collectibleId) {
+                    this.collectibleManager?.collectJewel(target.data.collectibleId);
+                    this.persistMeaningfulProgress();
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    protected checkForPuzzleEntry(): void {
+        const playerPosition = this.getExplorationPlayerWorldPosition();
+        if (!playerPosition || !this.tiledMapData) {
+            return;
+        }
+
+        const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(playerPosition.x, playerPosition.y);
+        if (!isPuzzleEntryTile(this.map, tileX, tileY)) {
+            return;
+        }
+
+        const puzzleId = this.getPuzzleIdAtWorldPosition(playerPosition.x, playerPosition.y);
+        if (puzzleId) {
+            void this.enterOverworldPuzzle(puzzleId);
+        }
+    }
+
+    public async enterOverworldPuzzle(puzzleId: string): Promise<void> {
+        const puzzleController = this.getEmbeddedPuzzleController();
+        if (!puzzleController) {
+            console.error(`[${this.sys.settings.key}] Puzzle controller not initialized`);
+            return;
+        }
+
+        try {
+            this.gameMode = 'puzzle';
+            this.interactionCursor?.hide();
+            this.setJewelHUDVisible(false);
+
+            this.playerController?.stopAndIdle();
+            this.playerController?.setEnabled(false);
+
+            const hudScene = this.scene.get('PuzzleHUDScene');
+            hudScene?.events.on('exit', this.handleHUDExit, this);
+            hudScene?.events.on('undo', this.handleHUDUndo, this);
+            hudScene?.events.on('redo', this.handleHUDRedo, this);
+            hudScene?.events.on('typeSelected', this.handleTypeSelected, this);
+            hudScene?.events.on('navigateNext', this.handleNavigateNext, this);
+            hudScene?.events.on('navigatePrevious', this.handleNavigatePrevious, this);
+
+            this.events.on('bridge-clicked', this.handleBridgeClicked, this);
+            this.input.keyboard?.on('keydown-ESC', this.handleEscapeKey, this);
+
+            await puzzleController.enterPuzzle(
+                puzzleId,
+                (mode: 'puzzle') => {
+                    this.gameMode = mode;
+                    this.onEmbeddedPuzzleEnteredMode();
+                },
+                this.getEmbeddedPuzzleFlowTileChangedCallback(puzzleId),
+            );
+
+            hidePuzzleConstraintNPCsAfterEntry(puzzleId, this.constraintNPCManager);
+            emitTestEvent('puzzle_entered', { puzzleId });
+        } catch (error) {
+            console.error(`[${this.sys.settings.key}] Failed to enter embedded puzzle ${puzzleId}:`, error);
+            await this.exitOverworldPuzzle(false);
+        }
+    }
+
+    public async exitOverworldPuzzle(success: boolean): Promise<void> {
+        const puzzleController = this.getEmbeddedPuzzleController();
+        if (!puzzleController || this.isExitingPuzzle) {
+            return;
+        }
+
+        this.isExitingPuzzle = true;
+
+        try {
+            const hudScene = this.scene.get('PuzzleHUDScene');
+            hudScene?.events.off('exit', this.handleHUDExit, this);
+            hudScene?.events.off('undo', this.handleHUDUndo, this);
+            hudScene?.events.off('redo', this.handleHUDRedo, this);
+            hudScene?.events.off('typeSelected', this.handleTypeSelected, this);
+            hudScene?.events.off('navigateNext', this.handleNavigateNext, this);
+            hudScene?.events.off('navigatePrevious', this.handleNavigatePrevious, this);
+
+            this.events.off('bridge-clicked', this.handleBridgeClicked, this);
+            this.input.keyboard?.off('keydown-ESC', this.handleEscapeKey, this);
+
+            const activePuzzleId = showPuzzleConstraintNPCsBeforeExit(
+                puzzleController,
+                this.constraintNPCManager,
+            );
+            const exitResult = await puzzleController.exitPuzzle(
+                success,
+                (mode: 'exploration') => {
+                    this.gameMode = mode;
+                    this.onEmbeddedPuzzleExitedMode();
+                },
+                this.getEmbeddedPuzzleBeforeExitTransitionCallback(activePuzzleId),
+            );
+
+            this.constraintNPCManager?.showConstraintNPCsForPuzzle(exitResult.puzzleId);
+
+            await this.doorManager?.animatePuzzleLinkedDoors(
+                exitResult.puzzleId,
+                exitResult.wasSolved,
+                exitResult.wasUnsolved,
+            );
+
+            if (exitResult.wasSolved || exitResult.wasUnsolved) {
+                this.persistMeaningfulProgress();
+            }
+
+            await this.handleCurrentSeriesAfterEmbeddedPuzzleExit(success);
+            await this.onEmbeddedPuzzleExited(exitResult, success);
+
+            this.setJewelHUDVisible(true);
+            this.isPointerHeld = false;
+            this.playerController?.setEnabled(this.gameMode === 'exploration');
+            this.restoreExplorationPointerHandlers();
+        } catch (error) {
+            console.error(`[${this.sys.settings.key}] Error exiting embedded puzzle:`, error);
+        } finally {
+            this.isExitingPuzzle = false;
+        }
+    }
+
+    public isInPuzzleMode(): boolean {
+        return this.getEmbeddedPuzzleController()?.isInPuzzleMode() ?? false;
+    }
+
+    protected handleHUDExit(): void {
+        this.currentSeries = null;
+        void this.exitOverworldPuzzle(false);
+    }
+
+    protected handleHUDUndo(): void {
+        this.getEmbeddedPuzzleController()?.handleUndo();
+    }
+
+    protected handleHUDRedo(): void {
+        this.getEmbeddedPuzzleController()?.handleRedo();
+    }
+
+    protected handleTypeSelected(typeId: string): void {
+        this.getEmbeddedPuzzleController()?.handleTypeSelected(typeId);
+    }
+
+    protected handleEscapeKey(): void {
+        if (this.isInPuzzleMode()) {
+            this.currentSeries = null;
+            void this.exitOverworldPuzzle(false);
+        }
+    }
+
+    protected async handleNavigateNext(): Promise<void> {
+        if (!this.currentSeries) {
+            return;
+        }
+
+        const result = this.currentSeries.navigateToNext();
+        if (result.success && result.puzzleId) {
+            await this.exitOverworldPuzzle(false);
+            await this.enterOverworldPuzzle(result.puzzleId);
+        }
+    }
+
+    protected async handleNavigatePrevious(): Promise<void> {
+        if (!this.currentSeries) {
+            return;
+        }
+
+        const result = this.currentSeries.navigateToPrevious();
+        if (result.success && result.puzzleId) {
+            await this.exitOverworldPuzzle(false);
+            await this.enterOverworldPuzzle(result.puzzleId);
+        }
+    }
+
+    protected handleBridgeClicked(bridgeId: string): void {
+        this.getEmbeddedPuzzleController()?.handleBridgeClicked(bridgeId);
+    }
+
+    private async handleCurrentSeriesAfterEmbeddedPuzzleExit(success: boolean): Promise<void> {
+        if (!success || !this.currentSeries || !this.currentSeries.isSeriesCompleted()) {
+            return;
+        }
+
+        const seriesDoor = this.doorManager?.doors.find((door) => door.id === this.currentSeries!.id);
+        if (seriesDoor && seriesDoor.isLocked()) {
+            await this.doorManager?.animateDoorChange(seriesDoor, true);
+        } else if (!seriesDoor) {
+            this.doorManager?.unlockDoor(this.currentSeries.id);
+        }
+
+        for (const [npcId, state] of (this.npcSpriteController?.npcSeriesStates.entries() ?? [])) {
+            if (state.getSeries()?.id === this.currentSeries.id) {
+                const npc = this.npcs.find((candidate) => candidate.id === npcId);
+                if (npc) {
+                    this.npcSpriteController?.updateNPCIcon(npc);
+                }
+            }
+        }
+    }
+
+    private updateExplorationInteractionCursor(): void {
+        const player = this.getExplorationPlayerSprite();
+        if (!this.interactionCursor || !this.tiledMapData || !player || !this.playerController) {
+            return;
+        }
+
+        const position = this.playerController.getPosition();
+        const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(position.x, position.y);
+        this.interactionCursor.setFacing(this.playerController.getFacingDirection());
+        this.interactionCursor.update(tileX, tileY, this.interactables);
     }
 
     protected setupCollisionBootstrap(tilesets: Phaser.Tilemaps.Tileset[]): CollisionBootstrapResult {

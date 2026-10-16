@@ -10,8 +10,7 @@ import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import { OverworldPuzzleController } from '@controller/OverworldPuzzleController';
 import { PlayerController } from '@view/PlayerController';
 import { CameraManager } from '@view/CameraManager';
-import { InteractionCursor, type Interactable } from '@view/InteractionCursor';
-import { findInteractableInRangeAtTile, isWithinInteractionRange } from '@view/PointerInteractionHelpers';
+import { InteractionCursor } from '@view/InteractionCursor';
 import { NPCSpriteController } from '@view/NPCSpriteController';
 import { CollectibleManager } from '@view/CollectibleManager';
 import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
@@ -21,9 +20,6 @@ import { RoofManager } from '@view/RoofManager';
 import { SceneTransitionCoordinator } from '@view/SceneTransitionCoordinator';
 import {
     buildPuzzleEntryInteractables,
-    hidePuzzleConstraintNPCsAfterEntry,
-    isPuzzleEntryTile,
-    showPuzzleConstraintNPCsBeforeExit,
 } from '@view/MapPuzzleSceneHelpers';
 import type { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
@@ -80,7 +76,6 @@ export class InteriorScene extends ExplorationMapScene {
 
     // ── Managers ──────────────────────────────────────────────────────────────
     private roofManager?: RoofManager;
-    private collectibleManager?: CollectibleManager;
     private puzzleManager!: OverworldPuzzleManager;
     private collisionManager!: CollisionManager;
     private bridgeManager?: OverworldBridgeManager;
@@ -89,18 +84,6 @@ export class InteriorScene extends ExplorationMapScene {
 
     // ── Scene state ───────────────────────────────────────────────────────────
     private collisionArray: number[][] = [];
-    private interactables: Interactable[] = [];
-    private isExitingPuzzle: boolean = false;
-
-    // ── Step-hotspot system (exit portals) ────────────────────────────────────
-    private readonly stepHotspots: Map<string, () => void> = new Map();
-    private lastCheckedTile: string = '';
-
-    // ── Input ─────────────────────────────────────────────────────────────────
-    private isPointerHeld: boolean = false;
-    private pointerDownHandler?: (pointer: Phaser.Input.Pointer) => void;
-    private pointerMoveHandler?: (pointer: Phaser.Input.Pointer) => void;
-    private pointerUpHandler?: () => void;
 
     // Map cache key for this interior (e.g. 'interiorMap_house')
     private mapCacheKey!: string;
@@ -177,13 +160,47 @@ export class InteriorScene extends ExplorationMapScene {
         this.saveStateCallback();
     }
 
-    protected setSeriesHUDVisible(visible: boolean): void {
+    protected setJewelHUDVisible(visible: boolean): void {
         const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
         hud?.setJewelHUDVisible(visible);
     }
 
     protected getSeriesPuzzleCallerSceneKey(): string {
         return 'InteriorScene';
+    }
+
+    protected getEmbeddedPuzzleController(): OverworldPuzzleController | undefined {
+        return this.puzzleController;
+    }
+
+    protected getExplorationPlayerSprite(): Phaser.GameObjects.Sprite | null {
+        return this.player ?? null;
+    }
+
+    protected getExplorationPlayerWorldPosition(): { x: number; y: number } | null {
+        return this.player
+            ? { x: this.player.x, y: this.player.y }
+            : null;
+    }
+
+    protected getPuzzleIdAtWorldPosition(worldX: number, worldY: number): string | null {
+        const puzzle = this.puzzleManager.getPuzzleAtPosition(worldX, worldY, this.tiledMapData);
+        return puzzle?.id ?? null;
+    }
+
+    protected setExplorationPlayerLayerDisplay(playerLayer: ReturnType<PlayerController['getPlayerLayer']>): void {
+        const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
+        hud?.setPlayerLayerDisplay(playerLayer);
+    }
+
+    protected onEmbeddedPuzzleExitedMode(): void {
+        this.cameras.main.startFollow(this.player);
+    }
+
+    protected onExplorationFrameWhileActive(): void {
+        if (this.roofManager && this.player) {
+            this.roofManager.update(this.player.x, this.player.y);
+        }
     }
 
     create(): void {
@@ -269,10 +286,7 @@ export class InteriorScene extends ExplorationMapScene {
         }
 
         // Pointer input for tap-to-move and interaction
-        this.setupPointerInput();
-
-        // E key to interact
-        this.input.keyboard?.on('keydown-E', () => this.onInteractKey());
+        this.setupExplorationInteractionInput();
 
         if (this.fadeInDurationMs) {
             const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
@@ -292,35 +306,7 @@ export class InteriorScene extends ExplorationMapScene {
     }
 
     update(_time: number, delta: number): void {
-        this.updateExplorationMap(_time, delta);
-        this.npcSpriteController?.update(
-            delta,
-            this.canPlayerMoveAroundAndInteract(),
-        );
-
-        this.player?.setDepth(this.player.y);
-
-        if (!this.canPlayerMoveAroundAndInteract()) {
-            return;
-        }
-
-        if (this.playerController) {
-            this.playerController.update();
-            const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
-            hud?.setPlayerLayerDisplay(this.playerController.getPlayerLayer());
-            this.checkStepHotspots();
-
-            if (this.interactionCursor && this.tiledMapData && this.player) {
-                const pos = this.playerController.getPosition();
-                const { x: tx, y: ty } = this.gridMapper.worldToGrid(pos.x, pos.y);
-                this.interactionCursor.setFacing(this.playerController.getFacingDirection());
-                this.interactionCursor.update(tx, ty, this.interactables);
-            }
-
-            if (this.roofManager && this.player) {
-                this.roofManager.update(this.player.x, this.player.y);
-            }
-        }
+        this.updateExplorationScene(_time, delta);
     }
 
     // ── Collision API (required by PlayerController and CollisionManager) ─────
@@ -335,27 +321,6 @@ export class InteriorScene extends ExplorationMapScene {
         if (tileY < 0 || tileY >= this.collisionArray.length) return;
         if (tileX < 0 || tileX >= (this.collisionArray[0]?.length ?? 0)) return;
         this.collisionArray[tileY][tileX] = collisionType;
-    }
-
-    public isInPuzzleMode(): boolean {
-        return this.puzzleController?.isInPuzzleMode() ?? false;
-    }
-
-    // ── Step-hotspot system ───────────────────────────────────────────────────
-
-    private registerStepHotspot(tileX: number, tileY: number, callback: () => void): void {
-        this.stepHotspots.set(`${tileX},${tileY}`, callback);
-    }
-
-    private checkStepHotspots(): void {
-        if (!this.player || !this.tiledMapData) return;
-        const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
-        const tileKey = `${tileX},${tileY}`;
-        if (tileKey !== this.lastCheckedTile) {
-            this.lastCheckedTile = tileKey;
-            const callback = this.stepHotspots.get(tileKey);
-            if (callback) callback();
-        }
     }
 
     // ── Exit to overworld ─────────────────────────────────────────────────────
@@ -694,304 +659,10 @@ export class InteriorScene extends ExplorationMapScene {
         this.collectibleManager.loadCollectibles();
     }
 
-    // ── Input handling ────────────────────────────────────────────────────────
-
-    private setupPointerInput(): void {
-        this.pointerDownHandler = (pointer: Phaser.Input.Pointer) => {
-            if (!this.playerController || !this.canPlayerMoveAroundAndInteract()) return;
-
-            const { x: worldX, y: worldY } = { x: pointer.worldX, y: pointer.worldY };
-
-            if (!this.player || !this.interactionCursor) return;
-            this.isPointerHeld = true;
-            const { x: clickTileX, y: clickTileY } = this.gridMapper.worldToGrid(worldX, worldY);
-            const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(
-                this.player.x, this.player.y
-            );
-
-            // Is there something specific in the clicked tile?
-            // If so that's the only target we want to interact with, even if there are other interactables in range.
-            const clickedTarget = findInteractableInRangeAtTile(
-                this.interactables,
-                playerTileX,
-                playerTileY,
-                clickTileX,
-                clickTileY,
-            );
-            if (clickedTarget) {
-                this.interactionCursor.setPreferredTargetTile(clickTileX, clickTileY);
-                this.interactWithTarget(clickedTarget);
-                this.isPointerHeld = false;
-                return;
-            }
-
-            // Otherwise revert to normal target selection
-            if (isWithinInteractionRange(playerTileX, playerTileY, clickTileX, clickTileY)) {
-                this.interactionCursor.clearPreferredTargetTile();
-
-                if (clickTileX === playerTileX && clickTileY === playerTileY) {
-                    this.checkForPuzzleEntry();
-                    this.isPointerHeld = false;
-                    return;
-                }
-            }
-
-            this.playerController.setTargetPosition(worldX, worldY);
-        };
-
-        this.pointerMoveHandler = (pointer: Phaser.Input.Pointer) => {
-            if (!this.canPlayerMoveAroundAndInteract()) return;
-            if (!this.player || !this.interactionCursor) return;
-
-            const { x: hoverTileX, y: hoverTileY } = this.gridMapper.worldToGrid(pointer.worldX, pointer.worldY);
-            const { x: playerTileX, y: playerTileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
-            const hoveredTarget = findInteractableInRangeAtTile(
-                this.interactables,
-                playerTileX,
-                playerTileY,
-                hoverTileX,
-                hoverTileY,
-            );
-
-            if (hoveredTarget) {
-                this.interactionCursor.setPreferredTargetTile(hoverTileX, hoverTileY);
-            } else {
-                this.interactionCursor.clearPreferredTargetTile();
-            }
-
-            if (!this.isPointerHeld || !this.playerController || !pointer.isDown) return;
-            this.playerController.setTargetPosition(pointer.worldX, pointer.worldY);
-        };
-
-        this.pointerUpHandler = () => { this.isPointerHeld = false; };
-
-        this.input.on('pointerdown', this.pointerDownHandler);
-        this.input.on('pointermove', this.pointerMoveHandler);
-        this.input.on('pointerup', this.pointerUpHandler);
-    }
-
-    private onInteractKey(): void {
-        if (!this.canPlayerMoveAroundAndInteract()) {
-            return;
-        }
-
-        const target = this.interactionCursor?.getCurrentTarget();
-        if (target) {
-            this.interactWithTarget(target);
-            return;
-        }
-
-        this.checkForPuzzleEntry();
-    }
-
-    private interactWithTarget(target: Interactable): void {
-        switch (target.type) {
-            case 'puzzle':
-                if (target.data?.puzzleId) {
-                    void this.enterOverworldPuzzle(target.data.puzzleId);
-                }
-                break;
-            case 'npc':
-                if (target.data?.npc) {
-                    void this.startConversationWithNPC(target.data.npc);
-                }
-                break;
-            case 'collectible':
-                if (target.data?.collectibleId) {
-                    this.collectibleManager?.collectJewel(target.data.collectibleId);
-                    this.saveStateCallback();
-                }
-                break;
-            default:
-                break;
-        }
-    }
-
     /** Canonical gate for interior movement/input; scene transitions or disabled player control keep this off even in exploration mode. */
-    private canPlayerMoveAroundAndInteract(): boolean {
+    protected canPlayerMoveAroundAndInteract(): boolean {
         return !this.isSceneTransitioning
             && this.gameMode === 'exploration'
             && (this.playerController?.isEnabled() ?? false);
     }
-
-    // ── Conversation handling (mirrors OverworldScene) ────────────────────────
-
-    private checkForPuzzleEntry(): void {
-        if (!this.tiledMapData || !this.player || !this.map) {
-            return;
-        }
-
-        const { x: tileX, y: tileY } = this.gridMapper.worldToGrid(this.player.x, this.player.y);
-        if (!isPuzzleEntryTile(this.map, tileX, tileY)) {
-            return;
-        }
-
-        const puzzle = this.puzzleManager.getPuzzleAtPosition(this.player.x, this.player.y, this.tiledMapData);
-        if (puzzle) {
-            void this.enterOverworldPuzzle(puzzle.id);
-        }
-    }
-
-    public async enterOverworldPuzzle(puzzleId: string): Promise<void> {
-        if (!this.puzzleController) {
-            console.error('[InteriorScene] Puzzle controller not initialized');
-            return;
-        }
-
-        try {
-            this.gameMode = 'puzzle';
-            this.interactionCursor?.hide();
-
-            const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
-            hud?.setJewelHUDVisible(false);
-
-            this.playerController?.stopAndIdle();
-            this.playerController?.setEnabled(false);
-
-            const hudScene = this.scene.get('PuzzleHUDScene');
-            hudScene?.events.on('exit', this.handleHUDExit, this);
-            hudScene?.events.on('undo', this.handleHUDUndo, this);
-            hudScene?.events.on('redo', this.handleHUDRedo, this);
-            hudScene?.events.on('typeSelected', this.handleTypeSelected, this);
-            hudScene?.events.on('navigateNext', this.handleNavigateNext, this);
-            hudScene?.events.on('navigatePrevious', this.handleNavigatePrevious, this);
-
-            this.events.on('bridge-clicked', this.handleBridgeClicked, this);
-            this.input.keyboard?.on('keydown-ESC', this.handleEscapeKey, this);
-
-            await this.puzzleController.enterPuzzle(puzzleId, (mode: 'puzzle') => {
-                this.gameMode = mode;
-                this.cameras.main.stopFollow();
-            });
-
-            hidePuzzleConstraintNPCsAfterEntry(puzzleId, this.constraintNPCManager);
-
-        } catch (error) {
-            console.error(`[InteriorScene] Failed to enter overworld puzzle: ${puzzleId}`, error);
-            await this.exitOverworldPuzzle(false);
-        }
-    }
-
-    public async exitOverworldPuzzle(success: boolean): Promise<void> {
-        if (!this.puzzleController) {
-            return;
-        }
-
-        if (this.isExitingPuzzle) {
-            return;
-        }
-
-        this.isExitingPuzzle = true;
-
-        try {
-            const hudScene = this.scene.get('PuzzleHUDScene');
-            hudScene?.events.off('exit', this.handleHUDExit, this);
-            hudScene?.events.off('undo', this.handleHUDUndo, this);
-            hudScene?.events.off('redo', this.handleHUDRedo, this);
-            hudScene?.events.off('typeSelected', this.handleTypeSelected, this);
-            hudScene?.events.off('navigateNext', this.handleNavigateNext, this);
-            hudScene?.events.off('navigatePrevious', this.handleNavigatePrevious, this);
-
-            this.events.off('bridge-clicked', this.handleBridgeClicked, this);
-            this.input.keyboard?.off('keydown-ESC', this.handleEscapeKey, this);
-
-            showPuzzleConstraintNPCsBeforeExit(
-                this.puzzleController,
-                this.constraintNPCManager,
-            );
-            const exitResult = await this.puzzleController.exitPuzzle(success, (mode: 'exploration') => {
-                this.gameMode = mode;
-                this.cameras.main.startFollow(this.player);
-            });
-
-            this.constraintNPCManager?.showConstraintNPCsForPuzzle(exitResult.puzzleId);
-
-            const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
-            hud?.setJewelHUDVisible(true);
-            this.isPointerHeld = false;
-            this.playerController?.setEnabled(!this.isSceneTransitioning && this.gameMode === 'exploration');
-
-            if (exitResult.wasSolved || exitResult.wasUnsolved) {
-                await this.doorManager?.animatePuzzleLinkedDoors(
-                    exitResult.puzzleId,
-                    exitResult.wasSolved,
-                    exitResult.wasUnsolved,
-                );
-                this.saveStateCallback();
-            }
-
-            if (this.pointerDownHandler) {
-                this.input.off('pointerdown', this.pointerDownHandler);
-                this.input.on('pointerdown', this.pointerDownHandler);
-            }
-            if (this.pointerMoveHandler) {
-                this.input.off('pointermove', this.pointerMoveHandler);
-                this.input.on('pointermove', this.pointerMoveHandler);
-            }
-            if (this.pointerUpHandler) {
-                this.input.off('pointerup', this.pointerUpHandler);
-                this.input.on('pointerup', this.pointerUpHandler);
-            }
-
-        } catch (error) {
-            console.error('[InteriorScene] Error exiting overworld puzzle:', error);
-        } finally {
-            this.isExitingPuzzle = false;
-        }
-    }
-
-    private handleHUDExit(): void {
-        this.currentSeries = null;
-        if (this.puzzleController) {
-            void this.exitOverworldPuzzle(false);
-        }
-    }
-
-    private handleHUDUndo(): void {
-        this.puzzleController?.handleUndo();
-    }
-
-    private handleHUDRedo(): void {
-        this.puzzleController?.handleRedo();
-    }
-
-    private handleTypeSelected(typeId: string): void {
-        this.puzzleController?.handleTypeSelected(typeId);
-    }
-
-    private handleEscapeKey(): void {
-        if (this.isInPuzzleMode()) {
-            this.currentSeries = null;
-            void this.exitOverworldPuzzle(false);
-        }
-    }
-
-    private async handleNavigateNext(): Promise<void> {
-        if (!this.currentSeries) {
-            return;
-        }
-
-        const result = this.currentSeries.navigateToNext();
-        if (result.success && result.puzzleId) {
-            await this.exitOverworldPuzzle(false);
-            await this.enterOverworldPuzzle(result.puzzleId);
-        }
-    }
-
-    private async handleNavigatePrevious(): Promise<void> {
-        if (!this.currentSeries) {
-            return;
-        }
-
-        const result = this.currentSeries.navigateToPrevious();
-        if (result.success && result.puzzleId) {
-            await this.exitOverworldPuzzle(false);
-            await this.enterOverworldPuzzle(result.puzzleId);
-        }
-    }
-
-    private handleBridgeClicked(bridgeId: string): void {
-        this.puzzleController?.handleBridgeClicked(bridgeId);
-    }
-
 }
