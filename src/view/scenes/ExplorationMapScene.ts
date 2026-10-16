@@ -6,28 +6,41 @@ import type { ConversationSpec } from '@model/conversation/ConversationData';
 import { ConversationConditionEvaluator } from '@model/conversation/ConversationConditionEvaluator';
 import { ConversationVariableSubstitutor } from '@model/conversation/ConversationVariableSubstitutor';
 import { NPC } from '@model/conversation/NPC';
+import type { OverworldPuzzleManager } from '@model/overworld/OverworldPuzzleManager';
 import type { OverworldGameState } from '@model/overworld/OverworldGameState';
+import type { CollisionManager } from '@model/overworld/CollisionManager';
 import { OverworldBridgeManager } from '@model/overworld/OverworldBridgeManager';
+import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import type { SeriesManager } from '@model/series/SeriesFactory';
+import type { CameraManager } from '@view/CameraManager';
 import type { CollectibleManager } from '@view/CollectibleManager';
 import type { ConstraintNPCManager } from '@view/ConstraintNPCManager';
 import type { DoorManager } from '@view/DoorManager';
 import { GridToWorldMapper } from '@view/GridToWorldMapper';
-import type { InteractionCursor, Interactable } from '@view/InteractionCursor';
+import { InteractionCursor, type Interactable } from '@view/InteractionCursor';
 import type { NPCSpriteController } from '@view/NPCSpriteController';
 import type { PlayerController } from '@view/PlayerController';
 import { findInteractableInRangeAtTile, isWithinInteractionRange } from '@view/PointerInteractionHelpers';
 import { TileAnimationManager } from '@view/TileAnimationManager';
 import { getConstraintPuzzleID } from '@view/ConstraintNPCUtils';
 import { createHiddenLayersBySuffix, createOverheadLayersBySuffix, createVisualLayers, loadMapTilesets } from '@view/MapSceneLayerUtils';
-import { areMapSceneTilesetsReady } from '@view/MapSceneLoadUtils';
 import {
+    getConstraintDisguiseImageLoadRequests,
+} from '@view/MapSceneAssetUtils';
+import { areMapSceneTilesetsReady, queueMapSceneImageRequests } from '@view/MapSceneLoadUtils';
+import {
+    buildPuzzleEntryInteractables,
     createBridgesLayer,
     hidePuzzleConstraintNPCsAfterEntry,
     isPuzzleEntryTile,
     showPuzzleConstraintNPCsBeforeExit,
 } from '@view/MapPuzzleSceneHelpers';
 import type { ConversationScene } from '@view/scenes/ConversationScene';
+import type { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
+import { CollectibleManager as WorldCollectibleManager } from '@view/CollectibleManager';
+import { ConstraintNPCManager as WorldConstraintNPCManager } from '@view/ConstraintNPCManager';
+import { DoorManager as WorldDoorManager } from '@view/DoorManager';
+import { NPCSpriteController as WorldNPCSpriteController } from '@view/NPCSpriteController';
 
 interface CollisionBootstrapResult {
     createdLayerNames: string[];
@@ -73,6 +86,10 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
     protected abstract getExplorationPlayerSprite(): Phaser.GameObjects.Sprite | null;
     protected abstract getExplorationPlayerWorldPosition(): { x: number; y: number } | null;
     protected abstract getPuzzleIdAtWorldPosition(worldX: number, worldY: number): string | null;
+    protected abstract getExplorationPuzzleManager(): OverworldPuzzleManager;
+    protected abstract getExplorationCollisionManager(): CollisionManager;
+    protected abstract getExplorationCameraManager(): CameraManager;
+    protected abstract getCollectibleHUDScene(): OverworldHUDScene | undefined;
 
     protected getSkippedVisualLayerNames(): string[] {
         return [];
@@ -161,6 +178,20 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
         return true;
     }
 
+    protected queueConstraintDisguiseSprites(): void {
+        const requests = getConstraintDisguiseImageLoadRequests(
+            this.tiledMapData,
+            (textureKey) => this.textures.exists(textureKey),
+        );
+
+        queueMapSceneImageRequests(
+            requests,
+            (textureKey, imagePath) => this.load.image(textureKey, imagePath),
+            () => this.load.isLoading(),
+            () => this.load.start(),
+        );
+    }
+
     protected bootstrapExplorationMap(options: { requireTilesets?: boolean } = {}): Phaser.Tilemaps.Tileset[] | null {
         const mapCacheKey = this.getMapCacheKey();
         this.map = this.make.tilemap({ key: mapCacheKey });
@@ -198,6 +229,38 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
         this.checkStepHotspots();
         this.updateExplorationInteractionCursor();
         this.onExplorationFrameWhileActive();
+    }
+
+    protected initialiseExplorationInteractablesAndCursor(): void {
+        if (!this.map || !this.tiledMapData) {
+            return;
+        }
+
+        this.initialiseSharedExplorationManagers();
+
+        this.interactionCursor = new InteractionCursor(
+            this,
+            this.tiledMapData.tilewidth,
+            this.tiledMapData.tileheight,
+        );
+
+        this.interactables = [
+            ...buildPuzzleEntryInteractables(
+                this.getExplorationPuzzleManager(),
+                this.tiledMapData,
+                this.gridMapper,
+                this.map,
+            ),
+        ];
+
+        this.loadNPCsFromTiledLayers();
+        if (this.npcs.length > 0) {
+            void this.npcSpriteController?.loadNPCSeries(this.npcs);
+        }
+
+        this.constraintNPCManager?.loadConstraintNPCs();
+        this.doorManager?.loadDoors();
+        this.collectibleManager?.loadCollectibles();
     }
 
     protected async startConversationWithNPC(npc: NPC): Promise<void> {
@@ -799,6 +862,92 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
 
     protected handleBridgeClicked(bridgeId: string): void {
         this.getEmbeddedPuzzleController()?.handleBridgeClicked(bridgeId);
+    }
+
+    protected initialiseSharedExplorationManagers(): void {
+        if (!this.map || !this.tiledMapData) {
+            return;
+        }
+
+        if (!this.npcSpriteController) {
+            this.npcSpriteController = new WorldNPCSpriteController(
+                this,
+                this.map,
+                this.gridMapper,
+                this.seriesManager,
+                this.tiledMapData,
+                (npc) => this.npcs.push(npc),
+                (interactable) => this.interactables.push(interactable),
+                (id, data) => this.currentSeriesPuzzleData.set(id, data),
+            );
+            this.npcSpriteController.registerAnimations();
+        }
+
+        if (!this.collectibleManager) {
+            this.collectibleManager = new WorldCollectibleManager(
+                this,
+                this.tiledMapData,
+                this.map,
+                this.gameState,
+                () => this.getCollectibleHUDScene(),
+                (interactable) => this.interactables.push(interactable),
+                (predicate) => {
+                    this.interactables = this.interactables.filter((interactable) => !predicate(interactable));
+                },
+            );
+            this.collectibleManager.initialise();
+        }
+
+        if (!this.doorManager) {
+            this.doorManager = new WorldDoorManager(
+                this,
+                this.tiledMapData,
+                this.map,
+                this.getExplorationCollisionManager(),
+                this.gameState,
+                this.getExplorationCameraManager(),
+                () => this.getExplorationPlayerSprite(),
+                () => this.playerController,
+            );
+        }
+
+        if (!this.constraintNPCManager && this.npcSpriteController) {
+            this.constraintNPCManager = new WorldConstraintNPCManager(
+                this,
+                this.getExplorationPuzzleManager(),
+                this.gridMapper,
+                this.gameState,
+                this.npcSpriteController.npcAppearanceRegistry,
+                this.tiledMapData,
+                (npc) => this.npcs.push(npc),
+                (npcId) => this.npcs.some((npc) => npc.id === npcId),
+                (interactable) => this.interactables.push(interactable),
+            );
+        }
+    }
+
+    protected loadNPCsFromTiledLayers(): void {
+        if (!this.npcSpriteController || !this.map || !this.tiledMapData) {
+            return;
+        }
+
+        const npcLayers = TiledLayerUtils.findObjectLayersByName(this.tiledMapData.layers, 'npcs');
+        for (const layerInfo of npcLayers) {
+            let layer = this.map.getObjectLayer(layerInfo.fullPath);
+            if (!layer) {
+                layer = this.map.getObjectLayer(layerInfo.name);
+            }
+            if (!layer) {
+                continue;
+            }
+
+            this.npcSpriteController.loadNPCsFromLayerWithOffset(
+                layer,
+                layerInfo.fullPath,
+                layerInfo.offsetX,
+                layerInfo.offsetY,
+            );
+        }
     }
 
     private async handleCurrentSeriesAfterEmbeddedPuzzleExit(success: boolean): Promise<void> {

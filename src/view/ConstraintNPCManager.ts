@@ -170,6 +170,9 @@ export class ConstraintNPCManager {
                             normalKey: item.disguiseSpriteKey,
                             solvedKey: item.disguiseSpriteSolvedKey,
                         });
+                        if (this.gameState.isPuzzleCompleted(puzzleId)) {
+                            sprite.setTexture(item.disguiseSpriteSolvedKey);
+                        }
                     }
 
                     if (item.requiredCount !== undefined && item.requiredCount >= 1 && item.requiredCount <= 8) {

@@ -10,17 +10,9 @@ import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import { OverworldPuzzleController } from '@controller/OverworldPuzzleController';
 import { PlayerController } from '@view/PlayerController';
 import { CameraManager } from '@view/CameraManager';
-import { InteractionCursor } from '@view/InteractionCursor';
-import { NPCSpriteController } from '@view/NPCSpriteController';
-import { CollectibleManager } from '@view/CollectibleManager';
-import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
-import { DoorManager } from '@view/DoorManager';
 import { Portal } from '@model/overworld/Portal';
 import { RoofManager } from '@view/RoofManager';
 import { SceneTransitionCoordinator } from '@view/SceneTransitionCoordinator';
-import {
-    buildPuzzleEntryInteractables,
-} from '@view/MapPuzzleSceneHelpers';
 import type { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 import { queueDoorSpriteAssets } from '@view/DoorAssetLoader';
@@ -188,6 +180,22 @@ export class InteriorScene extends ExplorationMapScene {
         return puzzle?.id ?? null;
     }
 
+    protected getExplorationPuzzleManager(): OverworldPuzzleManager {
+        return this.puzzleManager;
+    }
+
+    protected getExplorationCollisionManager(): CollisionManager {
+        return this.collisionManager;
+    }
+
+    protected getExplorationCameraManager(): CameraManager {
+        return this.cameraManager;
+    }
+
+    protected getCollectibleHUDScene(): OverworldHUDScene | undefined {
+        return this.scene.get('OverworldHUDScene') as OverworldHUDScene | undefined;
+    }
+
     protected setExplorationPlayerLayerDisplay(playerLayer: ReturnType<PlayerController['getPlayerLayer']>): void {
         const hud = this.scene.get('OverworldHUDScene') as OverworldHUDScene | null;
         hud?.setPlayerLayerDisplay(playerLayer);
@@ -265,19 +273,9 @@ export class InteriorScene extends ExplorationMapScene {
             });
         }
 
-        // NPCs, collectibles, portals
-        this.setupNPCs();
-        this.setupCollectibles();
         this.initializeInteriorPuzzles(tilesets);
-        this.setupDoors();
+        this.initialiseExplorationInteractablesAndCursor();
         this.loadPortals();
-
-        // Interaction cursor
-        this.interactionCursor = new InteractionCursor(
-            this,
-            this.tiledMapData?.tilewidth ?? 32,
-            this.tiledMapData?.tileheight ?? 32
-        );
 
         // Roof hiding
         if (this.roofsLayers.length > 0) {
@@ -378,6 +376,7 @@ export class InteriorScene extends ExplorationMapScene {
             );
             this.tiledMapData = preparedMap.mapData;
             this.loadEmbeddedTilesets(preparedMap.tilesetImageRequests);
+            this.queueConstraintDisguiseSprites();
             this.cache.tilemap.add(this.mapCacheKey, { format: 1, data: this.tiledMapData });
             console.log(`[InteriorScene] Map "${this.mapKey}" loaded`);
         } catch (error) {
@@ -529,6 +528,8 @@ export class InteriorScene extends ExplorationMapScene {
             return;
         }
 
+        this.gameState.restorePuzzleProgress(puzzles);
+
         const bridgesLayer = this.createBridgesLayerForMap(tilesets);
         if (bridgesLayer) {
             this.bridgeManager = new OverworldBridgeManager(bridgesLayer, this.tiledMapData, this);
@@ -552,111 +553,10 @@ export class InteriorScene extends ExplorationMapScene {
             this.bridgeManager,
             this.tiledMapData
         );
-
-        this.interactables.push(
-            ...buildPuzzleEntryInteractables(
-                this.puzzleManager,
-                this.tiledMapData,
-                this.gridMapper,
-                this.map,
-            )
-        );
-
-        if (this.npcSpriteController) {
-            this.constraintNPCManager = new ConstraintNPCManager(
-                this,
-                this.puzzleManager,
-                this.gridMapper,
-                this.gameState,
-                this.npcSpriteController.npcAppearanceRegistry,
-                this.tiledMapData,
-                (npc) => this.npcs.push(npc),
-                (npcId) => this.npcs.some((npc) => npc.id === npcId),
-                (interactable) => this.interactables.push(interactable),
-            );
-            this.constraintNPCManager.loadConstraintNPCs();
-        }
-    }
-
-    private setupDoors(): void {
-        if (!this.map || !this.tiledMapData) {
-            return;
-        }
-
-        this.doorManager = new DoorManager(
-            this,
-            this.tiledMapData,
-            this.map,
-            this.collisionManager,
-            this.gameState,
-            this.cameraManager,
-            () => this.player ?? null,
-            () => this.playerController,
-        );
-        this.doorManager.loadDoors();
     }
 
     private getPuzzleIDPrefix(): string {
         return `interior:${this.mapKey}`;
-    }
-
-    // ── NPC setup ─────────────────────────────────────────────────────────────
-
-    private setupNPCs(): void {
-        if (!this.map || !this.tiledMapData) return;
-
-        this.npcSpriteController = new NPCSpriteController(
-            this,
-            this.map,
-            this.gridMapper,
-            this.seriesManager,
-            this.tiledMapData,
-            (npc) => this.npcs.push(npc),
-            (i) => this.interactables.push(i),
-            (id, data) => this.currentSeriesPuzzleData.set(id, data),
-        );
-        this.npcSpriteController.registerAnimations();
-
-        const npcsLayers = TiledLayerUtils.findObjectLayersByName(this.tiledMapData.layers, 'npcs');
-        this.loadNPCLayers(npcsLayers);
-
-        if (this.npcs.length > 0) {
-            this.npcSpriteController.loadNPCSeries(this.npcs);
-        }
-    }
-
-    private loadNPCLayers(npcsLayers: ReturnType<typeof TiledLayerUtils.findObjectLayersByName>): void {
-        if (!this.npcSpriteController) return;
-
-        for (const layerInfo of npcsLayers) {
-            let layer = this.map.getObjectLayer(layerInfo.fullPath);
-            if (!layer) layer = this.map.getObjectLayer(layerInfo.name);
-            if (!layer) continue;
-            this.npcSpriteController.loadNPCsFromLayerWithOffset(
-                layer,
-                layerInfo.fullPath,
-                layerInfo.offsetX,
-                layerInfo.offsetY,
-            );
-        }
-    }
-
-    // ── Collectible setup ─────────────────────────────────────────────────────
-
-    private setupCollectibles(): void {
-        if (!this.map || !this.tiledMapData) return;
-
-        this.collectibleManager = new CollectibleManager(
-            this,
-            this.tiledMapData,
-            this.map,
-            this.gameState,
-            () => this.scene.get('OverworldHUDScene') as OverworldHUDScene | undefined,
-            (i) => this.interactables.push(i),
-            (pred) => { this.interactables = this.interactables.filter((i) => !pred(i)); },
-        );
-        this.collectibleManager.initialise();
-        this.collectibleManager.loadCollectibles();
     }
 
     /** Canonical gate for interior movement/input; scene transitions or disabled player control keep this off even in exploration mode. */

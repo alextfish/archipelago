@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     areTilesetTexturesReady,
     findMapLayersBySuffix,
+    getConstraintDisguiseImageLoadRequests,
     getTilesetTextureKey,
     getTilesetImageLoadRequests,
     resolveTilesetImagePath,
@@ -81,6 +82,48 @@ describe('MapSceneAssetUtils', () => {
                 {
                     textureKey: 'tileset_embedded',
                     imagePath: 'resources/tilesets/cave.png',
+                },
+            ]);
+        });
+    });
+
+    describe('getConstraintDisguiseImageLoadRequests', () => {
+        it('collects unique disguise sprite requests from nested constraint object layers', () => {
+            const requests = getConstraintDisguiseImageLoadRequests(
+                {
+                    layers: [
+                        {
+                            type: 'group',
+                            layers: [
+                                {
+                                    type: 'objectgroup',
+                                    objects: [
+                                        {
+                                            properties: [
+                                                { name: 'constraint', value: 'true' },
+                                                { name: 'disguise_sprite', value: 'Cultist-1' },
+                                                { name: 'disguise_sprite_solved', value: 'Cultist-1-Ruby' },
+                                            ],
+                                        },
+                                        {
+                                            properties: [
+                                                { name: 'constraint', value: true },
+                                                { name: 'disguise_sprite', value: 'Cultist-1' },
+                                            ],
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                },
+                (textureKey) => textureKey === 'Cultist-1-Ruby',
+            );
+
+            expect(requests).toEqual([
+                {
+                    textureKey: 'Cultist-1',
+                    imagePath: 'resources/sprites/Cultist-1.png',
                 },
             ]);
         });

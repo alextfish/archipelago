@@ -9,7 +9,6 @@ import { OverworldPuzzleController } from '@controller/OverworldPuzzleController
 import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 import { defaultTileConfig } from '@model/overworld/MapConfig';
 import { PlayerController } from '@view/PlayerController';
-import { InteractionCursor } from '@view/InteractionCursor';
 import { RoofManager } from '@view/RoofManager';
 import { attachTestMarker, isTestMode, getTestConfig } from '@helpers/TestMarkers';
 import { SeriesFactory, SeriesManager } from '@model/series/SeriesFactory';
@@ -17,7 +16,6 @@ import { FilePuzzleLoader, LocalStorageProgressStore } from '@model/series/Serie
 import { clearArchipelagoPersistentState } from '@model/persistence/PersistenceUtils';
 import { NPCIconConfig } from '@view/NPCIconConfig';
 import { PlayerStartManager } from '@model/overworld/PlayerStartManager';
-import { TiledLayerUtils } from '@model/overworld/TiledLayerUtils';
 import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
 import { RiverChannelInitialiser } from '@model/overworld/RiverChannelInitialiser';
 import { WaterPropagationEngine } from '@model/overworld/WaterPropagationEngine';
@@ -28,11 +26,7 @@ import type { PlayerStartPosition } from '@model/overworld/PlayerStartManager';
 import { SceneTransitionCoordinator } from '@view/SceneTransitionCoordinator';
 import { OverworldHUDScene } from '@view/scenes/OverworldHUDScene';
 import { FlowWaterVisualManager } from '@view/FlowWaterVisualManager';
-import { DoorManager } from '@view/DoorManager';
 import { queueDoorSpriteAssets } from '@view/DoorAssetLoader';
-import { CollectibleManager } from '@view/CollectibleManager';
-import { ConstraintNPCManager } from '@view/ConstraintNPCManager';
-import { NPCSpriteController } from '@view/NPCSpriteController';
 import { PortalManager } from '@view/PortalManager';
 import {
   getTilesetTextureKey,
@@ -43,9 +37,6 @@ import {
   queueMapSceneImageRequests,
 } from '@view/MapSceneLoadUtils';
 import { ExplorationMapScene } from '@view/scenes/ExplorationMapScene';
-import {
-  buildPuzzleEntryInteractables,
-} from '@view/MapPuzzleSceneHelpers';
 import { OverworldCameraZones } from '@model/overworld/OverworldCameraZones';
 
 /**
@@ -193,7 +184,7 @@ export class OverworldScene extends ExplorationMapScene {
       this.loadEmbeddedTilesets(this.tiledMapData, preparedMap.tilesetImageRequests);
 
       // Load any disguise sprites declared on constraint objects in the map
-      this.loadDisguiseSprites(this.tiledMapData);
+      this.queueConstraintDisguiseSprites();
 
       // Add the converted map data to Phaser's cache
       this.cache.tilemap.add('overworldMap', { format: 1, data: this.tiledMapData });
@@ -242,52 +233,7 @@ export class OverworldScene extends ExplorationMapScene {
     );
   }
 
-  /**
-   * Scan all constraint objects in the Tiled map for `disguise_sprite` and
-   * `disguise_sprite_solved` properties, and queue those images for loading.
-   * Must be called after the map JSON is available but before sprites are created
-   * (i.e. from within {@link loadTmxFile}).
-   */
-  private loadDisguiseSprites(tiledMapData: any): void {
-    if (!tiledMapData?.layers) return;
-
-    const keysToLoad = new Set<string>();
-
-    const scanLayer = (layer: any): void => {
-      if (layer.type === 'group' && layer.layers) {
-        for (const child of layer.layers) {
-          scanLayer(child);
-        }
-      } else if (layer.type === 'objectgroup' && layer.objects) {
-        for (const obj of layer.objects) {
-          if (!Array.isArray(obj.properties)) continue;
-          const props: Record<string, string> = {};
-          for (const p of obj.properties) {
-            props[p.name] = String(p.value);
-          }
-          if (props.constraint !== 'true') continue;
-          if (props.disguise_sprite) keysToLoad.add(props.disguise_sprite);
-          if (props.disguise_sprite_solved) keysToLoad.add(props.disguise_sprite_solved);
-        }
-      }
-    };
-
-    for (const layer of tiledMapData.layers) {
-      scanLayer(layer);
-    }
-
-    for (const key of keysToLoad) {
-      if (!this.textures.exists(key)) {
-        const path = `resources/sprites/${key}.png`;
-        this.load.image(key, path);
-        console.log(`Queued disguise sprite for loading: ${key} (${path})`);
-      }
-    }
-
-    if (keysToLoad.size > 0 && !this.load.isLoading() && this.load.totalToLoad > 0) {
-      this.load.start();
-    }
-  } private createFallbackMap() {
+  private createFallbackMap() {
     // Simple fallback map if TMX loading fails
     const mapData = {
       width: 20,
@@ -419,37 +365,6 @@ export class OverworldScene extends ExplorationMapScene {
     // Initialize shared puzzle HUD
     PuzzleHUDManager.getInstance().initializeHUD(this);
 
-    // Create NPCSpriteController (needs map, gridMapper, seriesManager)
-    this.npcSpriteController = new NPCSpriteController(
-      this,
-      this.map,
-      this.gridMapper,
-      this.seriesManager,
-      this.tiledMapData,
-      (npc) => this.npcs.push(npc),
-      (interactable) => this.interactables.push(interactable),
-      (id, data) => this.currentSeriesPuzzleData.set(id, data),
-    );
-
-    // Register looping idle animations for animated NPCs
-    this.npcSpriteController.registerAnimations();
-
-    // Create CollectibleManager early so jewel animations can be registered
-    // (requires map/tiledMapData to be ready, but not pontoonTiles)
-    if (this.tiledMapData && this.map) {
-      this.collectibleManager = new CollectibleManager(
-        this,
-        this.tiledMapData,
-        this.map,
-        this.gameState,
-        () => this.overworldHUD,
-        (i) => this.interactables.push(i),
-        (pred) => { this.interactables = this.interactables.filter(i => !pred(i)); },
-      );
-      // Register looping animations for collectible jewels
-      this.collectibleManager.initialise();
-    }
-
     // Initialize overworld puzzle system
     this.initializeOverworldPuzzles();
   }
@@ -536,8 +451,7 @@ export class OverworldScene extends ExplorationMapScene {
       // Set up puzzle interaction checking
       this.setupPuzzleInteraction();
 
-      // Initialize interaction cursor
-      this.initializeInteractionCursor();
+      this.initialiseExplorationInteractablesAndCursor();
 
       // Initialize roof manager if we have roofs layers
       if (this.roofsLayers.length > 0 && this.roofManager) {
@@ -883,147 +797,6 @@ export class OverworldScene extends ExplorationMapScene {
     window.location.reload();
   }
 
-  /**
-   * Initialize the interaction cursor and build list of interactables
-   */
-  private initializeInteractionCursor(): void {
-    if (!this.tiledMapData) {
-      return;
-    }
-
-    // Create the cursor
-    this.interactionCursor = new InteractionCursor(
-      this,
-      this.tiledMapData.tilewidth,
-      this.tiledMapData.tileheight
-    );
-
-    // Build list of all puzzle entry tiles as interactables
-    this.buildInteractablesList();
-
-    console.log(`Interaction cursor initialized with ${this.interactables.length} interactables`);
-  }
-
-  /**
-   * Build list of all interactable objects (puzzle entries, NPCs, etc.)
-   */
-  private buildInteractablesList(): void {
-    this.interactables = [];
-
-    if (!this.tiledMapData || !this.map) {
-      return;
-    }
-
-    this.interactables.push(
-      ...buildPuzzleEntryInteractables(
-        this.puzzleManager,
-        this.tiledMapData,
-        this.gridMapper,
-        this.map,
-      )
-    );
-
-    // Load NPCs from the "npcs" object layer
-    this.loadNPCs();
-
-    console.log(`Built interactables list with ${this.interactables.length} entries (${this.npcs.length} NPCs)`);
-  }
-
-  /**
-   * Load NPCs from all `<anything>/npcs` object layers in the Tiled map, load
-   * puzzle series, load constraint NPCs, doors, and collectibles.
-   */
-  private loadNPCs(): void {
-    if (!this.map || !this.tiledMapData || !this.npcSpriteController) return;
-
-    // Create ConstraintNPCManager and DoorManager on first call (lazy, needs all deps)
-    if (!this.constraintNPCManager) {
-      this.constraintNPCManager = new ConstraintNPCManager(
-        this,
-        this.puzzleManager,
-        this.gridMapper,
-        this.gameState,
-        this.npcSpriteController.npcAppearanceRegistry,
-        this.tiledMapData,
-        (npc) => this.npcs.push(npc),
-        (npcId) => !!this.npcs.find(n => n.id === npcId),
-        (i) => this.interactables.push(i),
-      );
-    }
-
-    if (!this.doorManager) {
-      this.doorManager = new DoorManager(
-        this,
-        this.tiledMapData,
-        this.map,
-        this.collisionManager,
-        this.gameState,
-        this.cameraManager,
-        () => this.player ?? null,
-        () => this.playerController,
-      );
-    }
-
-    if (!this.collectibleManager) {
-      this.collectibleManager = new CollectibleManager(
-        this,
-        this.tiledMapData,
-        this.map,
-        this.gameState,
-        () => this.overworldHUD,
-        (i) => this.interactables.push(i),
-        (pred) => { this.interactables = this.interactables.filter(i => !pred(i)); },
-      );
-      this.collectibleManager.initialise();
-    }
-
-    // Find all npcs object layers (including nested) in tiledMapData
-    const npcsLayers = TiledLayerUtils.findObjectLayersByName(this.tiledMapData.layers, 'npcs');
-
-    if (npcsLayers.length === 0) {
-      console.log('No NPCs layers found in map');
-    } else {
-      console.log(`Found ${npcsLayers.length} NPC layers`);
-
-      this.loadNPCLayers(npcsLayers);
-
-      // Load series for NPCs and create icons (once after all NPCs loaded)
-      this.npcSpriteController.loadNPCSeries(this.npcs);
-    }
-
-    // Load constraint NPCs from overworld puzzles
-    this.constraintNPCManager.loadConstraintNPCs();
-
-    // Load doors from object layers
-    this.doorManager.loadDoors();
-
-    // Load collectibles from "collectibles" object layers
-    this.collectibleManager.loadCollectibles();
-  }
-
-  private loadNPCLayers(npcsLayers: ReturnType<typeof TiledLayerUtils.findObjectLayersByName>): void {
-    if (!this.npcSpriteController) return;
-
-    for (const layerInfo of npcsLayers) {
-      let npcsLayer = this.map.getObjectLayer(layerInfo.fullPath);
-      if (!npcsLayer) {
-        npcsLayer = this.map.getObjectLayer(layerInfo.name);
-      }
-      if (!npcsLayer) {
-        console.warn(`Failed to get object layer: ${layerInfo.fullPath} or ${layerInfo.name}`);
-        continue;
-      }
-      console.log(`Loading NPCs from layer: ${layerInfo.fullPath}`);
-      this.npcSpriteController.loadNPCsFromLayerWithOffset(
-        npcsLayer,
-        layerInfo.fullPath,
-        layerInfo.offsetX,
-        layerInfo.offsetY,
-      );
-    }
-  }
-
-
   protected persistMeaningfulProgress(): void {
     this.saveGameState();
   }
@@ -1053,6 +826,22 @@ export class OverworldScene extends ExplorationMapScene {
   protected getPuzzleIdAtWorldPosition(worldX: number, worldY: number): string | null {
     const puzzle = this.puzzleManager.getPuzzleAtPosition(worldX, worldY, this.tiledMapData);
     return puzzle?.id ?? null;
+  }
+
+  protected getExplorationPuzzleManager(): OverworldPuzzleManager {
+    return this.puzzleManager;
+  }
+
+  protected getExplorationCollisionManager(): CollisionManager {
+    return this.collisionManager;
+  }
+
+  protected getExplorationCameraManager(): CameraManager {
+    return this.cameraManager;
+  }
+
+  protected getCollectibleHUDScene(): OverworldHUDScene | undefined {
+    return this.overworldHUD;
   }
 
   protected setExplorationPlayerLayerDisplay(playerLayer: ReturnType<PlayerController['getPlayerLayer']>): void {

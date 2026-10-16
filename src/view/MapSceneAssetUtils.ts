@@ -15,6 +15,21 @@ export interface TilesetLike {
     image?: string;
 }
 
+interface TiledPropertyLike {
+    name: string;
+    value: unknown;
+}
+
+interface TiledObjectLike {
+    properties?: unknown[];
+}
+
+interface TiledLayerTreeLike {
+    type?: string;
+    layers?: TiledLayerTreeLike[];
+    objects?: TiledObjectLike[];
+}
+
 export interface TilesetImageLoadRequest {
     textureKey: string;
     imagePath: string;
@@ -81,6 +96,62 @@ export function getTilesetImageLoadRequests(
             imagePath: resolveTilesetImagePath(tileset.image),
         }];
     });
+}
+
+export function getConstraintDisguiseImageLoadRequests(
+    tiledMapData: { layers?: TiledLayerTreeLike[] } | undefined,
+    textureExists: (textureKey: string) => boolean,
+): TilesetImageLoadRequest[] {
+    if (!tiledMapData?.layers) {
+        return [];
+    }
+
+    const spriteKeys = new Set<string>();
+
+    const scanLayer = (layer: TiledLayerTreeLike): void => {
+        if (layer.type === 'group' && Array.isArray(layer.layers)) {
+            layer.layers.forEach(scanLayer);
+            return;
+        }
+
+        if (layer.type !== 'objectgroup' || !Array.isArray(layer.objects)) {
+            return;
+        }
+
+        for (const object of layer.objects) {
+            if (!Array.isArray(object.properties)) {
+                continue;
+            }
+
+            const properties = new Map<string, unknown>(
+                object.properties.map((property) => {
+                    const candidate = property as Partial<TiledPropertyLike>;
+                    return [candidate.name ?? '', candidate.value];
+                }),
+            );
+
+            if (properties.get('constraint') !== 'true' && properties.get('constraint') !== true) {
+                continue;
+            }
+
+            const normalKey = properties.get('disguise_sprite');
+            if (typeof normalKey === 'string' && !textureExists(normalKey)) {
+                spriteKeys.add(normalKey);
+            }
+
+            const solvedKey = properties.get('disguise_sprite_solved');
+            if (typeof solvedKey === 'string' && !textureExists(solvedKey)) {
+                spriteKeys.add(solvedKey);
+            }
+        }
+    };
+
+    tiledMapData.layers.forEach(scanLayer);
+
+    return Array.from(spriteKeys).map((textureKey) => ({
+        textureKey,
+        imagePath: `resources/sprites/${textureKey}.png`,
+    }));
 }
 
 export function areTilesetTexturesReady(
