@@ -242,18 +242,8 @@ export class InteriorScene extends ExplorationMapScene {
         PuzzleHUDManager.getInstance().ensureHidden(this);
 
         // Keyboard + player movement
-        this.cursors = this.input.keyboard!.createCursorKeys();
-        const wasdKeys = this.input.keyboard!.addKeys({
-            up: Phaser.Input.Keyboard.KeyCodes.W,
-            down: Phaser.Input.Keyboard.KeyCodes.S,
-            left: Phaser.Input.Keyboard.KeyCodes.A,
-            right: Phaser.Input.Keyboard.KeyCodes.D,
-        }) as {
-            up: Phaser.Input.Keyboard.Key;
-            down: Phaser.Input.Keyboard.Key;
-            left: Phaser.Input.Keyboard.Key;
-            right: Phaser.Input.Keyboard.Key;
-        };
+        const { cursors, wasdKeys } = this.createMovementKeys();
+        this.cursors = cursors;
         this.playerController = new PlayerController(
             this,
             this.player,
@@ -557,12 +547,5 @@ export class InteriorScene extends ExplorationMapScene {
 
     private getPuzzleIDPrefix(): string {
         return `interior:${this.mapKey}`;
-    }
-
-    /** Canonical gate for interior movement/input; scene transitions or disabled player control keep this off even in exploration mode. */
-    protected canPlayerMoveAroundAndInteract(): boolean {
-        return !this.isSceneTransitioning
-            && this.gameMode === 'exploration'
-            && (this.playerController?.isEnabled() ?? false);
     }
 }

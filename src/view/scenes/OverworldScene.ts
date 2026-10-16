@@ -98,11 +98,6 @@ export class OverworldScene extends ExplorationMapScene {
     this.seriesManager = new SeriesManager(seriesFactory, progressStore);
   }
 
-  /** Canonical gate for overworld exploration-time movement/input; disabled player control also blocks interaction. */
-  protected canPlayerMoveAroundAndInteract(): boolean {
-    return this.gameMode === 'exploration' && (this.playerController?.isEnabled() ?? false);
-  }
-
   preload() {
     // Load external tilesets (these reference images outside the map file)
     this.load.image('beachTileset', 'resources/tilesets/beach.png');
@@ -338,18 +333,8 @@ export class OverworldScene extends ExplorationMapScene {
     this.refreshOverworldCamera({ immediate: true, force: true });
 
     // Set up input and player controller
-    this.cursors = this.input.keyboard!.createCursorKeys();
-    const wasdKeys = this.input.keyboard!.addKeys({
-      up: Phaser.Input.Keyboard.KeyCodes.W,
-      down: Phaser.Input.Keyboard.KeyCodes.S,
-      left: Phaser.Input.Keyboard.KeyCodes.A,
-      right: Phaser.Input.Keyboard.KeyCodes.D,
-    }) as {
-      up: Phaser.Input.Keyboard.Key;
-      down: Phaser.Input.Keyboard.Key;
-      left: Phaser.Input.Keyboard.Key;
-      right: Phaser.Input.Keyboard.Key;
-    };
+    const { cursors, wasdKeys } = this.createMovementKeys();
+    this.cursors = cursors;
     this.playerController = new PlayerController(
       this,
       this.player,
