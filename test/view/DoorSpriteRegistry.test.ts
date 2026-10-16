@@ -30,5 +30,8 @@ describe('DoorSpriteRegistry', () => {
         expect(mapping!.variantsByWidth?.[3].passableWhenOpen).toEqual([false, true, false]);
         expect(mapping!.variantsByWidth?.[4].passableWhenOpen).toEqual([false, true, true, false]);
         expect(mapping!.variantsByWidth?.[5].passableWhenOpen).toEqual([false, true, true, true, false]);
+        expect(mapping!.variantsByWidth?.[3].renderAsGroundWhenOpen).toBe(true);
+        expect(mapping!.variantsByWidth?.[4].renderAsGroundWhenOpen).toBe(true);
+        expect(mapping!.variantsByWidth?.[5].renderAsGroundWhenOpen).toBe(true);
     });
 });

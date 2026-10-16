@@ -509,6 +509,12 @@ export class PuzzleController {
 
     validate() {
         const results = this.validator.validateAll();
+        const getConstraintDisplayItems = (): any[] => {
+            const validatorWithDisplayItems = this.validator as { getConstraintDisplayItems?: () => any[] };
+            return validatorWithDisplayItems.getConstraintDisplayItems?.() ?? [];
+        };
+        const constraintDisplayItems = getConstraintDisplayItems();
+        const hasConstraintNPCFeedback = constraintDisplayItems.length > 0;
 
         // Consider puzzle solved only if there is at least one constraint and all are satisfied.
         const nowSolved = results.allSatisfied && (results.perConstraint?.length ?? 0) > 0;
@@ -527,7 +533,7 @@ export class PuzzleController {
 
         if (!nowSolved) {
             // inform view which constraints failed — suppressed when puzzle gives no feedback
-            if (this.puzzle.givesFeedback) {
+            if (this.puzzle.givesFeedback && !hasConstraintNPCFeedback) {
                 const failed = results.perConstraint.filter(p => !p.result.satisfied);
                 const affected = failed.flatMap(f => f.result.affectedElements ?? []);
                 this.renderer.highlightViolations(affected);
@@ -539,8 +545,7 @@ export class PuzzleController {
         // Show per-constraint NPC+speech-bubble feedback whenever all bridges are placed,
         // but only if the puzzle gives feedback for unsolved states.
         if (this.puzzle.allBridgesPlaced() && this.puzzle.givesFeedback) {
-            const displayItems = this.validator.getConstraintDisplayItems();
-            this.renderer.showConstraintFeedback(displayItems, this.puzzle);
+            this.renderer.showConstraintFeedback(constraintDisplayItems, this.puzzle);
         } else {
             this.renderer.hideConstraintFeedback();
         }

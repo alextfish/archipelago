@@ -1006,7 +1006,7 @@ describe("PuzzleController", () => {
       controller.validate();
 
       expect(showConstraintSpy).toHaveBeenCalled();
-      expect(mockRenderer.violations).toEqual(['A']);
+      expect(mockRenderer.violations).toEqual([]);
     });
   });
 });

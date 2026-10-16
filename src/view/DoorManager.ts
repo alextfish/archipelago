@@ -229,7 +229,7 @@ export class DoorManager {
                 const frame = door.isLocked() ? variant.closedFrames[index] : variant.openFrames[index];
                 const sprite = this.scene.add.sprite(worldX, worldY, mapping.textureKey, frame);
                 sprite.setOrigin(0.5, 0.5);
-                sprite.setDepth((pos.tileY + 1) * tileH);
+                sprite.setDepth(this.getDoorSpriteDepth(pos.tileY, tileH, door.isLocked(), variant));
                 return sprite;
             });
 
@@ -268,9 +268,11 @@ export class DoorManager {
 
         const variant = this.getWidthVariant(door, mapping.variantsByWidth);
         if (variant && sprites.length === variant.closedFrames.length) {
+            const orderedPositions = this.getOrderedDoorPositions(door);
             sprites.forEach((sprite, index) => {
                 const frame = door.isLocked() ? variant.closedFrames[index] : variant.openFrames[index];
                 sprite.setFrame(frame);
+                sprite.setDepth(this.getDoorSpriteDepth(orderedPositions[index].tileY, this.tiledMapData?.tileheight ?? 32, door.isLocked(), variant));
             });
             console.log(`Updated door ${door.id} width-variant sprites to ${door.isLocked() ? 'closed' : 'open'} state`);
             return;
@@ -412,6 +414,19 @@ export class DoorManager {
         }
 
         return variant;
+    }
+
+    private getDoorSpriteDepth(
+        tileY: number,
+        tileHeight: number,
+        isLocked: boolean,
+        variant: DoorSpriteVariant
+    ): number {
+        if (!isLocked && variant.renderAsGroundWhenOpen) {
+            return tileY * tileHeight - 1;
+        }
+
+        return (tileY + 1) * tileHeight;
     }
 
     private async playFrameSequenceAnimation(
