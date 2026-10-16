@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ConstraintFeedbackDisplay } from '@view/ConstraintFeedbackDisplay';
+import { ConstraintFeedbackDisplay, bubbleArrowPlacement } from '@view/ConstraintFeedbackDisplay';
 import { GridToWorldMapper } from '@view/GridToWorldMapper';
 import { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
 import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
@@ -215,6 +215,21 @@ describe('ConstraintFeedbackDisplay', () => {
     for (const c of containers) {
       expect(c.destroy).toHaveBeenCalled();
     }
+  });
+
+  it('uses rightmost anchor for below-left placements', () => {
+    const placement = bubbleArrowPlacement({ x: 2, y: 8 }, { x: 4, y: 6 });
+    expect(placement).toEqual({ direction: 'below', horizontalAnchor: 'right' });
+  });
+
+  it('uses rightmost anchor for above-left placements', () => {
+    const placement = bubbleArrowPlacement({ x: 2, y: 4 }, { x: 4, y: 6 });
+    expect(placement).toEqual({ direction: 'above', horizontalAnchor: 'right' });
+  });
+
+  it('keeps leftmost anchor for below-right placements', () => {
+    const placement = bubbleArrowPlacement({ x: 4, y: 8 }, { x: 4, y: 6 });
+    expect(placement).toEqual({ direction: 'below', horizontalAnchor: 'left' });
   });
 });
 

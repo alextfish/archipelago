@@ -279,4 +279,28 @@ describe('SpeechBubblePlacer', () => {
         expect(placements[1].topLeft).toEqual({ x: 3, y: 5 });  // B claims central-left cell
         expect(placements[2].topLeft).toEqual({ x: 9, y: 5 });  // C goes right unobstructed
     });
+
+    it('breaks equal-distance ties right-to-left to reduce avoidable overlap on symmetric rows', () => {
+        // 11x11 puzzle with centre at (5,5).
+        // NPCs at (4,6) and (6,6) are equal-distance from centre.
+        // Processing (6,6) first lets it take below-right (6,8..8,8), then
+        // (4,6) can choose below-left (2,8..4,8), avoiding overlap.
+        const puzzle = makePuzzle([], 11, 11);
+        const requests: BubbleRequest[] = [
+            { npcPosition: { x: 2, y: 2 }, width: 1 },
+            { npcPosition: { x: 4, y: 2 }, width: 1 },
+            { npcPosition: { x: 2, y: 4 }, width: 1 },
+            { npcPosition: { x: 4, y: 4 }, width: 1 },
+            { npcPosition: { x: 6, y: 4 }, width: 1 },
+            { npcPosition: { x: 2, y: 6 }, width: 1 },
+            { npcPosition: { x: 4, y: 6 }, width: 3 },
+            { npcPosition: { x: 6, y: 6 }, width: 3 },
+            { npcPosition: { x: 8, y: 6 }, width: 1 },
+        ];
+
+        const placements = place(puzzle, requests);
+
+        expect(placements[6].topLeft).toEqual({ x: 2, y: 8 });
+        expect(placements[7].topLeft).toEqual({ x: 6, y: 8 });
+    });
 });

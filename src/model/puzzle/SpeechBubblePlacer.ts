@@ -62,12 +62,13 @@ const COST_COVERS_BRIDGE = 10;
  * Requests are processed in ascending distance from the puzzle centre so that
  * central NPCs claim the most sheltered spots first, leaving outer NPCs to
  * place their bubbles beyond the edges of the puzzle where space is ample.
+ * For equal centre distance, NPCs are processed right-to-left (then bottom-to-top)
+ * to reduce avoidable overlaps in symmetric rows.
  * Placements are returned in the same order as the input requests regardless
  * of the processing order.
  *
- * Ties in distance are broken by the original input order (stable sort).
- * The first candidate direction in case of equal cost is "right", matching
- * the existing convention.
+ * Remaining ties are broken by the original input order (stable sort).
+ * The first candidate direction in case of equal cost is "right".
  */
 export class SpeechBubblePlacer {
     private readonly npcPositions: Point[];
@@ -94,10 +95,21 @@ export class SpeechBubblePlacer {
             y: (this.puzzle.height - 1) / 2,
         };
 
-        // Build a sorted list of indices (stable sort preserves input order for ties).
+        // Build a sorted list of indices.
         const sortedIndices = this.requests
-            .map((r, i) => ({ i, dist: distanceSq(r.npcPosition, centre) }))
-            .sort((a, b) => a.dist - b.dist)
+            .map((r, i) => ({ i, dist: distanceSq(r.npcPosition, centre), npc: r.npcPosition }))
+            .sort((a, b) => {
+                if (a.dist !== b.dist) {
+                    return a.dist - b.dist;
+                }
+                if (a.npc.x !== b.npc.x) {
+                    return b.npc.x - a.npc.x;
+                }
+                if (a.npc.y !== b.npc.y) {
+                    return b.npc.y - a.npc.y;
+                }
+                return a.i - b.i;
+            })
             .map(entry => entry.i);
 
         const results: BubblePlacement[] = new Array(this.requests.length);
@@ -136,10 +148,12 @@ export class SpeechBubblePlacer {
      */
     private getCandidates(npc: Point, width: number): Point[] {
         return [
-            { x: npc.x + 2,         y: npc.y     },   // Right
-            { x: npc.x - width - 1, y: npc.y     },   // Left
-            { x: npc.x,             y: npc.y - 2 },   // Above
-            { x: npc.x,             y: npc.y + 2 },   // Below
+            { x: npc.x + 2, y: npc.y },   // Right
+            { x: npc.x - width - 1, y: npc.y },   // Left
+            { x: npc.x, y: npc.y - 2 },   // Above right
+            { x: npc.x, y: npc.y + 2 },   // Below right
+            { x: npc.x - width + 1, y: npc.y - 2 },   // Above left
+            { x: npc.x - width + 1, y: npc.y + 2 },   // Below left
         ];
     }
 

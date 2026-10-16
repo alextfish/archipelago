@@ -14,12 +14,17 @@ import Phaser from 'phaser';
 import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
 import type { ConstraintDisplayItem } from '@model/puzzle/constraints/ConstraintDisplayItem';
 import type { LanguageGlyphRegistry } from '@model/conversation/LanguageGlyphRegistry';
-import { SpeechBubble, type BubbleDirection } from './conversation/SpeechBubble';
+import { SpeechBubble, type BubbleDirection, type BubbleHorizontalAnchor } from './conversation/SpeechBubble';
 import type { GridToWorldMapper } from './GridToWorldMapper';
 import type { ActiveGlyphTracker } from '@model/translation/ActiveGlyphTracker';
 import { SpeechBubblePlacer, type BubbleRequest } from '@model/puzzle/SpeechBubblePlacer';
 import type { Point } from '@model/puzzle/Point';
 import { getNPCSpriteKey, NPC_FRAME } from './NPCSpriteHelper';
+
+type BubbleArrowPlacement = {
+  direction: BubbleDirection;
+  horizontalAnchor: BubbleHorizontalAnchor;
+};
 
 export class ConstraintFeedbackDisplay {
   private scene: Phaser.Scene;
@@ -120,7 +125,7 @@ export class ConstraintFeedbackDisplay {
       }
 
       // Decide which side of the bubble has the arrow (i.e. faces the NPC).
-      const direction = bubbleDirection(placement.topLeft, placement.npcPosition);
+      const { direction, horizontalAnchor } = bubbleArrowPlacement(placement.topLeft, placement.npcPosition);
 
       // The placer's topLeft is the content (glyph) area; the rendered bubble has a
       // 1-tile border on every side, so the container sits 1 tile up and left.
@@ -133,7 +138,7 @@ export class ConstraintFeedbackDisplay {
       if (this.glyphTracker) {
         bubble.setGlyphTracker(this.glyphTracker);
       }
-      bubble.create([glyphFrames], this.language, this.glyphRegistry, 1, direction);
+      bubble.create([glyphFrames], this.language, this.glyphRegistry, 1, direction, horizontalAnchor);
       bubble.setPosition(containerWorld.x, containerWorld.y);
       bubble.setDepth(this.depth + 1);
       this.speechBubbles.push(bubble);
@@ -184,11 +189,14 @@ export class ConstraintFeedbackDisplay {
 
 /**
  * Derive which side of the speech bubble should show the directional arrow,
- * based on the bubble's content top-left position relative to the NPC.
+ * and for vertical arrows choose whether the arrow sits over the leftmost or
+ * rightmost glyph column.
  */
-function bubbleDirection(topLeft: Point, npcPosition: Point): BubbleDirection {
-  if (topLeft.y < npcPosition.y) return 'above';
-  if (topLeft.y > npcPosition.y) return 'below';
-  if (topLeft.x > npcPosition.x) return 'right';
-  return 'left';
+export function bubbleArrowPlacement(topLeft: Point, npcPosition: Point): BubbleArrowPlacement {
+  const horizontalAnchor: BubbleHorizontalAnchor = topLeft.x < npcPosition.x ? 'right' : 'left';
+
+  if (topLeft.y < npcPosition.y) return { direction: 'above', horizontalAnchor };
+  if (topLeft.y > npcPosition.y) return { direction: 'below', horizontalAnchor };
+  if (topLeft.x > npcPosition.x) return { direction: 'right', horizontalAnchor: 'left' };
+  return { direction: 'left', horizontalAnchor: 'left' };
 }

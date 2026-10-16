@@ -12,6 +12,7 @@ import type { ActiveGlyphTracker, GlyphScreenBounds } from '@model/translation/A
  * Determines which border tile is replaced with a directional arrow.
  */
 export type BubbleDirection = 'right' | 'left' | 'above' | 'below';
+export type BubbleHorizontalAnchor = 'left' | 'right';
 
 export class SpeechBubble {
     private scene: Phaser.Scene;
@@ -55,8 +56,16 @@ export class SpeechBubble {
      * @param registry Glyph registry
      * @param scale Scale factor for the bubble (default 1)
      * @param direction Which side of the bubble has the arrow pointing toward the NPC (default 'right')
+     * @param horizontalAnchor For 'above'/'below' arrows, chooses leftmost or rightmost glyph column (default 'left')
      */
-    create(glyphFramesByRow: number[][], language: string, registry: LanguageGlyphRegistry, scale: number = 1, direction: BubbleDirection = 'right'): void {
+    create(
+        glyphFramesByRow: number[][],
+        language: string,
+        registry: LanguageGlyphRegistry,
+        scale: number = 1,
+        direction: BubbleDirection = 'right',
+        horizontalAnchor: BubbleHorizontalAnchor = 'left',
+    ): void {
         // Clear existing content (also unregisters from tracker)
         this.clear();
 
@@ -74,7 +83,7 @@ export class SpeechBubble {
         const bubbleHeight = sentences.length + 2; // +2 for top/bottom edges
 
         // Build background
-        this.buildBackground(bubbleFrames, bubbleWidth, bubbleHeight, tileSize, direction);
+        this.buildBackground(bubbleFrames, bubbleWidth, bubbleHeight, tileSize, direction, horizontalAnchor);
 
         // Add glyphs
         this.addGlyphs(sentences, tileSize);
@@ -106,8 +115,8 @@ export class SpeechBubble {
      * The directional arrow tile is placed on the border facing the NPC:
      *  - 'right':  left edge of the middle row  (NPC is to the left)
      *  - 'left':   right edge of the middle row (NPC is to the right), flipped horizontally
-     *  - 'above':  first tile of the bottom row  (NPC is below), rotated 90° CCW → ↓
-     *  - 'below':  first tile of the top row     (NPC is above), rotated 90° CW  → ↑
+     *  - 'above':  leftmost or rightmost tile of the bottom row (NPC is below), rotated 90° CCW → ↓
+     *  - 'below':  leftmost or rightmost tile of the top row    (NPC is above), rotated 90° CW  → ↑
      */
     private buildBackground(
         frames: SpeechBubbleFrames,
@@ -115,11 +124,14 @@ export class SpeechBubble {
         height: number,
         tileSize: number,
         direction: BubbleDirection,
+        horizontalAnchor: BubbleHorizontalAnchor,
     ): void {
+        const topBottomArrowX = horizontalAnchor === 'right' ? width - 2 : 1;
+
         // Top row
         this.addBackgroundTile(frames.topLeft, 0, 0, tileSize);
         for (let x = 1; x < width - 1; x++) {
-            if (direction === 'below' && x === 1) {
+            if (direction === 'below' && x === topBottomArrowX) {
                 // Arrow pointing up (↑) toward NPC above
                 this.addArrowTile(frames.arrow, x, 0, tileSize, false, false, Math.PI / 2);
             } else {
@@ -149,7 +161,7 @@ export class SpeechBubble {
         // Bottom row
         this.addBackgroundTile(frames.bottomLeft, 0, height - 1, tileSize);
         for (let x = 1; x < width - 1; x++) {
-            if (direction === 'above' && x === 1) {
+            if (direction === 'above' && x === topBottomArrowX) {
                 // Arrow pointing down (↓) toward NPC below
                 this.addArrowTile(frames.arrow, x, height - 1, tileSize, false, false, -Math.PI / 2);
             } else {
