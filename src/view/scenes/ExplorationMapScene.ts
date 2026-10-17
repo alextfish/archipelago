@@ -59,6 +59,8 @@ type MovementKeys = {
 };
 
 export abstract class ExplorationMapScene extends Phaser.Scene {
+    protected static readonly SERIES_TRANSITION_DEFAULT_COLOUR = 0x87ceeb;
+
     protected map!: Phaser.Tilemaps.Tilemap;
     protected collisionLayers: Phaser.Tilemaps.TilemapLayer[] = [];
     protected roofsLayers: Phaser.Tilemaps.TilemapLayer[] = [];
@@ -85,6 +87,8 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
     protected pointerUpHandler?: () => void;
     protected readonly stepHotspots: Map<string, () => void> = new Map();
     protected lastCheckedTile: string = '';
+    protected seriesTransitionOverlay: Phaser.GameObjects.Rectangle | null = null;
+    protected currentSeriesTransitionColour: number = ExplorationMapScene.SERIES_TRANSITION_DEFAULT_COLOUR;
 
     public abstract create(): void;
 
@@ -109,39 +113,39 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
         return 100_000;
     }
 
-    protected onMapCachePending(): void {}
+    protected onMapCachePending(): void { }
 
-    protected onTilesetTexturesPending(): void {}
+    protected onTilesetTexturesPending(): void { }
 
-    protected onNoTilesetDataInCache(): void {}
+    protected onNoTilesetDataInCache(): void { }
 
-    protected onTilesetLoaded(_tilesetName: string, _textureKey: string): void {}
+    protected onTilesetLoaded(_tilesetName: string, _textureKey: string): void { }
 
-    protected onTilesetLoadFailed(_tilesetName: string, _textureKey: string): void {}
+    protected onTilesetLoadFailed(_tilesetName: string, _textureKey: string): void { }
 
-    protected onNoTilesetsLoaded(): void {}
+    protected onNoTilesetsLoaded(): void { }
 
-    protected onVisualLayerCreated(_layerName: string): void {}
+    protected onVisualLayerCreated(_layerName: string): void { }
 
-    protected onVisualLayerCreateFailed(_layerName: string): void {}
+    protected onVisualLayerCreateFailed(_layerName: string): void { }
 
-    protected onRoofLayerCreated(_layerName: string, _layer: Phaser.Tilemaps.TilemapLayer): void {}
+    protected onRoofLayerCreated(_layerName: string, _layer: Phaser.Tilemaps.TilemapLayer): void { }
 
-    protected onRoofLayerCreateFailed(_layerName: string): void {}
+    protected onRoofLayerCreateFailed(_layerName: string): void { }
 
     protected onEmbeddedPuzzleEnteredMode(): void {
         this.cameras.main.stopFollow();
     }
 
-    protected onEmbeddedPuzzleExitedMode(): void {}
+    protected onEmbeddedPuzzleExitedMode(): void { }
 
     protected canPlayerMoveAroundAndInteract(): boolean {
         return this.gameMode === 'exploration' && (this.playerController?.isEnabled() ?? false);
     }
 
-    protected setExplorationPlayerLayerDisplay(_playerLayer: ReturnType<PlayerController['getPlayerLayer']>): void {}
+    protected setExplorationPlayerLayerDisplay(_playerLayer: ReturnType<PlayerController['getPlayerLayer']>): void { }
 
-    protected onExplorationFrameWhileActive(): void {}
+    protected onExplorationFrameWhileActive(): void { }
 
     protected shouldIgnoreExplorationPointerDown(_pointer: Phaser.Input.Pointer): boolean {
         return false;
@@ -161,7 +165,7 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
         return undefined;
     }
 
-    protected async onEmbeddedPuzzleExited(_exitResult: PuzzleExitResult, _success: boolean): Promise<void> {}
+    protected async onEmbeddedPuzzleExited(_exitResult: PuzzleExitResult, _success: boolean): Promise<void> { }
 
     protected resetExplorationMapState(): void {
         this.collisionLayers = [];
@@ -343,8 +347,10 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
     }
 
     protected onConversationEnded(): void {
-        this.playerController?.setEnabled(true);
-        this.gameMode = 'exploration';
+        if (!this.scene.isActive('BridgePuzzleScene')) {
+            this.playerController?.setEnabled(true);
+            this.gameMode = 'exploration';
+        }
 
         const conversationScene = this.scene.get('ConversationScene');
         if (conversationScene) {
@@ -384,6 +390,8 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
     }
 
     protected async startPuzzleSeries(seriesId: string, npc?: NPC): Promise<void> {
+        this.currentSeriesTransitionColour = await this.resolveSeriesTransitionColour(seriesId);
+
         let series = null;
 
         if (npc) {
@@ -427,17 +435,21 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
         }
 
         this.currentSeries = series;
+        this.showSeriesTransitionOverlay(this.currentSeriesTransitionColour);
         this.launchSeriesPuzzleEntry(firstUnsolvedId);
     }
 
     protected async handleSeriesPuzzleCompleted(data: { puzzleId: string; success: boolean }): Promise<void> {
         if (!this.currentSeries) {
-            this.setJewelHUDVisible(true);
+            this.hideSeriesTransitionOverlay();
+            this.restoreExplorationModeAfterSeriesSolve();
             return;
         }
 
         if (!data.success) {
-            this.setJewelHUDVisible(true);
+            this.hideSeriesTransitionOverlay();
+            this.currentSeries = null;
+            this.restoreExplorationModeAfterSeriesSolve();
             return;
         }
 
@@ -449,7 +461,8 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
 
         if (!matchingEntry) {
             console.warn(`[${this.sys.settings.key}] Could not find series entry for puzzle ${data.puzzleId}`);
-            this.setJewelHUDVisible(true);
+            this.hideSeriesTransitionOverlay();
+            this.restoreExplorationModeAfterSeriesSolve();
             return;
         }
 
@@ -474,10 +487,14 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
                     }
                 }
             }
+
+            // Series lifecycle is complete; clear active series state.
+            this.currentSeries = null;
         } else {
             const nextPuzzleId = this.getSeriesEntryIdToLaunch(this.currentSeries, false);
             if (!nextPuzzleId) {
-                this.setJewelHUDVisible(true);
+                this.hideSeriesTransitionOverlay();
+                this.restoreExplorationModeAfterSeriesSolve();
                 this.persistMeaningfulProgress();
                 return;
             }
@@ -489,7 +506,8 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
             return;
         }
 
-        this.setJewelHUDVisible(true);
+        this.hideSeriesTransitionOverlay();
+        this.restoreExplorationModeAfterSeriesSolve();
         this.persistMeaningfulProgress();
     }
 
@@ -513,11 +531,19 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
         const puzzleData = this.currentSeriesPuzzleData.get(entryId);
         if (!puzzleData) {
             console.error(`[${this.sys.settings.key}] No puzzle data for ${entryId}`);
-            this.setJewelHUDVisible(true);
+            this.hideSeriesTransitionOverlay();
+            this.restoreExplorationModeAfterSeriesSolve();
             return;
         }
 
+        this.gameMode = 'puzzle';
+        this.isPointerHeld = false;
+        this.playerController?.stopAndIdle();
+        this.playerController?.setEnabled(false);
+        this.interactionCursor?.hide();
+
         this.setJewelHUDVisible(false);
+        this.showSeriesTransitionOverlay(this.currentSeriesTransitionColour);
         this.events.once('seriesPuzzleCompleted', (data: { puzzleId: string; success: boolean }) => {
             void this.handleSeriesPuzzleCompleted(data);
         });
@@ -527,6 +553,14 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
             seriesMode: true,
             callerSceneKey: this.getSeriesPuzzleCallerSceneKey(),
         });
+    }
+
+    protected restoreExplorationModeAfterSeriesSolve(): void {
+        this.gameMode = 'exploration';
+        this.isPointerHeld = false;
+        this.playerController?.setEnabled(true);
+        this.setJewelHUDVisible(true);
+        this.restoreExplorationPointerHandlers();
     }
 
     protected setupExplorationInteractionInput(): void {
@@ -889,6 +923,78 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
                 right: Phaser.Input.Keyboard.KeyCodes.D,
             }) as MovementKeys['wasdKeys'],
         };
+    }
+
+    protected ensureSeriesTransitionOverlay(): Phaser.GameObjects.Rectangle {
+        if (this.seriesTransitionOverlay) {
+            this.seriesTransitionOverlay
+                .setPosition(0, 0)
+                .setSize(this.scale.width, this.scale.height)
+                .setDisplaySize(this.scale.width, this.scale.height);
+            return this.seriesTransitionOverlay;
+        }
+
+        this.seriesTransitionOverlay = this.add.rectangle(
+            0,
+            0,
+            this.scale.width,
+            this.scale.height,
+            this.currentSeriesTransitionColour,
+            1,
+        );
+        this.seriesTransitionOverlay.setOrigin(0, 0);
+        this.seriesTransitionOverlay.setScrollFactor(0);
+        this.seriesTransitionOverlay.setDepth(1_000_000);
+        this.seriesTransitionOverlay.setVisible(false);
+
+        return this.seriesTransitionOverlay;
+    }
+
+    protected showSeriesTransitionOverlay(colour: number): void {
+        const overlay = this.ensureSeriesTransitionOverlay();
+        overlay
+            .setFillStyle(colour, 1)
+            .setVisible(true);
+        this.children.bringToTop(overlay);
+    }
+
+    protected hideSeriesTransitionOverlay(): void {
+        this.seriesTransitionOverlay?.setVisible(false);
+    }
+
+    protected async resolveSeriesTransitionColour(seriesId: string): Promise<number> {
+        try {
+            const seriesPath = `data/series/${seriesId}.json`;
+            const response = await fetch(seriesPath);
+            if (!response.ok) {
+                return ExplorationMapScene.SERIES_TRANSITION_DEFAULT_COLOUR;
+            }
+
+            const seriesJson = await response.json();
+            const candidate = seriesJson?.metadata?.backgroundColour
+                ?? seriesJson?.metadata?.backgroundColor
+                ?? seriesJson?.backgroundColour
+                ?? seriesJson?.backgroundColor;
+
+            return this.parseHexColour(candidate)
+                ?? ExplorationMapScene.SERIES_TRANSITION_DEFAULT_COLOUR;
+        } catch {
+            return ExplorationMapScene.SERIES_TRANSITION_DEFAULT_COLOUR;
+        }
+    }
+
+    protected parseHexColour(value: unknown): number | null {
+        if (typeof value !== 'string') {
+            return null;
+        }
+
+        const trimmed = value.trim();
+        const normalised = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
+        if (!/^[0-9a-fA-F]{6}$/.test(normalised)) {
+            return null;
+        }
+
+        return Number.parseInt(normalised, 16);
     }
 
     protected initialiseSharedExplorationManagers(): void {

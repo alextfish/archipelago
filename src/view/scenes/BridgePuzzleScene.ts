@@ -8,6 +8,10 @@ import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 import type { IslandMapScene } from '@view/scenes/IslandMapScene';
 
 export class BridgePuzzleScene extends Phaser.Scene {
+    private static readonly SOLVED_EXIT_DELAY_MS = 1500;
+    private static readonly SERIES_SOLVED_EXIT_DELAY_MS = 1500;
+    private static readonly SERIES_SOLVED_ZOOM_OUT_FACTOR = 0.9;
+
     private puzzle: BridgePuzzle | null = null;
     private controller: PuzzleController | null = null;
     private puzzleData: any = null;
@@ -343,11 +347,26 @@ export class BridgePuzzleScene extends Phaser.Scene {
                 try { console.log('[PuzzleHost] onPuzzleSolved called (forwarding to HUD)'); } catch (e) { }
                 // Forward solved notification to show "Puzzle Solved!" overlay
                 this.events.emit('puzzleSolved');
-                // Delay exit to allow message to be visible for 1.5 seconds
+
+                const solvedExitDelayMS = this.seriesMode
+                    ? BridgePuzzleScene.SERIES_SOLVED_EXIT_DELAY_MS
+                    : BridgePuzzleScene.SOLVED_EXIT_DELAY_MS;
+
+                // In series mode, apply a gentle puzzle-wide zoom-out during the
+                // solved linger period so the wait feels intentional.
+                if (this.seriesMode) {
+                    const mapScene = this.scene.get('IslandMapScene');
+                    mapScene.events.emit('startCompletionZoomOut', {
+                        durationMS: solvedExitDelayMS,
+                        zoomFactor: BridgePuzzleScene.SERIES_SOLVED_ZOOM_OUT_FACTOR,
+                    });
+                }
+
+                // Delay exit so the solved moment has time to read on-screen.
                 setTimeout(() => {
                     console.log('[BridgePuzzleScene] Auto-exiting puzzle after delay');
                     this.controller?.exitPuzzle(true);
-                }, 1500);
+                }, solvedExitDelayMS);
             },
             onPuzzleExited: (success: boolean) => this.onPuzzleExited(success),
             onNoBridgeTypeAvailable: (typeId: string) => this.onNoBridgeTypeAvailable(typeId),
@@ -368,15 +387,17 @@ export class BridgePuzzleScene extends Phaser.Scene {
     onPuzzleExited(success: boolean): void {
         console.log(`Puzzle exited: ${success ? 'solved' : 'unsolved'}`);
 
-        // If in series mode and puzzle was solved, notify the caller scene
-        if (this.seriesMode && success && this.puzzle) {
-            console.log(`[BridgePuzzleScene] Series puzzle ${this.puzzle.id} completed, notifying ${this.callerSceneKey}`);
+        // In series mode, always notify the caller scene on exit so it can
+        // advance on success or clean up series transition visuals on cancel.
+        if (this.seriesMode) {
+            const puzzleId = this.puzzle?.id ?? '';
+            console.log(`[BridgePuzzleScene] Series puzzle ${puzzleId} exited (success=${success}), notifying ${this.callerSceneKey}`);
             const callerScene = this.scene.get(this.callerSceneKey);
             if (callerScene) {
                 // Emit event that the caller scene can listen for
                 callerScene.events.emit('seriesPuzzleCompleted', {
-                    puzzleId: this.puzzle.id,
-                    success: true
+                    puzzleId,
+                    success
                 });
             }
         }

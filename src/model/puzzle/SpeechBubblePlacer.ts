@@ -139,7 +139,7 @@ export class SpeechBubblePlacer {
     }
 
     /**
-     * Return the four candidate top-left positions for a bubble placed 2 tiles
+     * Return the candidate top-left positions for a bubble placed 2 tiles
      * away from the NPC in each direction.  The gap of 2 reflects the visual
      * layout: 1 tile for the directional arrow tile, 1 tile for the bubble
      * content itself.  The ordering (right, left, above, below) acts as a

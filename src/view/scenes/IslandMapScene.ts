@@ -9,10 +9,13 @@ export class IslandMapScene extends Phaser.Scene {
     private static readonly CONSTRAINT_PADDING_X_TILES = 5;
     private static readonly CONSTRAINT_PADDING_Y_TILES = 2;
     private static readonly HUD_SIDEBAR_WIDTH_PX = 150;
+    private static readonly COMPLETION_ZOOM_FACTOR_MIN = 0.85;
+    private static readonly COMPLETION_ZOOM_FACTOR_MAX = 1;
 
     private puzzle: BridgePuzzle | null = null;
     private gridMapper: GridToWorldMapper | null = null;
     private puzzleRenderer: PhaserPuzzleRenderer | null = null;
+    private completionZoomTween: Phaser.Tweens.Tween | null = null;
     public isDebugZoomed: boolean = false;
 
     constructor() {
@@ -142,6 +145,14 @@ export class IslandMapScene extends Phaser.Scene {
             this.debugZoomOut();
         });
 
+        this.events.on('startCompletionZoomOut', (config?: { durationMS?: number; zoomFactor?: number }) => {
+            this.startCompletionZoomOut(config);
+        });
+
+        this.events.on('stopCompletionZoomOut', () => {
+            this.stopCompletionZoomOut();
+        });
+
         // Forward island clicks from renderer to BridgePuzzleScene
         this.events.on('island-clicked', (worldX: number, worldY: number, gridX: number, gridY: number) => {
             console.log(`IslandMapScene: Forwarding island click at grid (${gridX}, ${gridY}) to BridgePuzzleScene`);
@@ -181,6 +192,8 @@ export class IslandMapScene extends Phaser.Scene {
 
     private initializeRenderer() {
         if (!this.puzzle) return;
+
+        this.stopCompletionZoomOut();
 
         if (this.puzzleRenderer) {
             this.puzzleRenderer.destroy();
@@ -355,6 +368,38 @@ export class IslandMapScene extends Phaser.Scene {
         }
     }
 
+    private startCompletionZoomOut(config?: { durationMS?: number; zoomFactor?: number }): void {
+        const camera = this.cameras.main;
+        const durationMS = Math.max(200, config?.durationMS ?? 1500);
+        const zoomFactor = Phaser.Math.Clamp(
+            config?.zoomFactor ?? 0.94,
+            IslandMapScene.COMPLETION_ZOOM_FACTOR_MIN,
+            IslandMapScene.COMPLETION_ZOOM_FACTOR_MAX,
+        );
+
+        this.stopCompletionZoomOut();
+
+        const targetZoom = Math.max(0.01, camera.zoom * zoomFactor);
+        this.completionZoomTween = this.tweens.add({
+            targets: camera,
+            zoom: targetZoom,
+            duration: durationMS,
+            ease: 'Sine.easeOut',
+            onComplete: () => {
+                this.completionZoomTween = null;
+            }
+        });
+    }
+
+    private stopCompletionZoomOut(): void {
+        if (!this.completionZoomTween) {
+            return;
+        }
+
+        this.completionZoomTween.remove();
+        this.completionZoomTween = null;
+    }
+
     update(_time: number, dt: number) {
         if (this.puzzleRenderer) {
             this.puzzleRenderer.update(dt);
@@ -379,6 +424,7 @@ export class IslandMapScene extends Phaser.Scene {
 
     // Cleanup when scene is stopped
     destroy() {
+        this.stopCompletionZoomOut();
         this.puzzleRenderer?.destroy();
     }
 }
