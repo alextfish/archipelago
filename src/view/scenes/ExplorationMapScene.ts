@@ -472,6 +472,10 @@ export abstract class ExplorationMapScene extends Phaser.Scene {
         }
 
         if (this.currentSeries.isSeriesCompleted()) {
+            // Hide the solid series background immediately so the later overworld
+            // camera pan and door animation are not covered by a blank screen.
+            this.hideSeriesTransitionOverlay();
+
             const seriesDoor = this.doorManager?.doors.find((door) => door.id === this.currentSeries!.id);
             if (seriesDoor && seriesDoor.isLocked()) {
                 await this.doorManager?.animateDoorChange(seriesDoor, true);

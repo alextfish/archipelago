@@ -17,9 +17,9 @@ describe('ConstraintNPCManager disguise switching', () => {
             } as any,
             {} as any,
             {},
-            () => {},
+            () => { },
             () => false,
-            () => {},
+            () => { },
         );
 
         const sprite = {
