@@ -349,6 +349,107 @@ export class RiverChannelInitialiser {
   }
 
   /**
+   * Build a set of world-tile keys for water that is connected (4-neighbour)
+   * to at least one tile marked `source: true` in the tileset properties.
+   *
+   * This lets callers seed FlowPuzzle edge inputs from real river sources only,
+   * rather than from decorative/static water that has no source connectivity.
+   */
+  static buildSourceConnectedWaterSet(
+    tiledMapData: any,
+    mergedWaterLayerData: number[] | undefined,
+  ): Set<GridKey> {
+    const connected = new Set<GridKey>();
+    if (!tiledMapData || !Array.isArray(mergedWaterLayerData)) return connected;
+
+    const mapWidth: number = tiledMapData.width ?? 0;
+    const mapHeight: number = tiledMapData.height ?? 0;
+    if (mapWidth <= 0 || mapHeight <= 0) return connected;
+
+    const sourceStarts: GridKey[] = [];
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        const idx = y * mapWidth + x;
+        const gid = mergedWaterLayerData[idx] ?? 0;
+        if (gid <= 0) continue;
+
+        const props = TiledLayerUtils.getTileProperties(tiledMapData.tilesets ?? [], gid);
+        if (props.source === true) {
+          sourceStarts.push(gridKey(x, y));
+        }
+      }
+    }
+
+    if (sourceStarts.length === 0) {
+      console.warn('[MergedWater] No source tiles found in merged water grid; source-connected water set is empty');
+      return connected;
+    }
+
+    const queue: GridKey[] = [...sourceStarts];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (connected.has(current)) continue;
+
+      const [xStr, yStr] = (current as string).split(',');
+      const x = Number.parseInt(xStr);
+      const y = Number.parseInt(yStr);
+      if (Number.isNaN(x) || Number.isNaN(y)) continue;
+      if (x < 0 || y < 0 || x >= mapWidth || y >= mapHeight) continue;
+
+      const idx = y * mapWidth + x;
+      if ((mergedWaterLayerData[idx] ?? 0) <= 0) continue;
+
+      connected.add(current);
+      const neighbors = [
+        gridKey(x, y - 1),
+        gridKey(x, y + 1),
+        gridKey(x + 1, y),
+        gridKey(x - 1, y),
+      ];
+      for (const n of neighbors) {
+        if (!connected.has(n)) queue.push(n);
+      }
+    }
+
+    console.log(
+      `[MergedWater] Source-connected water set: ${connected.size} tile(s) from ${sourceStarts.length} source tile(s)`
+    );
+    return connected;
+  }
+
+  /**
+   * Build a set of world-tile keys that are explicitly marked as
+   * `source: true` in tileset properties.
+   */
+  static buildSourceTileSet(
+    tiledMapData: any,
+    mergedWaterLayerData: number[] | undefined,
+  ): Set<GridKey> {
+    const sourceTiles = new Set<GridKey>();
+    if (!tiledMapData || !Array.isArray(mergedWaterLayerData)) return sourceTiles;
+
+    const mapWidth: number = tiledMapData.width ?? 0;
+    const mapHeight: number = tiledMapData.height ?? 0;
+    if (mapWidth <= 0 || mapHeight <= 0) return sourceTiles;
+
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        const idx = y * mapWidth + x;
+        const gid = mergedWaterLayerData[idx] ?? 0;
+        if (gid <= 0) continue;
+
+        const props = TiledLayerUtils.getTileProperties(tiledMapData.tilesets ?? [], gid);
+        if (props.source === true) {
+          sourceTiles.add(gridKey(x, y));
+        }
+      }
+    }
+
+    console.log(`[MergedWater] Found ${sourceTiles.size} source tile(s) in merged water grid`);
+    return sourceTiles;
+  }
+
+  /**
    * Infer the cardinal edge direction of a flow-square that sits on the border
    * of a puzzle region.
    *

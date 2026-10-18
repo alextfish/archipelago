@@ -423,11 +423,29 @@ export class MapPuzzleExtractor {
                     || localX === puzzleWidthInTiles - 1
                     || localY === puzzleHeightInTiles - 1;
                 if (isBorder && outgoing.length === 0 && !props.source) {
-                    console.warn(
-                        `[FlowSquare] "${definition.id}" border tile at local (${localX},${localY}) ` +
-                        `world (${tx},${ty}) has GID ${gid} with NO flow directions — ` +
-                        `edge inputs here will not propagate into the puzzle`
-                    );
+                    // Only warn when this dead-end border tile is adjacent to external
+                    // water, i.e. it is plausibly being used as a puzzle entry point.
+                    const externalAdjacentTiles: Array<{ x: number; y: number }> = [];
+                    if (localX === 0) externalAdjacentTiles.push({ x: tx - 1, y: ty });
+                    if (localX === puzzleWidthInTiles - 1) externalAdjacentTiles.push({ x: tx + 1, y: ty });
+                    if (localY === 0) externalAdjacentTiles.push({ x: tx, y: ty - 1 });
+                    if (localY === puzzleHeightInTiles - 1) externalAdjacentTiles.push({ x: tx, y: ty + 1 });
+
+                    const hasExternalWaterAdjacent = externalAdjacentTiles.some(({ x, y }) => {
+                        if (x < 0 || y < 0 || x >= tiledMap.width || y >= tiledMap.height) {
+                            return false;
+                        }
+                        const externalGID = TiledLayerUtils.getGIDAt(tileData, tiledMap.width, x, y);
+                        return externalGID !== 0;
+                    });
+
+                    if (hasExternalWaterAdjacent) {
+                        console.warn(
+                            `[FlowSquare] "${definition.id}" border tile at local (${localX},${localY}) ` +
+                            `world (${tx},${ty}) has GID ${gid} with NO flow directions and touches external water — ` +
+                            `edge inputs here will not propagate into the puzzle`
+                        );
+                    }
                 }
             }
         }

@@ -17,6 +17,7 @@ import { clearArchipelagoPersistentState } from '@model/persistence/PersistenceU
 import { NPCIconConfig } from '@view/NPCIconConfig';
 import { PlayerStartManager } from '@model/overworld/PlayerStartManager';
 import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
+import { gridKey, parseGridKey } from '@model/puzzle/FlowTypes';
 import { RiverChannelInitialiser } from '@model/overworld/RiverChannelInitialiser';
 import { WaterPropagationEngine } from '@model/overworld/WaterPropagationEngine';
 import type { TranslationModeScene } from '@view/scenes/TranslationModeScene';
@@ -617,6 +618,96 @@ export class OverworldScene extends ExplorationMapScene {
     waterEngine.setRiverChannels(channels);
     this.gameState.initializeWaterPropagation(waterEngine, this.puzzleManager);
 
+    const sourceConnectedWater = RiverChannelInitialiser.buildSourceConnectedWaterSet(
+      this.tiledMapData,
+      this.mergedWaterLayerData,
+    );
+
+    const accumulatedEdgeInputs = new Map<string, Set<import('@model/puzzle/FlowTypes').GridKey>>();
+
+    // ── 3b. Seed initial inputs from external overworld river tiles ───────────
+    // Some FlowPuzzles intentionally have no in-puzzle source tiles and should
+    // receive water from adjacent world-river tiles at puzzle load.
+    for (const [puzzleId, puzzle] of puzzles) {
+      if (!(puzzle instanceof FlowPuzzle)) continue;
+
+      // Preserve any already-initialised state (e.g. restored saves or in-puzzle sources).
+      const hasAnyWater = (() => {
+        for (let ly = 0; ly < puzzle.height; ly++) {
+          for (let lx = 0; lx < puzzle.width; lx++) {
+            if (puzzle.tileHasWater(lx, ly)) return true;
+          }
+        }
+        return false;
+      })();
+      if (hasAnyWater) continue;
+
+      const puzzleBounds = this.puzzleManager.getPuzzleBounds(puzzleId);
+      if (!puzzleBounds) continue;
+
+      const originTileX = Math.floor(puzzleBounds.x / tileW);
+      const originTileY = Math.floor(puzzleBounds.y / tileH);
+      const seededInputs: { x: number; y: number }[] = [];
+      const seen = new Set<string>();
+      const mapWidth = this.tiledMapData.width ?? 0;
+      const mapHeight = this.tiledMapData.height ?? 0;
+
+      for (let ly = 0; ly < puzzle.height; ly++) {
+        for (let lx = 0; lx < puzzle.width; lx++) {
+          const isBorder = lx === 0 || lx === puzzle.width - 1 || ly === 0 || ly === puzzle.height - 1;
+          if (!isBorder) continue;
+
+          const flowSquare = puzzle.getFlowSquare(lx, ly);
+          if (!flowSquare || (flowSquare.outgoing ?? []).length === 0) continue;
+
+          const edge = RiverChannelInitialiser.inferEdgeDirection(lx, ly, puzzle.width, puzzle.height);
+          const incomingDirection =
+            edge === 'N' ? 'S'
+            : edge === 'S' ? 'N'
+            : edge === 'W' ? 'E'
+            : 'W';
+
+          // Only seed entries that can propagate inward from the puzzle boundary.
+          if (!(flowSquare.outgoing ?? []).includes(incomingDirection)) {
+            continue;
+          }
+
+          const worldX = originTileX + lx;
+          const worldY = originTileY + ly;
+
+          let adjacentX = worldX;
+          let adjacentY = worldY;
+          if (edge === 'N') adjacentY -= 1;
+          else if (edge === 'S') adjacentY += 1;
+          else if (edge === 'W') adjacentX -= 1;
+          else adjacentX += 1;
+
+          if (adjacentX < 0 || adjacentY < 0 || adjacentX >= mapWidth || adjacentY >= mapHeight) continue;
+
+          const hasAdjacentRiverWater = sourceConnectedWater.has(gridKey(adjacentX, adjacentY));
+          if (!hasAdjacentRiverWater) continue;
+
+          const key = `${lx},${ly}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            seededInputs.push({ x: lx, y: ly });
+          }
+        }
+      }
+
+      if (seededInputs.length > 0) {
+        console.log(
+          `[RiverChannels] Seeding ${seededInputs.length} external edge input(s) for "${puzzleId}": ` +
+          `[${seededInputs.map(i => `(${i.x},${i.y})`).join(', ')}]`
+        );
+        accumulatedEdgeInputs.set(
+          puzzleId,
+          new Set(seededInputs.map((i) => gridKey(i.x, i.y))),
+        );
+        puzzle.setEdgeInputs(seededInputs);
+      }
+    }
+
     // ── 4. BFS initial propagation ──────────────────────────────────────────
     // Process each FlowPuzzle once; any downstream puzzle whose edge inputs change is
     // queued for re-processing (handles chains: A → B → C).
@@ -647,8 +738,21 @@ export class OverworldScene extends ExplorationMapScene {
             `from "${puzzleId}"`
           );
 
+          // Merge incoming edge inputs so multiple upstream channels and
+          // external seeds can coexist for the same puzzle.
+          const mergedInputSet = accumulatedEdgeInputs.get(targetId) ?? new Set<import('@model/puzzle/FlowTypes').GridKey>();
+          for (const input of inputs) {
+            mergedInputSet.add(gridKey(input.x, input.y));
+          }
+          accumulatedEdgeInputs.set(targetId, mergedInputSet);
+
+          const mergedInputs = Array.from(mergedInputSet).map((key) => {
+            const p = parseGridKey(key);
+            return { x: p.x, y: p.y };
+          });
+
           // Recompute water in the downstream puzzle
-          targetPuzzle.setEdgeInputs(inputs);
+          targetPuzzle.setEdgeInputs(mergedInputs);
 
           // Apply collision blocking for newly-wet tiles
           const targetBounds = this.puzzleManager.getPuzzleBounds(targetId);
