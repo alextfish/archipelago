@@ -5,6 +5,9 @@ import { OverworldPuzzleManager } from '@model/overworld/OverworldPuzzleManager'
 import { defaultTileConfig } from '@model/overworld/MapConfig';
 import { makeMockPuzzle } from '../helpers/MockFactories';
 import type { BridgePuzzle } from '@model/puzzle/BridgePuzzle';
+import { FlowPuzzle } from '@model/puzzle/FlowPuzzle';
+import type { FlowPuzzleSpec } from '@model/puzzle/FlowTypes';
+import { PuzzleHUDManager } from '@view/ui/PuzzleHUDManager';
 
 describe('OverworldPuzzleController', () => {
     let controller: OverworldPuzzleController;
@@ -57,7 +60,8 @@ describe('OverworldPuzzleController', () => {
 
         collisionManager = {
             updateCollisionFromBridges: vi.fn(),
-            restoreOriginalCollision: vi.fn()
+            restoreOriginalCollision: vi.fn(),
+            applyFlowWaterCollision: vi.fn()
         };
 
         bridgeManager = {
@@ -80,6 +84,51 @@ describe('OverworldPuzzleController', () => {
             bridgeManager,
             tiledMapData
         );
+
+        vi.spyOn(PuzzleHUDManager, 'getInstance').mockReturnValue({
+            hideControlsForOverworld: vi.fn(),
+            exitPuzzle: vi.fn()
+        } as any);
+    });
+
+    describe('FlowPuzzle cancel exit', () => {
+        it('clears placed bridges before restoring water collision on cancelled unsolved exit', async () => {
+            const flowSpec: FlowPuzzleSpec = {
+                id: 'test-flow-puzzle',
+                type: 'flow',
+                size: { width: 3, height: 3 },
+                islands: [
+                    { id: 'A', x: 0, y: 1 },
+                    { id: 'B', x: 2, y: 1 }
+                ],
+                bridgeTypes: [
+                    { id: 'basic', length: 2, count: 1 }
+                ],
+                constraints: [],
+                maxNumBridges: 2,
+                flowSquares: [
+                    { x: 1, y: 1, isSource: true, outgoing: [] }
+                ]
+            };
+
+            const flowPuzzle = new FlowPuzzle(flowSpec);
+            const bridge = flowPuzzle.inventory.getAvailableOfType('basic')[0];
+            flowPuzzle.placeBridge(bridge.id, { x: 0, y: 1 }, { x: 2, y: 1 });
+
+            expect(flowPuzzle.placedBridges.length).toBe(1);
+            expect(flowPuzzle.tileHasWater(1, 1)).toBe(false);
+
+            vi.spyOn(puzzleManager, 'getPuzzleBounds').mockReturnValue({ x: 0, y: 0, width: 96, height: 96 });
+            gameState.setActivePuzzle(flowPuzzle.id, flowPuzzle);
+
+            await controller.exitPuzzle(false, () => { });
+
+            expect(flowPuzzle.placedBridges.length).toBe(0);
+            expect(flowPuzzle.tileHasWater(1, 1)).toBe(true);
+            expect(collisionManager.applyFlowWaterCollision).toHaveBeenCalledWith([
+                { tileX: 1, tileY: 1 }
+            ]);
+        });
     });
 
     describe('determineExitMode', () => {

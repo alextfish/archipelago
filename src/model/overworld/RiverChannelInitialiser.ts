@@ -324,14 +324,14 @@ export class RiverChannelInitialiser {
     let waterLayers = TiledLayerUtils
       .findTileLayersByName(tiledMapData.layers ?? [], 'water')
       .filter(layer => this.shouldUseForFlow(layer.data));
-    
+
     const waterflowLayers = TiledLayerUtils
       .findTileLayersByName(tiledMapData.layers ?? [], 'waterflow')
       .filter(layer => this.shouldUseForFlow(layer.data));
-    
+
     // Merge both lists - use all available water layers
     waterLayers = waterLayers.concat(waterflowLayers);
-    
+
     console.log(`[MergedWater] Merging ${waterLayers.length} water layer(s) (${waterLayers.map(l => l.fullPath).join(', ')}) into master grid`);
 
     for (const layer of waterLayers) {

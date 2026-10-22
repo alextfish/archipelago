@@ -96,6 +96,8 @@ export class LanguageGlyphRegistry {
             ['jewel', 73],
             ['see', 74],
             ['catch', 75],
+            ['bad', 76],
+            ['think', 77],
         ]);
 
         this.languages.set('grass', {

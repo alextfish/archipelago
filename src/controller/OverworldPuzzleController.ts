@@ -262,6 +262,22 @@ export class OverworldPuzzleController {
     }
 
     /**
+     * Cancel exits for FlowPuzzles should discard placed bridges so water state
+     * recomputes from current sources and upstream edge inputs.
+     */
+    private clearPlacedBridgesForCancelledFlowPuzzle(puzzle: FlowPuzzle): void {
+        const placedBridges = [...puzzle.placedBridges];
+        if (placedBridges.length === 0) {
+            return;
+        }
+
+        console.log(`Clearing ${placedBridges.length} placed bridge(s) from cancelled FlowPuzzle ${puzzle.id}`);
+        for (const bridge of placedBridges) {
+            puzzle.removeBridge(bridge.id);
+        }
+    }
+
+    /**
      * Exit puzzle solving mode
      * 
      * @param success - Whether the puzzle was solved or cancelled
@@ -299,11 +315,6 @@ export class OverworldPuzzleController {
             // The full HUD cleanup (hiding overlay + scene) happens after the pan.
             PuzzleHUDManager.getInstance().hideControlsForOverworld();
 
-            // Save puzzle state before exiting
-            if (this.activePuzzleController) {
-                this.gameState.saveOverworldPuzzleProgress(activeData.id, activeData.puzzle);
-            }
-
             // Clean up puzzle input handler
             if (this.puzzleInputHandler) {
                 this.puzzleInputHandler.destroy();
@@ -338,6 +349,12 @@ export class OverworldPuzzleController {
             console.log(`[exitPuzzle] Created boundsRect:`, boundsRect);
 
             const action = this.determineExitAction(actualSuccess, activeData.id);
+
+            // On cancelled unsolved FlowPuzzles, discard all placed bridges before
+            // collision/water reapplication so dried tiles refill correctly.
+            if (!actualSuccess && activeData.puzzle instanceof FlowPuzzle) {
+                this.clearPlacedBridgesForCancelledFlowPuzzle(activeData.puzzle);
+            }
 
             if (action === 'bake') {
                 // Puzzle solved: restore original collision first, then bake bridges

@@ -663,9 +663,9 @@ export class OverworldScene extends ExplorationMapScene {
           const edge = RiverChannelInitialiser.inferEdgeDirection(lx, ly, puzzle.width, puzzle.height);
           const incomingDirection =
             edge === 'N' ? 'S'
-            : edge === 'S' ? 'N'
-            : edge === 'W' ? 'E'
-            : 'W';
+              : edge === 'S' ? 'N'
+                : edge === 'W' ? 'E'
+                  : 'W';
 
           // Only seed entries that can propagate inward from the puzzle boundary.
           if (!(flowSquare.outgoing ?? []).includes(incomingDirection)) {

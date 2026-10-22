@@ -313,15 +313,15 @@ export class MapPuzzleExtractor {
             tiledMap.layers as any[],
             'water'
         ).filter(layer => MapPuzzleExtractor.shouldUseAsPuzzleWaterLayer(layer.data));
-        
+
         const waterflowLayers = TiledLayerUtils.findTileLayersByName(
             tiledMap.layers as any[],
             'waterflow'
         ).filter(layer => MapPuzzleExtractor.shouldUseAsPuzzleWaterLayer(layer.data));
-        
+
         // Merge both lists - some puzzles may have tiles in both "water" and "waterflow" layers
         waterLayers = waterLayers.concat(waterflowLayers);
-        
+
         if (waterLayers.length === 0) {
             console.warn(`No water layer found for FlowPuzzle ${definition.id} (searched 'water' and 'waterflow' patterns)`);
             return [];
@@ -332,10 +332,10 @@ export class MapPuzzleExtractor {
         if (definition.regionGroup) {
             regionWaterLayers = waterLayers.filter(l => l.fullPath.startsWith(definition.regionGroup!));
         }
-        
+
         // If no region-specific layers found, fall back to any available water layers
         const layersToUse = regionWaterLayers.length > 0 ? regionWaterLayers : waterLayers;
-        
+
         console.log(`[FlowExtract] ${definition.id}: found ${layersToUse.length} water layer(s): ${layersToUse.map(l => l.fullPath).join(', ')}`);
 
         const tilesets: any[] = (tiledMap.tilesets ?? []) as any[];
@@ -344,43 +344,43 @@ export class MapPuzzleExtractor {
         const puzzleOriginTileY = Math.floor(definition.bounds.y / tiledMap.tileheight);
         const puzzleWidthInTiles = Math.ceil(definition.bounds.width / tiledMap.tilewidth);
         const puzzleHeightInTiles = Math.ceil(definition.bounds.height / tiledMap.tileheight);
-        
+
         // Diagnostic: log puzzle bounds
         console.log(`[FlowExtract] ${definition.id}: pixel bounds (${definition.bounds.x}, ${definition.bounds.y}, ${definition.bounds.width}×${definition.bounds.height}), tile bounds (${puzzleOriginTileX},${puzzleOriginTileY}) ${puzzleWidthInTiles}×${puzzleHeightInTiles}`);
 
         // Merge all water layer data (handle both "water" and "waterflow" layers)
         const mergedTileData: number[] = new Array(tiledMap.width! * tiledMap.height!).fill(0);
         for (const layer of layersToUse) {
-          const layerData = (layer.data.data as number[]) ?? [];
-          for (let i = 0; i < layerData.length && i < mergedTileData.length; i++) {
-            if (layerData[i] && layerData[i] > 0) {
-              mergedTileData[i] = layerData[i]; // last-writer-wins
+            const layerData = (layer.data.data as number[]) ?? [];
+            for (let i = 0; i < layerData.length && i < mergedTileData.length; i++) {
+                if (layerData[i] && layerData[i] > 0) {
+                    mergedTileData[i] = layerData[i]; // last-writer-wins
+                }
             }
-          }
         }
         const tileData = mergedTileData;
 
         const flowSquares: FlowSquareSpec[] = [];
         const tileGIDsSeen = new Map<number, { count: number; hasSource: boolean; hasFlow: boolean }>();
-        
+
         // Pre-scan: find any source tiles in the merged water layers for diagnostics
         const allSourceTiles: Array<{ wx: number; wy: number; gid: number; localX: number; localY: number }> = [];
         for (let ty = 0; ty < Math.min(tiledMap.height!, 100); ty++) {
-          for (let tx = 0; tx < Math.min(tiledMap.width!, 100); tx++) {
-            const gid = TiledLayerUtils.getGIDAt(tileData, tiledMap.width!, tx, ty);
-            if (gid === 0) continue;
-            const props = TiledLayerUtils.getTileProperties(tilesets, gid);
-            if (props.source) {
-              const localX = tx - puzzleOriginTileX;
-              const localY = ty - puzzleOriginTileY;
-              allSourceTiles.push({ wx: tx, wy: ty, gid, localX, localY });
+            for (let tx = 0; tx < Math.min(tiledMap.width!, 100); tx++) {
+                const gid = TiledLayerUtils.getGIDAt(tileData, tiledMap.width!, tx, ty);
+                if (gid === 0) continue;
+                const props = TiledLayerUtils.getTileProperties(tilesets, gid);
+                if (props.source) {
+                    const localX = tx - puzzleOriginTileX;
+                    const localY = ty - puzzleOriginTileY;
+                    allSourceTiles.push({ wx: tx, wy: ty, gid, localX, localY });
+                }
             }
-          }
         }
         if (allSourceTiles.length > 0) {
-          const inBounds = allSourceTiles.filter(s => s.localX >= 0 && s.localX < puzzleWidthInTiles && s.localY >= 0 && s.localY < puzzleHeightInTiles);
-          console.log(`[FlowExtract] Found ${allSourceTiles.length} source tile(s) in merged water layers: ${allSourceTiles.map(s => `(${s.wx},${s.wy})`).join(', ')}`);
-          console.log(`[FlowExtract]   ${inBounds.length} within puzzle bounds for "${definition.id}": ${inBounds.map(s => `(${s.wx},${s.wy})`).join(', ')}`);
+            const inBounds = allSourceTiles.filter(s => s.localX >= 0 && s.localX < puzzleWidthInTiles && s.localY >= 0 && s.localY < puzzleHeightInTiles);
+            console.log(`[FlowExtract] Found ${allSourceTiles.length} source tile(s) in merged water layers: ${allSourceTiles.map(s => `(${s.wx},${s.wy})`).join(', ')}`);
+            console.log(`[FlowExtract]   ${inBounds.length} within puzzle bounds for "${definition.id}": ${inBounds.map(s => `(${s.wx},${s.wy})`).join(', ')}`);
         }
 
         for (let ty = puzzleOriginTileY; ty < puzzleOriginTileY + puzzleHeightInTiles; ty++) {
@@ -400,7 +400,7 @@ export class MapPuzzleExtractor {
 
                 // Track GID stats for diagnostics
                 if (!tileGIDsSeen.has(gid)) {
-                  tileGIDsSeen.set(gid, { count: 0, hasSource: !!props.source, hasFlow: outgoing.length > 0 });
+                    tileGIDsSeen.set(gid, { count: 0, hasSource: !!props.source, hasFlow: outgoing.length > 0 });
                 }
                 const stat = tileGIDsSeen.get(gid)!;
                 stat.count++;
@@ -452,15 +452,15 @@ export class MapPuzzleExtractor {
 
         const sourceCount = flowSquares.filter(fs => fs.isSource).length;
         console.log(`Extracted ${flowSquares.length} flow squares for puzzle ${definition.id}: ${sourceCount} source tile(s)`);
-        
+
         // Diagnostic: show which tile GIDs are used and their properties
         if (tileGIDsSeen.size > 0) {
-          const gidDetails = Array.from(tileGIDsSeen.entries())
-            .map(([gid, stat]) => `GID ${gid} (×${stat.count}, source=${stat.hasSource}, flow=${stat.hasFlow})`)
-            .join('; ');
-          console.log(`  Tile GIDs in water layer: ${gidDetails}`);
+            const gidDetails = Array.from(tileGIDsSeen.entries())
+                .map(([gid, stat]) => `GID ${gid} (×${stat.count}, source=${stat.hasSource}, flow=${stat.hasFlow})`)
+                .join('; ');
+            console.log(`  Tile GIDs in water layer: ${gidDetails}`);
         }
-        
+
         if (sourceCount === 0) {
             console.warn(`  ⚠️  No source tiles! This puzzle will start with NO water unless edge inputs are provided.`);
         }
